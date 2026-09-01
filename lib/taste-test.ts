@@ -89,7 +89,7 @@ export async function fetchGenreTracks(genre: string, pool: Pool): Promise<PoolT
 }
 
 export function isMismatch(t: RatedTrack): boolean {
-  return (t.pool === 'disliked' && t.rating >= 4) || (t.pool === 'liked' && t.rating <= 2);
+  return (t.pool === 'disliked' && t.rating <= 2) || (t.pool === 'liked' && t.rating >= 4);
 }
 
 export function formatSeconds(s: number | undefined | null): string {
