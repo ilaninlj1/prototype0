@@ -122,3 +122,58 @@ export function pickJumpGenre(
   }
   return leastRecent;
 }
+
+// ---------- iTunes fetch layer ----------
+
+function toDiscoveryTrack(r: any): DiscoveryTrack {
+  return {
+    id: r.trackId,
+    trackName: r.trackName ?? 'Unknown Title',
+    artistId: r.artistId,
+    artistName: r.artistName ?? 'Unknown Artist',
+    artworkUrl100: r.artworkUrl100 ?? '',
+    primaryGenreName: r.primaryGenreName ?? '',
+    previewUrl: r.previewUrl,
+  };
+}
+
+function hasPreview(r: any): boolean {
+  return typeof r.previewUrl === 'string' && r.previewUrl.length > 0;
+}
+
+/** Pure: maps + filters a genre-search JSON response, dropping genre-unrelated results. */
+export function parseGenreSearchResponse(json: unknown, searchedGenre: string): DiscoveryTrack[] {
+  const results: any[] = Array.isArray((json as any)?.results) ? (json as any).results : [];
+  return results
+    .filter(hasPreview)
+    .map(toDiscoveryTrack)
+    .filter((t) => isGenreRelated(searchedGenre, t.primaryGenreName));
+}
+
+/** Pure: maps + filters an artist-lookup JSON response. Its first result is the artist itself. */
+export function parseArtistLookupResponse(json: unknown): DiscoveryTrack[] {
+  const results: any[] = Array.isArray((json as any)?.results) ? (json as any).results : [];
+  return results.filter((r) => r.wrapperType === 'track' && hasPreview(r)).map(toDiscoveryTrack);
+}
+
+export async function fetchTracksByGenre(genre: string): Promise<DiscoveryTrack[]> {
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(genre)}&entity=song&limit=25`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`iTunes search failed for ${genre}`);
+  const json = await res.json();
+  return parseGenreSearchResponse(json, genre);
+}
+
+export async function fetchTracksByArtist(artistId: number): Promise<DiscoveryTrack[]> {
+  const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=song&limit=25`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`iTunes lookup failed for artist ${artistId}`);
+  const json = await res.json();
+  return parseArtistLookupResponse(json);
+}
+
+export async function fetchForStrategy(strategy: Strategy): Promise<DiscoveryTrack[]> {
+  return strategy.type === 'genre'
+    ? fetchTracksByGenre(strategy.genre)
+    : fetchTracksByArtist(strategy.artistId);
+}

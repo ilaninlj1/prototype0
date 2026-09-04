@@ -9,6 +9,8 @@ import {
   deriveVisitedArtistIds,
   deriveGenresHeard,
   pickJumpGenre,
+  parseGenreSearchResponse,
+  parseArtistLookupResponse,
   type DiscoveryTrack,
   type SwipeEntry,
 } from './discovery.ts';
@@ -95,4 +97,31 @@ test('pickJumpGenre falls back to the least-recently-heard genre once everything
   ];
   const genre = pickJumpGenre(['Rock'], new Set(['Rock', 'Pop']), ['Rock', 'Pop'], history);
   assert.equal(genre, 'Pop'); // heard longer ago than Rock
+});
+
+test('parseGenreSearchResponse maps fields and drops genre-unrelated results', () => {
+  const json = {
+    results: [
+      { trackId: 1, trackName: 'Song A', artistId: 10, artistName: 'Band', artworkUrl100: 'a', primaryGenreName: 'Alternative Rock', previewUrl: 'p1' },
+      { trackId: 2, trackName: 'Song B', artistId: 11, artistName: 'Singer', artworkUrl100: 'b', primaryGenreName: 'Pop', previewUrl: 'p2' },
+      { trackId: 3, trackName: 'Song C', artistId: 12, artistName: 'Nobody', artworkUrl100: 'c', primaryGenreName: 'Jazz' },
+    ],
+  };
+  const result = parseGenreSearchResponse(json, 'Rock');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 1);
+  assert.equal(result[0].primaryGenreName, 'Alternative Rock');
+});
+
+test('parseArtistLookupResponse skips the artist entry and previewless tracks', () => {
+  const json = {
+    results: [
+      { wrapperType: 'artist', artistId: 10, artistName: 'Band' },
+      { wrapperType: 'track', trackId: 1, trackName: 'Song A', artistId: 10, artistName: 'Band', artworkUrl100: 'a', primaryGenreName: 'Rock', previewUrl: 'p1' },
+      { wrapperType: 'track', trackId: 2, trackName: 'Song B', artistId: 10, artistName: 'Band', artworkUrl100: 'b', primaryGenreName: 'Rock' },
+    ],
+  };
+  const result = parseArtistLookupResponse(json);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 1);
 });
