@@ -21,6 +21,7 @@
 - No hand-curated sub-genre taxonomy anywhere — genre relatedness is a plain case-insensitive substring check; the discovered-genre catalog is built purely from `primaryGenreName` values iTunes actually returns.
 - Queue target depth is 3 (current card + 2 buffered ahead); never block showing an already-buffered card on a user choice.
 - After every task, run `npx tsc --noEmit` from the project root and confirm no errors before moving on.
+- Any plain function called directly (not via `runOnJS`) from inside a Reanimated worklet (a `Gesture.Pan()` handler, `useAnimatedStyle`, etc.) must start with a `'worklet';` directive as its first statement — `resolveSwipeDirection` and `rotationForDrag` in `components/discovery/swipe-physics.ts` both need this (added retroactively to Task 7's code below after Task 8's review caught the omission; the directive is inert under plain `node --test`, so it doesn't affect that file's existing tests).
 - Every `*.test.ts` file's relative imports of local `.ts` modules must include the explicit `.ts` extension (e.g. `from './discovery.ts'`) — `node --test` treats a file containing `import` syntax as ESM regardless of `package.json`, and ESM resolution (unlike CommonJS) doesn't infer extensions. This needs `tsconfig.json`'s `compilerOptions.allowImportingTsExtensions: true` (added in Task 1) so `tsc --noEmit` accepts it too — that flag is genuinely required and stays. **Do not add `"type": "module"` to `package.json`** to solve this or anything else: it isn't needed for `node --test` and it breaks this repo's existing CommonJS-style Node-executed scripts (`scripts/reset-project.js`, `eslint.config.js`). Regular `.ts`/`.tsx` source files consumed by Metro/Expo (everything outside a `*.test.ts` file) keep their existing extensionless import style — do not add `.ts` extensions there.
 
 ---
@@ -1176,6 +1177,7 @@ export function resolveSwipeDirection(
   translationY: number,
   thresholds: SwipeThresholds = DEFAULT_SWIPE_THRESHOLDS
 ): SwipeDirection | null {
+  'worklet';
   if (translationY > thresholds.vertical && translationY > Math.abs(translationX)) {
     return 'down';
   }
@@ -1186,6 +1188,7 @@ export function resolveSwipeDirection(
 
 /** Tilt angle in degrees for the Tinder-style rotation, proportional to horizontal drag. */
 export function rotationForDrag(translateX: number, cardWidth: number): number {
+  'worklet';
   const maxRotation = 12; // degrees
   const ratio = Math.max(-1, Math.min(1, translateX / cardWidth));
   return ratio * maxRotation;
