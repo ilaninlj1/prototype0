@@ -184,6 +184,10 @@ export default function HomeScreen() {
   }
 
   function handleCardSwipe(direction: SwipeDirection, track: DiscoveryTrack) {
+    // Any next swipe dismisses a still-open overlay from an earlier like — not
+    // a timer. A right-swipe's own handleLike immediately reopens it for the
+    // new like.
+    setShowActionButtons(false);
     if (direction === 'left') handleSkip(track);
     else if (direction === 'right') handleLike(track);
     else handleGenreJump(track);

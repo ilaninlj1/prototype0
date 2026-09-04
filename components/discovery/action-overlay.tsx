@@ -1,17 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 
-const AUTO_DISMISS_MS = 8000;
 const FADE_MS = 400;
 
 type ActionOverlayProps = {
@@ -20,25 +13,24 @@ type ActionOverlayProps = {
   onSound: () => void;
 };
 
+// No auto-dismiss timer: the overlay stays up until the parent flips `visible`
+// to false, which it does on the next swipe (any direction) — not a clock. A
+// swipe away from an unanswered overlay leaves the strategy unchanged; there's
+// no implicit "default to sound" anymore.
 export function ActionOverlay({ visible, onArtist, onSound }: ActionOverlayProps) {
   const [rendered, setRendered] = useState(visible);
   const opacity = useSharedValue(0);
-  const onSoundRef = useRef(onSound);
-  onSoundRef.current = onSound;
 
   useEffect(() => {
     if (visible) {
       setRendered(true);
       opacity.value = withTiming(1, { duration: FADE_MS });
-      opacity.value = withDelay(AUTO_DISMISS_MS, withTiming(0, { duration: FADE_MS }));
-      const timer = setTimeout(() => onSoundRef.current(), AUTO_DISMISS_MS + FADE_MS);
-      return () => clearTimeout(timer);
+      return;
     }
     opacity.value = withTiming(0, { duration: FADE_MS }, (finished) => {
       if (finished) runOnJS(setRendered)(false);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }, [visible, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
