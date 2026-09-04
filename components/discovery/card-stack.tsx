@@ -8,7 +8,7 @@ const STACK_DEPTH = 3;
 
 type CardStackProps = {
   queue: DiscoveryTrack[];
-  onSwipe: (direction: SwipeDirection) => void;
+  onSwipe: (direction: SwipeDirection, track: DiscoveryTrack) => void;
 };
 
 export function CardStack({ queue, onSwipe }: CardStackProps) {

@@ -34,15 +34,21 @@ export function CardFace({ track }: { track: DiscoveryTrack }) {
 
 type SwipeCardProps = {
   track: DiscoveryTrack;
-  onSwipe: (direction: SwipeDirection) => void;
+  onSwipe: (direction: SwipeDirection, track: DiscoveryTrack) => void;
 };
 
 export function SwipeCard({ track, onSwipe }: SwipeCardProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
 
+  // Pass `track` explicitly rather than letting the caller re-derive "which
+  // track was this" from whatever's currently at the front of its own queue.
+  // `track` is this component's own prop, so it's pinned to the card that was
+  // actually dragged regardless of how much queue state changes elsewhere
+  // before this fires (the fly-out animation's runOnJS callback lands ~250ms
+  // after the gesture ends).
   function commit(direction: SwipeDirection) {
-    onSwipe(direction);
+    onSwipe(direction, track);
   }
 
   const pan = Gesture.Pan()

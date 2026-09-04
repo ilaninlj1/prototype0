@@ -132,18 +132,16 @@ export default function HomeScreen() {
     return nextHistory;
   }
 
-  async function handleSkip() {
-    if (!currentTrack) return;
-    const nextHistory = await logSwipe(currentTrack, 'skip');
+  async function handleSkip(track: DiscoveryTrack) {
+    const nextHistory = await logSwipe(track, 'skip');
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
     await runRefill(nextQueue, strategy, nextHistory, discoveredGenres);
   }
 
-  async function handleLike() {
-    if (!currentTrack) return;
-    lastLikedRef.current = currentTrack;
-    const nextHistory = await logSwipe(currentTrack, 'like');
+  async function handleLike(track: DiscoveryTrack) {
+    lastLikedRef.current = track;
+    const nextHistory = await logSwipe(track, 'like');
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
     setShowActionButtons(true);
@@ -175,9 +173,8 @@ export default function HomeScreen() {
     applyLikeStrategy({ type: 'genre', genre: liked.primaryGenreName });
   }
 
-  async function handleGenreJump() {
-    if (!currentTrack) return;
-    const nextHistory = await logSwipe(currentTrack, 'genre-jump');
+  async function handleGenreJump(track: DiscoveryTrack) {
+    const nextHistory = await logSwipe(track, 'genre-jump');
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const newGenre = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
     const nextStrategy: Strategy = { type: 'genre', genre: newGenre };
@@ -186,10 +183,10 @@ export default function HomeScreen() {
     await runRefill([], nextStrategy, nextHistory, discoveredGenres);
   }
 
-  function handleCardSwipe(direction: SwipeDirection) {
-    if (direction === 'left') handleSkip();
-    else if (direction === 'right') handleLike();
-    else handleGenreJump();
+  function handleCardSwipe(direction: SwipeDirection, track: DiscoveryTrack) {
+    if (direction === 'left') handleSkip(track);
+    else if (direction === 'right') handleLike(track);
+    else handleGenreJump(track);
   }
 
   // ---------- Render ----------
