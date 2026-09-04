@@ -147,7 +147,14 @@ export default function HomeScreen() {
   async function applyLikeStrategy(next: Strategy) {
     setShowActionButtons(false);
     setStrategy(next);
-    await runRefill(queue, next, seenTrackIds, discoveredGenres);
+    // Keep the one card already committed to showing next, but drop the rest of the
+    // buffered tail — it was backfilled under the old strategy right after the like,
+    // so the queue is normally already at target depth by the time this runs. Without
+    // truncating it here, refillQueue sees a full queue and no-ops, and the new
+    // strategy never actually gets fetched until the stale tail drains on its own.
+    const preserved = queue.slice(0, 1);
+    setQueue(preserved);
+    await runRefill(preserved, next, seenTrackIds, discoveredGenres);
   }
 
   function handleMoreFromArtist() {
