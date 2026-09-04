@@ -27,12 +27,12 @@ export function ActionOverlay({ visible, onArtist, onSound }: ActionOverlayProps
   return (
     <ThemedView style={styles.container} lightColor="transparent" darkColor="transparent">
       <TouchableOpacity onPress={onArtist} activeOpacity={0.7}>
-        <ThemedView style={styles.button} lightColor="#0a7ea4" darkColor="#0a7ea4">
+        <ThemedView style={styles.button} lightColor="#2a2a2a" darkColor="#2a2a2a">
           <ThemedText style={styles.buttonText}>More from this artist</ThemedText>
         </ThemedView>
       </TouchableOpacity>
       <TouchableOpacity onPress={onSound} activeOpacity={0.7}>
-        <ThemedView style={styles.button} lightColor="#0a7ea4" darkColor="#0a7ea4">
+        <ThemedView style={styles.button} lightColor="#1a1a1a" darkColor="#1a1a1a">
           <ThemedText style={styles.buttonText}>More like this sound</ThemedText>
         </ThemedView>
       </TouchableOpacity>
@@ -43,17 +43,18 @@ export function ActionOverlay({ visible, onArtist, onSound }: ActionOverlayProps
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 8,
   },
   button: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 999,
   },
   buttonText: {
     color: '#fff',
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
