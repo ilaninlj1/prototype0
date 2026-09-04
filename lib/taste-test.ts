@@ -39,6 +39,36 @@ export const GENRES = [
   'R&B',
   'Reggae',
   'Metal',
+  // Seeded alongside GENRE_TERM_OVERRIDES in lib/discovery.ts, whose exact-match
+  // lists are what make these search terms actually return correct results —
+  // 'Metal' is skipped here since it's already above.
+  'House',
+  'Deep House',
+  'Tech House',
+  'Techno',
+  'Dubstep',
+  'Drum and Bass',
+  'Disco',
+  'Funk',
+  'Soul',
+  'Reggaeton',
+  'Afrobeats',
+  'Amapiano',
+  'Bossa Nova',
+  'Salsa',
+  'Bachata',
+  'Cumbia',
+  'K-Pop',
+  'Shoegaze',
+  'Punk',
+  'Grunge',
+  'Indie Rock',
+  'Bedroom Pop',
+  'Lo-Fi',
+  'Ambient',
+  'Gospel',
+  'Drill',
+  'Boom Bap',
 ];
 
 export const PICKS_PER_SIDE = 3;

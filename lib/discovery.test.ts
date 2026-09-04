@@ -76,6 +76,29 @@ test('isGenreRelated rejects empty terms', () => {
   assert.equal(isGenreRelated('Rock', ''), false);
 });
 
+test('isGenreRelated uses an override\'s exact-match list, case-insensitively, when the term has one', () => {
+  const overrides = { reggaeton: ['Urbano Latino'] };
+  assert.equal(isGenreRelated('reggaeton', 'Urbano latino', overrides), true);
+  assert.equal(isGenreRelated('Reggaeton', 'urbano latino', overrides), true);
+});
+
+test('isGenreRelated rejects a genre not on the override list even if substring matching would have allowed it', () => {
+  const overrides = { metal: ['Hard Rock', 'Metal', 'Rock'] };
+  // "Heavy Metal" contains "metal" and would pass the substring check, but
+  // isn't on the override's list, so an override term rejects it outright.
+  assert.equal(isGenreRelated('metal', 'Heavy Metal', overrides), false);
+});
+
+test('isGenreRelated falls back to substring matching for a term absent from the override map', () => {
+  const overrides = { reggaeton: ['Urbano Latino'] };
+  assert.equal(isGenreRelated('Hip-Hop', 'Hip-Hop/Rap', overrides), true);
+});
+
+test('isGenreRelated: the real GENRE_TERM_OVERRIDES map fixes the reported reggaeton case', () => {
+  assert.equal(isGenreRelated('reggaeton', 'Urbano latino'), true);
+  assert.equal(isGenreRelated('reggaeton', 'Pop'), false);
+});
+
 test('derive* helpers collect distinct values from swipe history', () => {
   const history: SwipeEntry[] = [
     { trackId: 1, artistId: 10, genre: 'Rock', action: 'skip', timestamp: 1 },

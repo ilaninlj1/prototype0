@@ -55,11 +55,67 @@ export function mergeDiscoveredGenres(existing: string[], found: string[]): stri
   return additions.length > 0 ? [...existing, ...additions] : existing;
 }
 
-/** Case-insensitive substring relation, either direction — no external genre taxonomy. */
-export function isGenreRelated(searchTerm: string, trackGenre: string): boolean {
+export type GenreTermOverrides = Record<string, string[]>;
+
+// Substring matching fails whenever a search term shares no substring with the
+// primaryGenreName iTunes actually returns for it — e.g. "reggaeton" search
+// results come back as "Urbano latino"/"Música tropical", not "reggaeton", so
+// every one of them was getting filtered out despite being exactly right.
+// Bulk-tested against the live API across 33 search terms; these 28 needed an
+// explicit exact-match list instead. Keys and each value are matched
+// case-insensitively. Plain data — extend as more mismatches turn up.
+export const GENRE_TERM_OVERRIDES: GenreTermOverrides = {
+  house: ['House', 'Dance', 'Electronic'],
+  'deep house': ['House', 'Electronic', 'Dance'],
+  'tech house': ['House', 'Dance', 'Electronic'],
+  techno: ['Dance', 'Electronic', 'House'],
+  dubstep: ['Dance', 'Dubstep', 'Electronic'],
+  'drum and bass': ['Dance', 'Electronic', "Jungle/Drum'n'bass"],
+  disco: ['Disco', 'Dance', 'Pop'],
+  funk: ['R&B/Soul', 'Funk', 'Dance'],
+  soul: ['R&B/Soul'],
+  reggaeton: ['Urbano latino', 'Música tropical'],
+  afrobeats: ['Afrobeats', 'Afro-Beat', 'Worldwide'],
+  amapiano: ['Afro-Beat', 'Afrobeats', 'Worldwide'],
+  'bossa nova': ['Bossa Nova', 'Contemporary Jazz', 'Jazz'],
+  salsa: ['Música tropical', 'Latin'],
+  bachata: ['Música tropical', 'Urbano latino', 'Pop Latino'],
+  cumbia: ['Música Mexicana', 'Latin', 'Música tropical'],
+  'k-pop': ['K-Pop'],
+  shoegaze: ['Alternative', 'Rock'],
+  punk: ['Alternative', 'Rock', 'Punk'],
+  metal: ['Hard Rock', 'Metal', 'Rock'],
+  grunge: ['Alternative', 'Hard Rock', 'Rock'],
+  'indie rock': ['Indie Rock', 'Alternative'],
+  'bedroom pop': ['Pop', 'Alternative', 'Indie Pop'],
+  'lo-fi': ['Instrumental', 'Electronic'],
+  ambient: ['New Age', 'Instrumental', 'Electronic'],
+  gospel: ['Christian', 'Gospel'],
+  drill: ['Hip-Hop/Rap'],
+  'boom bap': ['Hip-Hop/Rap'],
+};
+
+/**
+ * Case-insensitive genre relation. A search term present in `overrides` is
+ * matched by exact equality against its acceptable list only — substring
+ * logic isn't consulted at all for that term, even where it would have
+ * matched. A term absent from `overrides` falls back to the substring check
+ * this always used (no external genre taxonomy for those).
+ */
+export function isGenreRelated(
+  searchTerm: string,
+  trackGenre: string,
+  overrides: GenreTermOverrides = GENRE_TERM_OVERRIDES
+): boolean {
   const a = searchTerm.trim().toLowerCase();
   const b = trackGenre.trim().toLowerCase();
   if (!a || !b) return false;
+
+  const acceptable = overrides[a];
+  if (acceptable) {
+    return acceptable.some((g) => g.trim().toLowerCase() === b);
+  }
+
   return a.includes(b) || b.includes(a);
 }
 
