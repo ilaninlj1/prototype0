@@ -89,6 +89,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   rowText: {
+    color: '#fff',
     fontSize: 16,
   },
   rowTextHeard: {
