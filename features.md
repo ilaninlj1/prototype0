@@ -58,3 +58,12 @@ the intent — one direction for "more from this artist," another for "more like
 sound" — so there's no deferred choice and no timer. Removes action-overlay.tsx
 entirely. Needs a visual hint that appears while dragging so the user can see where
 each direction leads.
+
+## [2026-09-04] Save liked tracks to Spotify or Apple Music
+Right now the app finds you songs and then loses them. Liking a track should be
+able to save it straight to a Spotify playlist or liked songs. Needs OAuth for
+Spotify (auth flow, token storage, refresh) and a track-matching step, since we
+hold an iTunes track and have to find the same song in their catalog by artist
+and title — matching will sometimes fail. Apple Music is the same idea but needs
+the $99 developer account, though the catalog IDs may line up directly since the
+previews already come from Apple.
