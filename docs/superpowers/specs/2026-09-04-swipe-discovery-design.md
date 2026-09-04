@@ -26,6 +26,9 @@ to the existing quiz" below.
 - No weighted/blended recommendation strategy (mixing several recent artists or
   genres at once). One active strategy at a time — see "Strategy engine".
 - No changes to `lib/taste-test.ts` or its storage keys.
+- No hand-curated sub-genre taxonomy. The genre catalog (`discoveredGenres`) is
+  built purely from what iTunes has actually returned, not a fixed mapping of
+  broad genres to sub-genres.
 
 ## Relationship to the existing quiz
 
@@ -81,29 +84,65 @@ type Strategy =
 
 ## Persistence
 
-One new AsyncStorage key, `blindspotDiscovery:swipeHistory`, holding
-`SwipeEntry[]` — append-only, same best-effort pattern as
-`taste-test.ts`'s `loadHistory`/`appendHistoryEntry` (read/write failures fall back
-to empty rather than throwing).
+Two AsyncStorage keys under `blindspotDiscovery:*`:
 
-On hydrate, derive three in-memory `Set`s from `swipeHistory` (no separate storage
-keys for these — single source of truth):
+- `blindspotDiscovery:swipeHistory` — `SwipeEntry[]`, append-only, same
+  best-effort pattern as `taste-test.ts`'s `loadHistory`/`appendHistoryEntry`
+  (read/write failures fall back to empty rather than throwing).
+- `blindspotDiscovery:discoveredGenres` — `string[]`, the running catalog of every
+  distinct `primaryGenreName` iTunes has returned for this user, across genre
+  searches and artist lookups alike. There is no hand-curated sub-genre map; the
+  catalog is built purely empirically as fetch results come back (see "Genre
+  discovery" below). Appended to, never pruned.
 
-- `seenTrackIds` — every `trackId` that has ever appeared as a swipe entry.
-  Used to filter fetches so a track is never shown twice.
+On hydrate, derive in-memory `Set`s from these (no further storage keys — these
+two arrays are the single source of truth):
+
+- `seenTrackIds` — every `trackId` that has ever appeared as a swipe entry (from
+  `swipeHistory`). Used to filter fetches so a track is never shown twice.
 - `visitedArtistIds` — every `artistId` from swipe entries.
 - `genresHeard` — every `genre` from swipe entries. A genre counts as "heard" once
   a track of it reached the top of the stack and played, **regardless of swipe
   direction** (skip, like, and genre-jump all imply the track was heard).
+- `discoveredGenres` — every genre string ever returned by a fetch (from the
+  `discoveredGenres` key), whether or not the track it came from was ever shown.
+  Always a superset of `genresHeard` in practice, since a track has to be
+  discovered before it can be heard.
 
 ## iTunes fetch layer
 
 - `fetchTracksByGenre(genre: string): Promise<DiscoveryTrack[]>` — same
   `search?term=...&entity=song&limit=25` endpoint shape as the quiz's
   `fetchGenreTracks`, but mapped to `DiscoveryTrack` (no `pool`/`sourceGenre`).
+  Applies the genre-relatedness filter below, since `term=` is a free-text search
+  and can return results that only matched on title/artist, not genre.
 - `fetchTracksByArtist(artistId: number): Promise<DiscoveryTrack[]>` — the iTunes
   **lookup** endpoint: `https://itunes.apple.com/lookup?id={artistId}&entity=song&limit=25`.
+  No relatedness filter — a lookup by artist ID has no genre search term to check
+  results against.
 - Both filter out results with no `previewUrl` and map through the same shape.
+
+### Genre-relatedness filter
+
+`fetchTracksByGenre(genre)` drops any result whose `primaryGenreName` isn't
+related to the searched `genre` term, via a simple case-insensitive substring
+check in either direction (e.g. searching `"Hip-Hop"` keeps a result tagged
+`"Hip-Hop/Rap"`; searching `"Rock"` keeps `"Alternative Rock"`). No external genre
+taxonomy — just a direct string relationship between what was searched and what
+iTunes tagged the result with.
+
+## Genre discovery
+
+`discoveredGenres` replaces a hand-curated sub-genre map. Every time a fetch
+(genre search or artist lookup) returns tracks, each *distinct* `primaryGenreName`
+among the results — after the relatedness filter, for genre searches — is appended
+to `blindspotDiscovery:discoveredGenres` if not already present. This runs
+regardless of whether those tracks end up in the queue (e.g. some may already be
+in `seenTrackIds`): a genre only needs to have been *returned by iTunes* to count
+as discovered, not necessarily shown to the user.
+
+This is what "Swipe down" below draws from before falling back to the static
+`GENRES` list.
 
 ## Queue and strategy engine
 
@@ -132,20 +171,32 @@ immediately-next card:
 
 - "More from this artist" → `strategy = { type: 'artist', artistId, artistName }`
   of the track that was just swiped.
-- "More like this sound" → `strategy = { type: 'genre', genre }` of the track that
-  was just swiped.
+- "More like this sound" → `strategy = { type: 'genre', genre }`, where `genre` is
+  the swiped track's own `primaryGenreName` — e.g. `"Alternative Rock"`, not a
+  broad category from `GENRES`. Searches under this strategy go through
+  `fetchTracksByGenre` (and its relatedness filter) exactly like any other
+  genre-typed strategy.
 - Untapped after ~4s → defaults to the "More like this sound" behavior.
 
 Log a `'like'` swipe entry immediately on the swipe (not on the button tap).
 
 ### Swipe down — genre jump
 
-Pick a random genre from `GENRES` not in `genresHeard`; once all genres have been
-heard, fall back to the least-recently-heard one (derived from `swipeHistory`
-order) rather than a hard stop. Unlike swipe-right, this is **immediate**: discard
-the buffered queue tail and fetch fresh for the new genre right away, since a
-genre jump reads as "pivot now," not "steer the future." Set
-`strategy = { type: 'genre', genre: newGenre }`. Log a `'genre-jump'` swipe entry.
+Pick the new genre in priority order:
+
+1. A random genre from `discoveredGenres \ genresHeard` — genres iTunes has
+   already surfaced for this user but that haven't been heard yet. This is the
+   common case once a session has run for a bit.
+2. If that's empty (e.g. early in a fresh session, before enough variety has been
+   discovered), fall back to a random genre from `GENRES \ genresHeard`.
+3. If both are empty (everything in both pools has been heard), fall back to the
+   least-recently-heard genre across `discoveredGenres ∪ GENRES` (derived from
+   `swipeHistory` order) rather than a hard stop.
+
+Unlike swipe-right, this is **immediate**: discard the buffered queue tail and
+fetch fresh for the new genre right away, since a genre jump reads as "pivot now,"
+not "steer the future." Set `strategy = { type: 'genre', genre: newGenre }`. Log a
+`'genre-jump'` swipe entry.
 
 ## Initial seed
 
