@@ -14,6 +14,7 @@ import {
   refillQueue,
   refillQueueWithFallback,
   buildSpotifySearchUrl,
+  artworkUrl,
   MAX_REFILL_ATTEMPTS,
   MAX_GENRE_FALLBACKS,
   type DiscoveryTrack,
@@ -108,6 +109,20 @@ test('derive* helpers collect distinct values from swipe history', () => {
   assert.deepEqual(deriveSeenTrackIds(history), new Set([1, 2, 3]));
   assert.deepEqual(deriveVisitedArtistIds(history), new Set([10, 20]));
   assert.deepEqual(deriveGenresHeard(history), new Set(['Rock', 'Pop']));
+});
+
+test('artworkUrl swaps the trailing 100x100bb.jpg segment for the requested size', () => {
+  const url =
+    'https://is1-ssl.mzstatic.com/image/thumb/Music/07/60/ba/mzi.png/100x100bb.jpg';
+  assert.equal(
+    artworkUrl(url, 600),
+    'https://is1-ssl.mzstatic.com/image/thumb/Music/07/60/ba/mzi.png/600x600bb.jpg'
+  );
+});
+
+test('artworkUrl leaves an empty or non-matching URL unchanged', () => {
+  assert.equal(artworkUrl('', 600), '');
+  assert.equal(artworkUrl('https://example.com/no-size-here.jpg', 600), 'https://example.com/no-size-here.jpg');
 });
 
 test('pickJumpGenre prefers an unexplored discovered genre', () => {

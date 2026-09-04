@@ -55,6 +55,19 @@ export function mergeDiscoveredGenres(existing: string[], found: string[]): stri
   return additions.length > 0 ? [...existing, ...additions] : existing;
 }
 
+/**
+ * Upscales an iTunes artwork URL from its default 100x100 to `size`x`size` —
+ * the same asset is served at any size through this URL's trailing
+ * `NxNbb.jpg` segment (verified against the live API: every artworkUrl100
+ * ends in exactly "100x100bb.jpg"), so no extra fetch or lookup is needed.
+ * Falls back to the input unchanged if it's empty or doesn't match that
+ * pattern.
+ */
+export function artworkUrl(url: string, size: number): string {
+  if (!url) return url;
+  return url.replace(/\d+x\d+bb\.jpg$/, `${size}x${size}bb.jpg`);
+}
+
 export type GenreTermOverrides = Record<string, string[]>;
 
 // Substring matching fails whenever a search term shares no substring with the

@@ -7,8 +7,12 @@ import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { buildSpotifySearchUrl, type DiscoveryTrack } from '@/lib/discovery';
+import { artworkUrl, buildSpotifySearchUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { loadLikedTracks, saveLikedTracks } from '@/lib/discovery-storage';
+
+// Rows are small (56x56) — a modest bump from the default 100x100 is plenty,
+// no need for the swipe cards' full 600x600.
+const ROW_ARTWORK_SIZE = 200;
 
 function openUrl(url: string) {
   Linking.openURL(url).catch(() => {});
@@ -123,7 +127,10 @@ export default function LikedTracksScreen() {
                 )}>
                 <ThemedView style={styles.row}>
                   {track.artworkUrl100 ? (
-                    <Image source={{ uri: track.artworkUrl100 }} style={styles.artwork} />
+                    <Image
+                      source={{ uri: artworkUrl(track.artworkUrl100, ROW_ARTWORK_SIZE) }}
+                      style={styles.artwork}
+                    />
                   ) : null}
                   <ThemedView style={styles.info} lightColor="transparent" darkColor="transparent">
                     <ThemedText type="defaultSemiBold" numberOfLines={1}>

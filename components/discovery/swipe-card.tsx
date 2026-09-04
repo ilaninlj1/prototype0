@@ -11,17 +11,21 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import type { DiscoveryTrack } from '@/lib/discovery';
+import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { resolveSwipeDirection, rotationForDrag, type SwipeDirection } from './swipe-physics';
 
 const CARD_WIDTH = 320;
 const FLY_OUT_DISTANCE = 600;
+// artworkUrl100 is only 100x100, stretched to fill the full-width card —
+// visibly blurry. iTunes serves the same asset at any size via the URL, so
+// ask for one big enough for the card instead of upscaling a thumbnail.
+const CARD_ARTWORK_SIZE = 600;
 
 export function CardFace({ track }: { track: DiscoveryTrack }) {
   return (
     <ThemedView style={styles.card}>
       {track.artworkUrl100 ? (
-        <Image source={{ uri: track.artworkUrl100 }} style={styles.artwork} />
+        <Image source={{ uri: artworkUrl(track.artworkUrl100, CARD_ARTWORK_SIZE) }} style={styles.artwork} />
       ) : null}
       <ThemedView style={styles.info}>
         <ThemedText type="subtitle">{track.trackName}</ThemedText>
