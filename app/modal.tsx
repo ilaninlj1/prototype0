@@ -2,12 +2,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Image } from 'expo-image';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import type { DiscoveryTrack } from '@/lib/discovery';
+import { buildSpotifySearchUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { loadLikedTracks } from '@/lib/discovery-storage';
+
+function openUrl(url: string) {
+  Linking.openURL(url).catch(() => {});
+}
 
 export default function LikedTracksScreen() {
   const [loaded, setLoaded] = useState(false);
@@ -77,6 +81,21 @@ export default function LikedTracksScreen() {
                   </ThemedText>
                   <ThemedText numberOfLines={1}>{track.artistName}</ThemedText>
                   <ThemedText style={styles.dim}>{track.primaryGenreName}</ThemedText>
+                  <ThemedView style={styles.linksRow} lightColor="transparent" darkColor="transparent">
+                    {track.trackViewUrl ? (
+                      <TouchableOpacity onPress={() => openUrl(track.trackViewUrl)}>
+                        <ThemedText type="link" style={styles.linkText}>
+                          Apple Music
+                        </ThemedText>
+                      </TouchableOpacity>
+                    ) : null}
+                    <TouchableOpacity
+                      onPress={() => openUrl(buildSpotifySearchUrl(track.artistName, track.trackName))}>
+                      <ThemedText type="link" style={styles.linkText}>
+                        Spotify
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </ThemedView>
                 </ThemedView>
                 <TouchableOpacity onPress={() => togglePlay(track)} activeOpacity={0.7}>
                   <ThemedView style={styles.playButton} lightColor="#2a2a2a" darkColor="#2a2a2a">
@@ -122,6 +141,14 @@ const styles = StyleSheet.create({
   },
   dim: {
     opacity: 0.6,
+  },
+  linksRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 2,
+  },
+  linkText: {
+    fontSize: 13,
   },
   playButton: {
     width: 40,

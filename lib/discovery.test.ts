@@ -13,6 +13,7 @@ import {
   parseArtistLookupResponse,
   refillQueue,
   refillQueueWithFallback,
+  buildSpotifySearchUrl,
   MAX_REFILL_ATTEMPTS,
   MAX_GENRE_FALLBACKS,
   type DiscoveryTrack,
@@ -29,6 +30,7 @@ function track(overrides: Partial<DiscoveryTrack>): DiscoveryTrack {
     artworkUrl100: 'https://example.com/art.jpg',
     primaryGenreName: 'Rock',
     previewUrl: 'https://example.com/preview.m4a',
+    trackViewUrl: 'https://music.apple.com/example',
     ...overrides,
   };
 }
@@ -129,6 +131,20 @@ test('parseArtistLookupResponse skips the artist entry and previewless tracks', 
   const result = parseArtistLookupResponse(json);
   assert.equal(result.length, 1);
   assert.equal(result[0].id, 1);
+});
+
+test('buildSpotifySearchUrl encodes artist and track name into a search query', () => {
+  assert.equal(
+    buildSpotifySearchUrl('Radiohead', 'Let Down'),
+    'https://open.spotify.com/search/Radiohead%20Let%20Down'
+  );
+});
+
+test('buildSpotifySearchUrl encodes special characters in either field', () => {
+  assert.equal(
+    buildSpotifySearchUrl('AC/DC', "Rock & Roll Ain't Noise Pollution"),
+    "https://open.spotify.com/search/AC%2FDC%20Rock%20%26%20Roll%20Ain't%20Noise%20Pollution"
+  );
 });
 
 test('refillQueue tops the queue up to target depth, skipping seen and duplicate tracks', async () => {

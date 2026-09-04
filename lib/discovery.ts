@@ -8,6 +8,7 @@ export type DiscoveryTrack = {
   artworkUrl100: string;
   primaryGenreName: string;
   previewUrl: string;
+  trackViewUrl: string;
 };
 
 export type SwipeAction = 'skip' | 'like' | 'genre-jump';
@@ -134,7 +135,13 @@ function toDiscoveryTrack(r: any): DiscoveryTrack {
     artworkUrl100: r.artworkUrl100 ?? '',
     primaryGenreName: r.primaryGenreName ?? '',
     previewUrl: r.previewUrl,
+    trackViewUrl: r.trackViewUrl ?? '',
   };
+}
+
+/** Pure: a Spotify web search deep link for a track — no API/OAuth, just a query URL. */
+export function buildSpotifySearchUrl(artistName: string, trackName: string): string {
+  return `https://open.spotify.com/search/${encodeURIComponent(`${artistName} ${trackName}`)}`;
 }
 
 function hasPreview(r: any): boolean {
