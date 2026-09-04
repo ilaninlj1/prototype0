@@ -21,6 +21,7 @@
 - No hand-curated sub-genre taxonomy anywhere — genre relatedness is a plain case-insensitive substring check; the discovered-genre catalog is built purely from `primaryGenreName` values iTunes actually returns.
 - Queue target depth is 3 (current card + 2 buffered ahead); never block showing an already-buffered card on a user choice.
 - After every task, run `npx tsc --noEmit` from the project root and confirm no errors before moving on.
+- Every `*.test.ts` file's relative imports of local `.ts` modules must include the explicit `.ts` extension (e.g. `from './discovery.ts'`) — `node --test` treats a file containing `import` syntax as ESM regardless of `package.json`, and ESM resolution (unlike CommonJS) doesn't infer extensions. This needs `tsconfig.json`'s `compilerOptions.allowImportingTsExtensions: true` (added in Task 1) so `tsc --noEmit` accepts it too — that flag is genuinely required and stays. **Do not add `"type": "module"` to `package.json`** to solve this or anything else: it isn't needed for `node --test` and it breaks this repo's existing CommonJS-style Node-executed scripts (`scripts/reset-project.js`, `eslint.config.js`). Regular `.ts`/`.tsx` source files consumed by Metro/Expo (everything outside a `*.test.ts` file) keep their existing extensionless import style — do not add `.ts` extensions there.
 
 ---
 
@@ -47,9 +48,37 @@
 **Files:**
 - Create: `lib/discovery.ts`
 - Create: `lib/discovery.test.ts`
+- Modify: `tsconfig.json` (add one compiler option — see Step 0 below)
 
 **Interfaces:**
 - Produces: `DiscoveryTrack`, `SwipeAction`, `SwipeEntry`, `Strategy` types; `dedupeDiscoveryTracks(tracks: DiscoveryTrack[]): DiscoveryTrack[]`; `extractGenres(tracks: DiscoveryTrack[]): string[]`; `mergeDiscoveredGenres(existing: string[], found: string[]): string[]`; `isGenreRelated(searchTerm: string, trackGenre: string): boolean`; `deriveSeenTrackIds(history: SwipeEntry[]): Set<number>`; `deriveVisitedArtistIds(history: SwipeEntry[]): Set<number>`; `deriveGenresHeard(history: SwipeEntry[]): Set<string>`; `pickJumpGenre(discoveredGenres: string[], genresHeard: Set<string>, allGenres: string[], history: SwipeEntry[]): string`.
+
+- [ ] **Step 0: Allow `.ts`-extension imports in `tsconfig.json`**
+
+Test files under `node --test` need an explicit `.ts` extension on relative imports (see Global Constraints) — add the one compiler option that lets `tsc --noEmit` accept that. In `tsconfig.json`, add `"allowImportingTsExtensions": true` alongside the existing `"strict": true`:
+
+```json
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}
+```
+
+Do not touch `package.json` in this or any task — see Global Constraints.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -69,7 +98,7 @@ import {
   pickJumpGenre,
   type DiscoveryTrack,
   type SwipeEntry,
-} from './discovery';
+} from './discovery.ts';
 
 function track(overrides: Partial<DiscoveryTrack>): DiscoveryTrack {
   return {
@@ -329,7 +358,7 @@ Claude-Session: https://claude.ai/code/session_016Vtfaj8MuDe8kfYmjx2oi2"
 Append to `lib/discovery.test.ts`:
 
 ```ts
-import { parseGenreSearchResponse, parseArtistLookupResponse } from './discovery';
+import { parseGenreSearchResponse, parseArtistLookupResponse } from './discovery.ts';
 
 test('parseGenreSearchResponse maps fields and drops genre-unrelated results', () => {
   const json = {
@@ -1086,7 +1115,7 @@ Create `components/discovery/swipe-physics.test.ts`:
 ```ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveSwipeDirection, rotationForDrag } from './swipe-physics';
+import { resolveSwipeDirection, rotationForDrag } from './swipe-physics.ts';
 
 test('resolveSwipeDirection returns right past the horizontal threshold', () => {
   assert.equal(resolveSwipeDirection(150, 0), 'right');
