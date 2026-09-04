@@ -1449,12 +1449,14 @@ function handleCardSwipe(direction: SwipeDirection) {
 }
 ```
 
-Replace the whole `<ThemedView style={styles.buttonRow}>...</ThemedView>` block (the Skip / More of this / New genre `TouchableOpacity`s) with:
+Replace the whole block from the leading `{currentTrack.artworkUrl100 ? (...) : null}` artwork check down through the `<ThemedView style={styles.buttonRow}>...</ThemedView>` block (that is: the bare artwork `Image`, the `trackName`/`artistName`/`primaryGenreName` `ThemedText`s, the `!status.isLoaded` loading text, and the Skip / More of this / New genre `TouchableOpacity`s — all of Stage 1's placeholder track display, now fully superseded by `CardFace`'s own rendering of the same fields inside the card) with just:
 ```tsx
           <CardStack queue={queue} onSwipe={handleCardSwipe} />
 ```
 
-Remove the now-unused `buttonRow` and `actionButton` entries from the `styles` `StyleSheet.create` object at the bottom of the file (they were only used by the removed button row).
+That placeholder block and the real card would otherwise render as two independent siblings in the parent's flex column — the plain, unstyled placeholder stacking directly above the properly-styled card — rather than the placeholder being replaced by it. This applies on every platform Expo targets, not just web; it's just most visually obvious there.
+
+Since `status` (from `useAudioPlayerStatus`) was only read by the removed `!status.isLoaded` check, remove that hook call too, and its `useAudioPlayerStatus` import (keep `useAudioPlayer` and the `player` it returns — still needed for playback). Remove the now-unused `expo-image` `Image` import (no longer referenced anywhere in this file). Remove the now-unused `buttonRow`, `actionButton`, `artwork`, and `dim` entries from the `styles` `StyleSheet.create` object at the bottom of the file (all were only used by the removed block).
 
 - [ ] **Step 3: Type-check**
 

@@ -1,5 +1,4 @@
-import { Image } from 'expo-image';
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
@@ -49,7 +48,6 @@ export default function HomeScreen() {
   const currentTrack = queue[0];
 
   const player = useAudioPlayer(null);
-  const status = useAudioPlayerStatus(player);
 
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
@@ -198,14 +196,6 @@ export default function HomeScreen() {
 
       {currentTrack ? (
         <>
-          {currentTrack.artworkUrl100 ? (
-            <Image source={{ uri: currentTrack.artworkUrl100 }} style={styles.artwork} />
-          ) : null}
-          <ThemedText type="subtitle">{currentTrack.trackName}</ThemedText>
-          <ThemedText>{currentTrack.artistName}</ThemedText>
-          <ThemedText style={styles.dim}>{currentTrack.primaryGenreName}</ThemedText>
-          {!status.isLoaded && <ThemedText style={styles.dim}>Loading preview…</ThemedText>}
-
           <CardStack queue={queue} onSwipe={handleCardSwipe} />
 
           <ActionOverlay
@@ -233,15 +223,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  artwork: {
-    width: 240,
-    height: 240,
-    borderRadius: 12,
-    alignSelf: 'center',
-  },
-  dim: {
-    opacity: 0.6,
   },
   errorText: {
     color: '#c0392b',
