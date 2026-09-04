@@ -31,6 +31,21 @@ export async function appendSwipeEntry(entry: SwipeEntry): Promise<void> {
   }
 }
 
+/**
+ * Overwrites the persisted history with `history` wholesale, rather than the
+ * load-then-modify-then-save pattern appendSwipeEntry uses. Used by undo,
+ * which already has the correct (trimmed) array in memory — reloading from
+ * disk first would race against the original swipe's own in-flight
+ * appendSwipeEntry write.
+ */
+export async function saveSwipeHistory(history: SwipeEntry[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(SWIPE_HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // ignore
+  }
+}
+
 export async function loadDiscoveredGenres(): Promise<string[]> {
   try {
     const raw = await AsyncStorage.getItem(DISCOVERED_GENRES_KEY);

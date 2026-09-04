@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet } from 'react-native';
 import { ActionOverlay } from '@/components/discovery/action-overlay';
 import { CardStack } from '@/components/discovery/card-stack';
 import type { SwipeDirection } from '@/components/discovery/swipe-physics';
+import { UndoButton } from '@/components/discovery/undo-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -23,12 +24,23 @@ import {
   loadDiscoveredGenres,
   loadSwipeHistory,
   saveDiscoveredGenres,
+  saveSwipeHistory,
 } from '@/lib/discovery-storage';
 import { GENRES } from '@/lib/taste-test';
 
 function randomGenre(): string {
   return GENRES[Math.floor(Math.random() * GENRES.length)];
 }
+
+// Full state needed to roll a single swipe back exactly as it was — see
+// handleCardSwipe (where this is captured) and handleUndo (where it's restored).
+type UndoSnapshot = {
+  queue: DiscoveryTrack[];
+  strategy: Strategy;
+  discoveredGenres: string[];
+  swipeHistory: SwipeEntry[];
+  showActionButtons: boolean;
+};
 
 export default function HomeScreen() {
   const [hydrated, setHydrated] = useState(false);
@@ -41,6 +53,11 @@ export default function HomeScreen() {
   const [showActionButtons, setShowActionButtons] = useState(false);
 
   const lastLikedRef = useRef<DiscoveryTrack | null>(null);
+  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
+  // Bumped by every runRefill call and by handleUndo, so a refill that's still
+  // in flight when an undo (or a newer refill) lands can't clobber state with
+  // a stale result once it finally resolves.
+  const refillEpochRef = useRef(0);
 
   const currentTrack = queue[0];
 
@@ -91,6 +108,7 @@ export default function HomeScreen() {
     history: SwipeEntry[],
     knownGenres: string[]
   ) {
+    const epoch = ++refillEpochRef.current;
     try {
       const { queue: nextQueue, fetched, strategy: landedStrategy } = await refillQueueWithFallback(
         baseQueue,
@@ -100,6 +118,10 @@ export default function HomeScreen() {
         GENRES,
         fetchForStrategy
       );
+      // Superseded by a newer refill, or by an undo that rolled back the swipe
+      // this refill was fetching for — discard rather than clobber current state.
+      if (refillEpochRef.current !== epoch) return;
+
       setQueue(nextQueue);
       if (landedStrategy !== activeStrategy) {
         setStrategy(landedStrategy);
@@ -112,6 +134,7 @@ export default function HomeScreen() {
       }
       setError(null);
     } catch {
+      if (refillEpochRef.current !== epoch) return;
       setError('Something went wrong fetching tracks. Check your connection and try again.');
     }
   }
@@ -184,6 +207,9 @@ export default function HomeScreen() {
   }
 
   function handleCardSwipe(direction: SwipeDirection, track: DiscoveryTrack) {
+    // Snapshot everything this swipe can touch before touching any of it, so a
+    // later undo can restore it exactly — see UndoSnapshot / handleUndo.
+    setUndoSnapshot({ queue, strategy, discoveredGenres, swipeHistory, showActionButtons });
     // Any next swipe dismisses a still-open overlay from an earlier like — not
     // a timer. A right-swipe's own handleLike immediately reopens it for the
     // new like.
@@ -191,6 +217,24 @@ export default function HomeScreen() {
     if (direction === 'left') handleSkip(track);
     else if (direction === 'right') handleLike(track);
     else handleGenreJump(track);
+  }
+
+  async function handleUndo() {
+    const snapshot = undoSnapshot;
+    if (!snapshot) return;
+    // Invalidate any refill still in flight from the swipe being undone, so it
+    // can't resolve later and clobber the state we're about to restore.
+    refillEpochRef.current += 1;
+    setUndoSnapshot(null);
+    setQueue(snapshot.queue);
+    setStrategy(snapshot.strategy);
+    setDiscoveredGenres(snapshot.discoveredGenres);
+    setSwipeHistory(snapshot.swipeHistory);
+    setShowActionButtons(snapshot.showActionButtons);
+    await Promise.all([
+      saveSwipeHistory(snapshot.swipeHistory),
+      saveDiscoveredGenres(snapshot.discoveredGenres),
+    ]);
   }
 
   // ---------- Render ----------
@@ -205,6 +249,8 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
+
       {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
       {currentTrack ? (
