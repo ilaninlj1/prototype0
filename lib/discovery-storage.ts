@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { SwipeEntry } from './discovery';
+import type { DiscoveryTrack, SwipeEntry } from './discovery';
 
 // All persistence is best-effort: a read/write failure falls back to an empty
 // result rather than throwing, mirroring lib/taste-test.ts's pattern.
@@ -8,6 +8,7 @@ import type { SwipeEntry } from './discovery';
 const STORAGE_PREFIX = 'blindspotDiscovery';
 const SWIPE_HISTORY_KEY = `${STORAGE_PREFIX}:swipeHistory`;
 const DISCOVERED_GENRES_KEY = `${STORAGE_PREFIX}:discoveredGenres`;
+const LIKED_TRACKS_KEY = `${STORAGE_PREFIX}:likedTracks`;
 
 export async function loadSwipeHistory(): Promise<SwipeEntry[]> {
   try {
@@ -60,6 +61,32 @@ export async function loadDiscoveredGenres(): Promise<string[]> {
 export async function saveDiscoveredGenres(genres: string[]): Promise<void> {
   try {
     await AsyncStorage.setItem(DISCOVERED_GENRES_KEY, JSON.stringify(genres));
+  } catch {
+    // ignore
+  }
+}
+
+// swipeHistory only carries {trackId, artistId, genre, action, timestamp} — not
+// enough to render a liked-tracks list. Full DiscoveryTrack records for likes
+// are kept here instead, independent of swipeHistory, in chronological
+// (append) order; callers reverse for newest-first display.
+
+export async function loadLikedTracks(): Promise<DiscoveryTrack[]> {
+  try {
+    const raw = await AsyncStorage.getItem(LIKED_TRACKS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function appendLikedTrack(track: DiscoveryTrack): Promise<void> {
+  try {
+    const existing = await loadLikedTracks();
+    existing.push(track);
+    await AsyncStorage.setItem(LIKED_TRACKS_KEY, JSON.stringify(existing));
   } catch {
     // ignore
   }

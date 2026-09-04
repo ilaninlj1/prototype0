@@ -1,10 +1,12 @@
 import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ActionOverlay } from '@/components/discovery/action-overlay';
 import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
+import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
 import type { SwipeDirection } from '@/components/discovery/swipe-physics';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { ThemedText } from '@/components/themed-text';
@@ -21,6 +23,7 @@ import {
   type SwipeEntry,
 } from '@/lib/discovery';
 import {
+  appendLikedTrack,
   appendSwipeEntry,
   loadDiscoveredGenres,
   loadSwipeHistory,
@@ -44,6 +47,7 @@ type UndoSnapshot = {
 };
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -175,6 +179,7 @@ export default function HomeScreen() {
   async function handleLike(track: DiscoveryTrack) {
     lastLikedRef.current = track;
     const nextHistory = await logSwipe(track, 'like');
+    await appendLikedTrack(track); // independent of swipeHistory — see lib/discovery-storage.ts
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
     setShowActionButtons(true);
@@ -281,6 +286,7 @@ export default function HomeScreen() {
     <ThemedView style={styles.container}>
       <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
       <GenrePicker genres={allGenres} heardGenres={genresHeard} onSelect={handlePickGenre} />
+      <LikedTracksButton onPress={() => router.push('/modal')} />
 
       {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
