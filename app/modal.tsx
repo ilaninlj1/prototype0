@@ -2,12 +2,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Image } from 'expo-image';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { buildSpotifySearchUrl, type DiscoveryTrack } from '@/lib/discovery';
-import { loadLikedTracks } from '@/lib/discovery-storage';
+import { loadLikedTracks, saveLikedTracks } from '@/lib/discovery-storage';
 
 function openUrl(url: string) {
   Linking.openURL(url).catch(() => {});
@@ -52,6 +53,23 @@ export default function LikedTracksScreen() {
     setPlayingId(track.id);
   }
 
+  function handleRequestDelete(track: DiscoveryTrack, closeRow: () => void) {
+    Alert.alert('Remove from liked tracks?', `"${track.trackName}" will be removed.`, [
+      { text: 'Cancel', style: 'cancel', onPress: closeRow },
+      { text: 'Remove', style: 'destructive', onPress: () => handleConfirmDelete(track) },
+    ]);
+  }
+
+  async function handleConfirmDelete(track: DiscoveryTrack) {
+    if (playingId === track.id) {
+      player.pause();
+      setPlayingId(null);
+    }
+    const next = tracks.filter((t) => t.id !== track.id);
+    setTracks(next);
+    await saveLikedTracks(next);
+  }
+
   if (!loaded) {
     return (
       <ThemedView style={styles.centered}>
@@ -71,38 +89,49 @@ export default function LikedTracksScreen() {
           newestFirst.map((track) => {
             const isPlayingThis = playingId === track.id && status.playing;
             return (
-              <ThemedView key={track.id} style={styles.row}>
-                {track.artworkUrl100 ? (
-                  <Image source={{ uri: track.artworkUrl100 }} style={styles.artwork} />
-                ) : null}
-                <ThemedView style={styles.info} lightColor="transparent" darkColor="transparent">
-                  <ThemedText type="defaultSemiBold" numberOfLines={1}>
-                    {track.trackName}
-                  </ThemedText>
-                  <ThemedText numberOfLines={1}>{track.artistName}</ThemedText>
-                  <ThemedText style={styles.dim}>{track.primaryGenreName}</ThemedText>
-                  <ThemedView style={styles.linksRow} lightColor="transparent" darkColor="transparent">
-                    {track.trackViewUrl ? (
-                      <TouchableOpacity onPress={() => openUrl(track.trackViewUrl)}>
+              <Swipeable
+                key={track.id}
+                overshootRight={false}
+                renderRightActions={(_progress, _translation, swipeableMethods) => (
+                  <TouchableOpacity
+                    onPress={() => handleRequestDelete(track, swipeableMethods.close)}
+                    style={styles.deleteAction}>
+                    <ThemedText style={styles.deleteActionText}>Delete</ThemedText>
+                  </TouchableOpacity>
+                )}>
+                <ThemedView style={styles.row}>
+                  {track.artworkUrl100 ? (
+                    <Image source={{ uri: track.artworkUrl100 }} style={styles.artwork} />
+                  ) : null}
+                  <ThemedView style={styles.info} lightColor="transparent" darkColor="transparent">
+                    <ThemedText type="defaultSemiBold" numberOfLines={1}>
+                      {track.trackName}
+                    </ThemedText>
+                    <ThemedText numberOfLines={1}>{track.artistName}</ThemedText>
+                    <ThemedText style={styles.dim}>{track.primaryGenreName}</ThemedText>
+                    <ThemedView style={styles.linksRow} lightColor="transparent" darkColor="transparent">
+                      {track.trackViewUrl ? (
+                        <TouchableOpacity onPress={() => openUrl(track.trackViewUrl)}>
+                          <ThemedText type="link" style={styles.linkText}>
+                            Apple Music
+                          </ThemedText>
+                        </TouchableOpacity>
+                      ) : null}
+                      <TouchableOpacity
+                        onPress={() => openUrl(buildSpotifySearchUrl(track.artistName, track.trackName))}>
                         <ThemedText type="link" style={styles.linkText}>
-                          Apple Music
+                          Spotify
                         </ThemedText>
                       </TouchableOpacity>
-                    ) : null}
-                    <TouchableOpacity
-                      onPress={() => openUrl(buildSpotifySearchUrl(track.artistName, track.trackName))}>
-                      <ThemedText type="link" style={styles.linkText}>
-                        Spotify
-                      </ThemedText>
-                    </TouchableOpacity>
+                    </ThemedView>
                   </ThemedView>
+                  <TouchableOpacity onPress={() => togglePlay(track)} activeOpacity={0.7}>
+                    <ThemedView style={styles.playButton} lightColor="#2a2a2a" darkColor="#2a2a2a">
+                      <ThemedText style={styles.playButtonText}>{isPlayingThis ? '⏸' : '▶'}</ThemedText>
+                    </ThemedView>
+                  </TouchableOpacity>
                 </ThemedView>
-                <TouchableOpacity onPress={() => togglePlay(track)} activeOpacity={0.7}>
-                  <ThemedView style={styles.playButton} lightColor="#2a2a2a" darkColor="#2a2a2a">
-                    <ThemedText style={styles.playButtonText}>{isPlayingThis ? '⏸' : '▶'}</ThemedText>
-                  </ThemedView>
-                </TouchableOpacity>
-              </ThemedView>
+              </Swipeable>
             );
           })
         )}
@@ -160,5 +189,15 @@ const styles = StyleSheet.create({
   playButtonText: {
     color: '#fff',
     fontSize: 14,
+  },
+  deleteAction: {
+    backgroundColor: '#c0392b', // matches errorText's red in app/(tabs)/index.tsx
+    width: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteActionText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });

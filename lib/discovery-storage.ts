@@ -91,3 +91,17 @@ export async function appendLikedTrack(track: DiscoveryTrack): Promise<void> {
     // ignore
   }
 }
+
+/**
+ * Overwrites the persisted liked tracks with `tracks` wholesale, mirroring
+ * saveSwipeHistory's pattern. Used when removing a track — the screen already
+ * holds the full (now-filtered) list in state, so there's no need to reload
+ * from disk first.
+ */
+export async function saveLikedTracks(tracks: DiscoveryTrack[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LIKED_TRACKS_KEY, JSON.stringify(tracks));
+  } catch {
+    // ignore
+  }
+}
