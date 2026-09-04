@@ -67,17 +67,15 @@ export default function HomeScreen() {
 
   const currentTrack = queue[0];
 
-  // Every genre worth offering in the picker: what iTunes has actually
-  // returned so far, plus the hand-picked base list, deduped and sorted so
-  // the flat list stays scannable as discoveredGenres grows over a session.
-  const allGenres = useMemo(
-    () => Array.from(new Set([...discoveredGenres, ...GENRES])).sort(),
-    [discoveredGenres]
-  );
   // Only genres actually rated (skip/like) count as "heard" for the picker's
   // checkmark — deriveGenresHeard below is a different, broader notion used by
   // the jump-selection engine, not what should drive this display.
   const genresHeard = useMemo(() => deriveRatedGenres(swipeHistory), [swipeHistory]);
+
+  // Drives the genre picker's trigger label and its scroll-to/highlight —
+  // null while on an artist strategy, since there's no single genre to point at.
+  const currentGenre = strategy.type === 'genre' ? strategy.genre : null;
+  const currentLabel = strategy.type === 'genre' ? strategy.genre : `More from: ${strategy.artistName}`;
 
   const player = useAudioPlayer(null);
 
@@ -258,6 +256,17 @@ export default function HomeScreen() {
     await commitGenreJump(genre, nextHistory);
   }
 
+  // The picker's "Explore" row: same random-jump selection swipe-down already
+  // uses, just triggered by a tap instead of a gesture.
+  async function handleExplore() {
+    captureUndoSnapshot();
+    setShowActionButtons(false);
+    const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
+    const nextGenresHeard = deriveGenresHeard(nextHistory);
+    const target = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
+    await commitGenreJump(target, nextHistory);
+  }
+
   async function handleUndo() {
     const snapshot = undoSnapshot;
     if (!snapshot) return;
@@ -289,7 +298,15 @@ export default function HomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
-      <GenrePicker genres={allGenres} heardGenres={genresHeard} onSelect={handlePickGenre} />
+      <GenrePicker
+        curatedGenres={GENRES}
+        discoveredGenres={discoveredGenres}
+        heardGenres={genresHeard}
+        currentGenre={currentGenre}
+        currentLabel={currentLabel}
+        onSelect={handlePickGenre}
+        onExplore={handleExplore}
+      />
       <LikedTracksButton onPress={() => router.push('/modal')} />
 
       {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
