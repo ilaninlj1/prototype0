@@ -177,3 +177,47 @@ export async function fetchForStrategy(strategy: Strategy): Promise<DiscoveryTra
     ? fetchTracksByGenre(strategy.genre)
     : fetchTracksByArtist(strategy.artistId);
 }
+
+// ---------- Queue engine ----------
+
+export const QUEUE_TARGET_DEPTH = 3;
+export const MAX_REFILL_ATTEMPTS = 5;
+
+export type RefillResult = {
+  queue: DiscoveryTrack[];
+  fetched: DiscoveryTrack[];
+};
+
+/**
+ * Tops `queue` up to QUEUE_TARGET_DEPTH by calling `fetcher` for more tracks under
+ * `strategy`, skipping anything in `seenTrackIds` or already queued. `fetched`
+ * accumulates every track any fetch attempt returned — including duplicates that
+ * never make it into the queue — since a genre only needs to have been *returned*
+ * by iTunes to count as discovered (see lib/discovery-storage.ts's genre catalog).
+ * Gives up after MAX_REFILL_ATTEMPTS fetches that add nothing new, rather than
+ * looping forever against an exhausted strategy.
+ */
+export async function refillQueue(
+  queue: DiscoveryTrack[],
+  strategy: Strategy,
+  seenTrackIds: Set<number>,
+  fetcher: (strategy: Strategy) => Promise<DiscoveryTrack[]>
+): Promise<RefillResult> {
+  let result = [...queue];
+  const fetched: DiscoveryTrack[] = [];
+  let attempts = 0;
+
+  while (result.length < QUEUE_TARGET_DEPTH && attempts < MAX_REFILL_ATTEMPTS) {
+    attempts += 1;
+    const batch = dedupeDiscoveryTracks(await fetcher(strategy));
+    fetched.push(...batch);
+
+    const queuedIds = new Set(result.map((t) => t.id));
+    const fresh = batch.filter((t) => !seenTrackIds.has(t.id) && !queuedIds.has(t.id));
+    if (fresh.length === 0) continue;
+
+    result = [...result, ...fresh].slice(0, QUEUE_TARGET_DEPTH);
+  }
+
+  return { queue: result, fetched };
+}

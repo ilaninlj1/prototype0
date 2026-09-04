@@ -11,6 +11,8 @@ import {
   pickJumpGenre,
   parseGenreSearchResponse,
   parseArtistLookupResponse,
+  refillQueue,
+  MAX_REFILL_ATTEMPTS,
   type DiscoveryTrack,
   type SwipeEntry,
 } from './discovery.ts';
@@ -124,4 +126,37 @@ test('parseArtistLookupResponse skips the artist entry and previewless tracks', 
   const result = parseArtistLookupResponse(json);
   assert.equal(result.length, 1);
   assert.equal(result[0].id, 1);
+});
+
+test('refillQueue tops the queue up to target depth, skipping seen and duplicate tracks', async () => {
+  const seen = new Set([1]);
+  const batch = [track({ id: 1 }), track({ id: 2 }), track({ id: 3 }), track({ id: 4 })];
+  const fetcher = async () => batch;
+  const { queue, fetched } = await refillQueue([], { type: 'genre', genre: 'Rock' }, seen, fetcher);
+  assert.equal(queue.length, 3);
+  assert.deepEqual(queue.map((t) => t.id), [2, 3, 4]);
+  assert.equal(fetched.length, 4); // every returned track counts as discovered, shown or not
+});
+
+test('refillQueue does nothing when already at target depth', async () => {
+  let calls = 0;
+  const fetcher = async () => {
+    calls += 1;
+    return [];
+  };
+  const full = [track({ id: 1 }), track({ id: 2 }), track({ id: 3 })];
+  const { queue } = await refillQueue(full, { type: 'genre', genre: 'Rock' }, new Set(), fetcher);
+  assert.equal(calls, 0);
+  assert.deepEqual(queue, full);
+});
+
+test('refillQueue stops retrying once a strategy stops producing anything new', async () => {
+  let calls = 0;
+  const fetcher = async () => {
+    calls += 1;
+    return [track({ id: 1 })]; // always the same already-seen track
+  };
+  const { queue } = await refillQueue([], { type: 'genre', genre: 'Rock' }, new Set([1]), fetcher);
+  assert.equal(queue.length, 0);
+  assert.equal(calls, MAX_REFILL_ATTEMPTS);
 });
