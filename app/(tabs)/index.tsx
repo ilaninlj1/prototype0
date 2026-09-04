@@ -1,9 +1,11 @@
 import { Image } from 'expo-image';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ActionOverlay } from '@/components/discovery/action-overlay';
+import { CardStack } from '@/components/discovery/card-stack';
+import type { SwipeDirection } from '@/components/discovery/swipe-physics';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -174,6 +176,12 @@ export default function HomeScreen() {
     await runRefill([], nextStrategy, nextSeen, discoveredGenres);
   }
 
+  function handleCardSwipe(direction: SwipeDirection) {
+    if (direction === 'left') handleSkip();
+    else if (direction === 'right') handleLike();
+    else handleGenreJump();
+  }
+
   // ---------- Render ----------
 
   if (!hydrated) {
@@ -198,23 +206,7 @@ export default function HomeScreen() {
           <ThemedText style={styles.dim}>{currentTrack.primaryGenreName}</ThemedText>
           {!status.isLoaded && <ThemedText style={styles.dim}>Loading preview…</ThemedText>}
 
-          <ThemedView style={styles.buttonRow}>
-            <TouchableOpacity onPress={handleSkip} activeOpacity={0.7}>
-              <ThemedView style={styles.actionButton} lightColor="#f2f2f2" darkColor="#242424">
-                <ThemedText type="defaultSemiBold">Skip</ThemedText>
-              </ThemedView>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleLike} activeOpacity={0.7}>
-              <ThemedView style={styles.actionButton} lightColor="#e0f7ec" darkColor="#1d3d2f">
-                <ThemedText type="defaultSemiBold">More of this</ThemedText>
-              </ThemedView>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleGenreJump} activeOpacity={0.7}>
-              <ThemedView style={styles.actionButton} lightColor="#f2f2f2" darkColor="#242424">
-                <ThemedText type="defaultSemiBold">New genre</ThemedText>
-              </ThemedView>
-            </TouchableOpacity>
-          </ThemedView>
+          <CardStack queue={queue} onSwipe={handleCardSwipe} />
 
           <ActionOverlay
             visible={showActionButtons}
@@ -253,17 +245,5 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#c0392b',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
   },
 });
