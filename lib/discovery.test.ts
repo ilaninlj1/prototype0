@@ -12,9 +12,12 @@ import {
   parseGenreSearchResponse,
   parseArtistLookupResponse,
   refillQueue,
+  refillQueueWithFallback,
   MAX_REFILL_ATTEMPTS,
+  MAX_GENRE_FALLBACKS,
   type DiscoveryTrack,
   type SwipeEntry,
+  type Strategy,
 } from './discovery.ts';
 
 function track(overrides: Partial<DiscoveryTrack>): DiscoveryTrack {
@@ -159,4 +162,56 @@ test('refillQueue stops retrying once a strategy stops producing anything new', 
   const { queue } = await refillQueue([], { type: 'genre', genre: 'Rock' }, new Set([1]), fetcher);
   assert.equal(queue.length, 0);
   assert.equal(calls, MAX_REFILL_ATTEMPTS);
+});
+
+test('refillQueueWithFallback falls back to another genre once the current strategy is exhausted', async () => {
+  const calls: string[] = [];
+  const history: SwipeEntry[] = [{ trackId: 1, artistId: 10, genre: 'Rock', action: 'skip', timestamp: 1 }];
+  const fetcher = async (strategy: Strategy) => {
+    if (strategy.type !== 'genre') throw new Error('unexpected artist strategy');
+    calls.push(strategy.genre);
+    if (strategy.genre === 'Rock') return [track({ id: 1 })]; // the only Rock result, already seen
+    if (strategy.genre === 'Jazz') return [track({ id: 2 }), track({ id: 3 }), track({ id: 4 })];
+    throw new Error(`unexpected genre ${strategy.genre}`);
+  };
+
+  const result = await refillQueueWithFallback(
+    [],
+    { type: 'genre', genre: 'Rock' },
+    history,
+    ['Jazz'],
+    ['Rock', 'Jazz'],
+    fetcher
+  );
+
+  assert.deepEqual(result.queue.map((t) => t.id), [2, 3, 4]);
+  assert.deepEqual(result.strategy, { type: 'genre', genre: 'Jazz' });
+  // Rock is retried MAX_REFILL_ATTEMPTS times before giving up on it, then Jazz succeeds on the first try.
+  assert.equal(calls.length, MAX_REFILL_ATTEMPTS + 1);
+});
+
+test('refillQueueWithFallback tries distinct genres and terminates instead of looping forever when nothing has anything left', async () => {
+  const allGenres = ['G0', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6'];
+  const history: SwipeEntry[] = [{ trackId: 1, artistId: 1, genre: 'G0', action: 'skip', timestamp: 1 }];
+  const seenGenres = new Set<string>();
+  let calls = 0;
+  const fetcher = async (strategy: Strategy) => {
+    calls += 1;
+    if (strategy.type === 'genre') seenGenres.add(strategy.genre);
+    return []; // every genre is completely tapped out
+  };
+
+  const result = await refillQueueWithFallback(
+    [],
+    { type: 'genre', genre: 'G0' },
+    history,
+    [],
+    allGenres,
+    fetcher
+  );
+
+  assert.equal(result.queue.length, 0);
+  // The initial strategy plus MAX_GENRE_FALLBACKS distinct fallback genres, never repeating one.
+  assert.equal(seenGenres.size, MAX_GENRE_FALLBACKS + 1);
+  assert.equal(calls, (MAX_GENRE_FALLBACKS + 1) * MAX_REFILL_ATTEMPTS);
 });

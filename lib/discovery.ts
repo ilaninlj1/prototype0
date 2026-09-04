@@ -156,8 +156,14 @@ export function parseArtistLookupResponse(json: unknown): DiscoveryTrack[] {
   return results.filter((r) => r.wrapperType === 'track' && hasPreview(r)).map(toDiscoveryTrack);
 }
 
+// iTunes's Search API caps `limit` at 200 and silently ignores any `offset`
+// param (verified against the live endpoint: offset=25 returns the exact same
+// page as offset=0) — there is no real pagination available here. Asking for
+// the max in one shot is the only way to get more than a token pool per genre.
+const ITUNES_MAX_LIMIT = 200;
+
 export async function fetchTracksByGenre(genre: string): Promise<DiscoveryTrack[]> {
-  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(genre)}&entity=song&limit=25`;
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(genre)}&entity=song&limit=${ITUNES_MAX_LIMIT}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`iTunes search failed for ${genre}`);
   const json = await res.json();
@@ -165,7 +171,7 @@ export async function fetchTracksByGenre(genre: string): Promise<DiscoveryTrack[
 }
 
 export async function fetchTracksByArtist(artistId: number): Promise<DiscoveryTrack[]> {
-  const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=song&limit=25`;
+  const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=song&limit=${ITUNES_MAX_LIMIT}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`iTunes lookup failed for artist ${artistId}`);
   const json = await res.json();
@@ -220,4 +226,58 @@ export async function refillQueue(
   }
 
   return { queue: result, fetched };
+}
+
+export const MAX_GENRE_FALLBACKS = 5;
+
+export type RefillWithFallbackResult = {
+  queue: DiscoveryTrack[];
+  fetched: DiscoveryTrack[];
+  strategy: Strategy;
+};
+
+/**
+ * Like refillQueue, but never dead-ends on an exhausted strategy: if the given
+ * strategy (an artist's catalog, or a genre search that's returned everything
+ * it has) can't fill the queue on its own, falls back to another genre —
+ * chosen the same way a swipe-down genre-jump picks one, preferring an
+ * unexplored discovered genre, then an unexplored broad genre, then the
+ * least-recently-heard genre — and keeps trying distinct genres up to
+ * MAX_GENRE_FALLBACKS times. Returns the strategy actually left active, which
+ * the caller should persist as the new current strategy if it changed.
+ */
+export async function refillQueueWithFallback(
+  queue: DiscoveryTrack[],
+  strategy: Strategy,
+  history: SwipeEntry[],
+  discoveredGenres: string[],
+  allGenres: string[],
+  fetcher: (strategy: Strategy) => Promise<DiscoveryTrack[]>
+): Promise<RefillWithFallbackResult> {
+  const seenTrackIds = deriveSeenTrackIds(history);
+  const genresHeard = deriveGenresHeard(history);
+  const triedGenres = new Set<string>();
+
+  let currentStrategy = strategy;
+  let currentQueue = [...queue];
+  let knownGenres = discoveredGenres;
+  const fetched: DiscoveryTrack[] = [];
+  let fallbacks = 0;
+
+  for (;;) {
+    const result = await refillQueue(currentQueue, currentStrategy, seenTrackIds, fetcher);
+    currentQueue = result.queue;
+    fetched.push(...result.fetched);
+    knownGenres = mergeDiscoveredGenres(knownGenres, extractGenres(result.fetched));
+
+    if (currentQueue.length >= QUEUE_TARGET_DEPTH || fallbacks >= MAX_GENRE_FALLBACKS) break;
+
+    fallbacks += 1;
+    if (currentStrategy.type === 'genre') triedGenres.add(currentStrategy.genre);
+    const excluded = new Set([...genresHeard, ...triedGenres]);
+    const fallbackGenre = pickJumpGenre(knownGenres, excluded, allGenres, history);
+    currentStrategy = { type: 'genre', genre: fallbackGenre };
+  }
+
+  return { queue: currentQueue, fetched, strategy: currentStrategy };
 }

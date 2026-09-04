@@ -1,5 +1,5 @@
 import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ActionOverlay } from '@/components/discovery/action-overlay';
@@ -9,12 +9,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
   deriveGenresHeard,
-  deriveSeenTrackIds,
   extractGenres,
   fetchForStrategy,
   mergeDiscoveredGenres,
   pickJumpGenre,
-  refillQueue,
+  refillQueueWithFallback,
   type DiscoveryTrack,
   type Strategy,
   type SwipeEntry,
@@ -42,8 +41,6 @@ export default function HomeScreen() {
   const [showActionButtons, setShowActionButtons] = useState(false);
 
   const lastLikedRef = useRef<DiscoveryTrack | null>(null);
-
-  const seenTrackIds = useMemo(() => deriveSeenTrackIds(swipeHistory), [swipeHistory]);
 
   const currentTrack = queue[0];
 
@@ -75,7 +72,7 @@ export default function HomeScreen() {
 
       const initialStrategy: Strategy = { type: 'genre', genre: randomGenre() };
       setStrategy(initialStrategy);
-      await runRefill([], initialStrategy, deriveSeenTrackIds(history), genres);
+      await runRefill([], initialStrategy, history, genres);
 
       setHydrated(true);
     })();
@@ -84,20 +81,29 @@ export default function HomeScreen() {
 
   // ---------- Queue refill ----------
 
+  // `history` (not just a seen-ids set) is required here because a strategy that
+  // can't fill the queue on its own falls back to another genre — via the same
+  // priority order as a swipe-down genre-jump — instead of dead-ending on an
+  // empty queue; picking that fallback genre needs the full swipe history.
   async function runRefill(
     baseQueue: DiscoveryTrack[],
     activeStrategy: Strategy,
-    seenIds: Set<number>,
+    history: SwipeEntry[],
     knownGenres: string[]
   ) {
     try {
-      const { queue: nextQueue, fetched } = await refillQueue(
+      const { queue: nextQueue, fetched, strategy: landedStrategy } = await refillQueueWithFallback(
         baseQueue,
         activeStrategy,
-        seenIds,
+        history,
+        knownGenres,
+        GENRES,
         fetchForStrategy
       );
       setQueue(nextQueue);
+      if (landedStrategy !== activeStrategy) {
+        setStrategy(landedStrategy);
+      }
 
       const merged = mergeDiscoveredGenres(knownGenres, extractGenres(fetched));
       if (merged !== knownGenres) {
@@ -131,7 +137,7 @@ export default function HomeScreen() {
     const nextHistory = await logSwipe(currentTrack, 'skip');
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, strategy, deriveSeenTrackIds(nextHistory), discoveredGenres);
+    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres);
   }
 
   async function handleLike() {
@@ -141,7 +147,7 @@ export default function HomeScreen() {
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
     setShowActionButtons(true);
-    await runRefill(nextQueue, strategy, deriveSeenTrackIds(nextHistory), discoveredGenres);
+    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres);
   }
 
   async function applyLikeStrategy(next: Strategy) {
@@ -154,7 +160,7 @@ export default function HomeScreen() {
     // strategy never actually gets fetched until the stale tail drains on its own.
     const preserved = queue.slice(0, 1);
     setQueue(preserved);
-    await runRefill(preserved, next, seenTrackIds, discoveredGenres);
+    await runRefill(preserved, next, swipeHistory, discoveredGenres);
   }
 
   function handleMoreFromArtist() {
@@ -172,13 +178,12 @@ export default function HomeScreen() {
   async function handleGenreJump() {
     if (!currentTrack) return;
     const nextHistory = await logSwipe(currentTrack, 'genre-jump');
-    const nextSeen = deriveSeenTrackIds(nextHistory);
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const newGenre = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
     const nextStrategy: Strategy = { type: 'genre', genre: newGenre };
     setStrategy(nextStrategy);
     setQueue([]); // discard the buffered tail — a genre jump is immediate, not queued
-    await runRefill([], nextStrategy, nextSeen, discoveredGenres);
+    await runRefill([], nextStrategy, nextHistory, discoveredGenres);
   }
 
   function handleCardSwipe(direction: SwipeDirection) {
