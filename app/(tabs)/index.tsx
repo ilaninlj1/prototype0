@@ -1,9 +1,10 @@
 import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ActionOverlay } from '@/components/discovery/action-overlay';
 import { CardStack } from '@/components/discovery/card-stack';
+import { GenrePicker } from '@/components/discovery/genre-picker';
 import type { SwipeDirection } from '@/components/discovery/swipe-physics';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { ThemedText } from '@/components/themed-text';
@@ -60,6 +61,15 @@ export default function HomeScreen() {
   const refillEpochRef = useRef(0);
 
   const currentTrack = queue[0];
+
+  // Every genre worth offering in the picker: what iTunes has actually
+  // returned so far, plus the hand-picked base list, deduped and sorted so
+  // the flat list stays scannable as discoveredGenres grows over a session.
+  const allGenres = useMemo(
+    () => Array.from(new Set([...discoveredGenres, ...GENRES])).sort(),
+    [discoveredGenres]
+  );
+  const genresHeard = useMemo(() => deriveGenresHeard(swipeHistory), [swipeHistory]);
 
   const player = useAudioPlayer(null);
 
@@ -196,20 +206,31 @@ export default function HomeScreen() {
     applyLikeStrategy({ type: 'genre', genre: liked.primaryGenreName });
   }
 
+  // Shared tail of "jump to this genre right now": set strategy, discard the
+  // buffered tail (a jump is immediate, not queued), refill from scratch.
+  // Used by both the random swipe-down jump and the genre picker's chosen one.
+  async function commitGenreJump(genre: string, nextHistory: SwipeEntry[]) {
+    const nextStrategy: Strategy = { type: 'genre', genre };
+    setStrategy(nextStrategy);
+    setQueue([]);
+    await runRefill([], nextStrategy, nextHistory, discoveredGenres);
+  }
+
   async function handleGenreJump(track: DiscoveryTrack) {
     const nextHistory = await logSwipe(track, 'genre-jump');
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const newGenre = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
-    const nextStrategy: Strategy = { type: 'genre', genre: newGenre };
-    setStrategy(nextStrategy);
-    setQueue([]); // discard the buffered tail — a genre jump is immediate, not queued
-    await runRefill([], nextStrategy, nextHistory, discoveredGenres);
+    await commitGenreJump(newGenre, nextHistory);
+  }
+
+  // Snapshot everything a swipe (or a genre pick) can touch before touching any
+  // of it, so a later undo can restore it exactly — see UndoSnapshot / handleUndo.
+  function captureUndoSnapshot() {
+    setUndoSnapshot({ queue, strategy, discoveredGenres, swipeHistory, showActionButtons });
   }
 
   function handleCardSwipe(direction: SwipeDirection, track: DiscoveryTrack) {
-    // Snapshot everything this swipe can touch before touching any of it, so a
-    // later undo can restore it exactly — see UndoSnapshot / handleUndo.
-    setUndoSnapshot({ queue, strategy, discoveredGenres, swipeHistory, showActionButtons });
+    captureUndoSnapshot();
     // Any next swipe dismisses a still-open overlay from an earlier like — not
     // a timer. A right-swipe's own handleLike immediately reopens it for the
     // new like.
@@ -217,6 +238,15 @@ export default function HomeScreen() {
     if (direction === 'left') handleSkip(track);
     else if (direction === 'right') handleLike(track);
     else handleGenreJump(track);
+  }
+
+  async function handlePickGenre(genre: string) {
+    captureUndoSnapshot();
+    setShowActionButtons(false);
+    // Same as swipe-down abandoning whatever's currently showing — except
+    // there's nothing to log a swipe against if the queue's already empty.
+    const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
+    await commitGenreJump(genre, nextHistory);
   }
 
   async function handleUndo() {
@@ -250,6 +280,7 @@ export default function HomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
+      <GenrePicker genres={allGenres} heardGenres={genresHeard} onSelect={handlePickGenre} />
 
       {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
