@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Image } from 'expo-image';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { ThemedText } from '@/components/themed-text';
@@ -12,6 +12,23 @@ import { loadLikedTracks, saveLikedTracks } from '@/lib/discovery-storage';
 
 function openUrl(url: string) {
   Linking.openURL(url).catch(() => {});
+}
+
+// react-native-web's Alert.alert is a no-op (confirmed against the installed
+// react-native-web@0.21 source — `static alert() {}`), so a Cancel/Remove
+// button pair there never fires either callback. window.confirm is a real,
+// blocking browser dialog available in any DOM environment; wrapping both
+// paths in a promise keeps the caller platform-agnostic.
+function confirmDialog(title: string, message: string): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    return Promise.resolve(window.confirm(`${title}\n\n${message}`));
+  }
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'Remove', style: 'destructive', onPress: () => resolve(true) },
+    ]);
+  });
 }
 
 export default function LikedTracksScreen() {
@@ -53,11 +70,16 @@ export default function LikedTracksScreen() {
     setPlayingId(track.id);
   }
 
-  function handleRequestDelete(track: DiscoveryTrack, closeRow: () => void) {
-    Alert.alert('Remove from liked tracks?', `"${track.trackName}" will be removed.`, [
-      { text: 'Cancel', style: 'cancel', onPress: closeRow },
-      { text: 'Remove', style: 'destructive', onPress: () => handleConfirmDelete(track) },
-    ]);
+  async function handleRequestDelete(track: DiscoveryTrack, closeRow: () => void) {
+    const confirmed = await confirmDialog(
+      'Remove from liked tracks?',
+      `"${track.trackName}" will be removed.`
+    );
+    if (confirmed) {
+      await handleConfirmDelete(track);
+    } else {
+      closeRow();
+    }
   }
 
   async function handleConfirmDelete(track: DiscoveryTrack) {
