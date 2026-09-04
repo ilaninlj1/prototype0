@@ -20,6 +20,7 @@ export function resolveSwipeDirection(
   translationY: number,
   thresholds: SwipeThresholds = DEFAULT_SWIPE_THRESHOLDS
 ): SwipeDirection | null {
+  'worklet';
   if (translationY > thresholds.vertical && translationY > Math.abs(translationX)) {
     return 'down';
   }
@@ -30,6 +31,7 @@ export function resolveSwipeDirection(
 
 /** Tilt angle in degrees for the Tinder-style rotation, proportional to horizontal drag. */
 export function rotationForDrag(translateX: number, cardWidth: number): number {
+  'worklet';
   const maxRotation = 12; // degrees
   const ratio = Math.max(-1, Math.min(1, translateX / cardWidth));
   return ratio * maxRotation;
