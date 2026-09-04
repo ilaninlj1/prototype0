@@ -50,3 +50,11 @@ longer feeds it.
 While a card is being dragged, the current track and the next one should mix,
 resolving fully when the swipe commits. Would need two audio players with
 volume driven by drag distance, instead of the single player swapping sources.
+
+## [2026-09-04] Move the artist/sound choice into the swipe itself
+The post-like overlay asks a second question the swipe already answered, and the
+buttons are easy to miss before they auto-dismiss. Better: let the direction carry
+the intent — one direction for "more from this artist," another for "more like this
+sound" — so there's no deferred choice and no timer. Removes action-overlay.tsx
+entirely. Needs a visual hint that appears while dragging so the user can see where
+each direction leads.
