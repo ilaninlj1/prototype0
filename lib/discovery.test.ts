@@ -8,6 +8,7 @@ import {
   deriveSeenTrackIds,
   deriveVisitedArtistIds,
   deriveGenresHeard,
+  deriveRatedGenres,
   pickJumpGenre,
   parseGenreSearchResponse,
   parseArtistLookupResponse,
@@ -109,6 +110,22 @@ test('derive* helpers collect distinct values from swipe history', () => {
   assert.deepEqual(deriveSeenTrackIds(history), new Set([1, 2, 3]));
   assert.deepEqual(deriveVisitedArtistIds(history), new Set([10, 20]));
   assert.deepEqual(deriveGenresHeard(history), new Set(['Rock', 'Pop']));
+});
+
+test('deriveRatedGenres only counts skip/like, excluding genre-jump', () => {
+  const history: SwipeEntry[] = [
+    { trackId: 1, artistId: 10, genre: 'Rock', action: 'skip', timestamp: 1 },
+    { trackId: 2, artistId: 10, genre: 'Jazz', action: 'like', timestamp: 2 },
+    { trackId: 3, artistId: 20, genre: 'Pop', action: 'genre-jump', timestamp: 3 },
+  ];
+  assert.deepEqual(deriveRatedGenres(history), new Set(['Rock', 'Jazz']));
+});
+
+test('deriveRatedGenres returns an empty set when history is only genre-jumps', () => {
+  const history: SwipeEntry[] = [
+    { trackId: 1, artistId: 10, genre: 'Rock', action: 'genre-jump', timestamp: 1 },
+  ];
+  assert.deepEqual(deriveRatedGenres(history), new Set());
 });
 
 test('artworkUrl swaps the trailing 100x100bb.jpg segment for the requested size', () => {

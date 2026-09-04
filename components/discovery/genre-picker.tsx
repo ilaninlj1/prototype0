@@ -36,7 +36,7 @@ export function GenrePicker({ genres, heardGenres, onSelect }: GenrePickerProps)
                 return (
                   <TouchableOpacity key={genre} onPress={() => pick(genre)} activeOpacity={0.7}>
                     <ThemedView style={styles.row} lightColor="#1a1a1a" darkColor="#1a1a1a">
-                      <ThemedText style={[styles.rowText, heard && styles.rowTextHeard]}>{genre}</ThemedText>
+                      <ThemedText style={styles.rowText}>{genre}</ThemedText>
                       {heard && <ThemedText style={styles.checkmark}>✓</ThemedText>}
                     </ThemedView>
                   </TouchableOpacity>
@@ -91,9 +91,6 @@ const styles = StyleSheet.create({
   rowText: {
     color: '#fff',
     fontSize: 16,
-  },
-  rowTextHeard: {
-    opacity: 0.5,
   },
   checkmark: {
     color: '#4cd964',

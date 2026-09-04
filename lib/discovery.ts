@@ -142,8 +142,24 @@ export function deriveVisitedArtistIds(history: SwipeEntry[]): Set<number> {
   return new Set(history.map((e) => e.artistId));
 }
 
+// Every genre a swipe has touched at all, including genre-jumps (which log
+// the genre being *abandoned*, not judged). This intentionally broad "already
+// explored" notion is what pickJumpGenre and refillQueueWithFallback use to
+// avoid re-surfacing the same territory — a different concern from "did the
+// user actually rate something from this genre" (see deriveRatedGenres).
 export function deriveGenresHeard(history: SwipeEntry[]): Set<string> {
   return new Set(history.map((e) => e.genre));
+}
+
+// Genres the user actually swiped left (skip) or right (like) on a track
+// from — deliberately excludes genre-jump entries, since swiping down away
+// from a genre doesn't mean any track from it was actually judged. Used for
+// the genre picker's "heard" checkmark, which was previously wired to the
+// broader deriveGenresHeard and ended up marking far too many genres.
+export function deriveRatedGenres(history: SwipeEntry[]): Set<string> {
+  return new Set(
+    history.filter((e) => e.action === 'skip' || e.action === 'like').map((e) => e.genre)
+  );
 }
 
 // ---------- Genre-jump selection ----------

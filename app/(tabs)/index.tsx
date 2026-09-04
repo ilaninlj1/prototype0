@@ -13,6 +13,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
   deriveGenresHeard,
+  deriveRatedGenres,
   extractGenres,
   fetchForStrategy,
   mergeDiscoveredGenres,
@@ -73,7 +74,10 @@ export default function HomeScreen() {
     () => Array.from(new Set([...discoveredGenres, ...GENRES])).sort(),
     [discoveredGenres]
   );
-  const genresHeard = useMemo(() => deriveGenresHeard(swipeHistory), [swipeHistory]);
+  // Only genres actually rated (skip/like) count as "heard" for the picker's
+  // checkmark — deriveGenresHeard below is a different, broader notion used by
+  // the jump-selection engine, not what should drive this display.
+  const genresHeard = useMemo(() => deriveRatedGenres(swipeHistory), [swipeHistory]);
 
   const player = useAudioPlayer(null);
 
