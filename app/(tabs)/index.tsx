@@ -206,6 +206,7 @@ export default function HomeScreen() {
       artistId: track.artistId,
       artistName: track.artistName,
       genre: track.primaryGenreName,
+      collectionId: track.collectionId,
       action,
       timestamp: Date.now(),
       // status.currentTime is still the swiped track's position at this point

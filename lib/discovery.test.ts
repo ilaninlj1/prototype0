@@ -29,6 +29,9 @@ import {
   derivePlayedToEndButSkipped,
   deriveTopArtists,
   deriveGenrePathSegments,
+  ALBUM_SPREAD_WINDOW,
+  ALBUM_SPREAD_CAP,
+  spreadByAlbum,
   type DiscoveryTrack,
   type SwipeEntry,
   type Strategy,
@@ -271,6 +274,23 @@ test('refillQueue stops retrying once a strategy stops producing anything new', 
   const { queue } = await refillQueue([], { type: 'genre', genre: 'Rock' }, new Set([1]), fetcher);
   assert.equal(queue.length, 0);
   assert.equal(calls, MAX_REFILL_ATTEMPTS);
+});
+
+test('refillQueue spreads across the whole accumulated pool, not per batch — a dominated first fetch does not force an adjacent repeat', async () => {
+  let call = 0;
+  const fetcher = async () => {
+    call += 1;
+    // First attempt: two tracks, both album 100 — not enough alone to reach
+    // target depth, so a second attempt happens.
+    if (call === 1) return [track({ id: 1, collectionId: 100 }), track({ id: 2, collectionId: 100 })];
+    // Second attempt: a different album entirely.
+    return [track({ id: 3, collectionId: 200 }), track({ id: 4, collectionId: 200 })];
+  };
+  const { queue } = await refillQueue([], { type: 'genre', genre: 'Rock' }, new Set(), fetcher);
+  // Placing per-batch-as-it-arrived would have produced [1, 2, 3] — two
+  // album-100 tracks adjacent at the front, from the first batch alone.
+  // Spreading over the accumulated pool interleaves them instead.
+  assert.deepEqual(queue.map((t) => t.id), [1, 3, 2]);
 });
 
 test('refillQueueWithFallback falls back to another genre once the current strategy is exhausted', async () => {
@@ -617,4 +637,69 @@ test('deriveGenrePathSegments merges a following non-steer entry into the segmen
 
 test('deriveGenrePathSegments returns an empty array for empty input', () => {
   assert.deepEqual(deriveGenrePathSegments([]), []);
+});
+
+// ---------- spreadByAlbum ----------
+
+test('spreadByAlbum keeps two same-album candidates apart when a different album is available to place between them', () => {
+  const candidates = [
+    track({ id: 1, collectionId: 100 }),
+    track({ id: 2, collectionId: 100 }),
+    track({ id: 3, collectionId: 200 }),
+  ];
+  const result = spreadByAlbum(candidates, []);
+  assert.deepEqual(result.map((t) => t.id), [1, 3, 2]);
+});
+
+test('spreadByAlbum never treats two no-collectionId candidates as matching each other', () => {
+  const candidates = [
+    track({ id: 1, collectionId: undefined }),
+    track({ id: 2, collectionId: undefined }),
+    track({ id: 3, collectionId: undefined }),
+  ];
+  // If undefined were ever compared as "the same album", cap=1 would force
+  // reordering here. Order staying exactly as given proves it isn't.
+  assert.deepEqual(spreadByAlbum(candidates, []).map((t) => t.id), [1, 2, 3]);
+});
+
+test('spreadByAlbum defers a candidate matching an already-presented album in recentAlbumIds', () => {
+  const candidates = [track({ id: 1, collectionId: 100 }), track({ id: 2, collectionId: 200 })];
+  const result = spreadByAlbum(candidates, [100]);
+  assert.deepEqual(result.map((t) => t.id), [2, 1]);
+});
+
+test('spreadByAlbum tier 2: falls back to any different album rather than repeat the immediately preceding one, once the full cap already can\'t be satisfied', () => {
+  // Both albums already appear somewhere in the trailing window, so tier 1
+  // (the full window/cap rule) fails for both candidates — but only one of
+  // them equals the *immediately* preceding album, so tier 2 must prefer the
+  // other one rather than falling all the way back to "just take the first".
+  const recentAlbumIds = [200, 100]; // last presented album is 100
+  const candidates = [track({ id: 1, collectionId: 100 }), track({ id: 2, collectionId: 200 })];
+  const result = spreadByAlbum(candidates, recentAlbumIds);
+  assert.deepEqual(result.map((t) => t.id), [2, 1]);
+});
+
+test('spreadByAlbum tier 3: places every candidate even when they are all the same over-represented album', () => {
+  const candidates = [
+    track({ id: 1, collectionId: 100 }),
+    track({ id: 2, collectionId: 100 }),
+    track({ id: 3, collectionId: 100 }),
+  ];
+  // Nothing to interleave with — every remaining candidate is the same album
+  // as the one just placed, so a repeat is unavoidable. All three still get
+  // placed; none are dropped.
+  assert.deepEqual(spreadByAlbum(candidates, []).map((t) => t.id), [1, 2, 3]);
+});
+
+test('spreadByAlbum tolerates undefined entries in recentAlbumIds (pre-migration history) without crashing or false-matching', () => {
+  const candidates = [track({ id: 1, collectionId: 100 }), track({ id: 2, collectionId: 100 })];
+  // Two undefined slots (simulating old SwipeEntry rows with no collectionId)
+  // must not block placement of a real album, and must not be mistaken for
+  // one another or for a real id.
+  const result = spreadByAlbum(candidates, [undefined, undefined]);
+  assert.deepEqual(result.map((t) => t.id), [1, 2]);
+});
+
+test('spreadByAlbum returns an empty array for empty candidates', () => {
+  assert.deepEqual(spreadByAlbum([], []), []);
 });

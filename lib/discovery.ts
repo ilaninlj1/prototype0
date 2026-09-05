@@ -9,6 +9,10 @@ export type DiscoveryTrack = {
   primaryGenreName: string;
   previewUrl: string;
   trackViewUrl: string;
+  // iTunes's album id. Optional — never coerced to a fake shared value when
+  // absent, since that would wrongly group unrelated tracks together. Powers
+  // spreadByAlbum below.
+  collectionId?: number;
 };
 
 // 'steer-artist'/'steer-sound': logged when the user redirects discovery
@@ -36,6 +40,10 @@ export type SwipeEntry = {
   // existed genuinely don't have it — deriveRatedGenres treats a missing
   // value as 0 rather than migrating old data.
   listenMs?: number;
+  // Same precedent as trackName/artistName: populated going forward, no
+  // migration. Powers spreadByAlbum's recent-albums window — an entry
+  // without it simply never constrains anything (see spreadByAlbum).
+  collectionId?: number;
 };
 
 export type Strategy =
@@ -245,6 +253,7 @@ function toDiscoveryTrack(r: any): DiscoveryTrack {
     primaryGenreName: r.primaryGenreName ?? '',
     previewUrl: r.previewUrl,
     trackViewUrl: r.trackViewUrl ?? '',
+    collectionId: r.collectionId,
   };
 }
 
@@ -305,6 +314,65 @@ export async function fetchForStrategy(strategy: Strategy): Promise<DiscoveryTra
 export const QUEUE_TARGET_DEPTH = 3;
 export const MAX_REFILL_ATTEMPTS = 5;
 
+// A search dominated by one compilation/album can otherwise surface several
+// of its tracks in a row. Window=5, cap=1: no album may appear more than
+// once within any trailing 5-track stretch of what's actually been
+// presented — which subsumes "no two consecutive" as the window=2 case,
+// so there's no separate adjacency rule to keep in sync with this one.
+export const ALBUM_SPREAD_WINDOW = 5;
+export const ALBUM_SPREAD_CAP = 1;
+
+/**
+ * Reorders `candidates` (freshly fetched, not-yet-queued tracks) so that,
+ * placed one at a time after `recentAlbumIds` (oldest first — already-
+ * presented history followed by whatever's currently queued), no album
+ * exceeds ALBUM_SPREAD_CAP occurrences within any trailing ALBUM_SPREAD_WINDOW
+ * stretch. A track with no collectionId is never constrained against
+ * anything, and an `undefined` entry in `recentAlbumIds` (pre-migration
+ * history with no recorded album) never spuriously matches a real one —
+ * `undefined === 5` is simply false.
+ *
+ * Greedy, with a two-tier fallback so relaxing the cap never relaxes all the
+ * way to unbounded:
+ *  1. Prefer the first remaining candidate (preserving iTunes's original
+ *     relevance order as a tie-break) that satisfies the full window/cap
+ *     rule.
+ *  2. If none do, fall back to the one guarantee that doesn't relax: the
+ *     first remaining candidate that isn't the same album as the track just
+ *     placed — keeping "no two consecutive" true even once the broader cap
+ *     has to give.
+ *  3. Only if every remaining candidate is the same album as the one just
+ *     placed — nothing left to interleave with — does a repeat happen.
+ */
+export function spreadByAlbum(
+  candidates: DiscoveryTrack[],
+  recentAlbumIds: (number | undefined)[]
+): DiscoveryTrack[] {
+  const remaining = [...candidates];
+  const placed: DiscoveryTrack[] = [];
+  const window = [...recentAlbumIds];
+
+  while (remaining.length > 0) {
+    const trailing = window.slice(-(ALBUM_SPREAD_WINDOW - 1));
+    const last = window[window.length - 1];
+
+    let index = remaining.findIndex((t) => {
+      if (t.collectionId === undefined) return true;
+      const count = trailing.filter((id) => id === t.collectionId).length;
+      return count < ALBUM_SPREAD_CAP;
+    });
+    if (index === -1) {
+      index = remaining.findIndex((t) => t.collectionId === undefined || t.collectionId !== last);
+    }
+    if (index === -1) index = 0; // every remaining candidate is the same album as the one just placed
+
+    const [chosen] = remaining.splice(index, 1);
+    placed.push(chosen);
+    window.push(chosen.collectionId);
+  }
+  return placed;
+}
+
 export type RefillResult = {
   queue: DiscoveryTrack[];
   fetched: DiscoveryTrack[];
@@ -318,27 +386,40 @@ export type RefillResult = {
  * by iTunes to count as discovered (see lib/discovery-storage.ts's genre catalog).
  * Gives up after MAX_REFILL_ATTEMPTS fetches that add nothing new, rather than
  * looping forever against an exhausted strategy.
+ *
+ * Fresh candidates from every attempt accumulate in a pool and are spread by
+ * album (spreadByAlbum) once, after fetching stops — not per batch — so a
+ * dominated first batch can still be interleaved against a later batch's
+ * alternatives instead of forcing an adjacency that a smarter placement could
+ * have avoided. `recentAlbumIds` is the already-presented history/queue
+ * context spreading should avoid repeating into; defaulted to `[]` for
+ * callers that don't care about spreading.
  */
 export async function refillQueue(
   queue: DiscoveryTrack[],
   strategy: Strategy,
   seenTrackIds: Set<number>,
-  fetcher: (strategy: Strategy) => Promise<DiscoveryTrack[]>
+  fetcher: (strategy: Strategy) => Promise<DiscoveryTrack[]>,
+  recentAlbumIds: (number | undefined)[] = []
 ): Promise<RefillResult> {
   let result = [...queue];
   const fetched: DiscoveryTrack[] = [];
+  const pool: DiscoveryTrack[] = [];
   let attempts = 0;
 
-  while (result.length < QUEUE_TARGET_DEPTH && attempts < MAX_REFILL_ATTEMPTS) {
+  while (result.length + pool.length < QUEUE_TARGET_DEPTH && attempts < MAX_REFILL_ATTEMPTS) {
     attempts += 1;
     const batch = dedupeDiscoveryTracks(await fetcher(strategy));
     fetched.push(...batch);
 
-    const queuedIds = new Set(result.map((t) => t.id));
+    const queuedIds = new Set([...result, ...pool].map((t) => t.id));
     const fresh = batch.filter((t) => !seenTrackIds.has(t.id) && !queuedIds.has(t.id));
-    if (fresh.length === 0) continue;
+    pool.push(...fresh);
+  }
 
-    result = [...result, ...fresh].slice(0, QUEUE_TARGET_DEPTH);
+  if (pool.length > 0) {
+    const windowSoFar = [...recentAlbumIds, ...result.map((t) => t.collectionId)];
+    result = [...result, ...spreadByAlbum(pool, windowSoFar)].slice(0, QUEUE_TARGET_DEPTH);
   }
 
   return { queue: result, fetched };
@@ -373,6 +454,7 @@ export async function refillQueueWithFallback(
   const seenTrackIds = deriveSeenTrackIds(history);
   const genresHeard = deriveGenresHeard(history);
   const triedGenres = new Set<string>();
+  const recentAlbumIds = history.slice(-ALBUM_SPREAD_WINDOW).map((e) => e.collectionId);
 
   let currentStrategy = strategy;
   let currentQueue = [...queue];
@@ -381,7 +463,7 @@ export async function refillQueueWithFallback(
   let fallbacks = 0;
 
   for (;;) {
-    const result = await refillQueue(currentQueue, currentStrategy, seenTrackIds, fetcher);
+    const result = await refillQueue(currentQueue, currentStrategy, seenTrackIds, fetcher, recentAlbumIds);
     currentQueue = result.queue;
     fetched.push(...result.fetched);
     knownGenres = mergeDiscoveredGenres(knownGenres, extractGenres(result.fetched));
