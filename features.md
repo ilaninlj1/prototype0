@@ -75,3 +75,16 @@ not act on it. Tapping a liked track should offer "more from this artist" and
 Same machinery as the post-like overlay, but reachable when you're browsing what
 you saved rather than only in the moment after a swipe. May be a better home for
 those two options than the overlay is.
+
+## [2026-09-05] Base "heard" on listen time, not skip/like
+The genre picker's checkmark currently means "swiped left or right on a track
+from this genre" (deriveRatedGenres in lib/discovery.ts) — but a two-second
+skip counts the same as actually listening, which doesn't match what "heard"
+is supposed to mean. Needs a listenMs field on SwipeEntry (accumulated preview
+playback time before the swipe commits, not just whether one happened), and
+deriveRatedGenres redefined against a listen-time threshold instead of action
+type. Touches logSwipe's call sites in app/(tabs)/index.tsx (need to thread
+elapsed playback time from the player into each swipe) and the SwipeEntry
+schema in lib/discovery.ts — existing persisted entries won't have listenMs,
+so the new logic needs a sensible fallback for old data (probably: no
+listenMs recorded means don't count it as heard, same as it not existing).
