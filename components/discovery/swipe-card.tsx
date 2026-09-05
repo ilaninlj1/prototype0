@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -11,10 +12,12 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { resolveSwipeDirection, rotationForDrag, type SwipeDirection } from './swipe-physics';
 
 const CARD_WIDTH = 320;
+const CARD_HEIGHT = 420;
 const FLY_OUT_DISTANCE = 600;
 // artworkUrl100 is only 100x100, stretched to fill the full-width card —
 // visibly blurry. iTunes serves the same asset at any size via the URL, so
@@ -27,26 +30,36 @@ type CardFaceProps = {
   showPlayIcon?: boolean;
 };
 
+// Artwork fills the entire card; title/artist/genre sit directly over its
+// bottom edge on a BlurView rather than a separate panel below — the artwork
+// stays the visual focus (just softened where the text needs to sit) instead
+// of being pushed up to make room for a solid info block.
 export function CardFace({ track, showPlayIcon = false }: CardFaceProps) {
   return (
-    <ThemedView style={styles.card}>
+    <ThemedView style={styles.card} backgroundColor={Colors.surface}>
       {track.artworkUrl100 ? (
-        <ThemedView style={styles.artworkWrapper}>
-          <Image source={{ uri: artworkUrl(track.artworkUrl100, CARD_ARTWORK_SIZE) }} style={styles.artwork} />
-          {showPlayIcon && (
-            <ThemedView style={styles.playOverlay} lightColor="transparent" darkColor="transparent">
-              <ThemedView style={styles.playOverlayCircle} lightColor="rgba(0,0,0,0.55)" darkColor="rgba(0,0,0,0.55)">
-                <ThemedText style={styles.playOverlayIcon}>▶</ThemedText>
-              </ThemedView>
-            </ThemedView>
-          )}
-        </ThemedView>
+        <Image source={{ uri: artworkUrl(track.artworkUrl100, CARD_ARTWORK_SIZE) }} style={styles.artwork} />
       ) : null}
-      <ThemedView style={styles.info}>
-        <ThemedText type="subtitle">{track.trackName}</ThemedText>
-        <ThemedText>{track.artistName}</ThemedText>
-        <ThemedText style={styles.dim}>{track.primaryGenreName}</ThemedText>
-      </ThemedView>
+
+      {showPlayIcon && (
+        <ThemedView style={styles.playOverlay} backgroundColor="transparent">
+          <ThemedView style={styles.playOverlayCircle} backgroundColor="rgba(0, 0, 0, 0.5)">
+            <ThemedText style={styles.playOverlayIcon}>▶</ThemedText>
+          </ThemedView>
+        </ThemedView>
+      )}
+
+      <BlurView intensity={55} tint="dark" style={styles.infoOverlay}>
+        <ThemedText type="subtitle" numberOfLines={1}>
+          {track.trackName}
+        </ThemedText>
+        <ThemedText numberOfLines={1} style={styles.artist}>
+          {track.artistName}
+        </ThemedText>
+        <ThemedText type="caption" numberOfLines={1} style={styles.genre}>
+          {track.primaryGenreName}
+        </ThemedText>
+      </BlurView>
     </ThemedView>
   );
 }
@@ -122,20 +135,17 @@ export function SwipeCard({ track, onSwipe, onTap, showPlayIcon }: SwipeCardProp
 const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    height: CARD_HEIGHT,
+    borderRadius: Radius.lg,
     overflow: 'hidden',
-  },
-  artworkWrapper: {
-    position: 'relative',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
   artwork: {
-    width: '100%',
-    height: CARD_WIDTH,
+    ...StyleSheet.absoluteFillObject,
   },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -145,20 +155,28 @@ const styles = StyleSheet.create({
   playOverlayCircle: {
     width: 64,
     height: 64,
-    borderRadius: 32,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   playOverlayIcon: {
-    color: '#fff',
+    color: Colors.text,
     fontSize: 28,
     marginLeft: 4, // optical centering — the glyph itself sits slightly left otherwise
   },
-  info: {
-    padding: 16,
-    gap: 4,
+  infoOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg,
+    gap: 2,
   },
-  dim: {
-    opacity: 0.6,
+  artist: {
+    color: Colors.textSecondary,
+  },
+  genre: {
+    marginTop: 2,
   },
 });
