@@ -1,6 +1,6 @@
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ActionOverlay } from '@/components/discovery/action-overlay';
@@ -12,6 +12,7 @@ import { UndoButton } from '@/components/discovery/undo-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
+import { usePlayback } from '@/hooks/use-playback';
 import {
   deriveGenresHeard,
   deriveRatedGenres,
@@ -78,17 +79,15 @@ export default function HomeScreen() {
   const currentGenre = strategy.type === 'genre' ? strategy.genre : null;
   const currentLabel = strategy.type === 'genre' ? strategy.genre : `More from: ${strategy.artistName}`;
 
-  const player = useAudioPlayer(null);
-  const status = useAudioPlayerStatus(player);
+  // Shared across every screen that plays audio — see hooks/use-playback.tsx —
+  // so starting a preview here always stops one already playing on the liked
+  // tracks list or export history, and vice versa, since it's the same player.
+  const { player, status } = usePlayback();
   // status.didJustFinish is an event flag — true only in the single status
   // update right after a preview ends, not safe to read later to ask "did
   // this end". Captured here so a tap after that point knows to replay from
   // the start rather than try to "resume" a track already at its end.
   const [hasEnded, setHasEnded] = useState(false);
-
-  useEffect(() => {
-    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
-  }, []);
 
   // Autoplay whenever the top card changes — this never fires mid-drag, only when
   // a committed swipe actually changes queue[0].
@@ -102,6 +101,17 @@ export default function HomeScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack?.id]);
+
+  // Leaving this screen (another tab, or a modal pushed on top) pauses
+  // playback rather than leaving it running in the background — fires on
+  // blur as well as unmount, so it doesn't depend on whether expo-router
+  // actually unmounts an unfocused screen. Deliberately doesn't resume on
+  // refocus; tap-to-pause already covers restarting it.
+  useFocusEffect(
+    useCallback(() => {
+      return () => player.pause();
+    }, [player])
+  );
 
   useEffect(() => {
     if (status.didJustFinish) setHasEnded(true);

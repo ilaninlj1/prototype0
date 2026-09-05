@@ -1,5 +1,4 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
@@ -7,6 +6,7 @@ import { TrackRow } from '@/components/discovery/track-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { usePlayback } from '@/hooks/use-playback';
 import type { DiscoveryTrack } from '@/lib/discovery';
 import { loadExportBatches, type ExportBatch } from '@/lib/discovery-storage';
 
@@ -16,8 +16,10 @@ export default function ExportHistoryScreen() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [playingId, setPlayingId] = useState<number | null>(null);
 
-  const player = useAudioPlayer(null);
-  const status = useAudioPlayerStatus(player);
+  // Shared across every screen that plays audio — see hooks/use-playback.tsx —
+  // so starting a preview here always stops one already playing on the swipe
+  // screen or the liked tracks list, and vice versa, since it's the same player.
+  const { player, status } = usePlayback();
 
   // Reload every time this screen gains focus, so a batch exported after it
   // was last opened still shows up on return — mirrors the liked tracks screen.
@@ -34,6 +36,18 @@ export default function ExportHistoryScreen() {
         cancelled = true;
       };
     }, [])
+  );
+
+  // Leaving this screen pauses playback rather than leaving it running in the
+  // background, and clears the local "which row is playing" state so a row
+  // doesn't keep showing a pause icon for a track that's no longer playing.
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        player.pause();
+        setPlayingId(null);
+      };
+    }, [player])
   );
 
   function togglePlay(track: DiscoveryTrack) {
