@@ -3,10 +3,10 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
-import { ActionOverlay } from '@/components/discovery/action-overlay';
 import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
+import { SteeringRow } from '@/components/discovery/steering-row';
 import type { SwipeDirection } from '@/components/discovery/swipe-physics';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { ThemedText } from '@/components/themed-text';
@@ -39,14 +39,14 @@ function randomGenre(): string {
   return GENRES[Math.floor(Math.random() * GENRES.length)];
 }
 
-// Full state needed to roll a single swipe back exactly as it was — see
-// handleCardSwipe (where this is captured) and handleUndo (where it's restored).
+// Full state needed to roll a single swipe (or a steering choice) back
+// exactly as it was — see captureUndoSnapshot (where this is captured) and
+// handleUndo (where it's restored).
 type UndoSnapshot = {
   queue: DiscoveryTrack[];
   strategy: Strategy;
   discoveredGenres: string[];
   swipeHistory: SwipeEntry[];
-  showActionButtons: boolean;
 };
 
 export default function HomeScreen() {
@@ -58,9 +58,7 @@ export default function HomeScreen() {
   const [strategy, setStrategy] = useState<Strategy>({ type: 'genre', genre: 'Pop' });
   const [swipeHistory, setSwipeHistory] = useState<SwipeEntry[]>([]);
   const [discoveredGenres, setDiscoveredGenres] = useState<string[]>([]);
-  const [showActionButtons, setShowActionButtons] = useState(false);
 
-  const lastLikedRef = useRef<DiscoveryTrack | null>(null);
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
   // Bumped by every runRefill call and by handleUndo, so a refill that's still
   // in flight when an undo (or a newer refill) lands can't clobber state with
@@ -201,6 +199,7 @@ export default function HomeScreen() {
   // ---------- Swipe handlers ----------
 
   async function logSwipe(track: DiscoveryTrack, action: SwipeEntry['action']) {
+    const isSteer = action === 'steer-artist' || action === 'steer-sound';
     const entry: SwipeEntry = {
       trackId: track.id,
       trackName: track.trackName,
@@ -211,8 +210,11 @@ export default function HomeScreen() {
       timestamp: Date.now(),
       // status.currentTime is still the swiped track's position at this point
       // — the next track's replace() only happens later, once this swipe's
-      // state updates trigger the autoplay effect to re-run.
-      listenMs: Math.round(status.currentTime * 1000),
+      // state updates trigger the autoplay effect to re-run. Steering skips
+      // this entirely: it isn't a listen event, and the same track gets its
+      // own separate entry (with its own listenMs) later when it's actually
+      // swiped away — recording one here too would double-count that time.
+      ...(isSteer ? {} : { listenMs: Math.round(status.currentTime * 1000) }),
     };
     const nextHistory = [...swipeHistory, entry];
     setSwipeHistory(nextHistory);
@@ -228,38 +230,45 @@ export default function HomeScreen() {
   }
 
   async function handleLike(track: DiscoveryTrack) {
-    lastLikedRef.current = track;
     const nextHistory = await logSwipe(track, 'like');
     await appendLikedTrack(track); // independent of swipeHistory — see lib/discovery-storage.ts
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    setShowActionButtons(true);
     await runRefill(nextQueue, strategy, nextHistory, discoveredGenres);
   }
 
-  async function applyLikeStrategy(next: Strategy) {
-    setShowActionButtons(false);
+  // Steering doesn't touch the currently showing card — it keeps playing and
+  // stays swipeable exactly as before. Only the strategy for what gets
+  // fetched next changes, and (via logSwipe) a steer-* entry records that
+  // this was a deliberate redirect, not passive drift.
+  async function applySteeringStrategy(kind: 'artist' | 'sound', next: Strategy) {
+    const nextHistory = currentTrack
+      ? await logSwipe(currentTrack, kind === 'artist' ? 'steer-artist' : 'steer-sound')
+      : swipeHistory;
     setStrategy(next);
-    // Keep the one card already committed to showing next, but drop the rest of the
-    // buffered tail — it was backfilled under the old strategy right after the like,
-    // so the queue is normally already at target depth by the time this runs. Without
-    // truncating it here, refillQueue sees a full queue and no-ops, and the new
-    // strategy never actually gets fetched until the stale tail drains on its own.
+    // Keep the card already showing, but drop the rest of the buffered tail —
+    // it was fetched under the old strategy, so without truncating it here,
+    // refillQueue sees a full queue and no-ops, and the new strategy never
+    // actually gets fetched until the stale tail drains on its own.
     const preserved = queue.slice(0, 1);
     setQueue(preserved);
-    await runRefill(preserved, next, swipeHistory, discoveredGenres);
+    await runRefill(preserved, next, nextHistory, discoveredGenres);
   }
 
   function handleMoreFromArtist() {
-    const liked = lastLikedRef.current;
-    if (!liked) return;
-    applyLikeStrategy({ type: 'artist', artistId: liked.artistId, artistName: liked.artistName });
+    if (!currentTrack) return;
+    captureUndoSnapshot();
+    applySteeringStrategy('artist', {
+      type: 'artist',
+      artistId: currentTrack.artistId,
+      artistName: currentTrack.artistName,
+    });
   }
 
   function handleMoreLikeSound() {
-    const liked = lastLikedRef.current;
-    if (!liked) return;
-    applyLikeStrategy({ type: 'genre', genre: liked.primaryGenreName });
+    if (!currentTrack) return;
+    captureUndoSnapshot();
+    applySteeringStrategy('sound', { type: 'genre', genre: currentTrack.primaryGenreName });
   }
 
   // Shared tail of "jump to this genre right now": set strategy, discard the
@@ -279,18 +288,15 @@ export default function HomeScreen() {
     await commitGenreJump(newGenre, nextHistory);
   }
 
-  // Snapshot everything a swipe (or a genre pick) can touch before touching any
-  // of it, so a later undo can restore it exactly — see UndoSnapshot / handleUndo.
+  // Snapshot everything a swipe (a genre pick, or a steering choice) can touch
+  // before touching any of it, so a later undo can restore it exactly — see
+  // UndoSnapshot / handleUndo.
   function captureUndoSnapshot() {
-    setUndoSnapshot({ queue, strategy, discoveredGenres, swipeHistory, showActionButtons });
+    setUndoSnapshot({ queue, strategy, discoveredGenres, swipeHistory });
   }
 
   function handleCardSwipe(direction: SwipeDirection, track: DiscoveryTrack) {
     captureUndoSnapshot();
-    // Any next swipe dismisses a still-open overlay from an earlier like — not
-    // a timer. A right-swipe's own handleLike immediately reopens it for the
-    // new like.
-    setShowActionButtons(false);
     if (direction === 'left') handleSkip(track);
     else if (direction === 'right') handleLike(track);
     else handleGenreJump(track);
@@ -298,7 +304,6 @@ export default function HomeScreen() {
 
   async function handlePickGenre(genre: string) {
     captureUndoSnapshot();
-    setShowActionButtons(false);
     // Same as swipe-down abandoning whatever's currently showing — except
     // there's nothing to log a swipe against if the queue's already empty.
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
@@ -309,7 +314,6 @@ export default function HomeScreen() {
   // uses, just triggered by a tap instead of a gesture.
   async function handleExplore() {
     captureUndoSnapshot();
-    setShowActionButtons(false);
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const target = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
@@ -327,7 +331,6 @@ export default function HomeScreen() {
     setStrategy(snapshot.strategy);
     setDiscoveredGenres(snapshot.discoveredGenres);
     setSwipeHistory(snapshot.swipeHistory);
-    setShowActionButtons(snapshot.showActionButtons);
     await Promise.all([
       saveSwipeHistory(snapshot.swipeHistory),
       saveDiscoveredGenres(snapshot.discoveredGenres),
@@ -369,11 +372,7 @@ export default function HomeScreen() {
             showPlayIcon={showPlayIcon}
           />
 
-          <ActionOverlay
-            visible={showActionButtons}
-            onArtist={handleMoreFromArtist}
-            onSound={handleMoreLikeSound}
-          />
+          <SteeringRow onArtist={handleMoreFromArtist} onSound={handleMoreLikeSound} />
         </>
       ) : (
         <ThemedText style={styles.emptyText}>No more tracks — try again in a bit.</ThemedText>

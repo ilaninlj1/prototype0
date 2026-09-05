@@ -11,7 +11,12 @@ export type DiscoveryTrack = {
   trackViewUrl: string;
 };
 
-export type SwipeAction = 'skip' | 'like' | 'genre-jump';
+// 'steer-artist'/'steer-sound': logged when the user redirects discovery
+// (SteeringRow) without swiping the current track away — see the derivations
+// below for how these are kept out of listen-time and visit-count metrics.
+export type SwipeAction = 'skip' | 'like' | 'genre-jump' | 'steer-artist' | 'steer-sound';
+
+const STEER_ACTIONS = new Set<SwipeAction>(['steer-artist', 'steer-sound']);
 
 export type SwipeEntry = {
   trackId: number;
@@ -447,7 +452,10 @@ export function deriveGenrePath(entries: SwipeEntry[]): GenreVisit[] {
   const visits: GenreVisit[] = [];
   for (const entry of entries) {
     const current = visits[visits.length - 1];
-    if (current && current.genre === entry.genre) {
+    // A steer entry never merges into the running visit, even when its genre
+    // matches — it's a deliberate re-arrival, not a continuation of drift.
+    const continuesRun = current && current.genre === entry.genre && !STEER_ACTIONS.has(entry.action);
+    if (continuesRun) {
       current.trackCount += 1;
       current.listenMs += entry.listenMs ?? 0;
     } else {
@@ -476,7 +484,12 @@ export function rankGenresByListenTime(history: SwipeEntry[]): { genre: string; 
 export function rankGenresByVisits(sessions: Session[]): { genre: string; visits: number }[] {
   const counts = new Map<string, number>();
   for (const session of sessions) {
-    for (const visit of deriveGenrePath(session.entries)) {
+    // Steering isn't a visit — it doesn't reflect time spent anywhere, so it's
+    // dropped before run-collapsing rather than merely not forcing a boundary
+    // (deriveGenrePath's forced-boundary rule is for the path *display*, which
+    // sees the unfiltered entries instead).
+    const heardEntries = session.entries.filter((e) => !STEER_ACTIONS.has(e.action));
+    for (const visit of deriveGenrePath(heardEntries)) {
       counts.set(visit.genre, (counts.get(visit.genre) ?? 0) + 1);
     }
   }
@@ -533,8 +546,13 @@ export function deriveTopArtists(history: SwipeEntry[], minTracks = 2): ArtistSt
     if (entry.artistName) names.set(entry.artistId, entry.artistName);
   }
 
+  // Name resolution above scans full history (a steer entry still carries a
+  // usable artistName), but grouping excludes steer entries — otherwise
+  // steering alone could inflate an artist's displayed trackCount without any
+  // track actually being judged.
+  const judged = history.filter((e) => !STEER_ACTIONS.has(e.action));
   const groups = new Map<number, { count: number; listenSum: number; listenCount: number }>();
-  for (const entry of history) {
+  for (const entry of judged) {
     const bucket = groups.get(entry.artistId) ?? { count: 0, listenSum: 0, listenCount: 0 };
     bucket.count += 1;
     if (entry.listenMs !== undefined) {

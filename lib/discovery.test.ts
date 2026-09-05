@@ -508,3 +508,74 @@ test('deriveTopArtists excludes an artist with no named entry anywhere, even if 
   ];
   assert.deepEqual(deriveTopArtists(history), []);
 });
+
+// ---------- Steering: 'steer-artist' / 'steer-sound' ----------
+
+test('deriveGenrePath starts a new visit for a steer entry even when the genre matches the previous one', () => {
+  const entries = [
+    swipe({ genre: 'Rock', action: 'skip', timestamp: 0 }),
+    swipe({ genre: 'Rock', action: 'steer-sound', timestamp: 10 }),
+  ];
+  assert.equal(deriveGenrePath(entries).length, 2);
+});
+
+test('deriveGenrePath still merges a following non-steer entry into the run a steer entry opened', () => {
+  const entries = [
+    swipe({ genre: 'Rock', action: 'steer-sound', timestamp: 0 }),
+    swipe({ genre: 'Rock', action: 'skip', timestamp: 10 }),
+  ];
+  const visits = deriveGenrePath(entries);
+  assert.equal(visits.length, 1);
+  assert.equal(visits[0].trackCount, 2);
+});
+
+test('rankGenresByVisits counts nothing for a session containing only a steer entry', () => {
+  const session: Session = {
+    entries: [swipe({ genre: 'Rock', action: 'steer-sound', timestamp: 0 })],
+    startedAt: 0,
+    endedAt: 0,
+  };
+  assert.deepEqual(rankGenresByVisits([session]), []);
+});
+
+test('rankGenresByVisits treats a steer entry sandwiched between real swipes as a no-op, not an extra visit', () => {
+  const session: Session = {
+    entries: [
+      swipe({ genre: 'Rock', action: 'skip', timestamp: 0 }),
+      swipe({ genre: 'Rock', action: 'steer-sound', timestamp: 10 }),
+      swipe({ genre: 'Rock', action: 'skip', timestamp: 20 }),
+    ],
+    startedAt: 0,
+    endedAt: 20,
+  };
+  assert.deepEqual(rankGenresByVisits([session]), [{ genre: 'Rock', visits: 1 }]);
+});
+
+test('deriveTopArtists excludes an artist that only reaches minTracks through steer entries', () => {
+  const history = [
+    swipe({ trackId: 1, artistId: 1, artistName: 'SteerOnly', action: 'steer-sound', timestamp: 1 }),
+    swipe({ trackId: 2, artistId: 1, artistName: 'SteerOnly', action: 'steer-artist', timestamp: 2 }),
+    swipe({ trackId: 3, artistId: 2, artistName: 'Filler', listenMs: 0, timestamp: 3 }),
+  ];
+  assert.deepEqual(deriveTopArtists(history), []);
+});
+
+test('deriveTopArtists resolves a name from a steer entry for an artist that otherwise qualifies through judged entries', () => {
+  const history = [
+    swipe({ trackId: 10, artistId: 5, artistName: undefined, action: 'skip', timestamp: 1, listenMs: 9000 }),
+    swipe({ trackId: 11, artistId: 5, artistName: undefined, action: 'skip', timestamp: 2, listenMs: 9000 }),
+    swipe({ trackId: 12, artistId: 5, artistName: 'SteerName', action: 'steer-sound', timestamp: 3 }),
+    swipe({ trackId: 13, artistId: 6, artistName: 'Filler', listenMs: 0, timestamp: 4 }),
+  ];
+  // overall average = (9000 + 9000 + 0) / 3 = 6000 (the steer entry has no listenMs to contribute)
+  assert.deepEqual(deriveTopArtists(history), [
+    { artistId: 5, artistName: 'SteerName', avgListenMs: 9000, trackCount: 2 },
+  ]);
+});
+
+test('a steer entry is inert to deriveRatedGenres, rankGenresByListenTime, and derivePlayedToEndButSkipped', () => {
+  const entry = swipe({ genre: 'Rock', action: 'steer-sound', timestamp: 0 });
+  assert.deepEqual(deriveRatedGenres([entry]), new Set());
+  assert.deepEqual(rankGenresByListenTime([entry]), [{ genre: 'Rock', listenMs: 0 }]);
+  assert.deepEqual(derivePlayedToEndButSkipped([entry]), []);
+});
