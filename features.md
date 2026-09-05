@@ -67,3 +67,11 @@ hold an iTunes track and have to find the same song in their catalog by artist
 and title — matching will sometimes fail. Apple Music is the same idea but needs
 the $99 developer account, though the catalog IDs may line up directly since the
 previews already come from Apple.
+
+## [2026-09-05] Explore from a liked track
+The liked list is currently a dead end — you can play, link out, or delete, but
+not act on it. Tapping a liked track should offer "more from this artist" and
+"more like this sound," setting the strategy and returning to the swipe feed.
+Same machinery as the post-like overlay, but reachable when you're browsing what
+you saved rather than only in the moment after a swipe. May be a better home for
+those two options than the overlay is.
