@@ -19,6 +19,7 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Liked Tracks' }} />
+        <Stack.Screen name="export-history" options={{ presentation: 'modal', title: 'Export History' }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

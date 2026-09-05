@@ -9,6 +9,7 @@ const STORAGE_PREFIX = 'blindspotDiscovery';
 const SWIPE_HISTORY_KEY = `${STORAGE_PREFIX}:swipeHistory`;
 const DISCOVERED_GENRES_KEY = `${STORAGE_PREFIX}:discoveredGenres`;
 const LIKED_TRACKS_KEY = `${STORAGE_PREFIX}:likedTracks`;
+const EXPORT_BATCHES_KEY = `${STORAGE_PREFIX}:exportBatches`;
 
 export async function loadSwipeHistory(): Promise<SwipeEntry[]> {
   try {
@@ -101,6 +102,37 @@ export async function appendLikedTrack(track: DiscoveryTrack): Promise<void> {
 export async function saveLikedTracks(tracks: DiscoveryTrack[]): Promise<void> {
   try {
     await AsyncStorage.setItem(LIKED_TRACKS_KEY, JSON.stringify(tracks));
+  } catch {
+    // ignore
+  }
+}
+
+// A bulk export archives the exported tracks here, browsable later, and
+// removes them from likedTracks — this is what makes "export" different from
+// "delete": the tracks aren't gone, just moved out of the active list.
+
+export type ExportBatch = {
+  id: string;
+  exportedAt: number;
+  tracks: DiscoveryTrack[];
+};
+
+export async function loadExportBatches(): Promise<ExportBatch[]> {
+  try {
+    const raw = await AsyncStorage.getItem(EXPORT_BATCHES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function appendExportBatch(batch: ExportBatch): Promise<void> {
+  try {
+    const existing = await loadExportBatches();
+    existing.push(batch);
+    await AsyncStorage.setItem(EXPORT_BATCHES_KEY, JSON.stringify(existing));
   } catch {
     // ignore
   }
