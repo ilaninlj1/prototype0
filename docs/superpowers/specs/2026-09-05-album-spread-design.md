@@ -52,13 +52,20 @@ export const ALBUM_SPREAD_CAP = 1;
  * anything — it's treated as its own ungrouped track, not lumped in with
  * other album-less tracks.
  *
- * Greedy: at each step, picks the first remaining candidate (preserving
- * iTunes's original relevance order as a tie-break) that satisfies the cap
- * against the trailing window so far. If NONE do — the batch is dominated
- * enough that spreading is exhausted — takes the next remaining candidate
- * anyway rather than stall the queue below target depth. This can still
- * place two of the same album consecutively in that fully-starved case; that's
- * accepted as better than an under-filled queue.
+ * Greedy, with a two-tier fallback so relaxing the cap never means relaxing
+ * all the way to unbounded:
+ *
+ *  1. Prefer the first remaining candidate (preserving iTunes's original
+ *     relevance order as a tie-break) that satisfies the full window/cap
+ *     rule against the trailing window so far.
+ *  2. If none do, fall back to the one guarantee that doesn't relax: the
+ *     first remaining candidate that at least isn't the same album as the
+ *     track just placed. This is what keeps "no two consecutive" true even
+ *     when the broader 1-per-5 cap has to give.
+ *  3. Only if EVERY remaining candidate is the same album as the one just
+ *     placed — there is no other track left to interleave with at all —
+ *     does a repeat happen. This is the true floor: it can't be avoided
+ *     without inventing a track that doesn't exist in what was fetched.
  */
 export function spreadByAlbum(
   candidates: DiscoveryTrack[],
@@ -70,12 +77,18 @@ export function spreadByAlbum(
 
   while (remaining.length > 0) {
     const trailing = window.slice(-(ALBUM_SPREAD_WINDOW - 1));
+    const last = window[window.length - 1];
+
     let index = remaining.findIndex((t) => {
       if (t.collectionId === undefined) return true;
       const count = trailing.filter((id) => id === t.collectionId).length;
       return count < ALBUM_SPREAD_CAP;
     });
-    if (index === -1) index = 0; // nothing satisfies the cap — relax it rather than stall
+    if (index === -1) {
+      index = remaining.findIndex((t) => t.collectionId === undefined || t.collectionId !== last);
+    }
+    if (index === -1) index = 0; // every remaining candidate is the same album as the one just placed
+
     const [chosen] = remaining.splice(index, 1);
     placed.push(chosen);
     window.push(chosen.collectionId);
@@ -84,11 +97,11 @@ export function spreadByAlbum(
 }
 ```
 
-A track with no `collectionId` always satisfies the cap check (`return true` immediately), which has a convenient side effect worth calling out: when nothing in a batch has a `collectionId` at all (as in every existing `refillQueue` test, which never sets it), `spreadByAlbum` always picks `remaining[0]` and is a pure identity/order-preserving pass-through — existing behavior is unaffected without touching those tests.
+A track with no `collectionId` always satisfies tier 1 (`return true` immediately), which has a convenient side effect worth calling out: when nothing in a batch has a `collectionId` at all (as in every existing `refillQueue` test, which never sets it), `spreadByAlbum` always picks `remaining[0]` via tier 1 and is a pure identity/order-preserving pass-through — existing behavior is unaffected without touching those tests. `undefined` values elsewhere in `recentAlbumIds` (pre-migration `SwipeEntry`s — see below) are similarly inert: `undefined === t.collectionId` is always `false` for a real album id, so a slot with no recorded album can never spuriously match one, and `t.collectionId !== last` is `true` whenever `last` is `undefined`, so tier 2 works the same way against an unknown predecessor as against a known different one.
 
 ## `refillQueue` / `refillQueueWithFallback`: threading the window through
 
-`refillQueue` gains one new, defaulted parameter so every existing call site (production and tests) that doesn't care about spreading keeps compiling unchanged:
+**Spreading has to see everything fetched in one `refillQueue` call before placing anything, not one batch at a time.** Spreading per-batch-as-it-arrives can't fix an adjacency forced by a dominated first batch even if a *later* batch in the same call turns out to have alternatives — and a dominated single batch is exactly the reported bug. So `refillQueue`'s loop now accumulates fetched-but-not-yet-placed candidates into a `pool` across attempts, and spreads once, after fetching stops (either because enough candidates were gathered or attempts ran out) rather than after every individual batch:
 
 ```ts
 export async function refillQueue(
@@ -100,26 +113,29 @@ export async function refillQueue(
 ): Promise<RefillResult> {
   let result = [...queue];
   const fetched: DiscoveryTrack[] = [];
+  const pool: DiscoveryTrack[] = [];
   let attempts = 0;
 
-  while (result.length < QUEUE_TARGET_DEPTH && attempts < MAX_REFILL_ATTEMPTS) {
+  while (result.length + pool.length < QUEUE_TARGET_DEPTH && attempts < MAX_REFILL_ATTEMPTS) {
     attempts += 1;
     const batch = dedupeDiscoveryTracks(await fetcher(strategy));
     fetched.push(...batch);
 
-    const queuedIds = new Set(result.map((t) => t.id));
+    const queuedIds = new Set([...result, ...pool].map((t) => t.id));
     const fresh = batch.filter((t) => !seenTrackIds.has(t.id) && !queuedIds.has(t.id));
-    if (fresh.length === 0) continue;
+    pool.push(...fresh);
+  }
 
+  if (pool.length > 0) {
     const windowSoFar = [...recentAlbumIds, ...result.map((t) => t.collectionId)];
-    result = [...result, ...spreadByAlbum(fresh, windowSoFar)].slice(0, QUEUE_TARGET_DEPTH);
+    result = [...result, ...spreadByAlbum(pool, windowSoFar)].slice(0, QUEUE_TARGET_DEPTH);
   }
 
   return { queue: result, fetched };
 }
 ```
 
-`windowSoFar` is recomputed each loop iteration from the live `result` (which already starts as the current queue and keeps growing), so both cross-batch spreading within one `refillQueue` call and the boundary between the already-buffered queue and newly appended tracks are covered by the same mechanism — no special-casing the first batch versus later ones.
+The loop's exit condition (`result.length + pool.length < QUEUE_TARGET_DEPTH`) fires at the same point the old per-batch-append version did, so the number of fetch attempts made in each existing test scenario is unchanged (hand-traced against all four existing `refillQueue`/`refillQueueWithFallback` tests — none of their assertions move); this only changes *when* placement happens, not how much gets fetched.
 
 `refillQueueWithFallback` derives the trailing history slice once and passes it to every `refillQueue` call it makes (including across genre-fallback attempts):
 
@@ -131,9 +147,16 @@ const result = await refillQueue(currentQueue, currentStrategy, seenTrackIds, fe
 
 ## Testing (`lib/discovery.test.ts`)
 
-- `spreadByAlbum`: two same-album candidates never end up adjacent when a different-album candidate is available to place between them; a candidate with no `collectionId` is never treated as matching another no-`collectionId` candidate; the cap is evaluated against `recentAlbumIds` too (a candidate matching something already in the trailing window gets deferred behind a candidate that doesn't); when every remaining candidate is the same over-represented album, the function still places all of them (never drops one) even though the cap ends up exceeded; empty `candidates` returns `[]`.
-- `refillQueue`: with `recentAlbumIds` supplied and a fetched batch containing an album run, the resulting queue has no two consecutive same-`collectionId` tracks; with no `collectionId` set anywhere (existing test style), behavior is unchanged from before this change.
-- No changes needed to existing `refillQueue`/`refillQueueWithFallback` tests — the new parameter is defaulted and inert when unused.
+- `spreadByAlbum`:
+  - Two same-album candidates never end up adjacent when a different-album candidate is available to place between them.
+  - A candidate with no `collectionId` is never treated as matching another no-`collectionId` candidate.
+  - The cap is evaluated against `recentAlbumIds` too (a candidate matching something already in the trailing window gets deferred behind a candidate that doesn't).
+  - **Tier-2 floor:** when the full cap can't be satisfied but a *different* album is still available among the remaining candidates, that different album is placed next — never a repeat of the immediately preceding one, even though the broader window/cap is violated.
+  - **Tier-3 (true floor):** when every single remaining candidate is the same album as the one just placed, the function still places all of them (never drops one) even though this does produce a repeat — there is no alternative to place instead.
+  - **Pre-migration data:** a `recentAlbumIds` array containing `undefined` entries (simulating history from before this field existed) doesn't crash and doesn't cause a real-`collectionId` candidate to be treated as matching an unknown one.
+  - Empty `candidates` returns `[]`.
+- `refillQueue`: a scenario where the first fetch attempt returns a batch entirely of one album and a second attempt (needed to reach target depth) returns a different album confirms spreading happens across the accumulated pool, not per-batch — the first attempt's tracks and the second's end up interleaved rather than all of album A placed before any of album B is considered. With no `collectionId` set anywhere (existing test style), behavior is unchanged from before this change.
+- No changes needed to existing `refillQueue`/`refillQueueWithFallback` tests — the new parameter is defaulted and inert when unused, and the pool-based restructuring was hand-verified to preserve their exact fetch-attempt counts and outputs.
 
 ## Out of scope
 
