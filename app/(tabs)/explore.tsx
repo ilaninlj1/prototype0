@@ -7,7 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   averageListenMs,
-  deriveGenrePath,
+  deriveGenrePathSegments,
   deriveSessions,
   deriveTopArtists,
   derivePlayedToEndButSkipped,
@@ -39,11 +39,42 @@ function formatSessionLabel(startedAt: number): string {
   return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
-/** The chain of genres a run of entries moved through, e.g. "Pop → House → Jazz". */
-function genrePathLabel(entries: SwipeEntry[]): string {
-  return deriveGenrePath(entries)
-    .map((visit) => visit.genre)
-    .join(' → ');
+// Sized off the spacing scale rather than a magic number — see the marker
+// styles below.
+const MARKER_SIZE = Spacing.sm;
+
+/**
+ * The chain of genres a run of entries moved through, e.g. "Pop → House →
+ * Jazz", with a small marker in front of any genre that was deliberately
+ * steered into (as opposed to drifted into) — a circle for "more from this
+ * artist", a square for "more like this sound". Both use the app's one
+ * accent color; shape (not a second color) is what tells them apart, since
+ * the palette deliberately has a single accent. Rendered as actual Views
+ * rather than characters so there's no font-rendering dependence, which
+ * means each segment is its own small row (arrow + marker + genre name kept
+ * together) inside a wrapping flex container, rather than one block of text —
+ * a View can't nest inline inside Text.
+ */
+function GenrePathChain({ entries }: { entries: SwipeEntry[] }) {
+  const segments = deriveGenrePathSegments(entries);
+  return (
+    <ThemedView style={styles.pathRow} backgroundColor="transparent">
+      {segments.map((segment, i) => (
+        <ThemedView key={i} style={styles.pathSegment} backgroundColor="transparent">
+          {i > 0 && <ThemedText style={styles.pathArrow}>→</ThemedText>}
+          {segment.openedBy && (
+            <ThemedView
+              style={[
+                styles.marker,
+                segment.openedBy === 'steer-artist' ? styles.markerArtist : styles.markerSound,
+              ]}
+            />
+          )}
+          <ThemedText style={styles.pathText}>{segment.genre}</ThemedText>
+        </ThemedView>
+      ))}
+    </ThemedView>
+  );
 }
 
 export default function ProfileScreen() {
@@ -186,7 +217,7 @@ export default function ProfileScreen() {
             {currentSession ? (
               <>
                 <ThemedText type="defaultSemiBold">Current session</ThemedText>
-                <ThemedText style={styles.pathText}>{genrePathLabel(currentSession.entries)}</ThemedText>
+                <GenrePathChain entries={currentSession.entries} />
               </>
             ) : null}
             <ThemedText type="defaultSemiBold" style={styles.allSessionsHeading}>
@@ -201,7 +232,7 @@ export default function ProfileScreen() {
                   {formatSessionLabel(session.startedAt)} · {session.entries.length}{' '}
                   {session.entries.length === 1 ? 'track' : 'tracks'}
                 </ThemedText>
-                <ThemedText style={styles.pathText}>{genrePathLabel(session.entries)}</ThemedText>
+                <GenrePathChain entries={session.entries} />
               </ThemedView>
             ))}
           </>
@@ -265,6 +296,32 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.md,
     gap: 2,
+  },
+  pathRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: Spacing.xs,
+    rowGap: Spacing.xs,
+  },
+  pathSegment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  pathArrow: {
+    color: Colors.textSecondary,
+  },
+  marker: {
+    width: MARKER_SIZE,
+    height: MARKER_SIZE,
+    backgroundColor: Colors.accent,
+  },
+  markerArtist: {
+    borderRadius: Radius.pill, // circle
+  },
+  markerSound: {
+    borderRadius: 0, // square
   },
   pathText: {
     color: Colors.textSecondary,

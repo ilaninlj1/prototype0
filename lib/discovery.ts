@@ -465,6 +465,36 @@ export function deriveGenrePath(entries: SwipeEntry[]): GenreVisit[] {
   return visits;
 }
 
+export type GenrePathSegment = {
+  genre: string;
+  openedBy: 'steer-artist' | 'steer-sound' | null;
+};
+
+/**
+ * Same boundary rule as deriveGenrePath (a steer entry always opens a new
+ * visit; a non-steer entry merges when the genre matches), but for display:
+ * each segment is tagged with which steer action opened it, or null for an
+ * ordinary transition. Only the Profile screen's path rendering uses this —
+ * ranking (rankGenresByVisits) goes through deriveGenrePath directly, since
+ * trackCount/listenMs (which this doesn't need) matter there and openedBy
+ * doesn't.
+ */
+export function deriveGenrePathSegments(entries: SwipeEntry[]): GenrePathSegment[] {
+  const segments: GenrePathSegment[] = [];
+  for (const entry of entries) {
+    const isSteer = STEER_ACTIONS.has(entry.action);
+    const last = segments[segments.length - 1];
+    const continuesRun = last && last.genre === entry.genre && !isSteer;
+    if (!continuesRun) {
+      segments.push({
+        genre: entry.genre,
+        openedBy: isSteer ? (entry.action as 'steer-artist' | 'steer-sound') : null,
+      });
+    }
+  }
+  return segments;
+}
+
 /** Total listen time per genre across all of history, sorted descending. */
 export function rankGenresByListenTime(history: SwipeEntry[]): { genre: string; listenMs: number }[] {
   const totals = new Map<string, number>();

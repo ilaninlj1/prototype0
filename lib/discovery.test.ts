@@ -28,6 +28,7 @@ import {
   PLAYED_TO_END_THRESHOLD_MS,
   derivePlayedToEndButSkipped,
   deriveTopArtists,
+  deriveGenrePathSegments,
   type DiscoveryTrack,
   type SwipeEntry,
   type Strategy,
@@ -578,4 +579,42 @@ test('a steer entry is inert to deriveRatedGenres, rankGenresByListenTime, and d
   assert.deepEqual(deriveRatedGenres([entry]), new Set());
   assert.deepEqual(rankGenresByListenTime([entry]), [{ genre: 'Rock', listenMs: 0 }]);
   assert.deepEqual(derivePlayedToEndButSkipped([entry]), []);
+});
+
+// ---------- deriveGenrePathSegments ----------
+
+test('deriveGenrePathSegments tags a segment opened by steer-artist or steer-sound, and null for an ordinary transition', () => {
+  const entries = [
+    swipe({ genre: 'Rock', action: 'skip', timestamp: 0 }),
+    swipe({ genre: 'Pop', action: 'steer-artist', timestamp: 10 }),
+    swipe({ genre: 'Jazz', action: 'steer-sound', timestamp: 20 }),
+  ];
+  assert.deepEqual(deriveGenrePathSegments(entries), [
+    { genre: 'Rock', openedBy: null },
+    { genre: 'Pop', openedBy: 'steer-artist' },
+    { genre: 'Jazz', openedBy: 'steer-sound' },
+  ]);
+});
+
+test('deriveGenrePathSegments gives a steer entry its own segment even when the genre matches the previous one', () => {
+  const entries = [
+    swipe({ genre: 'Pop', action: 'skip', timestamp: 0 }),
+    swipe({ genre: 'Pop', action: 'steer-sound', timestamp: 10 }),
+  ];
+  assert.deepEqual(deriveGenrePathSegments(entries), [
+    { genre: 'Pop', openedBy: null },
+    { genre: 'Pop', openedBy: 'steer-sound' },
+  ]);
+});
+
+test('deriveGenrePathSegments merges a following non-steer entry into the segment a steer entry opened', () => {
+  const entries = [
+    swipe({ genre: 'Pop', action: 'steer-artist', timestamp: 0 }),
+    swipe({ genre: 'Pop', action: 'skip', timestamp: 10 }),
+  ];
+  assert.deepEqual(deriveGenrePathSegments(entries), [{ genre: 'Pop', openedBy: 'steer-artist' }]);
+});
+
+test('deriveGenrePathSegments returns an empty array for empty input', () => {
+  assert.deepEqual(deriveGenrePathSegments([]), []);
 });
