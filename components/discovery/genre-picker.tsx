@@ -10,6 +10,7 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { buildGenreSections, type GenreSection } from './genre-taxonomy';
 
 type GenrePickerProps = {
@@ -110,9 +111,10 @@ export function GenrePicker({
         onLayout={(e) => registerRowOffset(genre, e)}>
         <ThemedView
           style={[styles.leafRow, indented && styles.rowIndented, isCurrent && styles.rowCurrent]}
-          lightColor="#1a1a1a"
-          darkColor="#1a1a1a">
-          <ThemedText style={styles.rowText}>{genre}</ThemedText>
+          backgroundColor={Colors.surface}>
+          <ThemedText type="label" style={styles.rowText}>
+            {genre}
+          </ThemedText>
           {heard && <ThemedText style={styles.checkmark}>✓</ThemedText>}
         </ThemedView>
       </TouchableOpacity>
@@ -127,14 +129,15 @@ export function GenrePicker({
       <ThemedView key={section.label}>
         <ThemedView
           style={[styles.groupRow, isCurrent && styles.rowCurrent]}
-          lightColor="#1a1a1a"
-          darkColor="#1a1a1a"
+          backgroundColor={Colors.surface}
           onLayout={section.genre ? (e) => registerRowOffset(section.genre as string, e) : undefined}>
           <TouchableOpacity
             onPress={() => (section.genre ? pick(section.genre) : toggleGroup(section.label))}
             activeOpacity={0.7}
             style={styles.groupLabelTap}>
-            <ThemedText style={styles.rowText}>{section.label}</ThemedText>
+            <ThemedText type="label" style={styles.rowText}>
+              {section.label}
+            </ThemedText>
             {heard && <ThemedText style={styles.checkmark}>✓</ThemedText>}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => toggleGroup(section.label)} activeOpacity={0.7} style={styles.chevronTap}>
@@ -149,8 +152,8 @@ export function GenrePicker({
   return (
     <>
       <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.7} style={styles.trigger}>
-        <ThemedView style={styles.triggerButton} lightColor="#2a2a2a" darkColor="#2a2a2a">
-          <ThemedText style={styles.triggerText} numberOfLines={1}>
+        <ThemedView style={styles.triggerButton} backgroundColor={Colors.surfaceElevated}>
+          <ThemedText type="label" numberOfLines={1} style={styles.triggerText}>
             {currentLabel}
           </ThemedText>
         </ThemedView>
@@ -161,8 +164,10 @@ export function GenrePicker({
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <ScrollView ref={scrollRef} contentContainerStyle={styles.list}>
               <TouchableOpacity onPress={explore} activeOpacity={0.7}>
-                <ThemedView style={styles.exploreRow}>
-                  <ThemedText style={styles.exploreText}>🔀 Explore</ThemedText>
+                <ThemedView style={styles.exploreRow} backgroundColor={Colors.surface}>
+                  <ThemedText type="label" style={styles.exploreText}>
+                    🔀 Explore
+                  </ThemedText>
                 </ThemedView>
               </TouchableOpacity>
               {sections.map((section) =>
@@ -179,84 +184,80 @@ export function GenrePicker({
 const styles = StyleSheet.create({
   trigger: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: Spacing.lg,
+    right: Spacing.lg,
     maxWidth: 200,
     zIndex: 1,
   },
   triggerButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 999,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.pill,
   },
   triggerText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+    color: Colors.textSecondary,
   },
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   sheet: {
     maxHeight: '70%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
     overflow: 'hidden',
   },
   list: {
-    paddingVertical: 8,
+    paddingVertical: Spacing.sm,
   },
   exploreRow: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: Spacing.md + 2,
+    paddingHorizontal: Spacing.xl,
   },
   exploreText: {
-    color: '#4a9eff',
+    color: Colors.accent,
     fontSize: 16,
-    fontWeight: '600',
   },
   leafRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: Spacing.md + 2,
+    paddingHorizontal: Spacing.xl,
   },
   rowIndented: {
-    paddingLeft: 36,
+    paddingLeft: Spacing.xxl + Spacing.md,
   },
   rowCurrent: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: Colors.surfaceElevated,
   },
   groupRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.xl,
   },
   groupLabelTap: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    paddingVertical: Spacing.md + 2,
   },
   chevronTap: {
-    paddingVertical: 14,
-    paddingLeft: 12,
+    paddingVertical: Spacing.md + 2,
+    paddingLeft: Spacing.md,
   },
   chevron: {
-    color: '#fff',
+    color: Colors.textTertiary,
     fontSize: 16,
-    opacity: 0.6,
   },
   rowText: {
-    color: '#fff',
     fontSize: 16,
   },
   checkmark: {
-    color: '#4cd964',
+    color: Colors.accent,
     fontSize: 16,
     fontWeight: '600',
   },

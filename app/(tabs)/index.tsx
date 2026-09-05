@@ -11,6 +11,7 @@ import type { SwipeDirection } from '@/components/discovery/swipe-physics';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Spacing } from '@/constants/theme';
 import {
   deriveGenresHeard,
   deriveRatedGenres,
@@ -322,7 +323,7 @@ export default function HomeScreen() {
   if (!hydrated) {
     return (
       <ThemedView style={styles.centered}>
-        <ActivityIndicator />
+        <ActivityIndicator color={Colors.accent} />
       </ThemedView>
     );
   }
@@ -359,7 +360,7 @@ export default function HomeScreen() {
           />
         </>
       ) : (
-        <ThemedText>No more tracks — try again in a bit.</ThemedText>
+        <ThemedText style={styles.emptyText}>No more tracks — try again in a bit.</ThemedText>
       )}
     </ThemedView>
   );
@@ -368,8 +369,8 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    gap: 12,
+    padding: Spacing.lg,
+    gap: Spacing.md,
     alignItems: 'stretch',
     justifyContent: 'center',
   },
@@ -378,7 +379,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  emptyText: {
+    textAlign: 'center',
+    color: Colors.textSecondary,
+  },
   errorText: {
-    color: '#c0392b',
+    color: Colors.destructive,
   },
 });

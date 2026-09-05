@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity } fr
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   clearGenrePicks,
   isMismatch,
@@ -82,7 +83,7 @@ export default function ProfileScreen() {
   if (!loaded) {
     return (
       <ThemedView style={styles.centered}>
-        <ActivityIndicator />
+        <ActivityIndicator color={Colors.accent} />
       </ThemedView>
     );
   }
@@ -99,20 +100,20 @@ export default function ProfileScreen() {
         <ThemedText type="title">Taste Profile</ThemedText>
 
         {total === 0 ? (
-          <ThemedText>
+          <ThemedText style={styles.dim}>
             No listening history yet. Rate some tracks in the Home tab to build your taste
             profile.
           </ThemedText>
         ) : (
           <>
-            <ThemedView style={styles.statsRow}>
-              <ThemedView style={styles.statTile} lightColor="#f2f2f2" darkColor="#242424">
+            <ThemedView style={styles.statsRow} backgroundColor="transparent">
+              <ThemedView style={styles.statTile} backgroundColor={Colors.surface}>
                 <ThemedText style={styles.statNumber}>{total}</ThemedText>
-                <ThemedText style={styles.statLabel}>tracks rated</ThemedText>
+                <ThemedText type="caption">tracks rated</ThemedText>
               </ThemedView>
-              <ThemedView style={styles.statTile} lightColor="#f2f2f2" darkColor="#242424">
+              <ThemedView style={styles.statTile} backgroundColor={Colors.surface}>
                 <ThemedText style={styles.statNumber}>{mismatchRate}%</ThemedText>
-                <ThemedText style={styles.statLabel}>mismatch rate</ThemedText>
+                <ThemedText type="caption">mismatch rate</ThemedText>
               </ThemedView>
             </ThemedView>
             <ThemedText style={styles.dim}>
@@ -123,8 +124,8 @@ export default function ProfileScreen() {
             <ThemedText type="subtitle" style={styles.sectionTitle}>
               Stated vs. actual taste
             </ThemedText>
-            <ThemedView style={styles.compareRow}>
-              <ThemedView style={styles.compareCol}>
+            <ThemedView style={styles.compareRow} backgroundColor="transparent">
+              <ThemedView style={styles.compareCol} backgroundColor="transparent">
                 <ThemedText type="defaultSemiBold" style={styles.compareHeading}>
                   Your actual top genres
                 </ThemedText>
@@ -139,7 +140,7 @@ export default function ProfileScreen() {
                 )}
               </ThemedView>
 
-              <ThemedView style={styles.compareCol}>
+              <ThemedView style={styles.compareCol} backgroundColor="transparent">
                 <ThemedText type="defaultSemiBold" style={styles.compareHeading}>
                   You said you like
                 </ThemedText>
@@ -167,8 +168,8 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 20,
-    gap: 12,
+    padding: Spacing.lg,
+    gap: Spacing.md,
     alignItems: 'stretch',
   },
   centered: {
@@ -177,16 +178,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sectionTitle: {
-    marginTop: 12,
+    marginTop: Spacing.md,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: Spacing.md,
   },
   statTile: {
     flex: 1,
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.lg,
     alignItems: 'center',
     gap: 2,
   },
@@ -194,26 +195,22 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
   },
-  statLabel: {
-    opacity: 0.7,
-    fontSize: 13,
-  },
   dim: {
-    opacity: 0.6,
+    color: Colors.textSecondary,
   },
   compareRow: {
     flexDirection: 'row',
-    gap: 20,
+    gap: Spacing.xl,
   },
   compareCol: {
     flex: 1,
-    gap: 4,
+    gap: Spacing.xs,
   },
   compareHeading: {
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   redoLink: {
-    marginTop: 24,
+    marginTop: Spacing.xl,
     alignSelf: 'flex-start',
   },
 });

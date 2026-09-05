@@ -18,6 +18,7 @@ import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { TrackRow } from '@/components/discovery/track-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { buildSpotifySearchUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { appendExportBatch, loadLikedTracks, saveLikedTracks } from '@/lib/discovery-storage';
 
@@ -210,7 +211,7 @@ export default function LikedTracksScreen() {
   if (!loaded) {
     return (
       <ThemedView style={styles.centered}>
-        <ActivityIndicator />
+        <ActivityIndicator color={Colors.accent} />
       </ThemedView>
     );
   }
@@ -222,9 +223,9 @@ export default function LikedTracksScreen() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <ThemedView style={styles.container}>
           {selectionMode ? (
-            <ThemedView style={styles.toolbar}>
+            <ThemedView style={styles.toolbar} backgroundColor="transparent">
               <ThemedText type="defaultSemiBold">{selectedIds.size} selected</ThemedText>
-              <ThemedView style={styles.toolbarActions} lightColor="transparent" darkColor="transparent">
+              <ThemedView style={styles.toolbarActions} backgroundColor="transparent">
                 <TouchableOpacity onPress={handleBulkExport} disabled={selectedIds.size === 0}>
                   <ThemedText type="link">Export</ThemedText>
                 </TouchableOpacity>
@@ -234,7 +235,9 @@ export default function LikedTracksScreen() {
                   </ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={exitSelectionMode}>
-                  <ThemedText type="link">Cancel</ThemedText>
+                  <ThemedText type="label" style={styles.cancelLink}>
+                    Cancel
+                  </ThemedText>
                 </TouchableOpacity>
               </ThemedView>
             </ThemedView>
@@ -245,7 +248,7 @@ export default function LikedTracksScreen() {
           )}
 
           {newestFirst.length === 0 ? (
-            <ThemedText>No liked tracks yet — swipe right on something you like.</ThemedText>
+            <ThemedText style={styles.emptyText}>No liked tracks yet — swipe right on something you like.</ThemedText>
           ) : (
             newestFirst.map((track) => {
               const isPlayingThis = playingId === track.id && status.playing;
@@ -256,13 +259,13 @@ export default function LikedTracksScreen() {
                   onPress={selectionMode ? () => toggleSelected(track) : undefined}
                   onLongPress={() => handleLongPressRow(track)}
                   delayLongPress={350}>
-                  <ThemedView style={[styles.rowWrapper, isSelected && styles.rowSelected]}>
+                  <ThemedView style={[styles.rowWrapper, isSelected && styles.rowSelected]} backgroundColor="transparent">
                     {selectionMode && (
-                      <ThemedView style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
+                      <ThemedView style={[styles.checkbox, isSelected && styles.checkboxChecked]} backgroundColor="transparent">
                         {isSelected && <ThemedText style={styles.checkboxMark}>✓</ThemedText>}
                       </ThemedView>
                     )}
-                    <ThemedView style={styles.rowContent} lightColor="transparent" darkColor="transparent">
+                    <ThemedView style={styles.rowContent} backgroundColor="transparent">
                       <TrackRow
                         track={track}
                         isPlaying={isPlayingThis}
@@ -282,7 +285,9 @@ export default function LikedTracksScreen() {
                     <TouchableOpacity
                       onPress={() => handleRequestDelete(track, swipeableMethods.close)}
                       style={styles.deleteAction}>
-                      <ThemedText style={styles.deleteActionText}>Delete</ThemedText>
+                      <ThemedText type="label" style={styles.deleteActionText}>
+                        Delete
+                      </ThemedText>
                     </TouchableOpacity>
                   )}>
                   {row}
@@ -296,17 +301,17 @@ export default function LikedTracksScreen() {
       <Modal visible={fallbackText !== null} transparent animationType="fade" onRequestClose={dismissFallback}>
         <Pressable style={styles.backdrop} onPress={dismissFallback}>
           <Pressable style={styles.fallbackSheet} onPress={(e) => e.stopPropagation()}>
-            <ThemedText type="defaultSemiBold" style={styles.fallbackTitle}>
+            <ThemedText type="defaultSemiBold">
               Sharing isn&apos;t available here — select and copy instead:
             </ThemedText>
             <ScrollView style={styles.fallbackScroll}>
-              <ThemedText selectable style={styles.fallbackText}>
+              <ThemedText selectable type="caption" style={styles.fallbackText}>
                 {fallbackText}
               </ThemedText>
             </ScrollView>
             <TouchableOpacity onPress={dismissFallback} activeOpacity={0.7}>
-              <ThemedView style={styles.fallbackDone} lightColor="#2a2a2a" darkColor="#2a2a2a">
-                <ThemedText style={styles.fallbackDoneText}>Done</ThemedText>
+              <ThemedView style={styles.fallbackDone} backgroundColor={Colors.surfaceElevated}>
+                <ThemedText type="label">Done</ThemedText>
               </ThemedView>
             </TouchableOpacity>
           </Pressable>
@@ -322,13 +327,16 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 20,
-    gap: 12,
+    padding: Spacing.lg,
+    gap: Spacing.md,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  emptyText: {
+    color: Colors.textSecondary,
   },
   historyLink: {
     alignSelf: 'flex-start',
@@ -340,18 +348,21 @@ const styles = StyleSheet.create({
   },
   toolbarActions: {
     flexDirection: 'row',
-    gap: 16,
+    gap: Spacing.lg,
   },
   deleteLink: {
-    color: '#c0392b',
+    color: Colors.destructive,
+  },
+  cancelLink: {
+    color: Colors.textSecondary,
   },
   rowWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
   rowSelected: {
-    backgroundColor: 'rgba(74, 158, 255, 0.12)',
+    backgroundColor: 'rgba(139, 92, 246, 0.14)',
   },
   rowContent: {
     flex: 1,
@@ -361,62 +372,52 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#888',
+    borderColor: Colors.textTertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#4a9eff',
-    borderColor: '#4a9eff',
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
   },
   checkboxMark: {
-    color: '#fff',
+    color: Colors.accentText,
     fontSize: 13,
     fontWeight: '700',
   },
   deleteAction: {
-    backgroundColor: '#c0392b', // matches errorText's red in app/(tabs)/index.tsx
+    backgroundColor: Colors.destructive,
     width: 80,
     alignItems: 'center',
     justifyContent: 'center',
   },
   deleteActionText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: Colors.accentText,
   },
   backdrop: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: Spacing.xl,
   },
   fallbackSheet: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 20,
-    gap: 16,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    gap: Spacing.lg,
     maxHeight: '80%',
     width: '100%',
-  },
-  fallbackTitle: {
-    color: '#fff',
   },
   fallbackScroll: {
     maxHeight: 300,
   },
   fallbackText: {
-    color: '#fff',
-    fontSize: 13,
     lineHeight: 20,
   },
   fallbackDone: {
-    paddingVertical: 12,
-    borderRadius: 999,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.pill,
     alignItems: 'center',
-  },
-  fallbackDoneText: {
-    color: '#fff',
-    fontWeight: '600',
   },
 });

@@ -6,6 +6,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'rea
 import { TrackRow } from '@/components/discovery/track-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import type { DiscoveryTrack } from '@/lib/discovery';
 import { loadExportBatches, type ExportBatch } from '@/lib/discovery-storage';
 
@@ -61,7 +62,7 @@ export default function ExportHistoryScreen() {
   if (!loaded) {
     return (
       <ThemedView style={styles.centered}>
-        <ActivityIndicator />
+        <ActivityIndicator color={Colors.accent} />
       </ThemedView>
     );
   }
@@ -72,7 +73,9 @@ export default function ExportHistoryScreen() {
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <ThemedView style={styles.container}>
         {newestFirst.length === 0 ? (
-          <ThemedText>No export batches yet — bulk-export some liked tracks first.</ThemedText>
+          <ThemedText style={styles.emptyText}>
+            No export batches yet — bulk-export some liked tracks first.
+          </ThemedText>
         ) : (
           newestFirst.map((batch) => {
             const isOpen = expanded.has(batch.id);
@@ -82,12 +85,12 @@ export default function ExportHistoryScreen() {
               day: 'numeric',
             });
             return (
-              <ThemedView key={batch.id}>
+              <ThemedView key={batch.id} backgroundColor="transparent">
                 <TouchableOpacity onPress={() => toggleExpanded(batch.id)} activeOpacity={0.7}>
-                  <ThemedView style={styles.batchRow} lightColor="#1a1a1a" darkColor="#1a1a1a">
-                    <ThemedView style={styles.batchInfo} lightColor="transparent" darkColor="transparent">
+                  <ThemedView style={styles.batchRow} backgroundColor={Colors.surface}>
+                    <ThemedView style={styles.batchInfo} backgroundColor="transparent">
                       <ThemedText type="defaultSemiBold">{date}</ThemedText>
-                      <ThemedText style={styles.dim}>
+                      <ThemedText type="caption">
                         {batch.tracks.length} track{batch.tracks.length === 1 ? '' : 's'}
                       </ThemedText>
                     </ThemedView>
@@ -95,7 +98,7 @@ export default function ExportHistoryScreen() {
                   </ThemedView>
                 </TouchableOpacity>
                 {isOpen && (
-                  <ThemedView style={styles.batchTracks}>
+                  <ThemedView style={styles.batchTracks} backgroundColor="transparent">
                     {batch.tracks.map((track) => (
                       <TrackRow
                         key={track.id}
@@ -121,36 +124,35 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 20,
-    gap: 12,
+    padding: Spacing.lg,
+    gap: Spacing.md,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  emptyText: {
+    color: Colors.textSecondary,
+  },
   batchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: Spacing.md + 2,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.md,
   },
   batchInfo: {
     gap: 2,
   },
-  dim: {
-    opacity: 0.6,
-  },
   chevron: {
-    color: '#fff',
+    color: Colors.textTertiary,
     fontSize: 16,
-    opacity: 0.6,
   },
   batchTracks: {
-    paddingTop: 12,
-    paddingLeft: 12,
-    gap: 12,
+    paddingTop: Spacing.md,
+    paddingLeft: Spacing.md,
+    gap: Spacing.md,
   },
 });

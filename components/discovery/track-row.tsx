@@ -3,6 +3,7 @@ import { Linking, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { artworkUrl, buildSpotifySearchUrl, type DiscoveryTrack } from '@/lib/discovery';
 
 // Rows are small (56x56) — a modest bump from the default 100x100 is plenty,
@@ -24,17 +25,19 @@ type TrackRowProps = {
 /** Artwork, title/artist/genre, Apple Music/Spotify links, and a play/pause button — shared by the liked tracks list and export history. */
 export function TrackRow({ track, isPlaying, onTogglePlay, disabled = false }: TrackRowProps) {
   return (
-    <ThemedView style={styles.row}>
+    <ThemedView style={styles.row} backgroundColor="transparent">
       {track.artworkUrl100 ? (
         <Image source={{ uri: artworkUrl(track.artworkUrl100, ROW_ARTWORK_SIZE) }} style={styles.artwork} />
       ) : null}
-      <ThemedView style={styles.info} lightColor="transparent" darkColor="transparent">
+      <ThemedView style={styles.info} backgroundColor="transparent">
         <ThemedText type="defaultSemiBold" numberOfLines={1}>
           {track.trackName}
         </ThemedText>
-        <ThemedText numberOfLines={1}>{track.artistName}</ThemedText>
-        <ThemedText style={styles.dim}>{track.primaryGenreName}</ThemedText>
-        <ThemedView style={styles.linksRow} lightColor="transparent" darkColor="transparent">
+        <ThemedText numberOfLines={1} style={styles.artist}>
+          {track.artistName}
+        </ThemedText>
+        <ThemedText type="caption">{track.primaryGenreName}</ThemedText>
+        <ThemedView style={styles.linksRow} backgroundColor="transparent">
           {track.trackViewUrl ? (
             <TouchableOpacity disabled={disabled} onPress={() => openUrl(track.trackViewUrl)}>
               <ThemedText type="link" style={[styles.linkText, disabled && styles.dimmed]}>
@@ -52,7 +55,7 @@ export function TrackRow({ track, isPlaying, onTogglePlay, disabled = false }: T
         </ThemedView>
       </ThemedView>
       <TouchableOpacity disabled={disabled} onPress={onTogglePlay} activeOpacity={0.7}>
-        <ThemedView style={[styles.playButton, disabled && styles.dimmed]} lightColor="#2a2a2a" darkColor="#2a2a2a">
+        <ThemedView style={[styles.playButton, disabled && styles.dimmed]} backgroundColor={Colors.surfaceElevated}>
           <ThemedText style={styles.playButtonText}>{isPlaying ? '⏸' : '▶'}</ThemedText>
         </ThemedView>
       </TouchableOpacity>
@@ -64,26 +67,26 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
   artwork: {
     width: 56,
     height: 56,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
   },
   info: {
     flex: 1,
     gap: 2,
   },
-  dim: {
-    opacity: 0.6,
+  artist: {
+    color: Colors.textSecondary,
   },
   dimmed: {
     opacity: 0.35,
   },
   linksRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: Spacing.md,
     marginTop: 2,
   },
   linkText: {
@@ -92,12 +95,12 @@ const styles = StyleSheet.create({
   playButton: {
     width: 40,
     height: 40,
-    borderRadius: 999,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   playButtonText: {
-    color: '#fff',
+    color: Colors.text,
     fontSize: 14,
   },
 });
