@@ -9,9 +9,11 @@ const STACK_DEPTH = 3;
 type CardStackProps = {
   queue: DiscoveryTrack[];
   onSwipe: (direction: SwipeDirection, track: DiscoveryTrack) => void;
+  onTap: () => void;
+  showPlayIcon: boolean;
 };
 
-export function CardStack({ queue, onSwipe }: CardStackProps) {
+export function CardStack({ queue, onSwipe, onTap, showPlayIcon }: CardStackProps) {
   const visible = queue.slice(0, STACK_DEPTH);
 
   return (
@@ -22,7 +24,7 @@ export function CardStack({ queue, onSwipe }: CardStackProps) {
         .map(({ track, index }) =>
           index === 0 ? (
             <View key={track.id} style={styles.layer}>
-              <SwipeCard track={track} onSwipe={onSwipe} />
+              <SwipeCard track={track} onSwipe={onSwipe} onTap={onTap} showPlayIcon={showPlayIcon} />
             </View>
           ) : (
             <View

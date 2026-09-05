@@ -21,11 +21,26 @@ const FLY_OUT_DISTANCE = 600;
 // ask for one big enough for the card instead of upscaling a thumbnail.
 const CARD_ARTWORK_SIZE = 600;
 
-export function CardFace({ track }: { track: DiscoveryTrack }) {
+type CardFaceProps = {
+  track: DiscoveryTrack;
+  /** Overlays a play icon on the artwork — paused or a finished preview. Never set by CardStack's static background cards. */
+  showPlayIcon?: boolean;
+};
+
+export function CardFace({ track, showPlayIcon = false }: CardFaceProps) {
   return (
     <ThemedView style={styles.card}>
       {track.artworkUrl100 ? (
-        <Image source={{ uri: artworkUrl(track.artworkUrl100, CARD_ARTWORK_SIZE) }} style={styles.artwork} />
+        <ThemedView style={styles.artworkWrapper}>
+          <Image source={{ uri: artworkUrl(track.artworkUrl100, CARD_ARTWORK_SIZE) }} style={styles.artwork} />
+          {showPlayIcon && (
+            <ThemedView style={styles.playOverlay} lightColor="transparent" darkColor="transparent">
+              <ThemedView style={styles.playOverlayCircle} lightColor="rgba(0,0,0,0.55)" darkColor="rgba(0,0,0,0.55)">
+                <ThemedText style={styles.playOverlayIcon}>▶</ThemedText>
+              </ThemedView>
+            </ThemedView>
+          )}
+        </ThemedView>
       ) : null}
       <ThemedView style={styles.info}>
         <ThemedText type="subtitle">{track.trackName}</ThemedText>
@@ -39,9 +54,11 @@ export function CardFace({ track }: { track: DiscoveryTrack }) {
 type SwipeCardProps = {
   track: DiscoveryTrack;
   onSwipe: (direction: SwipeDirection, track: DiscoveryTrack) => void;
+  onTap: () => void;
+  showPlayIcon: boolean;
 };
 
-export function SwipeCard({ track, onSwipe }: SwipeCardProps) {
+export function SwipeCard({ track, onSwipe, onTap, showPlayIcon }: SwipeCardProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
 
@@ -74,6 +91,17 @@ export function SwipeCard({ track, onSwipe }: SwipeCardProps) {
       }
     });
 
+  // A plain tap toggles playback (pause/resume/replay — the parent decides
+  // which) without touching queue/swipe state at all. Raced against the pan
+  // so a real drag never also fires a tap and a stationary tap never fights
+  // the drag threshold — each gesture's own default movement/timing tolerance
+  // is enough to tell them apart.
+  const tap = Gesture.Tap().onEnd(() => {
+    runOnJS(onTap)();
+  });
+
+  const gesture = Gesture.Race(pan, tap);
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translateX.value },
@@ -83,9 +111,9 @@ export function SwipeCard({ track, onSwipe }: SwipeCardProps) {
   }));
 
   return (
-    <GestureDetector gesture={pan}>
+    <GestureDetector gesture={gesture}>
       <Animated.View style={animatedStyle}>
-        <CardFace track={track} />
+        <CardFace track={track} showPlayIcon={showPlayIcon} />
       </Animated.View>
     </GestureDetector>
   );
@@ -102,9 +130,29 @@ const styles = StyleSheet.create({
     elevation: 4,
     overflow: 'hidden',
   },
+  artworkWrapper: {
+    position: 'relative',
+  },
   artwork: {
     width: '100%',
     height: CARD_WIDTH,
+  },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playOverlayCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playOverlayIcon: {
+    color: '#fff',
+    fontSize: 28,
+    marginLeft: 4, // optical centering — the glyph itself sits slightly left otherwise
   },
   info: {
     padding: 16,

@@ -1,4 +1,4 @@
-import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
@@ -78,6 +78,12 @@ export default function HomeScreen() {
   const currentLabel = strategy.type === 'genre' ? strategy.genre : `More from: ${strategy.artistName}`;
 
   const player = useAudioPlayer(null);
+  const status = useAudioPlayerStatus(player);
+  // status.didJustFinish is an event flag — true only in the single status
+  // update right after a preview ends, not safe to read later to ask "did
+  // this end". Captured here so a tap after that point knows to replay from
+  // the start rather than try to "resume" a track already at its end.
+  const [hasEnded, setHasEnded] = useState(false);
 
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
@@ -86,6 +92,7 @@ export default function HomeScreen() {
   // Autoplay whenever the top card changes — this never fires mid-drag, only when
   // a committed swipe actually changes queue[0].
   useEffect(() => {
+    setHasEnded(false);
     if (currentTrack) {
       player.replace(currentTrack.previewUrl);
       player.play();
@@ -94,6 +101,31 @@ export default function HomeScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack?.id]);
+
+  useEffect(() => {
+    if (status.didJustFinish) setHasEnded(true);
+  }, [status.didJustFinish]);
+
+  // Paused and "finished" both leave status.playing false, so one flag covers
+  // showing the play icon for either; the tap handler below distinguishes them.
+  const showPlayIcon = !!currentTrack && status.isLoaded && !status.playing;
+
+  // Tap-to-pause on the swipe card — pure playback control, no interaction
+  // with queue/strategy/undo state at all.
+  async function handleCardTap() {
+    if (!currentTrack || !status.isLoaded) return;
+    if (hasEnded) {
+      setHasEnded(false);
+      await player.seekTo(0); // don't rely on play() implicitly restarting a finished player
+      player.play();
+      return;
+    }
+    if (status.playing) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  }
 
   // ---------- Bootstrap ----------
 
@@ -313,7 +345,12 @@ export default function HomeScreen() {
 
       {currentTrack ? (
         <>
-          <CardStack queue={queue} onSwipe={handleCardSwipe} />
+          <CardStack
+            queue={queue}
+            onSwipe={handleCardSwipe}
+            onTap={handleCardTap}
+            showPlayIcon={showPlayIcon}
+          />
 
           <ActionOverlay
             visible={showActionButtons}
