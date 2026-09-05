@@ -2,17 +2,20 @@ import { StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 
 type LikedTracksButtonProps = {
   onPress: () => void;
 };
 
-/** Persistent bottom-right pill button — Undo and the genre picker already occupy the top corners. */
+/** Persistent bottom-right pill button — Undo and the genre picker already occupy the top corners. A quiet utility action, same treatment as UndoButton. */
 export function LikedTracksButton({ onPress }: LikedTracksButtonProps) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.wrapper}>
-      <ThemedView style={styles.button} lightColor="#2a2a2a" darkColor="#2a2a2a">
-        <ThemedText style={styles.buttonText}>Liked</ThemedText>
+      <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
+        <ThemedText type="label" style={styles.text}>
+          Liked
+        </ThemedText>
       </ThemedView>
     </TouchableOpacity>
   );
@@ -21,18 +24,16 @@ export function LikedTracksButton({ onPress }: LikedTracksButtonProps) {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
+    bottom: Spacing.lg,
+    right: Spacing.lg,
     zIndex: 1,
   },
   button: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 999,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.pill,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+  text: {
+    color: Colors.textSecondary,
   },
 });

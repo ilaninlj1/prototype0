@@ -4,6 +4,7 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 
 const FADE_MS = 400;
 
@@ -39,13 +40,13 @@ export function ActionOverlay({ visible, onArtist, onSound }: ActionOverlayProps
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
       <TouchableOpacity onPress={onArtist} activeOpacity={0.7}>
-        <ThemedView style={styles.button} lightColor="#2a2a2a" darkColor="#2a2a2a">
-          <ThemedText style={styles.buttonText}>More from this artist</ThemedText>
+        <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
+          <ThemedText type="label">More from this artist</ThemedText>
         </ThemedView>
       </TouchableOpacity>
       <TouchableOpacity onPress={onSound} activeOpacity={0.7}>
-        <ThemedView style={styles.button} lightColor="#1a1a1a" darkColor="#1a1a1a">
-          <ThemedText style={styles.buttonText}>More like this sound</ThemedText>
+        <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
+          <ThemedText type="label">More like this sound</ThemedText>
         </ThemedView>
       </TouchableOpacity>
     </Animated.View>
@@ -55,18 +56,13 @@ export function ActionOverlay({ visible, onArtist, onSound }: ActionOverlayProps
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: 8,
+    gap: Spacing.sm,
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: Spacing.sm,
   },
   button: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 999,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.pill,
   },
 });

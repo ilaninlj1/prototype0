@@ -2,13 +2,14 @@ import { StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 
 type UndoButtonProps = {
   disabled: boolean;
   onPress: () => void;
 };
 
-/** Persistent top-left pill button — dimmed and inert when there's nothing to undo. */
+/** Persistent top-left pill button — a quiet utility action, so it recedes rather than competing with the card. Dimmed and inert when there's nothing to undo. */
 export function UndoButton({ disabled, onPress }: UndoButtonProps) {
   return (
     <TouchableOpacity
@@ -16,8 +17,10 @@ export function UndoButton({ disabled, onPress }: UndoButtonProps) {
       disabled={disabled}
       activeOpacity={0.7}
       style={[styles.wrapper, disabled && styles.disabled]}>
-      <ThemedView style={styles.button} lightColor="#2a2a2a" darkColor="#2a2a2a">
-        <ThemedText style={styles.buttonText}>Undo</ThemedText>
+      <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
+        <ThemedText type="label" style={styles.text}>
+          Undo
+        </ThemedText>
       </ThemedView>
     </TouchableOpacity>
   );
@@ -26,21 +29,19 @@ export function UndoButton({ disabled, onPress }: UndoButtonProps) {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    top: 16,
-    left: 16,
+    top: Spacing.lg,
+    left: Spacing.lg,
     zIndex: 1,
   },
   disabled: {
     opacity: 0.35,
   },
   button: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 999,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.pill,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+  text: {
+    color: Colors.textSecondary,
   },
 });
