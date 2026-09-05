@@ -18,6 +18,7 @@ import {
   artworkUrl,
   MAX_REFILL_ATTEMPTS,
   MAX_GENRE_FALLBACKS,
+  RATED_LISTEN_THRESHOLD_MS,
   type DiscoveryTrack,
   type SwipeEntry,
   type Strategy,
@@ -112,20 +113,35 @@ test('derive* helpers collect distinct values from swipe history', () => {
   assert.deepEqual(deriveGenresHeard(history), new Set(['Rock', 'Pop']));
 });
 
-test('deriveRatedGenres only counts skip/like, excluding genre-jump', () => {
+test('deriveRatedGenres counts a genre-jump the same as skip/like once listenMs clears the threshold', () => {
   const history: SwipeEntry[] = [
-    { trackId: 1, artistId: 10, genre: 'Rock', action: 'skip', timestamp: 1 },
-    { trackId: 2, artistId: 10, genre: 'Jazz', action: 'like', timestamp: 2 },
-    { trackId: 3, artistId: 20, genre: 'Pop', action: 'genre-jump', timestamp: 3 },
+    { trackId: 1, artistId: 10, genre: 'Rock', action: 'skip', timestamp: 1, listenMs: 12000 },
+    { trackId: 2, artistId: 10, genre: 'Jazz', action: 'like', timestamp: 2, listenMs: 15000 },
+    { trackId: 3, artistId: 20, genre: 'Pop', action: 'genre-jump', timestamp: 3, listenMs: 11000 },
   ];
-  assert.deepEqual(deriveRatedGenres(history), new Set(['Rock', 'Jazz']));
+  // Direction never mattered — a genre-jump after actually listening counts
+  // exactly like a skip or like does.
+  assert.deepEqual(deriveRatedGenres(history), new Set(['Rock', 'Jazz', 'Pop']));
 });
 
-test('deriveRatedGenres returns an empty set when history is only genre-jumps', () => {
+test('deriveRatedGenres excludes a swipe under the listen threshold regardless of action', () => {
   const history: SwipeEntry[] = [
-    { trackId: 1, artistId: 10, genre: 'Rock', action: 'genre-jump', timestamp: 1 },
+    { trackId: 1, artistId: 10, genre: 'Rock', action: 'skip', timestamp: 1, listenMs: 2000 },
+    { trackId: 2, artistId: 10, genre: 'Jazz', action: 'like', timestamp: 2, listenMs: 0 },
   ];
   assert.deepEqual(deriveRatedGenres(history), new Set());
+});
+
+test('deriveRatedGenres treats a missing listenMs (pre-existing entries) as 0, not heard', () => {
+  const history: SwipeEntry[] = [{ trackId: 1, artistId: 10, genre: 'Rock', action: 'like', timestamp: 1 }];
+  assert.deepEqual(deriveRatedGenres(history), new Set());
+});
+
+test('deriveRatedGenres includes a swipe at exactly the threshold', () => {
+  const history: SwipeEntry[] = [
+    { trackId: 1, artistId: 10, genre: 'Rock', action: 'skip', timestamp: 1, listenMs: RATED_LISTEN_THRESHOLD_MS },
+  ];
+  assert.deepEqual(deriveRatedGenres(history), new Set(['Rock']));
 });
 
 test('artworkUrl swaps the trailing 100x100bb.jpg segment for the requested size', () => {

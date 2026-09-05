@@ -207,6 +207,10 @@ export default function HomeScreen() {
       genre: track.primaryGenreName,
       action,
       timestamp: Date.now(),
+      // status.currentTime is still the swiped track's position at this point
+      // — the next track's replace() only happens later, once this swipe's
+      // state updates trigger the autoplay effect to re-run.
+      listenMs: Math.round(status.currentTime * 1000),
     };
     const nextHistory = [...swipeHistory, entry];
     setSwipeHistory(nextHistory);

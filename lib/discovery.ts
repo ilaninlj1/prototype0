@@ -19,6 +19,11 @@ export type SwipeEntry = {
   genre: string;
   action: SwipeAction;
   timestamp: number;
+  // Accumulated preview playback time before the swipe committed, in
+  // milliseconds. Optional because entries persisted before this field
+  // existed genuinely don't have it — deriveRatedGenres treats a missing
+  // value as 0 rather than migrating old data.
+  listenMs?: number;
 };
 
 export type Strategy =
@@ -151,14 +156,21 @@ export function deriveGenresHeard(history: SwipeEntry[]): Set<string> {
   return new Set(history.map((e) => e.genre));
 }
 
-// Genres the user actually swiped left (skip) or right (like) on a track
-// from — deliberately excludes genre-jump entries, since swiping down away
-// from a genre doesn't mean any track from it was actually judged. Used for
-// the genre picker's "heard" checkmark, which was previously wired to the
-// broader deriveGenresHeard and ended up marking far too many genres.
+// A third of a 30s preview — enough to have actually heard something, rather
+// than a reflexive dismissal. Named constant so it's a one-line change if it
+// feels wrong in practice.
+export const RATED_LISTEN_THRESHOLD_MS = 10000;
+
+// Genres the user actually listened to a track from, regardless of which way
+// they swiped — direction was never the thing that mattered, duration is.
+// A quick skip and a quick like are both "dismissed it in two seconds"; a
+// genre-jump after listening for a while is still listening. Used for the
+// genre picker's "heard" checkmark, which was previously wired to the
+// broader deriveGenresHeard and (before that) to swipe action, both of which
+// ended up marking genres heard that were only ever dismissed instantly.
 export function deriveRatedGenres(history: SwipeEntry[]): Set<string> {
   return new Set(
-    history.filter((e) => e.action === 'skip' || e.action === 'like').map((e) => e.genre)
+    history.filter((e) => (e.listenMs ?? 0) >= RATED_LISTEN_THRESHOLD_MS).map((e) => e.genre)
   );
 }
 
