@@ -19,9 +19,19 @@ import {
   MAX_REFILL_ATTEMPTS,
   MAX_GENRE_FALLBACKS,
   RATED_LISTEN_THRESHOLD_MS,
+  SESSION_GAP_MS,
+  deriveSessions,
+  deriveGenrePath,
+  rankGenresByListenTime,
+  rankGenresByVisits,
+  averageListenMs,
+  PLAYED_TO_END_THRESHOLD_MS,
+  derivePlayedToEndButSkipped,
+  deriveTopArtists,
   type DiscoveryTrack,
   type SwipeEntry,
   type Strategy,
+  type Session,
 } from './discovery.ts';
 
 function track(overrides: Partial<DiscoveryTrack>): DiscoveryTrack {
@@ -34,6 +44,17 @@ function track(overrides: Partial<DiscoveryTrack>): DiscoveryTrack {
     primaryGenreName: 'Rock',
     previewUrl: 'https://example.com/preview.m4a',
     trackViewUrl: 'https://music.apple.com/example',
+    ...overrides,
+  };
+}
+
+function swipe(overrides: Partial<SwipeEntry>): SwipeEntry {
+  return {
+    trackId: 1,
+    artistId: 1,
+    genre: 'Rock',
+    action: 'skip',
+    timestamp: 0,
     ...overrides,
   };
 }
@@ -301,4 +322,189 @@ test('refillQueueWithFallback tries distinct genres and terminates instead of lo
   // The initial strategy plus MAX_GENRE_FALLBACKS distinct fallback genres, never repeating one.
   assert.equal(seenGenres.size, MAX_GENRE_FALLBACKS + 1);
   assert.equal(calls, (MAX_GENRE_FALLBACKS + 1) * MAX_REFILL_ATTEMPTS);
+});
+
+// ---------- deriveSessions ----------
+
+test('deriveSessions puts entries with no large gap into one session, in order', () => {
+  const history = [swipe({ trackId: 1, timestamp: 0 }), swipe({ trackId: 2, timestamp: 100 }), swipe({ trackId: 3, timestamp: 200 })];
+  const sessions = deriveSessions(history);
+  assert.equal(sessions.length, 1);
+  assert.deepEqual(sessions[0].entries.map((e) => e.trackId), [1, 2, 3]);
+  assert.equal(sessions[0].startedAt, 0);
+  assert.equal(sessions[0].endedAt, 200);
+});
+
+test('deriveSessions splits into a new session once a gap exceeds SESSION_GAP_MS', () => {
+  const history = [swipe({ trackId: 1, timestamp: 0 }), swipe({ trackId: 2, timestamp: SESSION_GAP_MS + 1 })];
+  const sessions = deriveSessions(history);
+  assert.equal(sessions.length, 2);
+  assert.deepEqual(sessions[0].entries.map((e) => e.trackId), [1]);
+  assert.deepEqual(sessions[1].entries.map((e) => e.trackId), [2]);
+});
+
+test('deriveSessions treats a gap of exactly SESSION_GAP_MS as still one session', () => {
+  const history = [swipe({ trackId: 1, timestamp: 0 }), swipe({ trackId: 2, timestamp: SESSION_GAP_MS })];
+  const sessions = deriveSessions(history);
+  assert.equal(sessions.length, 1);
+});
+
+test('deriveSessions sorts unsorted history before splitting', () => {
+  const history = [swipe({ trackId: 2, timestamp: SESSION_GAP_MS + 1 }), swipe({ trackId: 1, timestamp: 0 })];
+  const sessions = deriveSessions(history);
+  assert.equal(sessions.length, 2);
+  assert.deepEqual(sessions[0].entries.map((e) => e.trackId), [1]);
+  assert.deepEqual(sessions[1].entries.map((e) => e.trackId), [2]);
+});
+
+test('deriveSessions returns an empty array for empty history', () => {
+  assert.deepEqual(deriveSessions([]), []);
+});
+
+// ---------- deriveGenrePath ----------
+
+test('deriveGenrePath collapses consecutive same-genre entries into one visit', () => {
+  const entries = [
+    swipe({ genre: 'Rock', timestamp: 0, listenMs: 100 }),
+    swipe({ genre: 'Rock', timestamp: 10, listenMs: 200 }),
+    swipe({ genre: 'Pop', timestamp: 20, listenMs: 50 }),
+  ];
+  const visits = deriveGenrePath(entries);
+  assert.deepEqual(visits, [
+    { genre: 'Rock', trackCount: 2, listenMs: 300, startedAt: 0 },
+    { genre: 'Pop', trackCount: 1, listenMs: 50, startedAt: 20 },
+  ]);
+});
+
+test('deriveGenrePath treats a missing listenMs as 0 within a run\'s sum', () => {
+  const entries = [swipe({ genre: 'Rock', timestamp: 0 }), swipe({ genre: 'Rock', timestamp: 10, listenMs: 100 })];
+  const visits = deriveGenrePath(entries);
+  assert.equal(visits[0].listenMs, 100);
+});
+
+test('deriveGenrePath returns an empty array for empty input', () => {
+  assert.deepEqual(deriveGenrePath([]), []);
+});
+
+// ---------- rankGenresByListenTime ----------
+
+test('rankGenresByListenTime sums listenMs per genre, sorted descending', () => {
+  const history = [
+    swipe({ genre: 'Rock', listenMs: 100 }),
+    swipe({ genre: 'Rock', listenMs: 200 }),
+    swipe({ genre: 'Pop', listenMs: 700 }),
+  ];
+  assert.deepEqual(rankGenresByListenTime(history), [
+    { genre: 'Pop', listenMs: 700 },
+    { genre: 'Rock', listenMs: 300 },
+  ]);
+});
+
+test('rankGenresByListenTime treats a missing listenMs as contributing 0', () => {
+  const history = [swipe({ genre: 'Rock' }), swipe({ genre: 'Rock', listenMs: 50 })];
+  assert.deepEqual(rankGenresByListenTime(history), [{ genre: 'Rock', listenMs: 50 }]);
+});
+
+// ---------- rankGenresByVisits ----------
+
+test('rankGenresByVisits counts runs, not tracks, and a genre resumed in a later session counts as another visit', () => {
+  const session1: Session = {
+    entries: [swipe({ genre: 'Rock', timestamp: 0 }), swipe({ genre: 'Rock', timestamp: 10 }), swipe({ genre: 'Pop', timestamp: 20 })],
+    startedAt: 0,
+    endedAt: 20,
+  };
+  const session2: Session = {
+    entries: [swipe({ genre: 'Rock', timestamp: SESSION_GAP_MS + 100 })],
+    startedAt: SESSION_GAP_MS + 100,
+    endedAt: SESSION_GAP_MS + 100,
+  };
+  const result = rankGenresByVisits([session1, session2]);
+  assert.deepEqual(result, [
+    { genre: 'Rock', visits: 2 },
+    { genre: 'Pop', visits: 1 },
+  ]);
+});
+
+// ---------- averageListenMs ----------
+
+test('averageListenMs excludes entries missing listenMs from both sum and denominator', () => {
+  const history = [swipe({ listenMs: 100 }), swipe({ listenMs: 200 }), swipe({})];
+  assert.equal(averageListenMs(history), 150);
+});
+
+test('averageListenMs returns 0 when no entry has listenMs', () => {
+  assert.equal(averageListenMs([swipe({}), swipe({})]), 0);
+});
+
+test('averageListenMs returns 0 for empty history', () => {
+  assert.equal(averageListenMs([]), 0);
+});
+
+// ---------- derivePlayedToEndButSkipped ----------
+
+test('derivePlayedToEndButSkipped includes a skip at exactly the threshold', () => {
+  const entry = swipe({ trackId: 1, action: 'skip', listenMs: PLAYED_TO_END_THRESHOLD_MS });
+  assert.deepEqual(derivePlayedToEndButSkipped([entry]), [entry]);
+});
+
+test('derivePlayedToEndButSkipped excludes a skip below the threshold', () => {
+  const entry = swipe({ action: 'skip', listenMs: PLAYED_TO_END_THRESHOLD_MS - 1 });
+  assert.deepEqual(derivePlayedToEndButSkipped([entry]), []);
+});
+
+test('derivePlayedToEndButSkipped excludes a like even at a high listenMs', () => {
+  const entry = swipe({ action: 'like', listenMs: PLAYED_TO_END_THRESHOLD_MS + 1000 });
+  assert.deepEqual(derivePlayedToEndButSkipped([entry]), []);
+});
+
+test('derivePlayedToEndButSkipped orders results newest first', () => {
+  const older = swipe({ trackId: 1, action: 'skip', timestamp: 1, listenMs: PLAYED_TO_END_THRESHOLD_MS });
+  const newer = swipe({ trackId: 2, action: 'skip', timestamp: 2, listenMs: PLAYED_TO_END_THRESHOLD_MS });
+  assert.deepEqual(derivePlayedToEndButSkipped([older, newer]), [newer, older]);
+});
+
+// ---------- deriveTopArtists ----------
+
+test('deriveTopArtists excludes an artist below minTracks even if its lone track beats the average', () => {
+  const history = [
+    swipe({ trackId: 1, artistId: 1, artistName: 'Solo', listenMs: 100000 }),
+    swipe({ trackId: 2, artistId: 2, artistName: 'Duo', listenMs: 100000 }),
+    swipe({ trackId: 3, artistId: 2, artistName: 'Duo', listenMs: 100000 }),
+    swipe({ trackId: 4, artistId: 3, artistName: 'Filler', listenMs: 0 }),
+  ];
+  // overall average = (100000 + 100000 + 100000 + 0) / 4 = 75000
+  const result = deriveTopArtists(history);
+  assert.deepEqual(result, [{ artistId: 2, artistName: 'Duo', avgListenMs: 100000, trackCount: 2 }]);
+});
+
+test('deriveTopArtists excludes an artist whose average does not beat the overall average', () => {
+  const history = [
+    swipe({ trackId: 1, artistId: 1, artistName: 'High', listenMs: 9000 }),
+    swipe({ trackId: 2, artistId: 1, artistName: 'High', listenMs: 9000 }),
+    swipe({ trackId: 3, artistId: 2, artistName: 'Low', listenMs: 1000 }),
+    swipe({ trackId: 4, artistId: 2, artistName: 'Low', listenMs: 1000 }),
+  ];
+  // overall average = (9000 + 9000 + 1000 + 1000) / 4 = 5000
+  const result = deriveTopArtists(history);
+  assert.deepEqual(result, [{ artistId: 1, artistName: 'High', avgListenMs: 9000, trackCount: 2 }]);
+});
+
+test('deriveTopArtists resolves a name from a later entry when an earlier entry for the same artist lacks one', () => {
+  const history = [
+    swipe({ trackId: 10, artistId: 5, artistName: undefined, timestamp: 1, listenMs: 9000 }),
+    swipe({ trackId: 11, artistId: 5, artistName: 'NewName', timestamp: 2, listenMs: 9000 }),
+    swipe({ trackId: 12, artistId: 6, artistName: 'Filler', timestamp: 3, listenMs: 0 }),
+  ];
+  // overall average = (9000 + 9000 + 0) / 3 = 6000
+  const result = deriveTopArtists(history);
+  assert.deepEqual(result, [{ artistId: 5, artistName: 'NewName', avgListenMs: 9000, trackCount: 2 }]);
+});
+
+test('deriveTopArtists excludes an artist with no named entry anywhere, even if otherwise qualifying', () => {
+  const history = [
+    swipe({ trackId: 20, artistId: 7, artistName: undefined, timestamp: 1, listenMs: 9000 }),
+    swipe({ trackId: 21, artistId: 7, artistName: undefined, timestamp: 2, listenMs: 9000 }),
+    swipe({ trackId: 22, artistId: 8, artistName: 'Filler', timestamp: 3, listenMs: 0 }),
+  ];
+  assert.deepEqual(deriveTopArtists(history), []);
 });

@@ -15,7 +15,14 @@ export type SwipeAction = 'skip' | 'like' | 'genre-jump';
 
 export type SwipeEntry = {
   trackId: number;
+  // Optional for the same reason as listenMs below: entries persisted before
+  // this field existed genuinely don't have it, and there's no migration.
+  // Populated from the DiscoveryTrack at swipe time so the Profile tab can
+  // display which track/artist something was, long after it's scrolled out
+  // of the fetch queue.
+  trackName?: string;
   artistId: number;
+  artistName?: string;
   genre: string;
   action: SwipeAction;
   timestamp: number;
@@ -384,4 +391,167 @@ export async function refillQueueWithFallback(
   }
 
   return { queue: currentQueue, fetched, strategy: currentStrategy };
+}
+
+// ---------- Profile: sessions, genre path, and listening-data derivations ----------
+
+// No field is added to persist sessions — they're recomputed from
+// swipeHistory's timestamps every time, which is what makes this work
+// retroactively on history already on disk. 30 minutes: long enough that a
+// pause to answer the door doesn't fracture one sitting into two, short
+// enough that "opened the app again this evening" reliably reads as a new one.
+export const SESSION_GAP_MS = 30 * 60 * 1000;
+
+export type Session = {
+  entries: SwipeEntry[]; // chronological
+  startedAt: number;
+  endedAt: number;
+};
+
+function toSession(entries: SwipeEntry[]): Session {
+  return { entries, startedAt: entries[0].timestamp, endedAt: entries[entries.length - 1].timestamp };
+}
+
+/** Splits history into sessions wherever the gap since the previous entry exceeds SESSION_GAP_MS. Oldest first. */
+export function deriveSessions(history: SwipeEntry[]): Session[] {
+  const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
+  const sessions: Session[] = [];
+  let current: SwipeEntry[] = [];
+
+  for (const entry of sorted) {
+    const prev = current[current.length - 1];
+    if (prev && entry.timestamp - prev.timestamp > SESSION_GAP_MS) {
+      sessions.push(toSession(current));
+      current = [];
+    }
+    current.push(entry);
+  }
+  if (current.length > 0) sessions.push(toSession(current));
+  return sessions;
+}
+
+export type GenreVisit = {
+  genre: string;
+  trackCount: number;
+  listenMs: number; // summed over the run; a missing listenMs contributes 0
+  startedAt: number;
+};
+
+/**
+ * Collapses one session's chronological entries into runs of consecutive
+ * same-genre swipes. Operates per-session (not across all of history)
+ * because a session boundary should always end a run — resuming the same
+ * genre after 30+ minutes away is a new visit, not a continuation.
+ */
+export function deriveGenrePath(entries: SwipeEntry[]): GenreVisit[] {
+  const visits: GenreVisit[] = [];
+  for (const entry of entries) {
+    const current = visits[visits.length - 1];
+    if (current && current.genre === entry.genre) {
+      current.trackCount += 1;
+      current.listenMs += entry.listenMs ?? 0;
+    } else {
+      visits.push({ genre: entry.genre, trackCount: 1, listenMs: entry.listenMs ?? 0, startedAt: entry.timestamp });
+    }
+  }
+  return visits;
+}
+
+/** Total listen time per genre across all of history, sorted descending. */
+export function rankGenresByListenTime(history: SwipeEntry[]): { genre: string; listenMs: number }[] {
+  const totals = new Map<string, number>();
+  for (const entry of history) {
+    totals.set(entry.genre, (totals.get(entry.genre) ?? 0) + (entry.listenMs ?? 0));
+  }
+  return Array.from(totals.entries())
+    .map(([genre, listenMs]) => ({ genre, listenMs }))
+    .sort((a, b) => b.listenMs - a.listenMs);
+}
+
+/**
+ * How many separate times each genre was visited — runs, not tracks, and
+ * counted per-session (see deriveGenrePath) so a genre resumed after a
+ * session gap counts as another visit. Sorted descending.
+ */
+export function rankGenresByVisits(sessions: Session[]): { genre: string; visits: number }[] {
+  const counts = new Map<string, number>();
+  for (const session of sessions) {
+    for (const visit of deriveGenrePath(session.entries)) {
+      counts.set(visit.genre, (counts.get(visit.genre) ?? 0) + 1);
+    }
+  }
+  return Array.from(counts.entries())
+    .map(([genre, visits]) => ({ genre, visits }))
+    .sort((a, b) => b.visits - a.visits);
+}
+
+/**
+ * Average listenMs across history. Entries without listenMs are excluded
+ * from both the sum and the denominator (not treated as 0) — same "missing
+ * means don't count it" convention as deriveRatedGenres. 0 if none qualify.
+ */
+export function averageListenMs(history: SwipeEntry[]): number {
+  const withListen = history.filter((e) => e.listenMs !== undefined);
+  if (withListen.length === 0) return 0;
+  const sum = withListen.reduce((total, e) => total + (e.listenMs as number), 0);
+  return sum / withListen.length;
+}
+
+// Track duration isn't stored anywhere — iTunes previews are nominally ~30s
+// but that's never verified per-track — so "reached the end" is approximated
+// by elapsed listen time alone. Loose on purpose given that approximation.
+export const PLAYED_TO_END_THRESHOLD_MS = 25000;
+
+/** Skips where the preview had all but played out first — newest first. */
+export function derivePlayedToEndButSkipped(history: SwipeEntry[]): SwipeEntry[] {
+  return history
+    .filter((e) => e.action === 'skip' && (e.listenMs ?? 0) >= PLAYED_TO_END_THRESHOLD_MS)
+    .sort((a, b) => b.timestamp - a.timestamp);
+}
+
+export type ArtistStat = {
+  artistId: number;
+  artistName: string;
+  avgListenMs: number;
+  trackCount: number;
+};
+
+/**
+ * Artists whose average listen time beats the overall average, requiring at
+ * least `minTracks` logged tracks (avoids a single long listen putting a
+ * one-track artist at the top). artistName is only present on entries logged
+ * after that field existed, so each artist's name is resolved from the most
+ * recent entry (by timestamp) that has one; an artistId with no named entry
+ * anywhere is excluded — there's nothing sensible to display. Sorted
+ * descending by avgListenMs.
+ */
+export function deriveTopArtists(history: SwipeEntry[], minTracks = 2): ArtistStat[] {
+  const overallAverage = averageListenMs(history);
+
+  const names = new Map<number, string>();
+  for (const entry of [...history].sort((a, b) => a.timestamp - b.timestamp)) {
+    if (entry.artistName) names.set(entry.artistId, entry.artistName);
+  }
+
+  const groups = new Map<number, { count: number; listenSum: number; listenCount: number }>();
+  for (const entry of history) {
+    const bucket = groups.get(entry.artistId) ?? { count: 0, listenSum: 0, listenCount: 0 };
+    bucket.count += 1;
+    if (entry.listenMs !== undefined) {
+      bucket.listenSum += entry.listenMs;
+      bucket.listenCount += 1;
+    }
+    groups.set(entry.artistId, bucket);
+  }
+
+  const result: ArtistStat[] = [];
+  for (const [artistId, bucket] of groups) {
+    const artistName = names.get(artistId);
+    if (!artistName || bucket.count < minTracks || bucket.listenCount === 0) continue;
+    const avgListenMs = bucket.listenSum / bucket.listenCount;
+    if (avgListenMs <= overallAverage) continue;
+    result.push({ artistId, artistName, avgListenMs, trackCount: bucket.count });
+  }
+
+  return result.sort((a, b) => b.avgListenMs - a.avgListenMs);
 }

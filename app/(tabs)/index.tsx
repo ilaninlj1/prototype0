@@ -203,7 +203,9 @@ export default function HomeScreen() {
   async function logSwipe(track: DiscoveryTrack, action: SwipeEntry['action']) {
     const entry: SwipeEntry = {
       trackId: track.id,
+      trackName: track.trackName,
       artistId: track.artistId,
+      artistName: track.artistName,
       genre: track.primaryGenreName,
       action,
       timestamp: Date.now(),
