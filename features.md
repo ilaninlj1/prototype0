@@ -181,3 +181,23 @@ usually end up at Techno) that doesn't exist yet — path data is currently only
 as a per-session chain, never aggregated across sessions into a transition/adjacency
 view. Purely additive on top of existing data; no new persisted fields needed, same
 "derive it from what's already on disk" approach the sessions/path features already use.
+
+## [2026-09-05] Search + song page
+A search bar that queries the iTunes search endpoint with a user-typed term (rather
+than a curated genre term), landing on a song page for a chosen result — showing
+whatever metadata is already in the response (title, artist, album, artwork, release
+date, genre, length) plus the 30s preview. From that page, the existing steering moves
+— "more from this artist" / "more like this sound" — drop you into the feed anchored on
+that track.
+
+Shares its mechanism with "Explore from a liked track" above: both are an entry point
+that hands off into steering (set strategy from an arbitrary track, jump to the feed).
+Build that handoff once — probably by extracting what `applySteeringStrategy` already
+does into something callable from outside `app/(tabs)/index.tsx` — and use it from both
+this and the liked-track entry, rather than reimplementing it twice.
+
+**Out of scope, explicitly:** any written explanation or description of a song. iTunes's
+response is metadata only — no description, no context, nothing to display beyond the
+fields listed above. Producing one would mean a per-track LLM call, which means an API
+key living in a client-side app. Not part of this entry; a real design question for
+whenever/if that's actually wanted.
