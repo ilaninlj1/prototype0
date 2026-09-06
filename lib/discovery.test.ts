@@ -5,6 +5,7 @@ import {
   extractGenres,
   mergeDiscoveredGenres,
   isGenreRelated,
+  isGenericGenreTitle,
   deriveSeenTrackIds,
   deriveVisitedArtistIds,
   deriveGenresHeard,
@@ -214,6 +215,42 @@ test('parseGenreSearchResponse maps fields and drops genre-unrelated results', (
   assert.equal(result.length, 1);
   assert.equal(result[0].id, 1);
   assert.equal(result[0].primaryGenreName, 'Alternative Rock');
+});
+
+// ---------- isGenericGenreTitle ----------
+
+test('isGenericGenreTitle matches a title that is exactly the genre name', () => {
+  assert.equal(isGenericGenreTitle('Techno', 'Techno'), true);
+});
+
+test('isGenericGenreTitle matches case-insensitively and ignores surrounding whitespace/punctuation', () => {
+  assert.equal(isGenericGenreTitle('  techno!  ', 'Techno'), true);
+  assert.equal(isGenericGenreTitle('AMAPIANO', 'amapiano'), true);
+});
+
+test('isGenericGenreTitle does not match a title that merely contains the genre word', () => {
+  assert.equal(isGenericGenreTitle('Techno Nights', 'Techno'), false);
+  assert.equal(isGenericGenreTitle('My House', 'House'), false);
+});
+
+test('isGenericGenreTitle does not match an unrelated title', () => {
+  assert.equal(isGenericGenreTitle('Space Song', 'Techno'), false);
+});
+
+test('isGenericGenreTitle handles empty strings without matching each other', () => {
+  assert.equal(isGenericGenreTitle('', 'Techno'), false);
+  assert.equal(isGenericGenreTitle('Techno', ''), false);
+});
+
+test('parseGenreSearchResponse drops a genre-related result whose title is just the searched genre', () => {
+  const json = {
+    results: [
+      { trackId: 1, trackName: 'Techno', artistId: 10, artistName: 'DJ Nobody', artworkUrl100: 'a', primaryGenreName: 'Electronic', previewUrl: 'p1' },
+      { trackId: 2, trackName: 'Techno Nights', artistId: 11, artistName: 'Real Artist', artworkUrl100: 'b', primaryGenreName: 'Electronic', previewUrl: 'p2' },
+    ],
+  };
+  const result = parseGenreSearchResponse(json, 'Techno');
+  assert.deepEqual(result.map((t) => t.id), [2]);
 });
 
 test('parseArtistLookupResponse skips the artist entry and previewless tracks', () => {

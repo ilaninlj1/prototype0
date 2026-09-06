@@ -266,13 +266,31 @@ function hasPreview(r: any): boolean {
   return typeof r.previewUrl === 'string' && r.previewUrl.length > 0;
 }
 
-/** Pure: maps + filters a genre-search JSON response, dropping genre-unrelated results. */
+// A track literally titled after the genre ("Techno", "Amapiano") ranks
+// highly for that search term regardless of whether it's a real song —
+// verified live: 9/59 kept Amapiano results and 5/153 kept Techno results
+// were exactly this pattern, overwhelmingly generic tracks by unfamiliar
+// one-off producer names, not real songs. Deliberately narrow (exact match
+// only, not "contains" or "starts with") — that's what was actually
+// evidenced; broadening it is unverified. Known false-positive cost: a
+// genuinely famous song sharing the genre's exact name (Harry Styles'
+// "Pop") gets dropped too — accepted rather than engineered around.
+export function isGenericGenreTitle(trackName: string, searchedGenre: string): boolean {
+  const normalize = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const a = normalize(trackName);
+  const b = normalize(searchedGenre);
+  if (!a || !b) return false;
+  return a === b;
+}
+
+/** Pure: maps + filters a genre-search JSON response, dropping genre-unrelated and generically-titled results. */
 export function parseGenreSearchResponse(json: unknown, searchedGenre: string): DiscoveryTrack[] {
   const results: any[] = Array.isArray((json as any)?.results) ? (json as any).results : [];
   return results
     .filter(hasPreview)
     .map(toDiscoveryTrack)
-    .filter((t) => isGenreRelated(searchedGenre, t.primaryGenreName));
+    .filter((t) => isGenreRelated(searchedGenre, t.primaryGenreName))
+    .filter((t) => !isGenericGenreTitle(t.trackName, searchedGenre));
 }
 
 /** Pure: maps + filters an artist-lookup JSON response. Its first result is the artist itself. */
