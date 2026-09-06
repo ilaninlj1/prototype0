@@ -67,6 +67,10 @@ await refillQueueWithFallback(baseQueue, activeStrategy, history, knownGenres, G
 
 — rather than threading a new parameter through the queue engine's own signatures. Genre fallback keeps working exactly as before: `pickJumpGenre` picks a different genre, and the same region-bound fetcher is reused for the fallback attempt, so the fallback genre is pulled from the same storefront the user selected. `GENRE_TERM_OVERRIDES`/`isGenreRelated` need no region-awareness either — confirmed above that `primaryGenreName` comes back as the same localized string regardless of storefront.
 
+## Cross-region dedup: confirmed, no change needed
+
+`deriveSeenTrackIds(history)` builds its set from `trackId`s in `swipeHistory` regardless of which region fetched them — and since IDs are global (verified above), a track judged under MX correctly stays excluded if it resurfaces under US. This doesn't thin out a newly-selected region's catalog: only the minority of tracks that are shared crossover hits between the two storefronts (56% overlap for reggaeton, per the numbers above) are even capable of colliding with prior history; region-unique tracks were never in that history to begin with. If a strategy genuinely couldn't produce enough fresh tracks after a switch, `refillQueueWithFallback`'s existing genre-fallback is already the safety net — nothing new needed for that case either.
+
 ## Persistence (`lib/discovery-storage.ts`)
 
 Same pattern as `discoveredGenres` — best-effort, falls back to the default on any read failure or corrupt/unrecognized value:
