@@ -10,20 +10,26 @@
 
 `term=House&limit=25` and `term=Jazz&limit=200` (the app's actual configuration), each at `offset` 0/75/150/400: **byte-identical results at every offset**, both terms. `offset` isn't a documented parameter of this endpoint — it's silently accepted and discarded. No further exploration of it.
 
-### `country`: real, but divergence is uneven
+### `country`: real, but divergence is a property of the genre+storefront pairing, not of the country alone
 
-`term=reggaeton&limit=50`, storefronts US / CO / PR / MX:
+`limit=50`, artist-set overlap vs. US, across five pairings and four genres:
 
-| Pair | Distinct-artist overlap | Top-15 track overlap |
-|---|---|---|
-| US vs CO | 97.2% (35/36) | 14/15 |
-| US vs MX | 56.2% (27/48) | 8/15 |
+| Pairing | Genre term | US distinct | Other distinct | Overlap | Verdict |
+|---|---|---|---|---|---|
+| US vs CO | reggaeton | 36 | 35 | 97.2% | near-identical |
+| US vs MX | reggaeton | 36 | 39 | 56.2% | meaningful |
+| US vs NG | afrobeats | 38 | 34 | 89.5% | near-identical |
+| US vs ZA | amapiano | 49 | 45 | **9.3%** | huge |
+| US vs KR | K-pop | 14 | 0 | not comparable | term returns zero in KR |
+| — vs PR | reggaeton | — | — | — | invalid storefront |
 
-- **CO ≈ US** — nearly the identical top list (Daddy Yankee, Wisin & Yandel, Ozuna, Don Omar, J Balvin/Bad Bunny, in the same order). Not a useful control for this genre.
-- **MX diverges meaningfully** — Cris MJ, Quevedo, Piso 21, Mora, J Alvarez, Ingratax, and others absent from the US list surface in the top 50.
-- **PR is not a valid storefront** — `HTTP 400 {"errorMessage":"Invalid value(s) for key(s): [country]"}`. Puerto Rico has no separate Apple storefront; PR users are served by the US one. Never offerable as an option.
+- **CO and NG ≈ US** — CO's reggaeton list and NG's afrobeats list are both near-duplicates of the US list (NG's first 8 results are in the *same order* as US's). The genre's biggest stars are already global crossover artists in both cases. Not useful controls.
+- **MX diverges meaningfully** for reggaeton (Cris MJ, Quevedo, Piso 21, Mora, and others absent from the US list).
+- **ZA diverges enormously** for amapiano — and not just in artist names: the US results for "Amapiano" are mostly *mistagged* (genres like Afro-fusion, Worldwide, R&B/Soul — tracks loosely adjacent to the term, not the genre itself), while ZA's are cleanly tagged `genre: Amapiano` throughout and surface a deep, coherent scene (Kabza De Small, DJ Maphorisa, Kelvin Momo, Young Stunna, Mas Musiq, Sha Sha) essentially absent from the US catalog for this term — 41 of ZA's 45 artists never appear in the US list.
+- **KR is a valid storefront but this pairing doesn't work at all** — `resultCount: 0`, not an HTTP error like PR. The literal term "K-pop" (what `GENRES` would actually send) matches nothing in Korea's catalog, presumably because it's an externally-facing English label rather than how the genre is indexed locally. This is a *different failure mode* than "near-identical" — a pairing can silently return nothing for reasons that have nothing to do with musical overlap.
+- **PR is not a valid storefront at all** — `HTTP 400 {"errorMessage":"Invalid value(s) for key(s): [country]"}`. Puerto Rico has no separate Apple storefront; PR users are served by the US one. Never offerable as an option.
 
-Divergence is real but not a blanket "any regional storefront works" — it depends on the specific pair, and only US/MX have actually been checked. **Scope: ship only the two verified codes.** Adding a third region later means verifying it live first, the same way MX was verified here — not assuming from a docs list.
+**The conclusion isn't "regional storefronts diverge" or "they don't" — it's genre-and-region-pair-dependent**, ranging from 9.3% to 97.2% overlap across five checks of the same general idea, plus one pairing that doesn't resolve at all. **Scope: ship the three pairings with verified real divergence — US (default), MX, and ZA.** NG is dropped (89.5% identical — a dead control, same as CO) and KR is dropped (the term returns nothing). **Every additional storefront needs this same live check before being added** — a new pairing can silently come back near-duplicate (CO, NG) or empty (KR); that's not predictable from the country code or genre name alone, only from actually querying it.
 
 ### Track/album IDs are global, not storefront-scoped
 
@@ -32,8 +38,8 @@ Cross-checked identical songs by (artist, title) across US/CO/MX: `trackId` and 
 ## `Region` type and the fetch layer
 
 ```ts
-export type Region = 'US' | 'MX';
-export const REGIONS: Region[] = ['US', 'MX'];
+export type Region = 'US' | 'MX' | 'ZA';
+export const REGIONS: Region[] = ['US', 'MX', 'ZA'];
 export const DEFAULT_REGION: Region = 'US';
 
 export async function fetchTracksByGenre(genre: string, region: Region = DEFAULT_REGION): Promise<DiscoveryTrack[]> {
@@ -69,7 +75,7 @@ await refillQueueWithFallback(baseQueue, activeStrategy, history, knownGenres, G
 
 ## Cross-region dedup: confirmed, no change needed
 
-`deriveSeenTrackIds(history)` builds its set from `trackId`s in `swipeHistory` regardless of which region fetched them — and since IDs are global (verified above), a track judged under MX correctly stays excluded if it resurfaces under US. This doesn't thin out a newly-selected region's catalog: only the minority of tracks that are shared crossover hits between the two storefronts (56% overlap for reggaeton, per the numbers above) are even capable of colliding with prior history; region-unique tracks were never in that history to begin with. If a strategy genuinely couldn't produce enough fresh tracks after a switch, `refillQueueWithFallback`'s existing genre-fallback is already the safety net — nothing new needed for that case either.
+`deriveSeenTrackIds(history)` builds its set from `trackId`s in `swipeHistory` regardless of which region fetched them — and since IDs are global (verified above), a track judged under MX correctly stays excluded if it resurfaces under US. This doesn't thin out a newly-selected region's catalog: only the minority of tracks that are shared crossover hits between storefronts (56% for reggaeton MX/US; a mere 9.3% for amapiano ZA/US — even less overlap means even less to collide with) are even capable of colliding with prior history; region-unique tracks were never in that history to begin with. If a strategy genuinely couldn't produce enough fresh tracks after a switch, `refillQueueWithFallback`'s existing genre-fallback is already the safety net — nothing new needed for that case either.
 
 ## Persistence (`lib/discovery-storage.ts`)
 
@@ -81,7 +87,7 @@ const REGION_KEY = `${STORAGE_PREFIX}:region`;
 export async function loadRegion(): Promise<Region> {
   try {
     const raw = await AsyncStorage.getItem(REGION_KEY);
-    return raw === 'MX' ? 'MX' : 'US';
+    return raw === 'MX' || raw === 'ZA' ? raw : 'US';
   } catch {
     return 'US';
   }
@@ -103,7 +109,7 @@ export async function saveRegion(region: Region): Promise<void> {
 
 ```ts
 async function handleToggleRegion() {
-  const nextRegion: Region = region === 'US' ? 'MX' : 'US';
+  const nextRegion = REGIONS[(REGIONS.indexOf(region) + 1) % REGIONS.length];
   setRegion(nextRegion);
   await saveRegion(nextRegion);
   // Same "keep the current card, drop the stale buffered tail, refill under
@@ -113,6 +119,8 @@ async function handleToggleRegion() {
   await runRefill(preserved, strategy, swipeHistory, discoveredGenres, nextRegion);
 }
 ```
+
+Cycles US → MX → ZA → US rather than a binary flip, now that there are three verified options.
 
 `nextRegion` (the local variable), not the `region` state variable, is what's passed to `runRefill` — `setRegion` doesn't take effect synchronously within this same function call, and reading `region` here would still see the old value. `applySteeringStrategy` already avoids the equivalent trap for `strategy` by passing `next` explicitly rather than reading the `strategy` state; this follows the same precedent.
 
@@ -128,7 +136,7 @@ type RegionToggleProps = {
   onToggle: () => void;
 };
 
-/** Persistent bottom-left pill — the one corner Undo/GenrePicker/Liked don't already occupy. Shows the current storefront; tap flips it. */
+/** Persistent bottom-left pill — the one corner Undo/GenrePicker/Liked don't already occupy. Shows the current storefront; tap cycles to the next one. */
 export function RegionToggle({ region, onToggle }: RegionToggleProps) {
   return (
     <TouchableOpacity onPress={onToggle} activeOpacity={0.7} style={styles.wrapper}>
@@ -148,14 +156,15 @@ const styles = StyleSheet.create({
 
 ## Testing
 
-`fetchTracksByGenre`/`fetchTracksByArtist`/`fetchForStrategy` make real network calls and, consistent with the rest of this file, aren't unit-tested directly today (only their pure JSON-parsing counterparts — `parseGenreSearchResponse`/`parseArtistLookupResponse` — and `refillQueue`/`refillQueueWithFallback`, via injected fake fetchers, are). This change is a defaulted-parameter extension to those same untested functions, not new logic, so no new test file is warranted for them. `loadRegion`/`saveRegion` mirror `discoveredGenres`'s persistence functions, which also have no dedicated test file. Verified via typecheck + lint + manual check in a browser (`npm run web`): toggle flips the pill's label, persists across a reload, and the fetched genre's results visibly change between US and MX for a term like "reggaeton."
+`fetchTracksByGenre`/`fetchTracksByArtist`/`fetchForStrategy` make real network calls and, consistent with the rest of this file, aren't unit-tested directly today (only their pure JSON-parsing counterparts — `parseGenreSearchResponse`/`parseArtistLookupResponse` — and `refillQueue`/`refillQueueWithFallback`, via injected fake fetchers, are). This change is a defaulted-parameter extension to those same untested functions, not new logic, so no new test file is warranted for them. `loadRegion`/`saveRegion` mirror `discoveredGenres`'s persistence functions, which also have no dedicated test file. Verified via typecheck + lint + manual check in a browser (`npm run web`): toggle cycles the pill's label through US/MX/ZA, persists across a reload, and the fetched genre's results visibly change per region (e.g. "reggaeton" between US and MX, "amapiano" between US and ZA).
 
 ## Out of scope
 
-- Any third storefront — requires its own live verification pass first.
-- A picker UI for more than two options — the binary toggle is honest to what's actually been verified; revisit the UI shape if/when a third region is added.
+- **Any additional storefront requires the same live verification pass first — this is the central lesson of this spec, not a formality.** Divergence is a property of the specific genre+storefront pairing, not of the country code or genre name in isolation: CO and NG each looked promising on paper and turned out ~90-97% identical to US; KR returned zero results for the exact term `GENRES` would send. None of that was predictable without querying it. Don't add a region — or assume an existing region behaves the same for a genre it hasn't been checked against — without repeating this check.
+- A picker UI for more than three options — the cycling toggle is honest to what's actually been verified; revisit the UI shape if a fourth region clears the same bar.
 - Any change to `spreadByAlbum`, `refillQueue`, `refillQueueWithFallback`, or `GENRE_TERM_OVERRIDES` — confirmed above that none is needed.
 - Undo integration for the region toggle.
+- Detecting or handling a genre+region pairing that returns zero results (the K-pop/KR case) — out of scope because it's not offered as an option; would need addressing if a future region turns out to work for most genres but fail for a specific one.
 
 ## Files touched
 

@@ -287,26 +287,51 @@ export function parseArtistLookupResponse(json: unknown): DiscoveryTrack[] {
 // the max in one shot is the only way to get more than a token pool per genre.
 const ITUNES_MAX_LIMIT = 200;
 
-export async function fetchTracksByGenre(genre: string): Promise<DiscoveryTrack[]> {
-  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(genre)}&entity=song&limit=${ITUNES_MAX_LIMIT}`;
+// The `country` param (an Apple storefront) is real and documented, unlike
+// offset — verified live, across five genre+storefront pairings: divergence
+// is a property of the *pairing*, not the country code alone. US vs. MX
+// diverges meaningfully for reggaeton (~56% artist-set overlap) and US vs.
+// ZA diverges enormously for amapiano (~9%, and the US side is mostly
+// mistagged for that term to begin with) — but US vs. CO (reggaeton) and US
+// vs. NG (afrobeats) both came back ~90-97% identical, dead controls, and
+// US vs. KR (K-pop) returned zero results in KR for the exact term GENRES
+// would send. PR is rejected outright — no separate Apple storefront exists
+// for Puerto Rico. Only US/MX/ZA cleared the bar; adding a fourth means
+// verifying it live the same way first, never assuming from a docs list —
+// see docs/superpowers/specs/2026-09-05-region-storefront-design.md.
+export type Region = 'US' | 'MX' | 'ZA';
+export const REGIONS: Region[] = ['US', 'MX', 'ZA'];
+export const DEFAULT_REGION: Region = 'US';
+
+export async function fetchTracksByGenre(
+  genre: string,
+  region: Region = DEFAULT_REGION
+): Promise<DiscoveryTrack[]> {
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(genre)}&entity=song&limit=${ITUNES_MAX_LIMIT}&country=${region}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`iTunes search failed for ${genre}`);
   const json = await res.json();
   return parseGenreSearchResponse(json, genre);
 }
 
-export async function fetchTracksByArtist(artistId: number): Promise<DiscoveryTrack[]> {
-  const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=song&limit=${ITUNES_MAX_LIMIT}`;
+export async function fetchTracksByArtist(
+  artistId: number,
+  region: Region = DEFAULT_REGION
+): Promise<DiscoveryTrack[]> {
+  const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=song&limit=${ITUNES_MAX_LIMIT}&country=${region}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`iTunes lookup failed for artist ${artistId}`);
   const json = await res.json();
   return parseArtistLookupResponse(json);
 }
 
-export async function fetchForStrategy(strategy: Strategy): Promise<DiscoveryTrack[]> {
+export async function fetchForStrategy(
+  strategy: Strategy,
+  region: Region = DEFAULT_REGION
+): Promise<DiscoveryTrack[]> {
   return strategy.type === 'genre'
-    ? fetchTracksByGenre(strategy.genre)
-    : fetchTracksByArtist(strategy.artistId);
+    ? fetchTracksByGenre(strategy.genre, region)
+    : fetchTracksByArtist(strategy.artistId, region);
 }
 
 // ---------- Queue engine ----------

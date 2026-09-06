@@ -6,6 +6,7 @@ import { ActivityIndicator, StyleSheet } from 'react-native';
 import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
+import { RegionToggle } from '@/components/discovery/region-toggle';
 import { SteeringRow } from '@/components/discovery/steering-row';
 import type { SwipeDirection } from '@/components/discovery/swipe-physics';
 import { UndoButton } from '@/components/discovery/undo-button';
@@ -21,7 +22,9 @@ import {
   mergeDiscoveredGenres,
   pickJumpGenre,
   refillQueueWithFallback,
+  REGIONS,
   type DiscoveryTrack,
+  type Region,
   type Strategy,
   type SwipeEntry,
 } from '@/lib/discovery';
@@ -29,8 +32,10 @@ import {
   appendLikedTrack,
   appendSwipeEntry,
   loadDiscoveredGenres,
+  loadRegion,
   loadSwipeHistory,
   saveDiscoveredGenres,
+  saveRegion,
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
 import { GENRES } from '@/lib/taste-test';
@@ -58,6 +63,10 @@ export default function HomeScreen() {
   const [strategy, setStrategy] = useState<Strategy>({ type: 'genre', genre: 'Pop' });
   const [swipeHistory, setSwipeHistory] = useState<SwipeEntry[]>([]);
   const [discoveredGenres, setDiscoveredGenres] = useState<string[]>([]);
+  // Not part of UndoSnapshot — a standing preference, not a momentary content
+  // action like a swipe or a steering choice. Mis-tapping it is corrected by
+  // tapping it again, not by the undo button.
+  const [region, setRegion] = useState<Region>('US');
 
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
   // Bumped by every runRefill call and by handleUndo, so a refill that's still
@@ -140,13 +149,18 @@ export default function HomeScreen() {
 
   useEffect(() => {
     (async () => {
-      const [history, genres] = await Promise.all([loadSwipeHistory(), loadDiscoveredGenres()]);
+      const [history, genres, loadedRegion] = await Promise.all([
+        loadSwipeHistory(),
+        loadDiscoveredGenres(),
+        loadRegion(),
+      ]);
       setSwipeHistory(history);
       setDiscoveredGenres(genres);
+      setRegion(loadedRegion);
 
       const initialStrategy: Strategy = { type: 'genre', genre: randomGenre() };
       setStrategy(initialStrategy);
-      await runRefill([], initialStrategy, history, genres);
+      await runRefill([], initialStrategy, history, genres, loadedRegion);
 
       setHydrated(true);
     })();
@@ -159,11 +173,17 @@ export default function HomeScreen() {
   // can't fill the queue on its own falls back to another genre — via the same
   // priority order as a swipe-down genre-jump — instead of dead-ending on an
   // empty queue; picking that fallback genre needs the full swipe history.
+  // `activeRegion` is an explicit parameter rather than reading the `region`
+  // state variable — the region-toggle handler needs to refill under the
+  // *new* region in the same call that sets it, and setRegion doesn't take
+  // effect synchronously within that call. Same reason applySteeringStrategy
+  // passes `next` explicitly instead of reading `strategy` state.
   async function runRefill(
     baseQueue: DiscoveryTrack[],
     activeStrategy: Strategy,
     history: SwipeEntry[],
-    knownGenres: string[]
+    knownGenres: string[],
+    activeRegion: Region
   ) {
     const epoch = ++refillEpochRef.current;
     try {
@@ -173,7 +193,7 @@ export default function HomeScreen() {
         history,
         knownGenres,
         GENRES,
-        fetchForStrategy
+        (strategy) => fetchForStrategy(strategy, activeRegion)
       );
       // Superseded by a newer refill, or by an undo that rolled back the swipe
       // this refill was fetching for — discard rather than clobber current state.
@@ -227,7 +247,7 @@ export default function HomeScreen() {
     const nextHistory = await logSwipe(track, 'skip');
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres);
+    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres, region);
   }
 
   async function handleLike(track: DiscoveryTrack) {
@@ -235,7 +255,7 @@ export default function HomeScreen() {
     await appendLikedTrack(track); // independent of swipeHistory — see lib/discovery-storage.ts
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres);
+    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres, region);
   }
 
   // Steering doesn't touch the currently showing card — it keeps playing and
@@ -253,7 +273,7 @@ export default function HomeScreen() {
     // actually gets fetched until the stale tail drains on its own.
     const preserved = queue.slice(0, 1);
     setQueue(preserved);
-    await runRefill(preserved, next, nextHistory, discoveredGenres);
+    await runRefill(preserved, next, nextHistory, discoveredGenres, region);
   }
 
   function handleMoreFromArtist() {
@@ -279,7 +299,7 @@ export default function HomeScreen() {
     const nextStrategy: Strategy = { type: 'genre', genre };
     setStrategy(nextStrategy);
     setQueue([]);
-    await runRefill([], nextStrategy, nextHistory, discoveredGenres);
+    await runRefill([], nextStrategy, nextHistory, discoveredGenres, region);
   }
 
   async function handleGenreJump(track: DiscoveryTrack) {
@@ -338,6 +358,17 @@ export default function HomeScreen() {
     ]);
   }
 
+  async function handleToggleRegion() {
+    const nextRegion = REGIONS[(REGIONS.indexOf(region) + 1) % REGIONS.length];
+    setRegion(nextRegion);
+    await saveRegion(nextRegion);
+    // Same shape as applySteeringStrategy: keep the current card, drop the
+    // buffered tail (fetched under the old region), refill under the new one.
+    const preserved = queue.slice(0, 1);
+    setQueue(preserved);
+    await runRefill(preserved, strategy, swipeHistory, discoveredGenres, nextRegion);
+  }
+
   // ---------- Render ----------
 
   if (!hydrated) {
@@ -361,6 +392,7 @@ export default function HomeScreen() {
         onExplore={handleExplore}
       />
       <LikedTracksButton onPress={() => router.push('/modal')} />
+      <RegionToggle region={region} onToggle={handleToggleRegion} />
 
       {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 

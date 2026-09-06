@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { DiscoveryTrack, SwipeEntry } from './discovery';
+import type { DiscoveryTrack, Region, SwipeEntry } from './discovery';
 
 // All persistence is best-effort: a read/write failure falls back to an empty
 // result rather than throwing, mirroring lib/taste-test.ts's pattern.
@@ -10,6 +10,25 @@ const SWIPE_HISTORY_KEY = `${STORAGE_PREFIX}:swipeHistory`;
 const DISCOVERED_GENRES_KEY = `${STORAGE_PREFIX}:discoveredGenres`;
 const LIKED_TRACKS_KEY = `${STORAGE_PREFIX}:likedTracks`;
 const EXPORT_BATCHES_KEY = `${STORAGE_PREFIX}:exportBatches`;
+const REGION_KEY = `${STORAGE_PREFIX}:region`;
+
+/** Falls back to the default storefront on a missing, corrupt, or unrecognized value — not just a read failure. */
+export async function loadRegion(): Promise<Region> {
+  try {
+    const raw = await AsyncStorage.getItem(REGION_KEY);
+    return raw === 'MX' || raw === 'ZA' ? raw : 'US';
+  } catch {
+    return 'US';
+  }
+}
+
+export async function saveRegion(region: Region): Promise<void> {
+  try {
+    await AsyncStorage.setItem(REGION_KEY, region);
+  } catch {
+    // ignore
+  }
+}
 
 export async function loadSwipeHistory(): Promise<SwipeEntry[]> {
   try {
