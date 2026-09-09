@@ -1,5 +1,23 @@
 # Taste Space
 
+> **Status as of 2026-09-08: blocked on the candidate source, not on Last.fm.**
+> A live probe from the app runtime (Expo Go, not node) confirmed Last.fm answers
+> cleanly — every call HTTP 200 — so the concern raised in
+> `2026-09-07-taste-space-lastfm-layer-design.md`'s "Check 1" (web CORS) is
+> resolved for at least this runtime. But the same probe (rock/US, 25 tracks) found
+> 24 of 25 were top-50 hits by major artists: the iTunes Search pool this spec's
+> pipeline draws from occupies only the Hits corner. There are no deep cuts on the
+> X axis to draw from, and Y is compressed at the high-reach end. Last.fm can score
+> whatever candidates arrive; it has nothing to say about a pipeline that never
+> fetches a candidate belonging anywhere else on the pad. **Open question, not a
+> plan:** invert the pipeline so `artist.getTopTracks` (or a similar Last.fm
+> catalogue call) supplies deep-cut/niche candidates, and iTunes Search is used
+> only to resolve preview URLs/artwork for whatever Last.fm names — the reverse of
+> today's "iTunes finds candidates, Last.fm scores them" direction. Not designed
+> here; flagging that the candidate-sourcing problem is likely the harder half of
+> this feature, not the scoring half this spec and the Last.fm layer spec already
+> cover.
+
 A third tab, `app/(tabs)/taste-space.tsx`, giving the user a 2D control over
 what kind of track gets sampled into the discovery queue:
 
@@ -311,6 +329,147 @@ style as `swipe-physics.test.ts`. No test for the gesture component
 itself (`taste-space-pad.tsx`) — matches existing precedent
 (`swipe-card.tsx` has none either).
 
+## Control precedence
+
+Taste Space is the fourth control that shapes the queue, alongside steering
+(`2026-09-05-always-available-steering-design.md`), the genre picker, and the
+region toggle (`2026-09-05-region-storefront-design.md`). This section fixes what
+happens when they disagree.
+
+Rules 1 and 2 describe controls that already exist and need no code change. Rules
+3–5 land on the weighted-sampling design above, and two of them do not fit it
+cleanly — that is called out in place rather than papered over.
+
+### 1. Steering always wins; the graph re-applies on the next natural pull
+
+"More from this artist" / "More like this sound" beats the graph position
+unconditionally. A steer sets `strategy` — *which* pool is fetched. The graph is a
+preference applied *within* whatever that strategy returns. When the two conflict
+(a steered artist whose catalogue sits nowhere near the selected quadrant), the
+steer is honoured and the graph bends to it. The graph can never override, dilute,
+or partially ignore a steer; there is no blending.
+
+The graph re-applies on the **next natural queue pull** — the refill the steer
+itself triggers, and every refill after it — not immediately, and never
+retroactively. `applySteeringStrategy` already preserves the currently-showing card
+(`queue.slice(0, 1)`) and drops the buffered tail; the graph takes effect on the
+tracks fetched to replace that tail. This is the steering spec's own rule
+("steering only changes what gets fetched for subsequent cards") extended to the
+graph: no control reaches backwards into a card already committed to the screen.
+
+Note this is not a *delay*. The position-change path in the `index.tsx` wiring
+above already drops the buffered tail and refills on returning to Home; a steer
+refills too. Both leave the current card alone. "Not immediately" means "not
+retroactively" — there is no pending-graph state to track, and no case where a
+position change sits queued waiting for something else to happen first.
+
+### 2. Genre picker and region are hard filters; the graph is a preference
+
+The genre picker and the region toggle decide the pool: which search term goes out,
+and which storefront answers it. Both are absolute. The graph can never surface a
+track from an unselected genre or an unselected storefront at any position, for the
+simple reason that such a track was never fetched — the filter applies at the
+network boundary, upstream of everything in this spec.
+
+The graph is a preference over whatever those two leave behind. The consequence is
+worth stating plainly, because it will look like a bug otherwise: **a quadrant is
+only as reachable as the current genre+region pool makes it.** "Hits" inside a
+genre+region whose catalogue is uniformly obscure returns that pool's
+broadest-reach tracks — not globally broad-reach tracks. The corner labels name a
+position within the current pool, never an absolute tier.
+
+This is the same reasoning as the pool-local reach normalization in
+`2026-09-07-taste-space-lastfm-layer-design.md`, and deliberately so: both axes
+mean "relative to what is actually in front of you." A user who wants a different
+absolute answer changes the genre or the region — the two controls that are
+*designed* to move the pool — not the graph.
+
+### 3. The graph relaxes rather than stalls
+
+**The rule:** if the target quadrant cannot fill the queue, the acceptance window
+widens outward from the selected point until it can, rather than returning an empty
+stack. Same principle as `spreadByAlbum`'s two-tier fallback in
+`2026-09-05-album-spread-design.md`: a constraint that cannot be satisfied gives
+way; the queue is never starved to protect it.
+
+**How this lands on the design above — read this before implementing it.**
+`sampleByTasteSpace` *cannot* stall, structurally. It is a weighted permutation of
+the pool, not a filter: every candidate keeps a nonzero weight (hard requirement
+#2), every candidate appears exactly once in the output, and `spreadByAlbum` then
+slices `QUEUE_TARGET_DEPTH` off the front of it. The queue fills from whatever the
+pool holds, at every target position, including positions no track in the pool is
+anywhere near. There is no gate to relax and no empty-stack case to defend against.
+The behaviour this rule asks for is already guaranteed — a fortiori, not by
+accident.
+
+So the acceptance window is **diagnostic, not a gate.** Reintroducing it as a real
+filter — draw only from within radius r, widen r on failure, retry — would
+reintroduce exactly the "candidate is unreachable in practice" failure that hard
+requirement #2 and the rejected-sort discussion above exist to prevent, and is
+explicitly rejected here. Define the window instead as a radius around the target
+position, and call a pull **relaxed** when the tracks that actually filled the
+queue fell outside that radius because the pool held nothing nearer.
+
+"Widen outward until it fills" is therefore the *measurement*, not a retry loop:
+how far out from the selected point do you have to reach to account for what
+actually got queued. Nothing is re-drawn, no second pass runs, and the sampling
+algorithm above is untouched. What changes is that the distance is now recorded
+instead of discarded — which is rule 4.
+
+### 4. A relaxed pull must be observable
+
+A relaxed pull is recorded on the queue entry, so Profile can surface it later and
+so it is debuggable now. **It is not surfaced in the card UI** — no badge, no "not
+quite what you asked for" caption. That stays consistent with the existing decision
+in "Out of scope" below to keep the graph's internal state out of the card.
+
+Recorded at refill time, on the entry, as an optional field — the same
+`collectionId` / `listenMs` precedent this codebase already uses for
+"populated when known, absent otherwise, no migration":
+
+- On `DiscoveryTrack`: the drawn track's distance from the target position, in the
+  same `[-1,1]x[-1,1]` space `scoreTrack` works in, plus the target it was drawn
+  against. Set by `refillQueue` when sampling ran, absent when it did not.
+- Absent is meaningful and must stay distinguishable from zero: a Mixed-position
+  pull, or a pull under the neutral stub, records nothing at all rather than
+  recording distance 0. "No graph was applied" and "the graph was applied and got
+  an exact hit" are different facts and Profile must not conflate them.
+- For Profile to show this *later*, it has to survive the queue: `SwipeEntry` is
+  what persists, so the field is copied across at swipe time alongside `trackName`
+  / `artistName`, optional for the same reason those are.
+
+The threshold at which a distance counts as "relaxed" is a display concern, not a
+storage one — store the distance, let Profile decide what to call it. Storing a
+boolean instead would bake one threshold in permanently and throw away the number
+that makes it debuggable.
+
+### 5. Tracks with no Last.fm match are never dropped
+
+A track Last.fm cannot resolve is **unplaceable on both axes** — not obscure, not
+broad, not a deep cut, simply unmeasured. It passes any graph position rather than
+failing all of them. This is expected steady state, not an edge case: the Last.fm
+layer spec is explicit that mistagged genres, missing "feat." credits, and
+remix/live suffixes produce misses routinely, and that a cold-cache pool scores
+mostly unenriched on its first pass.
+
+**Implemented as the neutral `0.5 / 0.5` fallback** the Last.fm layer spec already
+specifies for an unresolved artist or track. That keeps the track in the
+permutation with a real, nonzero weight at every position — never filtered, never
+zero-weighted, reachable anywhere.
+
+One honest caveat, since "passes any position" and `0.5 / 0.5` are not literally
+the same thing: a neutral track sits at middling distance from every target, so at
+a corner it is out-weighted by a genuine corner match and out-weighs the opposite
+corner. It passes everywhere; it wins nowhere.
+
+**The stronger reading — score an unmatched track as if it sat exactly at the
+target, so it "passes" at full weight — is rejected.** Under it, unmatched tracks
+would outrank every genuinely-matching track at every position; combined with a
+cold-cache pool being mostly unmatched, the queue would fill with unplaceable
+tracks precisely at the extreme positions where the user is asking hardest for real
+signal. That inverts the feature. "Not dropped" is the requirement, and neutral
+weighting satisfies it; "always wins" is not the requirement.
+
 ## Out of scope
 
 - Actually sourcing `reach`/`relativePopularity` from real data — no such
@@ -319,6 +478,11 @@ itself (`taste-space-pad.tsx`) — matches existing precedent
   messaging). The control is fully real, just quietly waiting on data — a
   caveat can be added later if it proves confusing in practice.
 - Persisting Taste Space position in `UndoSnapshot`.
+- **The Profile-side display of relaxed pulls.** Control precedence rule 4 requires
+  the distance be *recorded* so Profile can show it later; what Profile actually
+  renders, and at what threshold a distance reads as "relaxed", is a separate
+  change against `app/(tabs)/explore.tsx` and is not designed here.
+- Any card-UI indication that a pull was relaxed — explicitly excluded by rule 4.
 - Changing `spreadByAlbum`'s own tie-break/fallback logic — Taste Space
   only changes the order it receives its input in.
 - An injectable RNG for `sampleByTasteSpace` — `Math.random()` directly,
@@ -331,9 +495,9 @@ itself (`taste-space-pad.tsx`) — matches existing precedent
 |---|---|
 | `lib/taste-space.ts` | New — types, `scoreTrack`, `ScoreInputSource`, `neutralScoreInputSource`, `sampleByTasteSpace`, persistence |
 | `lib/taste-space.test.ts` | New |
-| `lib/discovery.ts` | `refillQueue`/`refillQueueWithFallback` gain a defaulted `tasteSpacePosition` param; `sampleByTasteSpace` call feeds `spreadByAlbum` |
+| `lib/discovery.ts` | `refillQueue`/`refillQueueWithFallback` gain a defaulted `tasteSpacePosition` param; `sampleByTasteSpace` call feeds `spreadByAlbum`; optional relaxation field added to `DiscoveryTrack` and `SwipeEntry` per control-precedence rule 4 |
 | `lib/discovery.test.ts` | One new test added; no existing test modified |
-| `app/(tabs)/index.tsx` | Load/hold `tasteSpacePosition`; focus-triggered refresh on change, mirroring `region` |
+| `app/(tabs)/index.tsx` | Load/hold `tasteSpacePosition`; focus-triggered refresh on change, mirroring `region`; copy the relaxation field onto `SwipeEntry` at swipe time |
 | `app/(tabs)/_layout.tsx` | Third `Tabs.Screen` |
 | `app/(tabs)/taste-space.tsx` | New tab screen |
 | `components/taste-space/taste-space-pad.tsx` | New — drag/tap UI |

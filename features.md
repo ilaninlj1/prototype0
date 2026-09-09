@@ -16,6 +16,26 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-09-08] Taste Space is blocked on the candidate source, not on Last.fm
+Live probe from the app runtime (Expo Go, not node): Last.fm answered every call
+cleanly, HTTP 200 across the board — the CORS/reachability concern from the Last.fm
+data layer spec is resolved, at least for this runtime.
+
+But a rock/US probe (25 tracks) found 24 of 25 were top-50 hits by major artists.
+The iTunes Search pool `refillQueue` fetches from occupies only the Hits corner of
+the pad — there are essentially no deep cuts on the X axis to draw from, and Y is
+compressed at the high-reach end. Last.fm can score whatever candidates show up;
+it has no way to fix a candidate pipeline that never surfaces anything belonging
+elsewhere on the pad.
+
+**Possible fix, not a plan:** invert the pipeline — have Last.fm's
+`artist.getTopTracks` (or similar) supply deep-cut/niche candidates directly, and
+use iTunes Search only to resolve preview URLs/artwork for whatever Last.fm names.
+That's the reverse of the current "iTunes finds candidates, Last.fm scores them"
+direction. Open question for whenever Taste Space's data layer is actually
+designed further — see the status note at the top of
+`docs/superpowers/specs/2026-09-07-taste-space-design.md`.
+
 ## [2026-09-02] Replay the current clip before rating
 Each 30s preview plays once and then you rate it. If you get distracted, or the audio
 starts before headphones are on, there's no way to hear it again without restarting the
