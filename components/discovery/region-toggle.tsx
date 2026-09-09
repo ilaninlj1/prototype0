@@ -13,9 +13,9 @@ type RegionToggleProps = {
 /**
  * Persistent bottom-left pill — the one corner Undo (top-left), the genre
  * picker (top-right), and Liked (bottom-right) don't already occupy. Shows
- * the current storefront; tap flips it. A plain toggle rather than a picker
- * because only two storefronts have actually been verified to diverge — see
- * docs/superpowers/specs/2026-09-05-region-storefront-design.md.
+ * the current storefront; tap cycles to the next one. A plain cycling toggle
+ * rather than a picker, across the three verified storefronts (US, MX, ZA) —
+ * see docs/superpowers/specs/2026-09-05-region-storefront-design.md.
  */
 export function RegionToggle({ region, onToggle }: RegionToggleProps) {
   return (
