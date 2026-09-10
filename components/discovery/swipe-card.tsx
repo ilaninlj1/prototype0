@@ -109,8 +109,8 @@ export function SwipeCard({ track, onSwipe, onTap, showPlayIcon }: SwipeCardProp
   // so a real drag never also fires a tap and a stationary tap never fights
   // the drag threshold — each gesture's own default movement/timing tolerance
   // is enough to tell them apart.
-  const tap = Gesture.Tap().onEnd(() => {
-    runOnJS(onTap)();
+  const tap = Gesture.Tap().onEnd((_e, success) => {
+    if (success) runOnJS(onTap)();
   });
 
   const gesture = Gesture.Race(pan, tap);

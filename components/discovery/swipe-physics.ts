@@ -18,7 +18,7 @@ export const DEFAULT_SWIPE_THRESHOLDS: SwipeThresholds = {
 export function resolveSwipeDirection(
   translationX: number,
   translationY: number,
-  thresholds: SwipeThresholds = DEFAULT_SWIPE_THRESHOLDS
+  thresholds: SwipeThresholds = { horizontal: 120, vertical: 120 }
 ): SwipeDirection | null {
   'worklet';
   if (translationY > thresholds.vertical && translationY > Math.abs(translationX)) {
