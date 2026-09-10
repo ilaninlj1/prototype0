@@ -15,6 +15,7 @@ const customTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
+    primary: Colors.accent,
     background: Colors.background,
     card: Colors.surface,
     text: Colors.text,
