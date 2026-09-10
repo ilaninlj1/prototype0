@@ -1,13 +1,20 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
 import { RegionToggle } from '@/components/discovery/region-toggle';
 import { SteeringRow } from '@/components/discovery/steering-row';
-import type { SwipeDirection } from '@/components/discovery/swipe-physics';
+import {
+  computeCardSize,
+  MAX_CARD_HEIGHT,
+  MAX_CARD_WIDTH,
+  type CardSize,
+  type SwipeDirection,
+} from '@/components/discovery/swipe-physics';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -52,8 +59,23 @@ type UndoSnapshot = {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Starts at the card's max size (a reasonable default before the first
+  // layout pass) then shrinks to whatever cardArea actually measures — see
+  // handleCardAreaLayout and computeCardSize — so the card fits a small
+  // screen (e.g. iPhone SE) instead of overflowing behind the button rows.
+  const [cardSize, setCardSize] = useState<CardSize>({
+    width: MAX_CARD_WIDTH,
+    height: MAX_CARD_HEIGHT,
+  });
+
+  function handleCardAreaLayout(e: LayoutChangeEvent) {
+    const { width, height } = e.nativeEvent.layout;
+    setCardSize(computeCardSize({ width, height }));
+  }
 
   const [queue, setQueue] = useState<DiscoveryTrack[]>([]);
   const [strategy, setStrategy] = useState<Strategy>({ type: 'genre', genre: 'Pop' });
@@ -298,7 +320,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
       <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
       <GenrePicker
         curatedGenres={GENRES}
@@ -309,21 +331,33 @@ export default function HomeScreen() {
         onSelect={handlePickGenre}
         onExplore={handleExplore}
       />
-      <LikedTracksButton onPress={() => router.push('/modal')} />
-      <RegionToggle region={region} onToggle={handleToggleRegion} />
 
       {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
       {currentTrack ? (
         <>
-          <CardStack
-            queue={queue}
-            onSwipe={handleCardSwipe}
-            onTap={handleCardTap}
-            showPlayIcon={showPlayIcon}
-          />
+          <View style={styles.cardArea} onLayout={handleCardAreaLayout}>
+            <CardStack
+              queue={queue}
+              cardSize={cardSize}
+              onSwipe={handleCardSwipe}
+              onTap={handleCardTap}
+              showPlayIcon={showPlayIcon}
+            />
+          </View>
 
-          <SteeringRow onArtist={handleMoreFromArtist} onSound={handleMoreLikeSound} />
+          {/* Steering and the utility pills are separate rows, not floating
+              corner pills — they used to overlap when both floated
+              independently near the bottom. Both sit in normal flow above
+              the tab bar, which already handles its own bottom inset — this
+              screen only ever adds insets.top. */}
+          <View style={styles.bottomRows}>
+            <SteeringRow onArtist={handleMoreFromArtist} onSound={handleMoreLikeSound} />
+            <View style={styles.utilityRow}>
+              <RegionToggle region={region} onToggle={handleToggleRegion} />
+              <LikedTracksButton onPress={() => router.push('/modal')} />
+            </View>
+          </View>
         </>
       ) : (
         <ThemedText style={styles.emptyText}>No more tracks — try again in a bit.</ThemedText>
@@ -335,10 +369,23 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
     gap: Spacing.md,
     alignItems: 'stretch',
+  },
+  cardArea: {
+    flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  bottomRows: {
+    gap: Spacing.sm,
+  },
+  utilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   centered: {
     flex: 1,

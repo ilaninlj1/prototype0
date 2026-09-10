@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -37,6 +38,7 @@ export function GenrePicker({
   onSelect,
   onExplore,
 }: GenrePickerProps) {
+  const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
@@ -151,7 +153,10 @@ export function GenrePicker({
 
   return (
     <>
-      <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.7} style={styles.trigger}>
+      <TouchableOpacity
+        onPress={() => setVisible(true)}
+        activeOpacity={0.7}
+        style={[styles.trigger, { top: insets.top + Spacing.lg }]}>
         <ThemedView style={styles.triggerButton} backgroundColor={Colors.surfaceElevated}>
           <ThemedText type="label" numberOfLines={1} style={styles.triggerText}>
             {currentLabel}
@@ -184,7 +189,6 @@ export function GenrePicker({
 const styles = StyleSheet.create({
   trigger: {
     position: 'absolute',
-    top: Spacing.lg,
     right: Spacing.lg,
     maxWidth: 200,
     zIndex: 1,

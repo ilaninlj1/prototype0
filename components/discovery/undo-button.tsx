@@ -1,4 +1,5 @@
 import { StyleSheet, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -9,14 +10,20 @@ type UndoButtonProps = {
   onPress: () => void;
 };
 
-/** Persistent top-left pill button — a quiet utility action, so it recedes rather than competing with the card. Dimmed and inert when there's nothing to undo. */
+/**
+ * Persistent top-left pill button — a quiet utility action, so it recedes
+ * rather than competing with the card. Dimmed and inert when there's nothing
+ * to undo. Floats over the card, so it needs its own safe-area top inset
+ * rather than relying on the screen container's padding.
+ */
 export function UndoButton({ disabled, onPress }: UndoButtonProps) {
+  const insets = useSafeAreaInsets();
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.7}
-      style={[styles.wrapper, disabled && styles.disabled]}>
+      style={[styles.wrapper, { top: insets.top + Spacing.lg }, disabled && styles.disabled]}>
       <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
         <ThemedText type="label" style={styles.text}>
           Undo
@@ -29,7 +36,6 @@ export function UndoButton({ disabled, onPress }: UndoButtonProps) {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    top: Spacing.lg,
     left: Spacing.lg,
     zIndex: 1,
   },

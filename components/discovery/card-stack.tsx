@@ -2,18 +2,20 @@ import { StyleSheet, View } from 'react-native';
 
 import type { DiscoveryTrack } from '@/lib/discovery';
 import { CardFace, SwipeCard } from './swipe-card';
-import type { SwipeDirection } from './swipe-physics';
+import type { CardSize, SwipeDirection } from './swipe-physics';
 
 const STACK_DEPTH = 3;
 
 type CardStackProps = {
   queue: DiscoveryTrack[];
+  /** Computed by the screen from the space actually available — see computeCardSize. Shared by every layered card so the stack stays uniform. */
+  cardSize: CardSize;
   onSwipe: (direction: SwipeDirection, track: DiscoveryTrack) => void;
   onTap: () => void;
   showPlayIcon: boolean;
 };
 
-export function CardStack({ queue, onSwipe, onTap, showPlayIcon }: CardStackProps) {
+export function CardStack({ queue, cardSize, onSwipe, onTap, showPlayIcon }: CardStackProps) {
   const visible = queue.slice(0, STACK_DEPTH);
 
   return (
@@ -24,7 +26,7 @@ export function CardStack({ queue, onSwipe, onTap, showPlayIcon }: CardStackProp
         .map(({ track, index }) =>
           index === 0 ? (
             <View key={track.id} style={styles.layer}>
-              <SwipeCard track={track} onSwipe={onSwipe} onTap={onTap} showPlayIcon={showPlayIcon} />
+              <SwipeCard track={track} size={cardSize} onSwipe={onSwipe} onTap={onTap} showPlayIcon={showPlayIcon} />
             </View>
           ) : (
             <View
@@ -34,7 +36,7 @@ export function CardStack({ queue, onSwipe, onTap, showPlayIcon }: CardStackProp
                 styles.layer,
                 { transform: [{ scale: 1 - index * 0.04 }, { translateY: index * 10 }] },
               ]}>
-              <CardFace track={track} />
+              <CardFace track={track} size={cardSize} />
             </View>
           )
         )}

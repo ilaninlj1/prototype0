@@ -14,10 +14,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
-import { resolveSwipeDirection, rotationForDrag, type SwipeDirection } from './swipe-physics';
+import { resolveSwipeDirection, rotationForDrag, type CardSize, type SwipeDirection } from './swipe-physics';
 
-const CARD_WIDTH = 320;
-const CARD_HEIGHT = 420;
 const FLY_OUT_DISTANCE = 600;
 // artworkUrl100 is only 100x100, stretched to fill the full-width card —
 // visibly blurry. iTunes serves the same asset at any size via the URL, so
@@ -26,6 +24,8 @@ const CARD_ARTWORK_SIZE = 600;
 
 type CardFaceProps = {
   track: DiscoveryTrack;
+  /** Computed by the screen from the space actually available (see computeCardSize) — never a fixed constant, so the card shrinks to fit on a small screen. */
+  size: CardSize;
   /** Overlays a play icon on the artwork — paused or a finished preview. Never set by CardStack's static background cards. */
   showPlayIcon?: boolean;
 };
@@ -34,9 +34,9 @@ type CardFaceProps = {
 // bottom edge on a BlurView rather than a separate panel below — the artwork
 // stays the visual focus (just softened where the text needs to sit) instead
 // of being pushed up to make room for a solid info block.
-export function CardFace({ track, showPlayIcon = false }: CardFaceProps) {
+export function CardFace({ track, size, showPlayIcon = false }: CardFaceProps) {
   return (
-    <ThemedView style={styles.card} backgroundColor={Colors.surface}>
+    <ThemedView style={[styles.card, size]} backgroundColor={Colors.surface}>
       {track.artworkUrl100 ? (
         <Image source={{ uri: artworkUrl(track.artworkUrl100, CARD_ARTWORK_SIZE) }} style={styles.artwork} />
       ) : null}
@@ -66,12 +66,13 @@ export function CardFace({ track, showPlayIcon = false }: CardFaceProps) {
 
 type SwipeCardProps = {
   track: DiscoveryTrack;
+  size: CardSize;
   onSwipe: (direction: SwipeDirection, track: DiscoveryTrack) => void;
   onTap: () => void;
   showPlayIcon: boolean;
 };
 
-export function SwipeCard({ track, onSwipe, onTap, showPlayIcon }: SwipeCardProps) {
+export function SwipeCard({ track, size, onSwipe, onTap, showPlayIcon }: SwipeCardProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
 
@@ -119,14 +120,14 @@ export function SwipeCard({ track, onSwipe, onTap, showPlayIcon }: SwipeCardProp
     transform: [
       { translateX: translateX.value },
       { translateY: translateY.value },
-      { rotate: `${rotationForDrag(translateX.value, CARD_WIDTH)}deg` },
+      { rotate: `${rotationForDrag(translateX.value, size.width)}deg` },
     ],
   }));
 
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={animatedStyle}>
-        <CardFace track={track} showPlayIcon={showPlayIcon} />
+        <CardFace track={track} size={size} showPlayIcon={showPlayIcon} />
       </Animated.View>
     </GestureDetector>
   );
@@ -134,8 +135,6 @@ export function SwipeCard({ track, onSwipe, onTap, showPlayIcon }: SwipeCardProp
 
 const styles = StyleSheet.create({
   card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
     borderRadius: Radius.lg,
     overflow: 'hidden',
     shadowColor: '#000',

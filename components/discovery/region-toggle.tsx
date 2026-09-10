@@ -11,15 +11,15 @@ type RegionToggleProps = {
 };
 
 /**
- * Persistent bottom-left pill — the one corner Undo (top-left), the genre
- * picker (top-right), and Liked (bottom-right) don't already occupy. Shows
- * the current storefront; tap cycles to the next one. A plain cycling toggle
- * rather than a picker, across the three verified storefronts (US, MX, ZA) —
- * see docs/superpowers/specs/2026-09-05-region-storefront-design.md.
+ * Utility-row pill, alongside LikedTracksButton — see the utility row in
+ * app/(tabs)/index.tsx. Shows the current storefront; tap cycles to the next
+ * one. A plain cycling toggle rather than a picker, across the three
+ * verified storefronts (US, MX, ZA) — see
+ * docs/superpowers/specs/2026-09-05-region-storefront-design.md.
  */
 export function RegionToggle({ region, onToggle }: RegionToggleProps) {
   return (
-    <TouchableOpacity onPress={onToggle} activeOpacity={0.7} style={styles.wrapper}>
+    <TouchableOpacity onPress={onToggle} activeOpacity={0.7}>
       <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
         <ThemedText type="label" style={styles.text}>
           {region}
@@ -30,12 +30,6 @@ export function RegionToggle({ region, onToggle }: RegionToggleProps) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    position: 'absolute',
-    bottom: Spacing.lg,
-    left: Spacing.lg,
-    zIndex: 1,
-  },
   button: {
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
