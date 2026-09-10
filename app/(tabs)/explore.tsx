@@ -1,4 +1,4 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router/react-navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 
@@ -6,14 +6,14 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
-  averageListenMs,
-  deriveGenrePathSegments,
-  deriveSessions,
-  deriveTopArtists,
-  derivePlayedToEndButSkipped,
-  rankGenresByListenTime,
-  rankGenresByVisits,
-  type SwipeEntry,
+    averageListenMs,
+    deriveGenrePathSegments,
+    derivePlayedToEndButSkipped,
+    deriveSessions,
+    deriveTopArtists,
+    rankGenresByListenTime,
+    rankGenresByVisits,
+    type SwipeEntry,
 } from '@/lib/discovery';
 import { loadDiscoveredGenres, loadSwipeHistory } from '@/lib/discovery-storage';
 

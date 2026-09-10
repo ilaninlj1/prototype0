@@ -1,5 +1,4 @@
-import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
@@ -44,9 +43,6 @@ function randomGenre(): string {
   return GENRES[Math.floor(Math.random() * GENRES.length)];
 }
 
-// Full state needed to roll a single swipe (or a steering choice) back
-// exactly as it was — see captureUndoSnapshot (where this is captured) and
-// handleUndo (where it's restored).
 type UndoSnapshot = {
   queue: DiscoveryTrack[];
   strategy: Strategy;
@@ -63,41 +59,21 @@ export default function HomeScreen() {
   const [strategy, setStrategy] = useState<Strategy>({ type: 'genre', genre: 'Pop' });
   const [swipeHistory, setSwipeHistory] = useState<SwipeEntry[]>([]);
   const [discoveredGenres, setDiscoveredGenres] = useState<string[]>([]);
-  // Not part of UndoSnapshot — a standing preference, not a momentary content
-  // action like a swipe or a steering choice. Mis-tapping it is corrected by
-  // tapping it again, not by the undo button.
   const [region, setRegion] = useState<Region>('US');
 
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
-  // Bumped by every runRefill call and by handleUndo, so a refill that's still
-  // in flight when an undo (or a newer refill) lands can't clobber state with
-  // a stale result once it finally resolves.
   const refillEpochRef = useRef(0);
 
   const currentTrack = queue[0];
 
-  // Only genres actually rated (skip/like) count as "heard" for the picker's
-  // checkmark — deriveGenresHeard below is a different, broader notion used by
-  // the jump-selection engine, not what should drive this display.
   const genresHeard = useMemo(() => deriveRatedGenres(swipeHistory), [swipeHistory]);
 
-  // Drives the genre picker's trigger label and its scroll-to/highlight —
-  // null while on an artist strategy, since there's no single genre to point at.
   const currentGenre = strategy.type === 'genre' ? strategy.genre : null;
   const currentLabel = strategy.type === 'genre' ? strategy.genre : `More from: ${strategy.artistName}`;
 
-  // Shared across every screen that plays audio — see hooks/use-playback.tsx —
-  // so starting a preview here always stops one already playing on the liked
-  // tracks list or export history, and vice versa, since it's the same player.
   const { player, status } = usePlayback();
-  // status.didJustFinish is an event flag — true only in the single status
-  // update right after a preview ends, not safe to read later to ask "did
-  // this end". Captured here so a tap after that point knows to replay from
-  // the start rather than try to "resume" a track already at its end.
   const [hasEnded, setHasEnded] = useState(false);
 
-  // Autoplay whenever the top card changes — this never fires mid-drag, only when
-  // a committed swipe actually changes queue[0].
   useEffect(() => {
     setHasEnded(false);
     if (currentTrack) {
@@ -106,14 +82,8 @@ export default function HomeScreen() {
     } else {
       player.pause();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack?.id]);
 
-  // Leaving this screen (another tab, or a modal pushed on top) pauses
-  // playback rather than leaving it running in the background — fires on
-  // blur as well as unmount, so it doesn't depend on whether expo-router
-  // actually unmounts an unfocused screen. Deliberately doesn't resume on
-  // refocus; tap-to-pause already covers restarting it.
   useFocusEffect(
     useCallback(() => {
       return () => player.pause();
@@ -124,17 +94,13 @@ export default function HomeScreen() {
     if (status.didJustFinish) setHasEnded(true);
   }, [status.didJustFinish]);
 
-  // Paused and "finished" both leave status.playing false, so one flag covers
-  // showing the play icon for either; the tap handler below distinguishes them.
   const showPlayIcon = !!currentTrack && status.isLoaded && !status.playing;
 
-  // Tap-to-pause on the swipe card — pure playback control, no interaction
-  // with queue/strategy/undo state at all.
   async function handleCardTap() {
     if (!currentTrack || !status.isLoaded) return;
     if (hasEnded) {
       setHasEnded(false);
-      await player.seekTo(0); // don't rely on play() implicitly restarting a finished player
+      await player.seekTo(0);
       player.play();
       return;
     }
@@ -144,8 +110,6 @@ export default function HomeScreen() {
       player.play();
     }
   }
-
-  // ---------- Bootstrap ----------
 
   useEffect(() => {
     (async () => {
@@ -164,20 +128,8 @@ export default function HomeScreen() {
 
       setHydrated(true);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---------- Queue refill ----------
-
-  // `history` (not just a seen-ids set) is required here because a strategy that
-  // can't fill the queue on its own falls back to another genre — via the same
-  // priority order as a swipe-down genre-jump — instead of dead-ending on an
-  // empty queue; picking that fallback genre needs the full swipe history.
-  // `activeRegion` is an explicit parameter rather than reading the `region`
-  // state variable — the region-toggle handler needs to refill under the
-  // *new* region in the same call that sets it, and setRegion doesn't take
-  // effect synchronously within that call. Same reason applySteeringStrategy
-  // passes `next` explicitly instead of reading `strategy` state.
   async function runRefill(
     baseQueue: DiscoveryTrack[],
     activeStrategy: Strategy,
@@ -195,8 +147,6 @@ export default function HomeScreen() {
         GENRES,
         (strategy) => fetchForStrategy(strategy, activeRegion)
       );
-      // Superseded by a newer refill, or by an undo that rolled back the swipe
-      // this refill was fetching for — discard rather than clobber current state.
       if (refillEpochRef.current !== epoch) return;
 
       setQueue(nextQueue);
@@ -216,8 +166,6 @@ export default function HomeScreen() {
     }
   }
 
-  // ---------- Swipe handlers ----------
-
   async function logSwipe(track: DiscoveryTrack, action: SwipeEntry['action']) {
     const isSteer = action === 'steer-artist' || action === 'steer-sound';
     const entry: SwipeEntry = {
@@ -229,12 +177,6 @@ export default function HomeScreen() {
       collectionId: track.collectionId,
       action,
       timestamp: Date.now(),
-      // status.currentTime is still the swiped track's position at this point
-      // — the next track's replace() only happens later, once this swipe's
-      // state updates trigger the autoplay effect to re-run. Steering skips
-      // this entirely: it isn't a listen event, and the same track gets its
-      // own separate entry (with its own listenMs) later when it's actually
-      // swiped away — recording one here too would double-count that time.
       ...(isSteer ? {} : { listenMs: Math.round(status.currentTime * 1000) }),
     };
     const nextHistory = [...swipeHistory, entry];
@@ -252,25 +194,17 @@ export default function HomeScreen() {
 
   async function handleLike(track: DiscoveryTrack) {
     const nextHistory = await logSwipe(track, 'like');
-    await appendLikedTrack(track); // independent of swipeHistory — see lib/discovery-storage.ts
+    await appendLikedTrack(track);
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
     await runRefill(nextQueue, strategy, nextHistory, discoveredGenres, region);
   }
 
-  // Steering doesn't touch the currently showing card — it keeps playing and
-  // stays swipeable exactly as before. Only the strategy for what gets
-  // fetched next changes, and (via logSwipe) a steer-* entry records that
-  // this was a deliberate redirect, not passive drift.
   async function applySteeringStrategy(kind: 'artist' | 'sound', next: Strategy) {
     const nextHistory = currentTrack
       ? await logSwipe(currentTrack, kind === 'artist' ? 'steer-artist' : 'steer-sound')
       : swipeHistory;
     setStrategy(next);
-    // Keep the card already showing, but drop the rest of the buffered tail —
-    // it was fetched under the old strategy, so without truncating it here,
-    // refillQueue sees a full queue and no-ops, and the new strategy never
-    // actually gets fetched until the stale tail drains on its own.
     const preserved = queue.slice(0, 1);
     setQueue(preserved);
     await runRefill(preserved, next, nextHistory, discoveredGenres, region);
@@ -292,9 +226,6 @@ export default function HomeScreen() {
     applySteeringStrategy('sound', { type: 'genre', genre: currentTrack.primaryGenreName });
   }
 
-  // Shared tail of "jump to this genre right now": set strategy, discard the
-  // buffered tail (a jump is immediate, not queued), refill from scratch.
-  // Used by both the random swipe-down jump and the genre picker's chosen one.
   async function commitGenreJump(genre: string, nextHistory: SwipeEntry[]) {
     const nextStrategy: Strategy = { type: 'genre', genre };
     setStrategy(nextStrategy);
@@ -309,9 +240,6 @@ export default function HomeScreen() {
     await commitGenreJump(newGenre, nextHistory);
   }
 
-  // Snapshot everything a swipe (a genre pick, or a steering choice) can touch
-  // before touching any of it, so a later undo can restore it exactly — see
-  // UndoSnapshot / handleUndo.
   function captureUndoSnapshot() {
     setUndoSnapshot({ queue, strategy, discoveredGenres, swipeHistory });
   }
@@ -325,14 +253,10 @@ export default function HomeScreen() {
 
   async function handlePickGenre(genre: string) {
     captureUndoSnapshot();
-    // Same as swipe-down abandoning whatever's currently showing — except
-    // there's nothing to log a swipe against if the queue's already empty.
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     await commitGenreJump(genre, nextHistory);
   }
 
-  // The picker's "Explore" row: same random-jump selection swipe-down already
-  // uses, just triggered by a tap instead of a gesture.
   async function handleExplore() {
     captureUndoSnapshot();
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
@@ -344,8 +268,6 @@ export default function HomeScreen() {
   async function handleUndo() {
     const snapshot = undoSnapshot;
     if (!snapshot) return;
-    // Invalidate any refill still in flight from the swipe being undone, so it
-    // can't resolve later and clobber the state we're about to restore.
     refillEpochRef.current += 1;
     setUndoSnapshot(null);
     setQueue(snapshot.queue);
@@ -362,14 +284,10 @@ export default function HomeScreen() {
     const nextRegion = REGIONS[(REGIONS.indexOf(region) + 1) % REGIONS.length];
     setRegion(nextRegion);
     await saveRegion(nextRegion);
-    // Same shape as applySteeringStrategy: keep the current card, drop the
-    // buffered tail (fetched under the old region), refill under the new one.
     const preserved = queue.slice(0, 1);
     setQueue(preserved);
     await runRefill(preserved, strategy, swipeHistory, discoveredGenres, nextRegion);
   }
-
-  // ---------- Render ----------
 
   if (!hydrated) {
     return (

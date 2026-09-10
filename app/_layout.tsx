@@ -1,5 +1,5 @@
-import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
+import { DarkTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -11,14 +11,10 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-// Dark-only — see constants/theme.ts. Built on react-navigation's own
-// DarkTheme for the font shape, with colors swapped for this app's palette
-// so a pushed screen's native header matches everything else.
-const navigationTheme = {
+const customTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
-    primary: Colors.accent,
     background: Colors.background,
     card: Colors.surface,
     text: Colors.text,
@@ -29,7 +25,7 @@ const navigationTheme = {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: Colors.background }}>
-      <ThemeProvider value={navigationTheme}>
+      <ThemeProvider value={customTheme}>
         <PlaybackProvider>
           <Stack
             screenOptions={{
