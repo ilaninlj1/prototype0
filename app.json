@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "Blindspot",
-    "slug": "prototype0",
+    "slug": "blindspot",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "owner": "ilanrusso",
+    "owner": "smu-c3-mobile-fall-26",
     "scheme": "prototype0",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -22,6 +22,10 @@
       },
       "predictiveBackGestureEnabled": false,
       "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.RECORD_AUDIO",
@@ -70,14 +74,14 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d56d662c-dc58-468a-b1fd-5ba4882f1392"
+        "projectId": "93a021d9-29e0-41bb-876f-2d5ffba00638"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/d56d662c-dc58-468a-b1fd-5ba4882f1392"
+      "url": "https://u.expo.dev/93a021d9-29e0-41bb-876f-2d5ffba00638"
     }
   }
 }
