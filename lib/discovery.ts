@@ -13,6 +13,17 @@ export type DiscoveryTrack = {
   // absent, since that would wrongly group unrelated tracks together. Powers
   // spreadByAlbum below.
   collectionId?: number;
+  // The album's display title (iTunes's collectionName), null when the raw
+  // result had none. Purely additive alongside collectionId above — display
+  // data only, nothing here reads it for dedup/grouping.
+  collectionName: string | null;
+  // Optional solid-color fallback CardFace renders when artworkUrl100 is
+  // empty, instead of a flat gray box — set by lib/pool.ts's stub (colored
+  // per preset, so swapping presets is visually confirmable), left unset
+  // for real iTunes-sourced tracks (which always have real artwork). Also
+  // a reasonable permanent fallback if a real track is ever missing
+  // artwork, not strictly a stub-only concern.
+  placeholderColor?: string;
 };
 
 // 'steer-artist'/'steer-sound': logged when the user redirects discovery
@@ -254,6 +265,7 @@ function toDiscoveryTrack(r: any): DiscoveryTrack {
     previewUrl: r.previewUrl,
     trackViewUrl: r.trackViewUrl ?? '',
     collectionId: r.collectionId,
+    collectionName: r.collectionName ?? null,
   };
 }
 

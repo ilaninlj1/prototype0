@@ -49,6 +49,7 @@ function track(overrides: Partial<DiscoveryTrack>): DiscoveryTrack {
     primaryGenreName: 'Rock',
     previewUrl: 'https://example.com/preview.m4a',
     trackViewUrl: 'https://music.apple.com/example',
+    collectionName: null,
     ...overrides,
   };
 }
