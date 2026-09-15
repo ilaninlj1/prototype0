@@ -27,6 +27,11 @@ export const Colors = {
   // accumulated (an error banner's red and a delete action's red).
   destructive: '#ef4444',
 
+  // Paired with destructive for the swipe-zone tints (skip/like) — same
+  // Tailwind-500-ish saturation level as destructive, so the two read as a
+  // deliberate pair rather than one themed color and one arbitrary one.
+  positive: '#22c55e',
+
   tint: '#8b5cf6',
   icon: 'rgba(242, 242, 244, 0.62)',
 };

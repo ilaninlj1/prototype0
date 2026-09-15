@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
+import { PresetChips } from '@/components/discovery/preset-chips';
 import { RegionToggle } from '@/components/discovery/region-toggle';
 import { SteeringRow } from '@/components/discovery/steering-row';
 import {
@@ -44,6 +45,8 @@ import {
   saveRegion,
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
+import { getTracks, trackToDiscoveryTrack } from '@/lib/pool';
+import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
 
 function randomGenre(): string {
@@ -55,6 +58,7 @@ type UndoSnapshot = {
   strategy: Strategy;
   discoveredGenres: string[];
   swipeHistory: SwipeEntry[];
+  seenArtists: Set<string>;
 };
 
 export default function HomeScreen() {
@@ -77,11 +81,33 @@ export default function HomeScreen() {
     setCardSize(computeCardSize({ width, height }));
   }
 
+  // Measured, not guessed — the header overlay's real rendered height
+  // (Undo/genre-pill row + gap + preset chips row), used as the card's
+  // artworkTopInset below so the header never visually sits over artwork.
+  // A hardcoded constant would drift the moment a label wraps differently
+  // or a platform renders pill text at a different line-height.
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  function handleHeaderLayout(e: LayoutChangeEvent) {
+    setHeaderHeight(e.nativeEvent.layout.height);
+  }
+
   const [queue, setQueue] = useState<DiscoveryTrack[]>([]);
   const [strategy, setStrategy] = useState<Strategy>({ type: 'genre', genre: 'Pop' });
   const [swipeHistory, setSwipeHistory] = useState<SwipeEntry[]>([]);
   const [discoveredGenres, setDiscoveredGenres] = useState<string[]>([]);
   const [region, setRegion] = useState<Region>('US');
+
+  // Preset and genre (strategy) are independent axes — see runRefill's
+  // fetcher branch below. Not persisted (yet): resets to the default A on
+  // every launch, same as every other piece of state here except region
+  // and the two AsyncStorage-backed lists.
+  const [preset, setPreset] = useState<PresetId>('A');
+  const [presetLoading, setPresetLoading] = useState(false);
+  // Per-session pool exclusion (spec: "maintain a per-session seen-artist
+  // set and exclude those artists when refilling"). Deliberately plain
+  // state, not persisted — resets each launch, unlike swipeHistory.
+  const [seenArtists, setSeenArtists] = useState<Set<string>>(new Set());
 
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
   const refillEpochRef = useRef(0);
@@ -98,7 +124,12 @@ export default function HomeScreen() {
 
   useEffect(() => {
     setHasEnded(false);
-    if (currentTrack) {
+    // A falsy previewUrl means "nothing to play" (the stub deliberately
+    // uses this now — see lib/pool.ts), not an error — pause rather than
+    // hand expo-audio an empty/invalid source. Defensive for real tracks
+    // too: previewUrl is typed as guaranteed non-empty, but that's a type
+    // contract, not a runtime guarantee against every future data source.
+    if (currentTrack?.previewUrl) {
       player.replace(currentTrack.previewUrl);
       player.play();
     } else {
@@ -118,7 +149,11 @@ export default function HomeScreen() {
 
   const showPlayIcon = !!currentTrack && status.isLoaded && !status.playing;
 
-  async function handleCardTap() {
+  // Triggered by a ~400ms hold on the card now, not a tap — see
+  // components/discovery/swipe-card.tsx's onHold. Toggle logic itself is
+  // unchanged; only the gesture that fires it moved, since a plain tap now
+  // belongs to skip/like.
+  async function handleCardHold() {
     if (!currentTrack || !status.isLoaded) return;
     if (hasEnded) {
       setHasEnded(false);
@@ -146,7 +181,12 @@ export default function HomeScreen() {
 
       const initialStrategy: Strategy = { type: 'genre', genre: randomGenre() };
       setStrategy(initialStrategy);
-      await runRefill([], initialStrategy, history, genres, loadedRegion);
+      // Literal initial values, not the preset/seenArtists state — this
+      // effect runs once, at mount, before anything could have changed
+      // them, so reading the state itself would just be an unnecessary
+      // (and lint-flagged) dependency on values that are always still 'A' /
+      // empty here.
+      await runRefill([], initialStrategy, history, genres, loadedRegion, 'A', new Set());
 
       setHydrated(true);
     })();
@@ -157,7 +197,9 @@ export default function HomeScreen() {
     activeStrategy: Strategy,
     history: SwipeEntry[],
     knownGenres: string[],
-    activeRegion: Region
+    activeRegion: Region,
+    activePreset: PresetId,
+    excludeArtists: Set<string>
   ) {
     const epoch = ++refillEpochRef.current;
     try {
@@ -167,7 +209,15 @@ export default function HomeScreen() {
         history,
         knownGenres,
         GENRES,
-        (strategy) => fetchForStrategy(strategy, activeRegion)
+        // Artist strategies (steering) are unchanged — real iTunes lookup,
+        // preset-agnostic. Genre strategies (initial load, swipe-down,
+        // genre picker) route through the pool instead of the old
+        // genre-term search — see bugs.md's 2026-09-14 entry on why that
+        // path is retired here, not patched.
+        (strategy) =>
+          strategy.type === 'artist'
+            ? fetchForStrategy(strategy, activeRegion)
+            : getTracks(activePreset, strategy.genre, excludeArtists).then((tracks) => tracks.map(trackToDiscoveryTrack))
       );
       if (refillEpochRef.current !== epoch) return;
 
@@ -207,19 +257,28 @@ export default function HomeScreen() {
     return nextHistory;
   }
 
+  function markArtistSeen(track: DiscoveryTrack): Set<string> {
+    const next = new Set(seenArtists);
+    next.add(track.artistName);
+    setSeenArtists(next);
+    return next;
+  }
+
   async function handleSkip(track: DiscoveryTrack) {
     const nextHistory = await logSwipe(track, 'skip');
+    const nextSeen = markArtistSeen(track);
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres, region);
+    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres, region, preset, nextSeen);
   }
 
   async function handleLike(track: DiscoveryTrack) {
     const nextHistory = await logSwipe(track, 'like');
     await appendLikedTrack(track);
+    const nextSeen = markArtistSeen(track);
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres, region);
+    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres, region, preset, nextSeen);
   }
 
   async function applySteeringStrategy(kind: 'artist' | 'sound', next: Strategy) {
@@ -229,7 +288,10 @@ export default function HomeScreen() {
     setStrategy(next);
     const preserved = queue.slice(0, 1);
     setQueue(preserved);
-    await runRefill(preserved, next, nextHistory, discoveredGenres, region);
+    // Steering redirects the strategy; it doesn't count as "seen" the way a
+    // swipe-away does — "more from this artist" would be self-defeating if
+    // it did, and "more like this sound" isn't a judgment on the artist.
+    await runRefill(preserved, next, nextHistory, discoveredGenres, region, preset, seenArtists);
   }
 
   function handleMoreFromArtist() {
@@ -248,22 +310,25 @@ export default function HomeScreen() {
     applySteeringStrategy('sound', { type: 'genre', genre: currentTrack.primaryGenreName });
   }
 
-  async function commitGenreJump(genre: string, nextHistory: SwipeEntry[]) {
+  async function commitGenreJump(genre: string, nextHistory: SwipeEntry[], excludeArtists: Set<string>) {
     const nextStrategy: Strategy = { type: 'genre', genre };
     setStrategy(nextStrategy);
     setQueue([]);
-    await runRefill([], nextStrategy, nextHistory, discoveredGenres, region);
+    // Genre changes independently of preset — activePreset here is
+    // whatever's currently selected, untouched by this jump.
+    await runRefill([], nextStrategy, nextHistory, discoveredGenres, region, preset, excludeArtists);
   }
 
   async function handleGenreJump(track: DiscoveryTrack) {
     const nextHistory = await logSwipe(track, 'genre-jump');
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const newGenre = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
-    await commitGenreJump(newGenre, nextHistory);
+    const nextSeen = markArtistSeen(track);
+    await commitGenreJump(newGenre, nextHistory, nextSeen);
   }
 
   function captureUndoSnapshot() {
-    setUndoSnapshot({ queue, strategy, discoveredGenres, swipeHistory });
+    setUndoSnapshot({ queue, strategy, discoveredGenres, swipeHistory, seenArtists });
   }
 
   function handleCardSwipe(direction: SwipeDirection, track: DiscoveryTrack) {
@@ -276,7 +341,8 @@ export default function HomeScreen() {
   async function handlePickGenre(genre: string) {
     captureUndoSnapshot();
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
-    await commitGenreJump(genre, nextHistory);
+    const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
+    await commitGenreJump(genre, nextHistory, nextSeen);
   }
 
   async function handleExplore() {
@@ -284,7 +350,19 @@ export default function HomeScreen() {
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const target = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
-    await commitGenreJump(target, nextHistory);
+    const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
+    await commitGenreJump(target, nextHistory, nextSeen);
+  }
+
+  async function handleSelectPreset(newPreset: PresetId) {
+    if (newPreset === preset || presetLoading) return;
+    setPreset(newPreset);
+    setPresetLoading(true);
+    setQueue([]);
+    // Preset changes independently of genre — strategy (and therefore the
+    // active genre) is passed through unchanged.
+    await runRefill([], strategy, swipeHistory, discoveredGenres, region, newPreset, seenArtists);
+    setPresetLoading(false);
   }
 
   async function handleUndo() {
@@ -296,6 +374,7 @@ export default function HomeScreen() {
     setStrategy(snapshot.strategy);
     setDiscoveredGenres(snapshot.discoveredGenres);
     setSwipeHistory(snapshot.swipeHistory);
+    setSeenArtists(snapshot.seenArtists);
     await Promise.all([
       saveSwipeHistory(snapshot.swipeHistory),
       saveDiscoveredGenres(snapshot.discoveredGenres),
@@ -308,7 +387,7 @@ export default function HomeScreen() {
     await saveRegion(nextRegion);
     const preserved = queue.slice(0, 1);
     setQueue(preserved);
-    await runRefill(preserved, strategy, swipeHistory, discoveredGenres, nextRegion);
+    await runRefill(preserved, strategy, swipeHistory, discoveredGenres, nextRegion, preset, seenArtists);
   }
 
   if (!hydrated) {
@@ -321,16 +400,41 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
-      <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
-      <GenrePicker
-        curatedGenres={GENRES}
-        discoveredGenres={discoveredGenres}
-        heardGenres={genresHeard}
-        currentGenre={currentGenre}
-        currentLabel={currentLabel}
-        onSelect={handlePickGenre}
-        onExplore={handleExplore}
-      />
+      {/* Absolutely positioned overlay, NOT a flow sibling of cardArea —
+          this mirrors bottomRows' own precedent (see its comment below) in
+          reverse. bottomRows consolidated independently-floating pills
+          into ONE flow container because they overlapped each other. This
+          header does the opposite move for the same underlying reason:
+          never let two things in the same screen region each guess their
+          own position. Undo, the genre pill, and the preset chips are laid
+          out relative to each other by real flexbox INSIDE this one block
+          (so they can't overlap each other), and the whole block is kept
+          OUT of cardArea's flex column (so it can never take space from
+          the card, no matter what's added in here later). Moving this back
+          into normal flow "to simplify it" silently reintroduces the exact
+          card-shrinking bug this fixed — see the 2026-09-15 conversation
+          this responds to before doing that.
+          pointerEvents="box-none" on this and headerRow so the empty space
+          between/around Undo and the genre pill lets taps through to the
+          card underneath instead of swallowing them. */}
+      <View
+        style={[styles.headerOverlay, { top: insets.top + Spacing.lg }]}
+        pointerEvents="box-none"
+        onLayout={handleHeaderLayout}>
+        <View style={styles.headerRow} pointerEvents="box-none">
+          <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
+          <GenrePicker
+            curatedGenres={GENRES}
+            discoveredGenres={discoveredGenres}
+            heardGenres={genresHeard}
+            currentGenre={currentGenre}
+            currentLabel={currentLabel}
+            onSelect={handlePickGenre}
+            onExplore={handleExplore}
+          />
+        </View>
+        <PresetChips activePreset={preset} loading={presetLoading} onSelect={handleSelectPreset} />
+      </View>
 
       {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
@@ -341,8 +445,12 @@ export default function HomeScreen() {
               queue={queue}
               cardSize={cardSize}
               onSwipe={handleCardSwipe}
-              onTap={handleCardTap}
+              onHold={handleCardHold}
               showPlayIcon={showPlayIcon}
+              // Keeps the header overlay from visually sitting on top of
+              // artwork — see CardFace's own doc comment. +Spacing.sm so
+              // the chips don't look like they're touching the art directly.
+              artworkTopInset={headerHeight + Spacing.sm}
             />
           </View>
 
@@ -359,6 +467,10 @@ export default function HomeScreen() {
             </View>
           </View>
         </>
+      ) : presetLoading ? (
+        <ThemedView style={styles.centered}>
+          <ActivityIndicator color={Colors.accent} />
+        </ThemedView>
       ) : (
         <ThemedText style={styles.emptyText}>No more tracks — try again in a bit.</ThemedText>
       )}
@@ -378,6 +490,18 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerOverlay: {
+    position: 'absolute',
+    left: Spacing.lg,
+    right: Spacing.lg,
+    zIndex: 1,
+    gap: Spacing.sm,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   bottomRows: {
     gap: Spacing.sm,

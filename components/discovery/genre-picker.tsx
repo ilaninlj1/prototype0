@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -28,7 +27,12 @@ type GenrePickerProps = {
 
 type GroupSection = Extract<GenreSection, { type: 'group' }>;
 
-/** Top-right trigger button (shows where you are) + a grouped, scrollable genre list in a bottom-sheet modal. */
+/**
+ * Trigger button (shows where you are) + a grouped, scrollable genre list in
+ * a bottom-sheet modal. The trigger is a plain flow element — positioning is
+ * the caller's job (app/(tabs)/index.tsx's absolutely-positioned header
+ * overlay, alongside UndoButton), not this component's.
+ */
 export function GenrePicker({
   curatedGenres,
   discoveredGenres,
@@ -38,7 +42,6 @@ export function GenrePicker({
   onSelect,
   onExplore,
 }: GenrePickerProps) {
-  const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
@@ -153,10 +156,7 @@ export function GenrePicker({
 
   return (
     <>
-      <TouchableOpacity
-        onPress={() => setVisible(true)}
-        activeOpacity={0.7}
-        style={[styles.trigger, { top: insets.top + Spacing.lg }]}>
+      <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.7} style={styles.trigger}>
         <ThemedView style={styles.triggerButton} backgroundColor={Colors.surfaceElevated}>
           <ThemedText type="label" numberOfLines={1} style={styles.triggerText}>
             {currentLabel}
@@ -188,10 +188,7 @@ export function GenrePicker({
 
 const styles = StyleSheet.create({
   trigger: {
-    position: 'absolute',
-    right: Spacing.lg,
     maxWidth: 200,
-    zIndex: 1,
   },
   triggerButton: {
     paddingVertical: Spacing.sm,
