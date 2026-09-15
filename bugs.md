@@ -16,6 +16,55 @@ Description of the bug, repro steps, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-09-14] fetchTracksByGenre serves chart-relevance results, not genre-representative ones — live, not a stale path
+
+`fetchTracksByGenre` (`lib/discovery.ts:324-333`) issues a bare
+`search?term=<genre>&entity=song` — a relevance search on the genre name
+itself, no artist targeting — and iTunes's relevance ranking for a generic
+one-word query skews heavily toward chart/popularity signal. This is **live
+in production today**, not a dead or fallback path:
+
+- `app/(tabs)/index.tsx` starts every session on a `{ type: 'genre', ... }`
+  strategy (`randomGenre()`, line ~147) and swipe-down jumps
+  (`pickJumpGenre`, lines 252-255) land on another genre strategy — both go
+  through `fetchForStrategy` → `fetchTracksByGenre`. This is the default,
+  most-traveled path through the whole app.
+- `fetchTracksByArtist`'s correct call shape (`lookup?id=<artistId>`) is
+  only reached via `applySteeringStrategy('artist', ...)` — i.e. only after
+  a user explicitly steers to "more from this artist."
+
+**Decision (2026-09-14): not fixing this in place.** The correct fix is
+Last.fm-driven artist enumeration (the pool-steering control's Phase 1),
+which supersedes this function rather than patching its query. Phase 1
+must retire `fetchTracksByGenre` and route the genre strategy — both
+initial load and swipe-down jump — through the new pool instead.
+
+**What breaks when it's retired, flagged for Phase 1:**
+
+- **Region toggle stops affecting genre browsing.** `fetchTracksByGenre`
+  takes a `region: Region` param (US/MX/ZA storefront,
+  `2026-09-05-region-storefront-design.md`); the pool-steering spec's
+  `getTracks(preset, genreTag, excludeArtists)` has no region parameter.
+  Unless Phase 1 threads a region through, the toggle silently stops doing
+  anything for the default browsing mode (it'd still affect
+  `fetchTracksByArtist` calls from steering).
+- **"Discovered" genres and "more like this sound" steering have no route
+  into the new pool.** `GenrePicker`'s taxonomy (`components/discovery/
+  genre-taxonomy.ts`) surfaces a synthetic "Discovered" section built from
+  raw iTunes `primaryGenreName` strings outside the curated `GENRES` list
+  (e.g. "Urbano latino", "Punjabi Pop"), and `SteeringRow`'s "more like
+  this sound" sets `{ type: 'genre', genre: currentTrack.primaryGenreName }`
+  directly — also a raw iTunes string, not guaranteed to be a curated
+  `GENRES` entry. `assets/genres.json` is only ever keyed by the curated
+  list (Phase 0 seeds from `GENRES`), so either of these can hand the new
+  pool a `genreTag` with no seed entry at all.
+- **`GENRE_TERM_OVERRIDES`, `isGenreRelated`, `isGenericGenreTitle`, and
+  `parseGenreSearchResponse`** (`lib/discovery.ts`) become dead code — no
+  caller left once `fetchTracksByGenre` is gone.
+- **12 tests in `lib/discovery.test.ts`** exercise this machinery directly
+  (`isGenreRelated` ×6, `isGenericGenreTitle` ×5, `parseGenreSearchResponse`
+  ×2 — some overlap) and go stale at the same time.
+
 ## [2026-09-05] Generic genre-titled tracks polluting genre search results
 
 `fetchTracksByGenre` does plain free-text search (`search?term={genre}`), so

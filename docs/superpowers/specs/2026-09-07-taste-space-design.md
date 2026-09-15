@@ -18,6 +18,26 @@
 > this feature, not the scoring half this spec and the Last.fm layer spec already
 > cover.
 
+> **Correction, 2026-09-14: the 24/25 figure is a call-shape artifact — do not
+> cite it as the reason for inverting the pipeline.** The probe ran through
+> `fetchTracksByGenre` (`lib/discovery.ts:324-333`), which issues a bare
+> `search?term=<genre>&entity=song` — a relevance search on the *genre name
+> itself*, with no artist targeting. That call is known to skew toward
+> chart/popularity signal for a generic one-word query; it says nothing about
+> iTunes-sourcing in general. `fetchTracksByArtist`'s
+> `lookup?id=<artistId>&entity=song` shape (`lib/discovery.ts:335-344`, already
+> in this file, already used for "more from this artist" steering) does not
+> have this bias — it fetches a known artist's real catalog rather than asking
+> iTunes to rank or select anything.
+>
+> The inversion is still the right call, but for a narrower and more durable
+> reason than the probe result: **iTunes has no listener count or artist
+> fan-count field anywhere in its API.** No call shape recovers that. A
+> feature that wants to deliberately target obscure vs. popular artists needs
+> an external source for that axis regardless of how the iTunes side is
+> called — which is the actual justification, independent of and prior to the
+> 24/25 finding.
+
 A third tab, `app/(tabs)/taste-space.tsx`, giving the user a 2D control over
 what kind of track gets sampled into the discovery queue:
 
@@ -57,6 +77,47 @@ a real data source later is the only thing this spec doesn't do.
    the result today). If a future change makes this only statistically
    true, that change violates this spec even if `scoreTrack` itself is
    untouched.
+
+> **Amendment, 2026-09-14: requirement #1 does not carry over to the
+> pool-steering control (this spec's discrete-preset successor, see the
+> correction note above).** That control's default is Preset A ("their
+> best, unknown to you" — a niche artist's top track, this design's
+> "Breakouts" corner), not Mixed, and its first-launch behavior is
+> deliberately *not* byte-identical to the existing feed — a new user's
+> first deck is biased toward obscure artists from the moment the app
+> opens. This was evaluated, not defaulted into: the condition was that
+> every genre needed a real, non-token obscure band, which Phase 0's seed
+> pipeline (`scripts/seed-genres.ts` fetches, `scripts/band-genres.ts`
+> bands, both dev-only) confirmed for all 37 curated genres — **not** all
+> at the same target size, an earlier draft of this note overstated that.
+> Two things had to hold, and both were checked, not assumed:
+>
+> 1. **Non-zero, correctly ordered, on both sides.** Every genre's obscure
+>    band is non-empty and every one of its listener counts sits at or
+>    below every one of that genre's popular listener counts — verified
+>    directly against the written seed, not inferred from the banding
+>    logic's intent. This took two rounds of fixing: obscure has to claim
+>    its band *before* popular (Preset A draws from obscure and shipped as
+>    the default, so it's the side that can't come up empty), and even
+>    then the first ordering-safe version still let a thin genre's popular
+>    pick dip below its own obscure band when too few artists existed
+>    above the obscure ceiling — both were real bugs, not edge cases, and
+>    both are fixed in `scripts/band-genres.ts`.
+> 2. **Most genres reach `percentileFallbackMinBandSize` (40); a few
+>    don't, and that's a Last.fm population fact, not a bug.** Amapiano's
+>    entire above-floor population is 18 artists — its obscure band is 6,
+>    genuinely smaller than the target, because there is nothing more to
+>    give it. Bachata is close (39). This is the same Anglophone-skewed-
+>    scrobble-base fact behind Salsa/Cumbia's popular band needing the
+>    genre-relative percentile instead of the (now sanity-ceiling-only)
+>    absolute threshold — not a seeding error, and not something a
+>    different threshold number fixes.
+>
+> Had any genre come back with a literally empty or misordered band, this
+> default would not have shipped without revisiting it — that's the bar
+> that was actually checked, not "every genre hits 40." Requirement #1
+> stays correct and binding for Taste Space itself, if that's ever built —
+> this amendment only concerns the simpler control that shipped instead.
 
 ## `lib/taste-space.ts` (new module)
 

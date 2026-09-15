@@ -16,6 +16,96 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-09-14] Phase 1 requirement: serialize iTunes lookups with real pacing, pre-fetch ahead of the swipe
+
+Measured directly, not assumed: iTunes's real rate limit is much tighter
+than the original data-layer spec's "avoid 403s, don't loop one at a time"
+warning implied. `scripts/check-obscure-floor.ts` (retired, see the entry
+below) tripped a 429-escalating-to-403 block twice — once at concurrency 8,
+once at concurrency 2 with exponential backoff — and a single idle probe
+right after stopping came back 200 again, meaning the block reacts to burst
+pattern almost immediately, not to a sustained rate that a moderate
+concurrency cap comfortably avoids.
+
+**This is a runtime concern, not just a tooling one.** Phase 1 fills a deck
+by resolving candidates per artist during a live swipe session — if it fires
+those lookups concurrently (or even at a "reasonable-sounding" concurrency
+like 2-4), it risks tripping the same block on a user's own device mid-session,
+which reads to them as tracks silently failing to load with no visible cause.
+
+**Requirement for Phase 1's runtime data layer (`lib/pool.ts`):**
+- Serialize iTunes calls — no concurrency, a real fixed delay between them
+  (`scripts/resolve-itunes-ids.ts` uses 3s as a starting point; Phase 1
+  should re-derive its own number from how the resolver run actually
+  behaves, not copy 3s blindly).
+- Pre-fetch the *next* pool while the user is still swiping the *current*
+  one, so the pacing this requires is absorbed in the background and never
+  shows up as a visible stall before a card loads.
+- With `itunesArtistId` now pre-resolved into the seed (see the entry
+  below), Phase 1's runtime only needs one iTunes call per artist
+  (`lookup?id=`) instead of two — the name-search step, which is both the
+  fragile one and half the original budget, moves entirely to seed time.
+
+## [2026-09-14] scripts/check-obscure-floor.ts retired, replaced by an exhaustive offline resolver
+
+Two sampled runs of the floor-check script (n=30 then n=80 per bucket) came
+back non-monotonic and then near-zero, respectively — the first was a
+name-matching confound (see the entry below), the second was the iTunes
+rate-limit block described above corrupting the sample silently. Rather
+than keep tuning a sampled probe against an API that reacts badly to any
+meaningful burst, `scripts/resolve-itunes-ids.ts` now resolves an iTunes
+artistId for every one of the 15,418 distinct artists across all 37 genres
+(deduped globally — 926 artist-genre rows share a name with another genre's
+entry), serialized with real pacing, resumable across restarts and blocks,
+writing the result directly into `assets/genres-raw.json`. This both
+answers the floor question at n=15,418 instead of n=80
+(`scripts/report-itunes-resolution.ts`, read-only, safe to run anytime
+including mid-resolve) and produces the exact data Phase 1 needs to skip
+its own name-search step — one script serving both purposes rather than a
+throwaway measurement tool. `artistObscureMinListeners` stays at 20,000
+until this reports.
+
+## [2026-09-14] Phase 1 task: retry collaborative-credit artist names on iTunes resolution failure
+
+Found while validating the pool-steering control's Phase 0 data (iTunes
+artistId resolution gate, ~86% overall across a 64-artist sample spanning
+33 genres): the misses weren't random. Reggae came back 0/2 on the one
+targeted retest, and the specific failures across both resolution-gate runs
+were consistently multi-credit names — `Dave & Ansell Collins`, `DJ Antoine
+feat. The Beat Shakers`, `21 Savage & Metro Boomin` — where Last.fm's
+artist string names a collaboration and iTunes's `musicArtist` search
+resolves to a single performer instead, so the exact-normalized-match check
+in the resolution step fails even though the underlying catalog usually
+exists under one of the individual names.
+
+Logged, not chased now — n=2 for Reggae specifically is too thin to call it
+a genre problem, and the pattern (when it does appear) shows up across
+genres, not concentrated in one. This is a name-normalization issue in the
+resolution step itself, not a Reggae issue or a data-availability gap.
+
+**Phase 1 task:** in `lib/pool.ts`'s iTunes artistId resolution (spec's step
+a), on an exact-match failure, retry with the substring before the first
+`&`, `feat.`/`ft.`, or `x` separator before falling through to the
+term-search fallback. Not implemented yet — `lib/pool.ts` doesn't exist.
+
+## [2026-09-14] Correction to the entry below: the 24/25 finding was a call-shape bug
+
+The "24 of 25 were top-50 hits" result came from `fetchTracksByGenre`'s bare
+`search?term=<genre>&entity=song` — a relevance search on the genre name
+itself, no artist targeting — not from anything inherent to sourcing
+candidates via iTunes. `fetchTracksByArtist`'s `lookup?id=<artistId>` shape
+(same file, already used for artist-steering) doesn't have this bias.
+
+The inversion recommended below still stands, but the real reason is that
+iTunes has no listener/fan-count field at all — not the 24/25 number, which
+should not be cited as the justification going forward. Full correction in
+`docs/superpowers/specs/2026-09-07-taste-space-design.md`.
+
+Also noted in passing while checking this: `fetchTracksByGenre` is live in
+production today — it's the default path and the swipe-down refill path for
+the whole discovery feed, not a stale/unused function. That's a separate,
+independent bug from anything Taste Space or the entry below is about.
+
 ## [2026-09-08] Taste Space is blocked on the candidate source, not on Last.fm
 Live probe from the app runtime (Expo Go, not node): Last.fm answered every call
 cleanly, HTTP 200 across the board — the CORS/reachability concern from the Last.fm

@@ -44,3 +44,6 @@ app-example
 
 # superpowers scratch workspace (ledgers, briefs, review packages)
 .superpowers/
+
+# throwaway debug screens
+app/lastfm-probe.tsx
