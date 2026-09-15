@@ -5,6 +5,11 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
+    "seed-genres": "node --experimental-strip-types --env-file=.env.local scripts/seed-genres.ts",
+    "band-genres": "node --experimental-strip-types scripts/band-genres.ts",
+    "resolve-itunes-ids": "node --experimental-strip-types scripts/resolve-itunes-ids.ts",
+    "report-itunes-resolution": "node --experimental-strip-types scripts/report-itunes-resolution.ts",
+    "test-pool": "node --experimental-strip-types --env-file=.env.local scripts/test-pool.ts",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
