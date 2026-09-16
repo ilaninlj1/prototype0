@@ -24,18 +24,19 @@ const FLY_OUT_DISTANCE = 600;
 // ask for one big enough for the card instead of upscaling a thumbnail.
 const CARD_ARTWORK_SIZE = 600;
 
-// Tint zones: subtle at rest, a hint of where to press rather than a
-// competing visual — the album art is still the point of the screen.
-// Checked empirically against two real iTunes covers, 2026-09-15 (a
+// Tint zones: fully transparent at rest — the album art is the point of the
+// screen, not a competing visual — visible only once a drag is actually in
+// progress, ramping to this max as translateX approaches the swipe
+// threshold (see leftTintStyle/rightTintStyle below). Previously had a
+// TINT_REST_OPACITY floor (0.08) so the zones stayed faintly visible even
+// with no drag; removed 2026-09-15 because that floor, combined with a
+// press-only jump to full opacity, was washing out artwork on a mere
+// touch-down before any actual swipe intent. 0.32 itself is unchanged from
+// the 2026-09-15 empirical check against two real iTunes covers (a
 // near-black one and a bright/colorful one, both composited with the exact
-// tint colors — see that conversation for the images): at 0.12, a mostly-
-// black cover only showed the tint in negative space (fine), but a typical
-// bright cover visibly shifted skin tone and background hue — closer to
-// "tinted wrong" than "a hint." 0.08 stays clearly visible against a
-// no-tint baseline on both while leaving actual subject matter close to
-// true color. If art still reads off on some other cover, this is the
-// number to drop further, not a case for changing the mechanism.
-const TINT_REST_OPACITY = 0.08;
+// tint colors — see that conversation for the images) — that number is
+// about how strong the tint should get at full activation, independent of
+// when it starts appearing.
 const TINT_ACTIVE_OPACITY = 0.32;
 
 type CardFaceProps = {
@@ -160,6 +161,16 @@ export function SwipeCard({ track, size, onSwipe, onHold, showPlayIcon, artworkT
     onSwipe(direction, track);
   }
 
+  // Plain JS-thread function, deliberately NOT a worklet — it's a shared
+  // committed-swipe path called from two worklet contexts (tap.onEnd below,
+  // and pan.onEnd's left/right branch), and a plain function reference
+  // isn't reliably callable directly from a UI-thread worklet just because
+  // a worklet happens to call it. Every call site must go through
+  // runOnJS(flyOutHorizontally)(...), never a direct call from inside a
+  // worklet — see git history around 2026-09-16 for a real crash
+  // (Hermes exception inside the UI-runtime worklet, on gesture release,
+  // no red screen — uncatchable by RN's normal JS-thread error handler)
+  // caused by pan.onEnd calling this directly instead.
   function flyOutHorizontally(direction: 'left' | 'right') {
     translateX.value = withTiming(direction === 'right' ? FLY_OUT_DISTANCE : -FLY_OUT_DISTANCE, { duration: 250 }, () =>
       runOnJS(commit)(direction)
@@ -177,7 +188,7 @@ export function SwipeCard({ track, size, onSwipe, onHold, showPlayIcon, artworkT
     .onEnd((e) => {
       const direction = resolveSwipeDirection(e.translationX, e.translationY);
       if (direction === 'right' || direction === 'left') {
-        flyOutHorizontally(direction);
+        runOnJS(flyOutHorizontally)(direction);
       } else if (direction === 'down') {
         translateY.value = withTiming(FLY_OUT_DISTANCE, { duration: 250 }, () => runOnJS(commit)('down'));
       } else {
@@ -224,24 +235,27 @@ export function SwipeCard({ track, size, onSwipe, onHold, showPlayIcon, artworkT
     ],
   }));
 
-  // Both tints are driven by the same two inputs — how far translateX has
-  // dragged toward that side's commit threshold (smooth, so the tint
-  // visibly telegraphs "how close to committing this is"), OR'd with a flat
-  // jump to full intensity while simply pressed on that side with no drag
-  // yet. Whichever is stronger wins, so lifting off from a press doesn't
-  // dim the tint before a spring-back has visually settled.
-  const leftTintStyle = useAnimatedStyle(() => {
-    const dragActivation = interpolate(translateX.value, [-DEFAULT_SWIPE_THRESHOLDS.horizontal, 0], [1, 0], 'clamp');
-    const pressActivation = pressedSide.value === -1 && translateX.value <= 0 ? 1 : 0;
-    const activation = Math.max(dragActivation, pressActivation);
-    return { opacity: TINT_REST_OPACITY + (TINT_ACTIVE_OPACITY - TINT_REST_OPACITY) * activation };
-  });
-  const rightTintStyle = useAnimatedStyle(() => {
-    const dragActivation = interpolate(translateX.value, [0, DEFAULT_SWIPE_THRESHOLDS.horizontal], [0, 1], 'clamp');
-    const pressActivation = pressedSide.value === 1 && translateX.value >= 0 ? 1 : 0;
-    const activation = Math.max(dragActivation, pressActivation);
-    return { opacity: TINT_REST_OPACITY + (TINT_ACTIVE_OPACITY - TINT_REST_OPACITY) * activation };
-  });
+  // Pure function of drag distance — 0 at zero displacement (the artwork is
+  // the point of the card; no tint should show until a swipe is actually in
+  // progress), ramping smoothly to TINT_ACTIVE_OPACITY as translateX
+  // approaches that side's commit threshold, so the tint visibly telegraphs
+  // "how close to committing this is." Deliberately NOT consulting
+  // pressedSide here (2026-09-16), even though it's still set by pan's
+  // onBegin/onFinalize above and its own comment there still describes the
+  // tint-feedback role it used to play — folding it into this activation
+  // calc (a flat jump to full opacity on mere touch-down, no drag) is gone:
+  // no tint at zero displacement, full stop. pressedSide itself stays
+  // populated, unused, rather than removed — it was suspected (2026-09-16)
+  // as the cause of a real release-time crash during triage, restored out
+  // of caution, and the actual cause turned out to be unrelated (see
+  // flyOutHorizontally's own comment). Safe to remove for real at this
+  // point; left alone since there's nothing to gain by touching it again.
+  const leftTintStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [-DEFAULT_SWIPE_THRESHOLDS.horizontal, 0], [TINT_ACTIVE_OPACITY, 0], 'clamp'),
+  }));
+  const rightTintStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [0, DEFAULT_SWIPE_THRESHOLDS.horizontal], [0, TINT_ACTIVE_OPACITY], 'clamp'),
+  }));
 
   return (
     <GestureDetector gesture={gesture}>
