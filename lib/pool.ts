@@ -13,6 +13,17 @@
 // deepCutMinTrackCount (lib/pool-config.ts) select which of those match
 // the requested preset.
 //
+// Phase 1.5 (2026-09-15) — that live per-artist fetch is why first-card
+// latency was still ~9s even after the pacer split below: CATALOG_LOADERS
+// (see "Precomputed catalogs" section) reads scripts/precompute-catalogs.ts's
+// output instead, zero network calls, for whichever (genre, artist) pairs
+// it's scoped to cover. Everything else — a genre it hasn't scoped, an
+// artist outside a scoped genre's precomputed 40 — falls through to the
+// live path unchanged. This is a per-artist fetch-strategy fork
+// (resolveOneTrack), not a selection-logic change: starvation widening,
+// the leftover cache, and getTracks()'s quick-fill split below all still
+// apply identically regardless of which path served a given artist.
+//
 // Latency: getTracks() returns as soon as poolQuickFillSize tracks are
 // ready, not deckSize — the rest keeps filling in the background into an
 // in-memory leftover cache, keyed per preset+genre, that later calls for
@@ -36,7 +47,7 @@
 import genresSeedRaw from '../assets/genres.json' with { type: 'json' };
 import type { DiscoveryTrack } from './discovery.ts';
 import { deckSize, deepCutMinTrackCount, deepCutRelativeFloor, hitRankMax, itunesDelayMs, lastfmDelayMs, poolQuickFillSize } from './pool-config.ts';
-import type { ArtistBand, PresetId, SeedArtistEntry, SongBand, Track } from './pool-types.ts';
+import type { ArtistBand, ArtistCatalog, CatalogEntry, GenreCatalogFile, PresetId, SeedArtistEntry, SongBand, Track } from './pool-types.ts';
 import { shuffle } from './taste-test.ts';
 
 const genresSeed = genresSeedRaw as unknown as Record<string, SeedArtistEntry[]>;
@@ -57,10 +68,20 @@ export interface PoolDiagnostics {
   skippedForMinTrackCount: number; // artists skipped: trackCountInCatalog < deepCutMinTrackCount
   lookupFailures: number; // artists where the Last.fm or iTunes call itself failed
   starvedEvents: number; // times the primary ArtistBand ran out before a request was satisfied
+  catalogResolves: number; // resolveOneTrack calls served from a precomputed catalog — zero network
+  liveResolves: number; // resolveOneTrack calls served from the live Last.fm/iTunes path
 }
-let diagnostics: PoolDiagnostics = { titleMismatches: 0, skippedForMinTrackCount: 0, lookupFailures: 0, starvedEvents: 0 };
+const EMPTY_DIAGNOSTICS: PoolDiagnostics = {
+  titleMismatches: 0,
+  skippedForMinTrackCount: 0,
+  lookupFailures: 0,
+  starvedEvents: 0,
+  catalogResolves: 0,
+  liveResolves: 0,
+};
+let diagnostics: PoolDiagnostics = { ...EMPTY_DIAGNOSTICS };
 export function resetPoolDiagnostics(): void {
-  diagnostics = { titleMismatches: 0, skippedForMinTrackCount: 0, lookupFailures: 0, starvedEvents: 0 };
+  diagnostics = { ...EMPTY_DIAGNOSTICS };
 }
 export function getPoolDiagnostics(): PoolDiagnostics {
   return { ...diagnostics };
@@ -87,7 +108,7 @@ function normalizeArtist(s: string): string {
 // and live cuts never match as "the same track" across Last.fm's ranking
 // and iTunes's catalog, which is exactly the discard case the original
 // spec called out by name.
-function normalizeTitle(title: string): string {
+export function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
     .normalize('NFKD')
@@ -181,13 +202,18 @@ interface LastFmTopTracksResponse {
   toptracks?: { track?: LastFmTrack | LastFmTrack[] };
 }
 
-interface RankedTrack {
+export interface RankedTrack {
   title: string;
   rank: number;
   playcount: number | null;
 }
 
-async function fetchTopTracks(artistName: string): Promise<RankedTrack[]> {
+// Exported for scripts/precompute-catalogs.ts, which reuses this exact
+// function (paced, parsed, bounded-retried) rather than re-fetching/parsing
+// Last.fm's response shape itself — see that script's header for why it
+// layers its own OUTER indefinite-retry around this rather than
+// reimplementing pacing/parsing.
+export async function fetchTopTracks(artistName: string): Promise<RankedTrack[]> {
   const apiKey = process.env.EXPO_PUBLIC_LASTFM_API_KEY;
   if (!apiKey) throw new Error('EXPO_PUBLIC_LASTFM_API_KEY is not set');
   const url = new URL(LASTFM_API_ROOT);
@@ -222,7 +248,7 @@ interface ItunesLookupResponse {
   results: ItunesLookupTrack[];
 }
 
-interface ItunesEntry {
+export interface ItunesEntry {
   title: string;
   previewUrl: string | null;
   itunesTrackId: number;
@@ -230,7 +256,8 @@ interface ItunesEntry {
   album: string | null;
 }
 
-async function fetchItunesCatalog(itunesArtistId: number): Promise<ItunesEntry[]> {
+// Exported for scripts/precompute-catalogs.ts — see fetchTopTracks above.
+export async function fetchItunesCatalog(itunesArtistId: number): Promise<ItunesEntry[]> {
   const url = new URL(ITUNES_LOOKUP_ROOT);
   url.searchParams.set('id', String(itunesArtistId));
   url.searchParams.set('entity', 'song');
@@ -250,7 +277,7 @@ async function fetchItunesCatalog(itunesArtistId: number): Promise<ItunesEntry[]
 
 // ---------- Local title intersection ----------
 
-interface IntersectedCandidate {
+export interface IntersectedCandidate {
   title: string;
   rank: number;
   playcount: number | null;
@@ -268,7 +295,7 @@ interface IntersectedCandidate {
  * almost always longer than the studio version's, and a live cut is a
  * worse representative of a deep cut than the studio version would be).
  */
-function buildItunesTitleIndex(catalog: ItunesEntry[]): Map<string, ItunesEntry> {
+export function buildItunesTitleIndex(catalog: ItunesEntry[]): Map<string, ItunesEntry> {
   const index = new Map<string, ItunesEntry>();
   for (const entry of catalog) {
     const key = normalizeTitle(entry.title);
@@ -289,7 +316,10 @@ function buildItunesTitleIndex(catalog: ItunesEntry[]): Map<string, ItunesEntry>
   return index;
 }
 
-function intersectByTitle(rankedTracks: RankedTrack[], itunesCatalog: ItunesEntry[]): IntersectedCandidate[] {
+// Exported for scripts/precompute-catalogs.ts — same intersection logic,
+// same diagnostics.titleMismatches side-effect (read via getPoolDiagnostics
+// below), called directly rather than reimplemented.
+export function intersectByTitle(rankedTracks: RankedTrack[], itunesCatalog: ItunesEntry[]): IntersectedCandidate[] {
   const index = buildItunesTitleIndex(itunesCatalog);
   const candidates: IntersectedCandidate[] = [];
   for (const rt of rankedTracks) {
@@ -310,6 +340,126 @@ function intersectByTitle(rankedTracks: RankedTrack[], itunesCatalog: ItunesEntr
     });
   }
   return candidates;
+}
+
+// ---------- Precomputed catalogs (scripts/precompute-catalogs.ts) — the fast path ----------
+//
+// One entry per genre scripts/precompute-catalogs.ts has scoped
+// (SCOPED_GENRES there — kept in sync with this list by hand, same as
+// that script's own header notes). Each loader is a literal
+// require('...json') call, not a top-level `import ... with { type:
+// 'json' }` like genresSeed above: Metro defers a require() call's module
+// evaluation (JSON.parse included) until the call actually runs, so an
+// unscoped genre's catalog file is never parsed — genresSeed already pays
+// the eager-parse cost of one large file; a dozen more at the same
+// eagerness would multiply, not fix, that.
+//
+// `require` isn't a real global outside Metro's module system — this file
+// also runs under plain Node ESM (scripts/test-pool.ts), which has no such
+// binding (confirmed empirically: `typeof require` is 'undefined' there,
+// despite @types/node's ambient declaration claiming it always exists —
+// which is also why loadCatalog below catches the ReferenceError rather
+// than feature-detecting with `typeof require`; TypeScript flags that
+// check as "always true" per the ambient type and won't compile it).
+// loadCatalog treats that failure the same as "no catalog for this genre"
+// and falls through to the live-fetch path below — correct, just not a
+// speed demonstration: scripts/test-pool.ts never exercises this fast path
+// even for a scoped genre. Not yet verified against a live Metro build
+// either (Metro is intentionally offline right now, same caveat as
+// genresSeed's own import above) — worth a bundle check once it's back.
+const CATALOG_LOADERS: Record<string, () => GenreCatalogFile> = {
+  Electronic: () => require('../assets/catalogs/electronic.json'),
+  Pop: () => require('../assets/catalogs/pop.json'),
+  Rock: () => require('../assets/catalogs/rock.json'),
+  'Hip-Hop': () => require('../assets/catalogs/hip-hop.json'),
+  'Indie Rock': () => require('../assets/catalogs/indie-rock.json'),
+  Soul: () => require('../assets/catalogs/soul.json'),
+  Jazz: () => require('../assets/catalogs/jazz.json'),
+  House: () => require('../assets/catalogs/house.json'),
+  Metal: () => require('../assets/catalogs/metal.json'),
+  Ambient: () => require('../assets/catalogs/ambient.json'),
+  'Lo-Fi': () => require('../assets/catalogs/lo-fi.json'),
+  Funk: () => require('../assets/catalogs/funk.json'),
+};
+
+// Loaded (parsed) at most once per genre per process lifetime, including
+// the "no loader / require threw" case (cached as null) — so the
+// try/require in loadCatalog below isn't re-attempted on every single
+// artist lookup.
+const catalogCache = new Map<string, GenreCatalogFile | null>();
+
+function loadCatalog(genreTag: string): GenreCatalogFile | null {
+  if (catalogCache.has(genreTag)) return catalogCache.get(genreTag) ?? null;
+  const loader = CATALOG_LOADERS[genreTag];
+  let data: GenreCatalogFile | null = null;
+  if (loader) {
+    try {
+      data = loader() as GenreCatalogFile;
+      // One-time, not per-artist: this is the signal that the fast path is
+      // actually live for this genre in whatever runtime is currently
+      // loading pool.ts (Metro vs the Node harness) — see catalogResolves/
+      // liveResolves in PoolDiagnostics for the per-artist breakdown.
+      console.log(`[pool_catalog_loaded] genre=${genreTag} artists=${Object.keys(data).length}`);
+    } catch {
+      // No real `require` in this runtime (plain Node ESM) — or, in
+      // principle, a genuinely missing/corrupt catalog file under Metro.
+      // Either way, treated as "no catalog for this genre" rather than
+      // thrown, consistent with this file's other best-effort fallbacks.
+      data = null;
+    }
+  }
+  catalogCache.set(genreTag, data);
+  return data;
+}
+
+/**
+ * Mirrors resolveOneTrack below exactly (same PRESET_SONG_BAND dispatch,
+ * same Track shape) but against a precomputed ArtistCatalog instead of a
+ * live-fetched RankedTrack[]/ItunesEntry[] pair — every CatalogEntry is
+ * already title-matched and previewUrl-filtered, so there's no candidates/
+ * playable split to redo here, and no network call at all. Synchronous:
+ * the async signature below exists only so resolveOneTrack's single
+ * `await` call site doesn't need to branch on sync-vs-async.
+ */
+function resolveOneTrackFromCatalog(artist: SeedArtistEntry, catalog: ArtistCatalog, preset: PresetId, genreTag: string): Track | null {
+  let eligible: CatalogEntry[];
+  if (preset === 'M') {
+    eligible = catalog.mixed;
+  } else if (PRESET_SONG_BAND[preset] === 'hit') {
+    eligible = catalog.hits;
+  } else {
+    if (catalog.rankedTrackCount < deepCutMinTrackCount) {
+      diagnostics.skippedForMinTrackCount++;
+      return null;
+    }
+    eligible = catalog.deepCuts;
+  }
+  if (eligible.length === 0) return null;
+
+  const chosen = eligible[Math.floor(Math.random() * eligible.length)];
+  const songBand: SongBand = chosen.rank <= hitRankMax ? 'hit' : 'deepcut';
+
+  return {
+    id: `${normalizeArtist(artist.name)}::${normalizeTitle(chosen.title)}`,
+    artist: artist.name,
+    title: chosen.title,
+    album: chosen.album,
+    artworkUrl: chosen.artworkUrl,
+    previewUrl: chosen.previewUrl,
+    source: {
+      preset,
+      genreTag,
+      artistListeners: artist.listeners,
+      artistPlaycount: artist.playcount,
+      artistBand: artist.band,
+      trackRank: chosen.rank,
+      trackCountInCatalog: catalog.rankedTrackCount,
+      trackPlaycount: chosen.playcount,
+      songBand,
+      itunesTrackId: chosen.itunesTrackId,
+      itunesArtistId: artist.itunesArtistId!,
+    },
+  };
 }
 
 // ---------- Per-artist session cache ----------
@@ -356,6 +506,13 @@ async function getOrFetchArtistData(artist: SeedArtistEntry): Promise<ArtistData
 // ---------- Band selection + Track construction ----------
 
 async function resolveOneTrack(artist: SeedArtistEntry, preset: PresetId, genreTag: string): Promise<Track | null> {
+  const artistCatalog = loadCatalog(genreTag)?.[artist.name];
+  if (artistCatalog) {
+    diagnostics.catalogResolves++; // zero network calls for this artist
+    return resolveOneTrackFromCatalog(artist, artistCatalog, preset, genreTag);
+  }
+
+  diagnostics.liveResolves++; // about to make Last.fm + iTunes calls for this artist
   const data = await getOrFetchArtistData(artist);
   if (!data) return null;
 
@@ -520,6 +677,18 @@ function backgroundTopUp(preset: PresetId, genreTag: string, excludeArtists: Set
 // ---------- Public API ----------
 
 export async function getTracks(preset: PresetId, genreTag: string, excludeArtists: Set<string>): Promise<Track[]> {
+  // Elapsed-ms instrumentation (2026-09-15) — the actual number the
+  // catalog fast path is supposed to move, for a real call in the running
+  // app. catalogResolves/liveResolves are logged as their running total
+  // since app start (diagnostics is never reset in the app, unlike the
+  // test harness) — for a single manual check this call's own contribution
+  // is just the delta from whatever the previous log line showed.
+  const callStart = Date.now();
+  const logElapsed = (path: 'cacheHit' | 'freshFetch', count: number) =>
+    console.log(
+      `[pool_get_tracks] preset=${preset} genre=${genreTag} path=${path} count=${count} elapsedMs=${Date.now() - callStart} catalogResolves=${diagnostics.catalogResolves} liveResolves=${diagnostics.liveResolves}`
+    );
+
   const key = cacheKey(preset, genreTag);
   const cached = pruneExcluded(key, excludeArtists);
 
@@ -529,6 +698,7 @@ export async function getTracks(preset: PresetId, genreTag: string, excludeArtis
     if ((leftoverCache.get(key) ?? []).length < poolQuickFillSize) {
       backgroundTopUp(preset, genreTag, excludeArtists);
     }
+    logElapsed('cacheHit', toReturn.length);
     return toReturn;
   }
 
@@ -545,6 +715,7 @@ export async function getTracks(preset: PresetId, genreTag: string, excludeArtis
     backgroundTopUp(preset, genreTag, excludeArtists);
   }
 
+  logElapsed('freshFetch', toReturn.length);
   return toReturn;
 }
 

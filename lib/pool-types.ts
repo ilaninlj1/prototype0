@@ -68,3 +68,44 @@ export interface SeedArtistEntry {
   band: ArtistBand;
   itunesArtistId: number | null;
 }
+
+/**
+ * One playable, already-title-matched track as scripts/precompute-catalogs.ts
+ * stores it — the same shape lib/pool.ts's own IntersectedCandidate carries,
+ * minus the fields nothing downstream of the precompute step needs.
+ * previewUrl is non-nullable: the precompute step only ever stores a
+ * candidate it already filtered for a truthy previewUrl.
+ */
+export interface CatalogEntry {
+  title: string;
+  rank: number;
+  playcount: number | null;
+  previewUrl: string;
+  itunesTrackId: number;
+  artworkUrl: string | null;
+  album: string | null;
+}
+
+/**
+ * One artist's precomputed shortlist (assets/catalogs/<genre-slug>.json
+ * values, written by scripts/precompute-catalogs.ts, read by
+ * lib/pool.ts's catalog fast path). hits/deepCuts/mixed mirror
+ * lib/pool.ts's own selection bands (hitRankMax / deepCutRelativeFloor —
+ * see lib/pool-config.ts) computed once at seed time instead of per deck
+ * fill; mixed is a separate rank-spread sample (not hits ∪ deepCuts) so
+ * preset 'M' isn't narrowed to only the tracks the other four presets
+ * care about. rankedTrackCount is the artist's full Last.fm-ranked track
+ * count — needed for Track.source.trackCountInCatalog and for the same
+ * deepCutMinTrackCount skip lib/pool.ts's live-fetch path applies, since
+ * it isn't recoverable from deepCuts.length alone (that's already
+ * post-filtered to playable tracks).
+ */
+export interface ArtistCatalog {
+  hits: CatalogEntry[];
+  deepCuts: CatalogEntry[];
+  mixed: CatalogEntry[];
+  rankedTrackCount: number;
+}
+
+/** assets/catalogs/<genre-slug>.json's shape: artist name -> its catalog. */
+export type GenreCatalogFile = Record<string, ArtistCatalog>;
