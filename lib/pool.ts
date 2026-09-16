@@ -564,17 +564,32 @@ async function resolveOneTrack(artist: SeedArtistEntry, preset: PresetId, genreT
 
 // ---------- Artist iteration, with C7's widen-on-starvation fallback ----------
 
+// Catalog-covered artists (loadCatalog(genreTag)?.[a.name]) are shuffled
+// and listed before everyone else, rather than one shuffle over the whole
+// band — otherwise a genre's catalog coverage (often under half a band,
+// see scripts/precompute-catalogs.ts's ARTISTS_PER_BAND vs a genre's real
+// population) means the live-fetch path gets hit almost as often as the
+// catalog from the very first artist of a fresh fill, not just once the
+// catalog-covered artists run out. Each partition is still independently
+// shuffled — this only reorders catalog-covered ahead of not, it doesn't
+// bias which catalog artist (or which live artist) comes first within
+// its own group.
 function eligibleArtists(genreTag: string, band: ArtistBand | null, excludeNormalized: Set<string>, usedThisCall: Set<string>): SeedArtistEntry[] {
   const pool = genresSeed[genreTag] ?? [];
-  return shuffle(
-    pool.filter(
-      (a) =>
-        (band === null || a.band === band) &&
-        a.itunesArtistId !== null &&
-        !excludeNormalized.has(normalizeArtist(a.name)) &&
-        !usedThisCall.has(normalizeArtist(a.name))
-    )
+  const filtered = pool.filter(
+    (a) =>
+      (band === null || a.band === band) &&
+      a.itunesArtistId !== null &&
+      !excludeNormalized.has(normalizeArtist(a.name)) &&
+      !usedThisCall.has(normalizeArtist(a.name))
   );
+  const catalog = loadCatalog(genreTag);
+  const catalogCovered: SeedArtistEntry[] = [];
+  const liveOnly: SeedArtistEntry[] = [];
+  for (const a of filtered) {
+    (catalog?.[a.name] ? catalogCovered : liveOnly).push(a);
+  }
+  return [...shuffle(catalogCovered), ...shuffle(liveOnly)];
 }
 
 export interface CollectResult {
