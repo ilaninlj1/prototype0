@@ -1,5 +1,7 @@
 // ---------- Types ----------
 
+import type { PresetId } from './pool-types';
+
 export type DiscoveryTrack = {
   id: number;
   trackName: string;
@@ -24,6 +26,14 @@ export type DiscoveryTrack = {
   // a reasonable permanent fallback if a real track is ever missing
   // artwork, not strictly a stub-only concern.
   placeholderColor?: string;
+  // Phase 3 logging (2026-09-16): only meaningful for pool-steering tracks —
+  // lib/pool.ts's trackToDiscoveryTrack populates these from Track.source;
+  // the old genre-fetch/artist-steering path (lib/discovery.ts's own
+  // fetchTracksByGenre/fetchTracksByArtist) has no Last.fm ranking/listener
+  // data to offer, so they're simply absent there, same as placeholderColor
+  // above is pool-stub-only.
+  artistListeners?: number;
+  trackRank?: number;
 };
 
 // 'steer-artist'/'steer-sound': logged when the user redirects discovery
@@ -55,6 +65,23 @@ export type SwipeEntry = {
   // migration. Powers spreadByAlbum's recent-albums window — an entry
   // without it simply never constrains anything (see spreadByAlbum).
   collectionId?: number;
+  // Phase 3 logging (2026-09-16). Which preset the swiped card came from —
+  // always populated going forward (the screen always has a current preset
+  // in scope), but optional here since entries persisted before this field
+  // existed genuinely don't have it, same precedent as every other field
+  // in this type. artistListeners/trackRank mirror DiscoveryTrack's own
+  // same-named fields (pool-steering-only; undefined for the old genre-
+  // fetch/artist-steering path). dwellMs is wall-clock time from when this
+  // card became the top of the stack to when it was swiped away — distinct
+  // from listenMs (how much of the preview audio actually played): a card
+  // swiped before any audio starts has listenMs 0 but a real dwellMs. Both
+  // are skipped for steer-artist/steer-sound, same as listenMs already was
+  // — steering doesn't dismiss the current card, so neither "how long
+  // dwelled" nor "how long listened" has a real endpoint yet.
+  preset?: PresetId;
+  artistListeners?: number;
+  trackRank?: number;
+  dwellMs?: number;
 };
 
 export type Strategy =

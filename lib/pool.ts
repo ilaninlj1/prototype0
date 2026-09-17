@@ -755,6 +755,11 @@ export function trackToDiscoveryTrack(track: Track): DiscoveryTrack {
     collectionId: undefined,
     collectionName: track.album,
     placeholderColor: track.artworkUrl ? undefined : PLACEHOLDER_COLORS[track.source.preset],
+    // Phase 3 logging (2026-09-16) — carried through so app/(tabs)/index.tsx's
+    // logSwipe can record them; DiscoveryTrack has no other source for
+    // either, since the old genre-fetch path never had Last.fm data at all.
+    artistListeners: track.source.artistListeners,
+    trackRank: track.source.trackRank,
   };
 }
 

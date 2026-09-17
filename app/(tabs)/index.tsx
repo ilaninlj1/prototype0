@@ -37,6 +37,7 @@ import {
 } from '@/lib/discovery';
 import {
   appendLikedTrack,
+  appendPresetChangeEntry,
   appendSwipeEntry,
   loadDiscoveredGenres,
   loadRegion,
@@ -111,6 +112,17 @@ export default function HomeScreen() {
 
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
   const refillEpochRef = useRef(0);
+  // Phase 3 logging (2026-09-16). Wall-clock timestamp of when the current
+  // top-of-stack card first appeared — stamped in the currentTrack?.id
+  // effect below (the one that already replaces the preview player), not a
+  // separate effect, since "the top card changed" is the same event either
+  // way. logSwipe reads Date.now() - this at swipe time for dwellMs.
+  const cardShownAtRef = useRef(Date.now());
+  // How many cards have been skip/like/genre-jump-ed since the last preset
+  // change (or session start) — read and reset by handleSelectPreset,
+  // incremented by handleSkip/handleLike/handleGenreJump. Not steering:
+  // steering doesn't dismiss the current card (see applySteeringStrategy).
+  const cardsSeenSincePresetChangeRef = useRef(0);
 
   const currentTrack = queue[0];
 
@@ -124,6 +136,10 @@ export default function HomeScreen() {
 
   useEffect(() => {
     setHasEnded(false);
+    // Phase 3 logging: this is "the top card changed," the same event
+    // dwellMs needs a start time for — stamped here rather than a separate
+    // effect with the same dependency array.
+    cardShownAtRef.current = Date.now();
     // A falsy previewUrl means "nothing to play" (the stub deliberately
     // uses this now — see lib/pool.ts), not an error — pause rather than
     // hand expo-audio an empty/invalid source. Defensive for real tracks
@@ -249,7 +265,25 @@ export default function HomeScreen() {
       collectionId: track.collectionId,
       action,
       timestamp: Date.now(),
-      ...(isSteer ? {} : { listenMs: Math.round(status.currentTime * 1000) }),
+      // Phase 3 logging (2026-09-16): preset is always meaningful regardless
+      // of action type, so logged unconditionally, unlike listenMs/dwellMs
+      // below. artistListeners/trackRank are undefined for a DiscoveryTrack
+      // that never came from lib/pool.ts (the old genre-fetch/artist-
+      // steering path) — same as collectionId above, no special-casing
+      // needed here.
+      preset,
+      artistListeners: track.artistListeners,
+      trackRank: track.trackRank,
+      ...(isSteer
+        ? {}
+        : {
+            listenMs: Math.round(status.currentTime * 1000),
+            // Wall-clock time this card was the top of the stack, distinct
+            // from listenMs — see SwipeEntry's own comment. Skipped for
+            // steering for the same reason listenMs is: the card doesn't
+            // actually leave, so there's no real endpoint to measure yet.
+            dwellMs: Date.now() - cardShownAtRef.current,
+          }),
     };
     const nextHistory = [...swipeHistory, entry];
     setSwipeHistory(nextHistory);
@@ -265,6 +299,7 @@ export default function HomeScreen() {
   }
 
   async function handleSkip(track: DiscoveryTrack) {
+    cardsSeenSincePresetChangeRef.current += 1;
     const nextHistory = await logSwipe(track, 'skip');
     const nextSeen = markArtistSeen(track);
     const nextQueue = queue.slice(1);
@@ -273,6 +308,7 @@ export default function HomeScreen() {
   }
 
   async function handleLike(track: DiscoveryTrack) {
+    cardsSeenSincePresetChangeRef.current += 1;
     const nextHistory = await logSwipe(track, 'like');
     await appendLikedTrack(track);
     const nextSeen = markArtistSeen(track);
@@ -320,6 +356,7 @@ export default function HomeScreen() {
   }
 
   async function handleGenreJump(track: DiscoveryTrack) {
+    cardsSeenSincePresetChangeRef.current += 1;
     const nextHistory = await logSwipe(track, 'genre-jump');
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const newGenre = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
@@ -340,6 +377,7 @@ export default function HomeScreen() {
 
   async function handlePickGenre(genre: string) {
     captureUndoSnapshot();
+    if (currentTrack) cardsSeenSincePresetChangeRef.current += 1;
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
     await commitGenreJump(genre, nextHistory, nextSeen);
@@ -347,6 +385,7 @@ export default function HomeScreen() {
 
   async function handleExplore() {
     captureUndoSnapshot();
+    if (currentTrack) cardsSeenSincePresetChangeRef.current += 1;
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const target = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
@@ -356,6 +395,17 @@ export default function HomeScreen() {
 
   async function handleSelectPreset(newPreset: PresetId) {
     if (newPreset === preset || presetLoading) return;
+    // Phase 3 logging (2026-09-16): the stated purpose is deciding whether
+    // people actually move between presets — read the counter before
+    // resetting it, not after, and before setPreset so `preset` here is
+    // still the FROM value.
+    await appendPresetChangeEntry({
+      from: preset,
+      to: newPreset,
+      timestamp: Date.now(),
+      cardsSeenBeforeSwitch: cardsSeenSincePresetChangeRef.current,
+    });
+    cardsSeenSincePresetChangeRef.current = 0;
     setPreset(newPreset);
     setPresetLoading(true);
     setQueue([]);

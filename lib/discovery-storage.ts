@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { DiscoveryTrack, Region, SwipeEntry } from './discovery';
+import type { PresetId } from './pool-types';
 
 // All persistence is best-effort: a read/write failure falls back to an empty
 // result rather than throwing, mirroring lib/taste-test.ts's pattern.
@@ -11,6 +12,7 @@ const DISCOVERED_GENRES_KEY = `${STORAGE_PREFIX}:discoveredGenres`;
 const LIKED_TRACKS_KEY = `${STORAGE_PREFIX}:likedTracks`;
 const EXPORT_BATCHES_KEY = `${STORAGE_PREFIX}:exportBatches`;
 const REGION_KEY = `${STORAGE_PREFIX}:region`;
+const PRESET_CHANGES_KEY = `${STORAGE_PREFIX}:presetChanges`;
 
 /** Falls back to the default storefront on a missing, corrupt, or unrecognized value — not just a read failure. */
 export async function loadRegion(): Promise<Region> {
@@ -152,6 +154,42 @@ export async function appendExportBatch(batch: ExportBatch): Promise<void> {
     const existing = await loadExportBatches();
     existing.push(batch);
     await AsyncStorage.setItem(EXPORT_BATCHES_KEY, JSON.stringify(existing));
+  } catch {
+    // ignore
+  }
+}
+
+// Phase 3 logging (2026-09-16): the stated purpose is deciding whether
+// people actually move between presets — nothing else recorded that.
+// Separate from swipeHistory (a preset change isn't a swipe) rather than
+// folded into it as another SwipeAction, since it has no trackId/artistId
+// of its own.
+export type PresetChangeEntry = {
+  from: PresetId;
+  to: PresetId;
+  timestamp: number;
+  // How many cards were skip/like/genre-jump-ed since the previous preset
+  // change (or session start) — set by the caller right before it resets
+  // its own counter, not derived here.
+  cardsSeenBeforeSwitch: number;
+};
+
+export async function loadPresetChangeHistory(): Promise<PresetChangeEntry[]> {
+  try {
+    const raw = await AsyncStorage.getItem(PRESET_CHANGES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function appendPresetChangeEntry(entry: PresetChangeEntry): Promise<void> {
+  try {
+    const existing = await loadPresetChangeHistory();
+    existing.push(entry);
+    await AsyncStorage.setItem(PRESET_CHANGES_KEY, JSON.stringify(existing));
   } catch {
     // ignore
   }
