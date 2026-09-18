@@ -38,14 +38,14 @@
 // need it, and it isn't recoverable from deepCuts.length alone (already
 // post-filtered to playable tracks).
 //
-// Scope: 12 genres, 40 artists each (20 obscure + 20 popular, both by
-// listeners descending — the healthiest artists in each band first, for
-// the best yield on a first end-to-end run). Genres picked from
-// assets/genres.json's ACTUAL resolved population, ranked by each genre's
-// WEAKER band (a genre's precompute value is bounded by its thinnest side)
-// — see the genre list below and the report shown alongside this script
-// for the full ranking. This is why Salsa (popular=5 resolved) and Cumbia
-// (popular=2 resolved) are excluded: 20 wouldn't even be reachable.
+// Scope: all 37 curated genres, up to 40 artists each (20 obscure + 20
+// popular, both by listeners descending — the healthiest artists in each
+// band first). Widened 2026-09-17 from a first-run 12-genre scope (see
+// git history) once that run's yield came back healthy across every
+// genre it covered. A thin genre's band (Salsa's popular=5 resolved,
+// Cumbia's popular=2, Amapiano's obscure=6, etc.) simply yields fewer than
+// 40 artists — see scopedArtists below — rather than being excluded
+// outright the way the first run's narrower scope did.
 //
 // Resumability: per genre, an artist already present as a key in that
 // genre's output file (assets/catalogs/<slug>.json) is skipped — including
@@ -94,25 +94,52 @@ import type { ArtistCatalog, CatalogEntry, GenreCatalogFile, SeedArtistEntry } f
 const SEED_PATH = path.resolve(import.meta.dirname, '../assets/genres.json');
 const OUTPUT_DIR = path.resolve(import.meta.dirname, '../assets/catalogs');
 
-// Ranked by each genre's weaker resolved band (min(resolvedObscure,
-// resolvedPopular)) in assets/genres.json as of 2026-09-15 — see this
-// script's introduction message for the full 37-genre ranking. Funk (22)
-// edges out Punk (22, tied on min) for the 12th slot on overall resolved
-// population (184 obscure vs 163) and raw popular count (23 vs 22); swap
-// freely if Punk matters more for the app's actual audience.
+// All 37 curated genres (assets/genres.json's full key set) as of
+// 2026-09-17 — widened from the original 12-genre first-run scope (see git
+// history for that list and the ranking rationale that picked it) once
+// that run's per-genre yield came back healthy across the board. A thin
+// genre (Salsa's popular band, Amapiano's obscure band, etc.) simply
+// yields fewer than ARTISTS_PER_BAND*2 — scopedArtists' .slice() already
+// returns whatever's available rather than erroring, so no special-casing
+// is needed to include them here.
 const SCOPED_GENRES = [
-  'Electronic',
   'Pop',
   'Rock',
   'Hip-Hop',
-  'Indie Rock',
-  'Soul',
+  'Country',
   'Jazz',
-  'House',
+  'Classical',
+  'Electronic',
+  'R&B',
+  'Reggae',
   'Metal',
-  'Ambient',
-  'Lo-Fi',
+  'House',
+  'Deep House',
+  'Tech House',
+  'Techno',
+  'Dubstep',
+  'Drum and Bass',
+  'Disco',
   'Funk',
+  'Soul',
+  'Reggaeton',
+  'Afrobeats',
+  'Amapiano',
+  'Bossa Nova',
+  'Salsa',
+  'Bachata',
+  'Cumbia',
+  'K-Pop',
+  'Shoegaze',
+  'Punk',
+  'Grunge',
+  'Indie Rock',
+  'Bedroom Pop',
+  'Lo-Fi',
+  'Ambient',
+  'Gospel',
+  'Drill',
+  'Boom Bap',
 ];
 
 const ARTISTS_PER_BAND = 20; // → up to 40 artists/genre (20 obscure + 20 popular)

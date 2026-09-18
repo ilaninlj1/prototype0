@@ -13,13 +13,16 @@
 // deepCutMinTrackCount (lib/pool-config.ts) select which of those match
 // the requested preset.
 //
-// Phase 1.5 (2026-09-15) — that live per-artist fetch is why first-card
-// latency was still ~9s even after the pacer split below: CATALOG_LOADERS
-// (see "Precomputed catalogs" section) reads scripts/precompute-catalogs.ts's
-// output instead, zero network calls, for whichever (genre, artist) pairs
-// it's scoped to cover. Everything else — a genre it hasn't scoped, an
-// artist outside a scoped genre's precomputed 40 — falls through to the
-// live path unchanged. This is a per-artist fetch-strategy fork
+// Phase 1.5 (2026-09-15, widened to all 37 genres 2026-09-17) — that live
+// per-artist fetch is why first-card latency was still ~9s even after the
+// pacer split below: CATALOG_LOADERS (see "Precomputed catalogs" section)
+// reads scripts/precompute-catalogs.ts's output instead, zero network
+// calls, for every genre now (every key in CATALOG_LOADERS matches
+// assets/genres.json's full key set). An artist outside a genre's
+// precomputed ~40 still falls through to the live path unchanged — the
+// per-genre scope gap this comment used to describe is gone, but the
+// per-artist one is inherent to precomputing a fixed sample rather than a
+// genre's whole population. This is a per-artist fetch-strategy fork
 // (resolveOneTrack), not a selection-logic change: starvation widening,
 // the leftover cache, and getTracks()'s quick-fill split below all still
 // apply identically regardless of which path served a given artist.
@@ -368,18 +371,43 @@ export function intersectByTitle(rankedTracks: RankedTrack[], itunesCatalog: Itu
 // either (Metro is intentionally offline right now, same caveat as
 // genresSeed's own import above) — worth a bundle check once it's back.
 const CATALOG_LOADERS: Record<string, () => GenreCatalogFile> = {
-  Electronic: () => require('../assets/catalogs/electronic.json'),
   Pop: () => require('../assets/catalogs/pop.json'),
   Rock: () => require('../assets/catalogs/rock.json'),
   'Hip-Hop': () => require('../assets/catalogs/hip-hop.json'),
-  'Indie Rock': () => require('../assets/catalogs/indie-rock.json'),
-  Soul: () => require('../assets/catalogs/soul.json'),
+  Country: () => require('../assets/catalogs/country.json'),
   Jazz: () => require('../assets/catalogs/jazz.json'),
-  House: () => require('../assets/catalogs/house.json'),
+  Classical: () => require('../assets/catalogs/classical.json'),
+  Electronic: () => require('../assets/catalogs/electronic.json'),
+  'R&B': () => require('../assets/catalogs/r-b.json'),
+  Reggae: () => require('../assets/catalogs/reggae.json'),
   Metal: () => require('../assets/catalogs/metal.json'),
-  Ambient: () => require('../assets/catalogs/ambient.json'),
-  'Lo-Fi': () => require('../assets/catalogs/lo-fi.json'),
+  House: () => require('../assets/catalogs/house.json'),
+  'Deep House': () => require('../assets/catalogs/deep-house.json'),
+  'Tech House': () => require('../assets/catalogs/tech-house.json'),
+  Techno: () => require('../assets/catalogs/techno.json'),
+  Dubstep: () => require('../assets/catalogs/dubstep.json'),
+  'Drum and Bass': () => require('../assets/catalogs/drum-and-bass.json'),
+  Disco: () => require('../assets/catalogs/disco.json'),
   Funk: () => require('../assets/catalogs/funk.json'),
+  Soul: () => require('../assets/catalogs/soul.json'),
+  Reggaeton: () => require('../assets/catalogs/reggaeton.json'),
+  Afrobeats: () => require('../assets/catalogs/afrobeats.json'),
+  Amapiano: () => require('../assets/catalogs/amapiano.json'),
+  'Bossa Nova': () => require('../assets/catalogs/bossa-nova.json'),
+  Salsa: () => require('../assets/catalogs/salsa.json'),
+  Bachata: () => require('../assets/catalogs/bachata.json'),
+  Cumbia: () => require('../assets/catalogs/cumbia.json'),
+  'K-Pop': () => require('../assets/catalogs/k-pop.json'),
+  Shoegaze: () => require('../assets/catalogs/shoegaze.json'),
+  Punk: () => require('../assets/catalogs/punk.json'),
+  Grunge: () => require('../assets/catalogs/grunge.json'),
+  'Indie Rock': () => require('../assets/catalogs/indie-rock.json'),
+  'Bedroom Pop': () => require('../assets/catalogs/bedroom-pop.json'),
+  'Lo-Fi': () => require('../assets/catalogs/lo-fi.json'),
+  Ambient: () => require('../assets/catalogs/ambient.json'),
+  Gospel: () => require('../assets/catalogs/gospel.json'),
+  Drill: () => require('../assets/catalogs/drill.json'),
+  'Boom Bap': () => require('../assets/catalogs/boom-bap.json'),
 };
 
 // Loaded (parsed) at most once per genre per process lifetime, including
