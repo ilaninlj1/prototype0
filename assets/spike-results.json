@@ -1,0 +1,42 @@
+[
+  {
+    "genre": "electronic",
+    "artist": "Alessandro Cortini",
+    "title": "Iniziare",
+    "bpm": 79.8,
+    "key": "Eb major",
+    "danceability": 0.89
+  },
+  {
+    "genre": "jazz",
+    "artist": "Jack Shaindlin",
+    "title": "Let's Go Sunning",
+    "bpm": 140.3,
+    "key": "C minor",
+    "danceability": 1.33
+  },
+  {
+    "genre": "hip-hop",
+    "artist": "Miilkbone",
+    "title": "Keep It Real",
+    "bpm": 90.2,
+    "key": "F# minor",
+    "danceability": 1.32
+  },
+  {
+    "genre": "reggae",
+    "artist": "311",
+    "title": "Amber",
+    "bpm": 165.9,
+    "key": "C major",
+    "danceability": 1.56
+  },
+  {
+    "genre": "country",
+    "artist": "Wayne Hancock",
+    "title": "Thunderstorms and Neon Signs",
+    "bpm": 135.1,
+    "key": "E major",
+    "danceability": 1.31
+  }
+]

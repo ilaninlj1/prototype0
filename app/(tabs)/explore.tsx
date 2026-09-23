@@ -1,6 +1,6 @@
-import { useFocusEffect } from 'expo-router/react-navigation';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -78,6 +78,7 @@ function GenrePathChain({ entries }: { entries: SwipeEntry[] }) {
 }
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const [loaded, setLoaded] = useState(false);
   const [history, setHistory] = useState<SwipeEntry[]>([]);
   const [discoveredGenres, setDiscoveredGenres] = useState<string[]>([]);
@@ -237,6 +238,12 @@ export default function ProfileScreen() {
             ))}
           </>
         )}
+
+        <TouchableOpacity onPress={() => router.push('/spike-test')} style={styles.devLink}>
+          <ThemedText type="caption" style={styles.dim}>
+            Dev: Audio Feature Spike
+          </ThemedText>
+        </TouchableOpacity>
       </ThemedView>
     </ScrollView>
   );
@@ -277,6 +284,10 @@ const styles = StyleSheet.create({
   },
   dim: {
     color: Colors.textSecondary,
+  },
+  devLink: {
+    alignSelf: 'center',
+    marginTop: Spacing.xl,
   },
   compareRow: {
     flexDirection: 'row',

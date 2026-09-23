@@ -36,6 +36,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Liked Tracks' }} />
             <Stack.Screen name="export-history" options={{ presentation: 'modal', title: 'Export History' }} />
+            <Stack.Screen name="spike-test" options={{ presentation: 'modal', title: 'Spike Test' }} />
           </Stack>
           <StatusBar style="light" />
         </PlaybackProvider>
