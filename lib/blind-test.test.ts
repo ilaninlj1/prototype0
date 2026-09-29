@@ -5,7 +5,7 @@ import type { PoolSong } from './game-pool.ts';
 
 const genres = ['Country', 'Metal', 'Jazz', 'Pop', 'Rock', 'House', 'Salsa'];
 const pool: PoolSong[] = genres.flatMap((g) =>
-  Array.from({ length: 6 }, (_, i) => ({ artist: `${g}${i}`, title: `t${i}`, previewUrl: '', artworkUrl: '', listeners: 1000, genre: g }))
+  Array.from({ length: 6 }, (_, i) => ({ artist: `${g}${i}`, title: `t${i}`, previewUrl: '', artworkUrl: '', listeners: 1000, genre: g, itunesTrackId: 1 }))
 );
 
 test('pickTestSongs deals 5 never + 5 other with distinct artists', () => {

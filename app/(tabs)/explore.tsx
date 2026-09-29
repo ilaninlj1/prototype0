@@ -132,6 +132,10 @@ export default function ProfileScreen() {
             )}
           </>
         )}
+        <ThemedText type="caption" style={styles.about}>
+          Blindspot is a student project. Song previews provided courtesy of iTunes; listener counts from Last.fm. No
+          accounts — Daily Drop votes are anonymous and tied only to a random device id.
+        </ThemedText>
       </ThemedView>
     </ScrollView>
   );
@@ -173,6 +177,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: Colors.accent,
+  },
+  about: {
+    color: Colors.textTertiary,
+    marginTop: Spacing.xl,
   },
   dim: {
     color: Colors.textSecondary,

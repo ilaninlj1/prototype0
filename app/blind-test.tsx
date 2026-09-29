@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CardStack } from '@/components/discovery/card-stack';
 import { computeCardSize, MAX_CARD_HEIGHT, MAX_CARD_WIDTH, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
+import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -153,6 +154,7 @@ export default function BlindTestScreen() {
             allowDown={false}
           />
         </View>
+        <CreditLine />
       </ThemedView>
     );
   }
@@ -183,12 +185,17 @@ export default function BlindTestScreen() {
               <ThemedText type="caption">
                 {liked[i] ? '♥ liked' : '✕ skipped'} · {describeListeners(x.song.listeners).count} listeners
               </ThemedText>
+              <View style={styles.links}>
+                <AppleMusicLink trackId={x.song.itunesTrackId} />
+                <LastfmLink artist={x.song.artist} />
+              </View>
             </View>
             <ThemedText style={styles.dim}>{playingAt === i ? '⏸' : '▶'}</ThemedText>
           </ThemedView>
         </TouchableOpacity>
       ))}
 
+      <CreditLine />
       <View style={styles.actions}>
         <TouchableOpacity style={styles.action} onPress={() => Share.share({ message: testShareText(never, neverLiked) }).catch(() => {})}>
           <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
@@ -226,6 +233,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md },
   art: { width: 56, height: 56, borderRadius: Radius.sm },
   info: { flex: 1, gap: 2 },
+  links: { flexDirection: 'row', gap: Spacing.lg },
   actions: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
   action: { flex: 1 },
 });

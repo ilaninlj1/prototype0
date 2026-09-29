@@ -16,6 +16,7 @@ import {
 } from '@/components/discovery/swipe-physics';
 import { TuneSheet } from '@/components/discovery/tune-sheet';
 import { UndoButton } from '@/components/discovery/undo-button';
+import { CreditLine } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
@@ -512,6 +513,7 @@ export default function HomeScreen() {
             />
             <LikedTracksButton onPress={() => router.push('/modal')} />
           </View>
+          <CreditLine />
         </>
       ) : presetLoading ? (
         <ThemedView style={styles.centered}>

@@ -4,6 +4,7 @@ import { Linking, StyleSheet, TouchableOpacity } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { lastfmArtistUrl } from '@/lib/credits';
 import { artworkUrl, buildSpotifySearchUrl, describeGrowth, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 
 // Rows are small (56x56) — a modest bump from the default 100x100 is plenty,
@@ -80,6 +81,11 @@ export function TrackRow({ track, isPlaying, onTogglePlay, disabled = false, lis
             onPress={() => openUrl(buildSpotifySearchUrl(track.artistName, track.trackName))}>
             <ThemedText type="link" style={[styles.linkText, disabled && styles.dimmed]}>
               Spotify
+            </ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity disabled={disabled} onPress={() => openUrl(lastfmArtistUrl(track.artistName))}>
+            <ThemedText type="link" style={[styles.linkText, disabled && styles.dimmed]}>
+              Last.fm
             </ThemedText>
           </TouchableOpacity>
         </ThemedView>

@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { GuessTile } from '@/components/play/guess-tile';
+import { CreditLine } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -94,6 +95,7 @@ export default function SpotTheStarScreen() {
           </ThemedText>
         </ThemedView>
       </TouchableOpacity>
+      <CreditLine />
     </ScrollView>
   );
 }

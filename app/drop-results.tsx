@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, Share, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -106,6 +107,10 @@ export default function DropResultsScreen() {
                   </ThemedText>
                   <ThemedText style={styles.count}>{verdict.count} listeners</ThemedText>
                   <ThemedText style={styles.dim}>{verdict.verdict}</ThemedText>
+                  <View style={styles.links}>
+                    <AppleMusicLink trackId={song.itunesTrackId} />
+                    <LastfmLink artist={song.artist} />
+                  </View>
                   <View style={styles.tags}>
                     {song.slot === 'famous' && <ThemedText style={styles.tag}>The secret famous one</ThemedText>}
                     {guess === position && <ThemedText style={styles.tag}>🎯 Your guess</ThemedText>}
@@ -132,6 +137,7 @@ export default function DropResultsScreen() {
         <ThemedText type="caption">Fewest ← → Most listeners</ThemedText>
       </View>
 
+      <CreditLine />
       <View style={styles.actions}>
         <TouchableOpacity style={styles.action} onPress={() => Share.share({ message: shareText(drop, votes, guess, streak) }).catch(() => {})}>
           <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
@@ -163,6 +169,7 @@ const styles = StyleSheet.create({
   art: { width: '100%', aspectRatio: 1, borderRadius: Radius.md, marginVertical: Spacing.sm },
   dim: { color: Colors.textSecondary },
   count: { fontSize: 32, lineHeight: 38, fontWeight: '800', color: Colors.accent, marginTop: Spacing.sm },
+  links: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.xs },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginVertical: Spacing.xs },
   tag: { color: Colors.accent, fontWeight: '700' },
   bar: { height: 6, borderRadius: Radius.pill, overflow: 'hidden', marginVertical: 4 },

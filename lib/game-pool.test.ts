@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { buildPool, challenger, ratioBand, spotRound, type PoolSong } from './game-pool.ts';
 
 const song = (artist: string, listeners: number): PoolSong => ({
-  artist, listeners, title: `${artist} song`, previewUrl: `p/${artist}`, artworkUrl: '', genre: 'Pop',
+  artist, listeners, title: `${artist} song`, previewUrl: `p/${artist}`, artworkUrl: '', genre: 'Pop', itunesTrackId: 1,
 });
 const pool = [
   ...Array.from({ length: 6 }, (_, i) => song(`Star${i}`, 2_000_000 + i * 1_000_000)),

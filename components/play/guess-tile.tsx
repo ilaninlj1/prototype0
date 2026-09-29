@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, { FlipInEasyY } from 'react-native-reanimated';
 
+import { AppleMusicLink } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -13,7 +14,7 @@ type Props = {
   selected?: boolean;
   revealed?: boolean;
   correct?: boolean;
-  song?: { title: string; artist: string; artworkUrl: string; listeners: number };
+  song?: { title: string; artist: string; artworkUrl: string; listeners: number; itunesTrackId?: number };
   onPress?: () => void;
 };
 
@@ -31,6 +32,7 @@ export function GuessTile({ label, sub, selected, revealed, correct, song, onPre
             </ThemedText>
             <ThemedText type="caption" numberOfLines={1}>{song.artist}</ThemedText>
             <ThemedText style={styles.count}>{describeListeners(song.listeners).count}</ThemedText>
+            {song.itunesTrackId != null && <AppleMusicLink trackId={song.itunesTrackId} />}
           </ThemedView>
         </Animated.View>
       ) : (

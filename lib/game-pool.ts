@@ -1,6 +1,14 @@
 import type { GenreCatalogFile } from './pool-types.ts';
 
-export type PoolSong = { artist: string; title: string; previewUrl: string; artworkUrl: string; listeners: number; genre: string };
+export type PoolSong = {
+  artist: string;
+  title: string;
+  previewUrl: string;
+  artworkUrl: string;
+  listeners: number;
+  genre: string;
+  itunesTrackId: number;
+};
 
 const STAR = 1_000_000;
 const NEAR_MISS = 250_000;
@@ -21,7 +29,15 @@ export function buildPool(catalogs: Record<string, GenreCatalogFile>, listenersB
       const entry = cat.mixed[0] ?? cat.hits[0] ?? cat.deepCuts[0];
       if (listeners == null || !entry || seen.has(artist)) continue;
       seen.add(artist);
-      out.push({ artist, title: entry.title, previewUrl: entry.previewUrl, artworkUrl: entry.artworkUrl ?? '', listeners, genre });
+      out.push({
+        artist,
+        title: entry.title,
+        previewUrl: entry.previewUrl,
+        artworkUrl: entry.artworkUrl ?? '',
+        listeners,
+        genre,
+        itunesTrackId: entry.itunesTrackId,
+      });
     }
   }
   return out;

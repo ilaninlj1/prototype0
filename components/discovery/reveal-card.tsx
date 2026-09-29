@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FlipInEasyY } from 'react-native-reanimated';
 
+import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -53,6 +54,12 @@ export function RevealCard({ track, listeners, size, onDone }: RevealCardProps) 
               )}
             </ThemedView>
 
+            <ThemedView style={styles.links} backgroundColor="transparent">
+              <AppleMusicLink trackId={track.id} url={track.trackViewUrl} />
+              {described && <LastfmLink artist={track.artistName} />}
+            </ThemedView>
+            <CreditLine />
+
             <ThemedText type="caption" style={styles.hint}>
               Tap to keep going
             </ThemedText>
@@ -90,6 +97,11 @@ const styles = StyleSheet.create({
     lineHeight: 44,
     fontWeight: '800',
     color: Colors.accent,
+  },
+  links: {
+    flexDirection: 'row',
+    gap: Spacing.lg,
+    marginTop: Spacing.md,
   },
   hint: {
     marginTop: Spacing.md,
