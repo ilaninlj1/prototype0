@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useDailyDrop } from '@/hooks/use-daily-drop';
-import { loadBestStreaks, type BestStreaks } from '@/lib/discovery-storage';
+import { loadBestStreaks, loadBlindTest, type BestStreaks, type BlindTestResult } from '@/lib/discovery-storage';
 
 function Entry({ title, line, detail, onPress }: { title: string; line: string; detail?: string; onPress?: () => void }) {
   return (
@@ -24,11 +24,13 @@ export default function PlayScreen() {
   const router = useRouter();
   const daily = useDailyDrop();
   const [best, setBest] = useState<BestStreaks>({ spot: 0, h2h: 0 });
+  const [test, setTest] = useState<BlindTestResult | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       daily.refresh();
       loadBestStreaks().then(setBest);
+      loadBlindTest().then(setTest);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
@@ -53,6 +55,12 @@ export default function PlayScreen() {
         line={dropLine}
         detail={daily.streak > 0 ? `🔥 ${daily.streak} day streak` : undefined}
         onPress={dropGo}
+      />
+      <Entry
+        title="Blind Spot Test"
+        line={test ? `Retake — you liked ${test.neverLiked}/5 of your "nevers"` : "Pick genres you'd never listen to, then hear them blind"}
+        detail={test ? `Last time: never ${test.never.join(', ')}` : undefined}
+        onPress={() => router.push('/blind-test')}
       />
       <Entry
         title="Spot the Star"

@@ -285,3 +285,9 @@ export async function addFinishedDay(day: string): Promise<string[]> {
   await writeJson(FINISHED_DAYS_KEY, next);
   return next;
 }
+
+// Last Blind Spot Test result, shown on the Play card.
+const BLIND_TEST_KEY = `${STORAGE_PREFIX}:blindTest`;
+export type BlindTestResult = { never: string[]; neverLiked: number; otherLiked: number; at: number };
+export const loadBlindTest = () => readJson<BlindTestResult | null>(BLIND_TEST_KEY, null);
+export const saveBlindTest = (r: BlindTestResult) => writeJson(BLIND_TEST_KEY, r);
