@@ -47,3 +47,6 @@ app-example
 
 # throwaway debug screens
 app/lastfm-probe.tsx
+
+# Daily Drop review page (regenerated)
+drops/review.html
