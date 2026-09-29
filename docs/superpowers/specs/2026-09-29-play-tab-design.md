@@ -35,8 +35,12 @@ This is the same blind card stack as Home, with the same swipes and tap zones (d
 
 ## 4. Daily Drop results: swipeable cards (`app/drop-results.tsx`)
 
-- **Top:** "Blindspot Daily #N", the headline, and the guess line (unchanged text).
-- **Middle:** a horizontal pager of 5 full-size revealed cards in drop order. You swipe left and right to move between them and can go back. A "2/5" indicator sits under the pager. Each card shows:
+- **Top:** "Blindspot Daily #N", the headline, and the guess line (unchanged text; "it was #4" still means drop position).
+- **Middle:** a horizontal pager of 5 full-size revealed cards, **ordered from fewest to most listeners**, so swiping is a climb toward the famous one. You swipe left and right and can go back.
+- **The ranking is always visible.**
+  - Each card has a big rank badge: "#1 · fewest listeners", "#2", "#3", "#4", "#5 · most listeners".
+  - A 5-step ladder under the pager (5 dots, left = fewest) fills in up to the current card, so you always see where this song sits.
+- Each card shows:
   - artwork (big), title, artist
   - listener count (big) plus its `describeListeners` verdict
   - tags when they apply: "The secret famous one", "🎯 Your guess"
