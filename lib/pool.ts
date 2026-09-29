@@ -436,6 +436,18 @@ const CATALOG_LOADERS: Record<string, () => GenreCatalogFile> = {
   'Boom Bap': () => require('../assets/catalogs/boom-bap.json'),
 };
 
+/** Every precomputed genre catalog, loaded once (used by the Play tab's modes). */
+export function allCatalogs(): Record<string, GenreCatalogFile> {
+  return Object.fromEntries(Object.entries(CATALOG_LOADERS).map(([genre, load]) => [genre, load()]));
+}
+
+/** Seed Last.fm listener count per artist name, across all genres. */
+export function seedListeners(): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const list of Object.values(genresSeed)) for (const a of list) out.set(a.name, a.listeners);
+  return out;
+}
+
 // Loaded (parsed) at most once per genre per process lifetime, including
 // the "no loader / require threw" case (cached as null) — so the
 // try/require in loadCatalog below isn't re-attempted on every single
