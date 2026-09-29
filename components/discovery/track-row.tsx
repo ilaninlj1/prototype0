@@ -4,7 +4,7 @@ import { Linking, StyleSheet, TouchableOpacity } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { artworkUrl, buildSpotifySearchUrl, type DiscoveryTrack } from '@/lib/discovery';
+import { artworkUrl, buildSpotifySearchUrl, describeGrowth, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 
 // Rows are small (56x56) — a modest bump from the default 100x100 is plenty,
 // no need for the swipe cards' full 600x600.
@@ -20,10 +20,36 @@ type TrackRowProps = {
   onTogglePlay: () => void;
   /** Dims and disables the play button and links — used during multi-select, where a tap on the row means "select", not "act". */
   disabled?: boolean;
+  /** The artist's Last.fm listener count today — shown against the found-at count saved with the like. */
+  listenersNow?: number;
 };
 
-/** Artwork, title/artist/genre, Apple Music/Spotify links, and a play/pause button — shared by the liked tracks list and export history. */
-export function TrackRow({ track, isPlaying, onTogglePlay, disabled = false }: TrackRowProps) {
+const fmt = (n: number) => describeListeners(n).count;
+
+function ListenersLine({ found, now }: { found?: number; now?: number }) {
+  if (found != null && now != null) {
+    const { pct, calledIt } = describeGrowth(found, now);
+    return (
+      <ThemedView style={styles.listenersRow} backgroundColor="transparent">
+        <ThemedText type="caption">
+          Found at {fmt(found)} → {fmt(now)} now
+        </ThemedText>
+        {pct !== 0 && (
+          <ThemedText type="caption" style={calledIt ? styles.calledIt : pct > 0 ? styles.up : styles.down}>
+            {calledIt ? 'Called it ' : ''}
+            {pct > 0 ? '↑' : '↓'} {Math.abs(pct)}%
+          </ThemedText>
+        )}
+      </ThemedView>
+    );
+  }
+  if (found != null) return <ThemedText type="caption">Found at {fmt(found)} listeners</ThemedText>;
+  if (now != null) return <ThemedText type="caption">{fmt(now)} listeners</ThemedText>;
+  return null;
+}
+
+/** Artwork, title/artist, listener growth (or genre), Apple Music/Spotify links, and a play/pause button — shared by the liked tracks list and export history. */
+export function TrackRow({ track, isPlaying, onTogglePlay, disabled = false, listenersNow }: TrackRowProps) {
   return (
     <ThemedView style={styles.row} backgroundColor="transparent">
       {track.artworkUrl100 ? (
@@ -36,7 +62,11 @@ export function TrackRow({ track, isPlaying, onTogglePlay, disabled = false }: T
         <ThemedText numberOfLines={1} style={styles.artist}>
           {track.artistName}
         </ThemedText>
-        <ThemedText type="caption">{track.primaryGenreName}</ThemedText>
+        {track.artistListeners != null || listenersNow != null ? (
+          <ListenersLine found={track.artistListeners} now={listenersNow} />
+        ) : (
+          <ThemedText type="caption">{track.primaryGenreName}</ThemedText>
+        )}
         <ThemedView style={styles.linksRow} backgroundColor="transparent">
           {track.trackViewUrl ? (
             <TouchableOpacity disabled={disabled} onPress={() => openUrl(track.trackViewUrl)}>
@@ -88,6 +118,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.md,
     marginTop: 2,
+  },
+  listenersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: Spacing.sm,
+  },
+  up: {
+    color: Colors.positive,
+  },
+  down: {
+    color: Colors.textSecondary,
+  },
+  calledIt: {
+    color: Colors.accent,
+    fontWeight: '700',
   },
   linkText: {
     fontSize: 13,

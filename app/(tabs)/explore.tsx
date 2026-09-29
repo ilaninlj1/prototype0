@@ -1,98 +1,43 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { useListenersNow } from '@/hooks/use-listeners-now';
 import {
-    averageListenMs,
-    deriveGenrePathSegments,
-    derivePlayedToEndButSkipped,
-    deriveSessions,
-    deriveTopArtists,
-    rankGenresByListenTime,
-    rankGenresByVisits,
-    type SwipeEntry,
+  describeGrowth,
+  describeListeners,
+  summarizeFinds,
+  withLikedAt,
+  type DiscoveryTrack,
+  type SwipeEntry,
 } from '@/lib/discovery';
-import { loadDiscoveredGenres, loadSwipeHistory } from '@/lib/discovery-storage';
+import { loadLikedTracks, loadSwipeHistory } from '@/lib/discovery-storage';
 
-const TOP_GENRE_COUNT = 5;
+const fmt = (n: number) => describeListeners(n).count;
 
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.round(ms / 1000);
-  if (totalSeconds < 60) return `${totalSeconds}s`;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}m ${seconds}s`;
-}
-
-function formatSessionLabel(startedAt: number): string {
-  const date = new Date(startedAt);
-  const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-
-  if (date.toDateString() === now.toDateString()) return `Today, ${time}`;
-  if (date.toDateString() === yesterday.toDateString()) return `Yesterday, ${time}`;
-  return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
-}
-
-// Sized off the spacing scale rather than a magic number — see the marker
-// styles below.
-const MARKER_SIZE = Spacing.sm;
-
-/**
- * The chain of genres a run of entries moved through, e.g. "Pop → House →
- * Jazz", with a small marker in front of any genre that was deliberately
- * steered into (as opposed to drifted into) — a circle for "more from this
- * artist", a square for "more like this sound". Both use the app's one
- * accent color; shape (not a second color) is what tells them apart, since
- * the palette deliberately has a single accent. Rendered as actual Views
- * rather than characters so there's no font-rendering dependence, which
- * means each segment is its own small row (arrow + marker + genre name kept
- * together) inside a wrapping flex container, rather than one block of text —
- * a View can't nest inline inside Text.
- */
-function GenrePathChain({ entries }: { entries: SwipeEntry[] }) {
-  const segments = deriveGenrePathSegments(entries);
-  return (
-    <ThemedView style={styles.pathRow} backgroundColor="transparent">
-      {segments.map((segment, i) => (
-        <ThemedView key={i} style={styles.pathSegment} backgroundColor="transparent">
-          {i > 0 && <ThemedText style={styles.pathArrow}>→</ThemedText>}
-          {segment.openedBy && (
-            <ThemedView
-              style={[
-                styles.marker,
-                segment.openedBy === 'steer-artist' ? styles.markerArtist : styles.markerSound,
-              ]}
-            />
-          )}
-          <ThemedText style={styles.pathText}>{segment.genre}</ThemedText>
-        </ThemedView>
-      ))}
-    </ThemedView>
-  );
+function topGenre(tracks: DiscoveryTrack[]): { genre: string; genres: number } | null {
+  const counts = new Map<string, number>();
+  for (const t of tracks) counts.set(t.primaryGenreName, (counts.get(t.primaryGenreName) ?? 0) + 1);
+  const [genre] = [...counts].sort((a, b) => b[1] - a[1])[0] ?? [];
+  return genre ? { genre, genres: counts.size } : null;
 }
 
 export default function ProfileScreen() {
-  const router = useRouter();
   const [loaded, setLoaded] = useState(false);
+  const [finds, setFinds] = useState<DiscoveryTrack[]>([]);
   const [history, setHistory] = useState<SwipeEntry[]>([]);
-  const [discoveredGenres, setDiscoveredGenres] = useState<string[]>([]);
 
-  // Reload every time this tab gains focus, so swipes made on the Home tab
-  // always show fresh data.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const [h, genres] = await Promise.all([loadSwipeHistory(), loadDiscoveredGenres()]);
+        const [liked, h] = await Promise.all([loadLikedTracks(), loadSwipeHistory()]);
         if (cancelled) return;
+        setFinds(withLikedAt(liked, h));
         setHistory(h);
-        setDiscoveredGenres(genres);
         setLoaded(true);
       })();
       return () => {
@@ -101,19 +46,14 @@ export default function ProfileScreen() {
     }, [])
   );
 
-  const sessions = useMemo(() => deriveSessions(history), [history]);
-  const genresByListenTime = useMemo(
-    () => rankGenresByListenTime(history).slice(0, TOP_GENRE_COUNT),
-    [history]
+  const now = useListenersNow(finds.map((t) => t.artistName));
+  const summary = summarizeFinds(finds.map((t) => ({ artistName: t.artistName, found: t.artistListeners, now: now[t.artistName] })));
+  const calledIt = finds.filter(
+    (t) => t.artistListeners != null && now[t.artistName] != null && describeGrowth(t.artistListeners, now[t.artistName]).calledIt
   );
-  const genresByVisits = useMemo(
-    () => rankGenresByVisits(sessions).slice(0, TOP_GENRE_COUNT),
-    [sessions]
-  );
-  const topArtists = useMemo(() => deriveTopArtists(history), [history]);
-  const playedToEndSkipped = useMemo(() => derivePlayedToEndButSkipped(history), [history]);
-  const currentSession = sessions[sessions.length - 1] ?? null;
-  const sessionsNewestFirst = useMemo(() => [...sessions].reverse(), [sessions]);
+  const genre = useMemo(() => topGenre(finds), [finds]);
+  const heard = history.filter((e) => e.action === 'skip' || e.action === 'like' || e.action === 'genre-jump').length;
+  const firstFind = finds.find((t) => t.likedAt != null);
 
   if (!loaded) {
     return (
@@ -123,127 +63,67 @@ export default function ProfileScreen() {
     );
   }
 
-  const total = history.length;
-
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <ThemedView style={styles.container}>
-        <ThemedText type="title">Listening Data</ThemedText>
+        <ThemedText type="title">Your ears</ThemedText>
 
-        {total === 0 ? (
-          <ThemedText style={styles.dim}>
-            No listening history yet. Swipe on some tracks in the Home tab to build your profile.
-          </ThemedText>
+        {finds.length === 0 ? (
+          <ThemedText style={styles.dim}>Nothing found yet. Like a song blind and it shows up here.</ThemedText>
         ) : (
           <>
-            <ThemedView style={styles.statsRow} backgroundColor="transparent">
-              <ThemedView style={styles.statTile} backgroundColor={Colors.surface}>
-                <ThemedText style={styles.statNumber}>{total}</ThemedText>
-                <ThemedText type="caption">tracks logged</ThemedText>
-              </ThemedView>
-              <ThemedView style={styles.statTile} backgroundColor={Colors.surface}>
-                <ThemedText style={styles.statNumber}>{formatDuration(averageListenMs(history))}</ThemedText>
-                <ThemedText type="caption">avg listen time</ThemedText>
-              </ThemedView>
-              <ThemedView style={styles.statTile} backgroundColor={Colors.surface}>
-                <ThemedText style={styles.statNumber}>{discoveredGenres.length}</ThemedText>
-                <ThemedText type="caption">genres discovered</ThemedText>
-              </ThemedView>
+            <ThemedView style={styles.hero} backgroundColor={Colors.surface}>
+              <ThemedText style={styles.heroNumber}>{finds.length}</ThemedText>
+              <ThemedText style={styles.dim}>
+                songs found blind{heard > 0 ? `, out of ${heard} you heard` : ''}.
+              </ThemedText>
             </ThemedView>
 
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              Where you go vs. where you stay
-            </ThemedText>
-            <ThemedView style={styles.compareRow} backgroundColor="transparent">
-              <ThemedView style={styles.compareCol} backgroundColor="transparent">
-                <ThemedText type="defaultSemiBold" style={styles.compareHeading}>
-                  By listen time
-                </ThemedText>
-                {genresByListenTime.length > 0 ? (
-                  genresByListenTime.map((g) => (
-                    <ThemedText key={g.genre}>
-                      {g.genre} — {formatDuration(g.listenMs)}
-                    </ThemedText>
-                  ))
-                ) : (
-                  <ThemedText style={styles.dim}>—</ThemedText>
-                )}
-              </ThemedView>
-
-              <ThemedView style={styles.compareCol} backgroundColor="transparent">
-                <ThemedText type="defaultSemiBold" style={styles.compareHeading}>
-                  By visit count
-                </ThemedText>
-                {genresByVisits.length > 0 ? (
-                  genresByVisits.map((g) => (
-                    <ThemedText key={g.genre}>
-                      {g.genre} — {g.visits} {g.visits === 1 ? 'visit' : 'visits'}
-                    </ThemedText>
-                  ))
-                ) : (
-                  <ThemedText style={styles.dim}>—</ThemedText>
-                )}
-              </ThemedView>
-            </ThemedView>
-
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              Artists beating your average
-            </ThemedText>
-            {topArtists.length > 0 ? (
-              topArtists.map((a) => (
-                <ThemedText key={a.artistId}>
-                  {a.artistName} — {formatDuration(a.avgListenMs)} avg ({a.trackCount})
-                </ThemedText>
-              ))
-            ) : (
-              <ThemedText style={styles.dim}>No artist beats your average yet.</ThemedText>
+            {summary.medianFound != null && (
+              <ThemedText style={styles.line}>
+                Half your finds had under <ThemedText style={styles.em}>{fmt(summary.medianFound)}</ThemedText> listeners
+                when you found them. {describeListeners(summary.medianFound).verdict}
+              </ThemedText>
             )}
 
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              Played to the end, skipped anyway
-            </ThemedText>
-            {playedToEndSkipped.length > 0 ? (
-              playedToEndSkipped.map((e) => (
-                <ThemedText key={`${e.trackId}-${e.timestamp}`} numberOfLines={1}>
-                  {e.trackName ?? 'Unknown track'} — {e.artistName ?? e.genre}
+            {calledIt.length > 0 ? (
+              <ThemedView style={styles.block} backgroundColor="transparent">
+                <ThemedText style={styles.line}>
+                  You called <ThemedText style={styles.em}>{calledIt.length}</ThemedText> — they&apos;ve at least doubled
+                  since you found them:
                 </ThemedText>
-              ))
+                {calledIt.map((t) => (
+                  <ThemedText key={t.id} style={styles.dim}>
+                    {t.artistName}: {fmt(t.artistListeners!)} → {fmt(now[t.artistName])}
+                  </ThemedText>
+                ))}
+              </ThemedView>
+            ) : summary.best ? (
+              <ThemedText style={styles.line}>
+                Best call so far: <ThemedText style={styles.em}>{summary.best.artistName}</ThemedText>, up{' '}
+                {summary.best.pct}% since you found them.
+              </ThemedText>
             ) : (
-              <ThemedText style={styles.dim}>None yet.</ThemedText>
+              <ThemedText style={styles.line}>
+                None of your finds have grown yet. When one doubles, you called it.
+              </ThemedText>
             )}
 
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              Genre path
-            </ThemedText>
-            {currentSession ? (
-              <>
-                <ThemedText type="defaultSemiBold">Current session</ThemedText>
-                <GenrePathChain entries={currentSession.entries} />
-              </>
-            ) : null}
-            <ThemedText type="defaultSemiBold" style={styles.allSessionsHeading}>
-              All sessions
-            </ThemedText>
-            {sessionsNewestFirst.map((session, i) => (
-              <ThemedView
-                key={`${session.startedAt}-${i}`}
-                style={styles.sessionRow}
-                backgroundColor={Colors.surface}>
-                <ThemedText type="caption">
-                  {formatSessionLabel(session.startedAt)} · {session.entries.length}{' '}
-                  {session.entries.length === 1 ? 'track' : 'tracks'}
-                </ThemedText>
-                <GenrePathChain entries={session.entries} />
-              </ThemedView>
-            ))}
+            {genre && (
+              <ThemedText style={styles.line}>
+                You&apos;ve liked songs blind in <ThemedText style={styles.em}>{genre.genres}</ThemedText>{' '}
+                {genre.genres === 1 ? 'genre' : 'genres'}, most of all {genre.genre}.
+              </ThemedText>
+            )}
+
+            {firstFind && (
+              <ThemedText style={styles.dim}>
+                First find: {firstFind.trackName} by {firstFind.artistName},{' '}
+                {new Date(firstFind.likedAt!).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}.
+              </ThemedText>
+            )}
           </>
         )}
-
-        <TouchableOpacity onPress={() => router.push('/spike-test')} style={styles.devLink}>
-          <ThemedText type="caption" style={styles.dim}>
-            Dev: Audio Feature Spike
-          </ThemedText>
-        </TouchableOpacity>
       </ThemedView>
     </ScrollView>
   );
@@ -256,85 +136,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: Spacing.lg,
-    gap: Spacing.md,
-    alignItems: 'stretch',
+    gap: Spacing.lg,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sectionTitle: {
-    marginTop: Spacing.md,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  statTile: {
-    flex: 1,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.lg,
-    alignItems: 'center',
+  hero: {
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
     gap: 2,
   },
-  statNumber: {
-    fontSize: 22,
+  heroNumber: {
+    fontSize: 56,
+    lineHeight: 60,
+    fontWeight: '800',
+    color: Colors.accent,
+  },
+  block: {
+    gap: Spacing.xs,
+  },
+  line: {
+    fontSize: 18,
+    lineHeight: 26,
+  },
+  em: {
+    fontSize: 18,
     fontWeight: '700',
+    color: Colors.accent,
   },
   dim: {
-    color: Colors.textSecondary,
-  },
-  devLink: {
-    alignSelf: 'center',
-    marginTop: Spacing.xl,
-  },
-  compareRow: {
-    flexDirection: 'row',
-    gap: Spacing.xl,
-  },
-  compareCol: {
-    flex: 1,
-    gap: Spacing.xs,
-  },
-  compareHeading: {
-    marginBottom: Spacing.xs,
-  },
-  allSessionsHeading: {
-    marginTop: Spacing.sm,
-  },
-  sessionRow: {
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    gap: 2,
-  },
-  pathRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    columnGap: Spacing.xs,
-    rowGap: Spacing.xs,
-  },
-  pathSegment: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  pathArrow: {
-    color: Colors.textSecondary,
-  },
-  marker: {
-    width: MARKER_SIZE,
-    height: MARKER_SIZE,
-    backgroundColor: Colors.accent,
-  },
-  markerArtist: {
-    borderRadius: Radius.pill, // circle
-  },
-  markerSound: {
-    borderRadius: 0, // square
-  },
-  pathText: {
     color: Colors.textSecondary,
   },
 });

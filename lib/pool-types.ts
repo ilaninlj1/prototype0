@@ -44,8 +44,7 @@ export interface Track {
     // Added 2026-09-15, not in the original spec: Phase 2's card deck
     // reuses lib/discovery.ts's SwipeCard/CardStack unmodified (decided in
     // this project's C6), and DiscoveryTrack.artistId is a required numeric
-    // field — used by artist-steering ("more from this artist") and by
-    // Profile's deriveTopArtists. A Track needs its own resolved iTunes
+    // field — used by artist-steering ("more from this artist"). A Track needs its own resolved iTunes
     // artistId to bridge into that shape; scripts/resolve-itunes-ids.ts
     // already resolves this per artist ahead of Phase 1, so it's free once
     // Phase 1 reads the seed.

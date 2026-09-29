@@ -6,9 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
-import { PresetChips } from '@/components/discovery/preset-chips';
-import { RegionToggle } from '@/components/discovery/region-toggle';
-import { SteeringRow } from '@/components/discovery/steering-row';
+import { RevealCard } from '@/components/discovery/reveal-card';
 import {
   computeCardSize,
   MAX_CARD_HEIGHT,
@@ -16,6 +14,7 @@ import {
   type CardSize,
   type SwipeDirection,
 } from '@/components/discovery/swipe-physics';
+import { TuneSheet } from '@/components/discovery/tune-sheet';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -46,7 +45,7 @@ import {
   saveRegion,
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
-import { getTracks, trackToDiscoveryTrack } from '@/lib/pool';
+import { fetchArtistListeners, getTracks, trackToDiscoveryTrack } from '@/lib/pool';
 import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
 
@@ -82,17 +81,6 @@ export default function HomeScreen() {
     setCardSize(computeCardSize({ width, height }));
   }
 
-  // Measured, not guessed — the header overlay's real rendered height
-  // (Undo/genre-pill row + gap + preset chips row), used as the card's
-  // artworkTopInset below so the header never visually sits over artwork.
-  // A hardcoded constant would drift the moment a label wraps differently
-  // or a platform renders pill text at a different line-height.
-  const [headerHeight, setHeaderHeight] = useState(0);
-
-  function handleHeaderLayout(e: LayoutChangeEvent) {
-    setHeaderHeight(e.nativeEvent.layout.height);
-  }
-
   const [queue, setQueue] = useState<DiscoveryTrack[]>([]);
   const [strategy, setStrategy] = useState<Strategy>({ type: 'genre', genre: 'Pop' });
   const [swipeHistory, setSwipeHistory] = useState<SwipeEntry[]>([]);
@@ -110,6 +98,12 @@ export default function HomeScreen() {
   // state, not persisted — resets each launch, unlike swipeHistory.
   const [seenArtists, setSeenArtists] = useState<Set<string>>(new Set());
 
+  // The track just liked, shown face-up until tapped away. It stays at
+  // queue[0] meanwhile, so its preview keeps playing through the reveal.
+  const [revealTrack, setRevealTrack] = useState<DiscoveryTrack | null>(null);
+  // undefined while looking the count up, null if Last.fm doesn't have it.
+  const [revealListeners, setRevealListeners] = useState<number | null | undefined>(undefined);
+  const revealIdRef = useRef<number | null>(null);
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
   const refillEpochRef = useRef(0);
   // Phase 3 logging (2026-09-16). Wall-clock timestamp of when the current
@@ -309,12 +303,23 @@ export default function HomeScreen() {
 
   async function handleLike(track: DiscoveryTrack) {
     cardsSeenSincePresetChangeRef.current += 1;
-    const nextHistory = await logSwipe(track, 'like');
-    await appendLikedTrack(track);
-    const nextSeen = markArtistSeen(track);
+    const likedAt = Date.now();
+    await logSwipe(track, 'like');
+    markArtistSeen(track);
+    setRevealTrack(track);
+    setRevealListeners(track.artistListeners);
+    revealIdRef.current = track.id;
+    const found = track.artistListeners ?? (await fetchArtistListeners(track.artistName));
+    if (revealIdRef.current === track.id) setRevealListeners(found);
+    await appendLikedTrack({ ...track, artistListeners: found ?? undefined, likedAt });
+  }
+
+  async function handleRevealDone() {
+    setRevealTrack(null);
+    revealIdRef.current = null;
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres, region, preset, nextSeen);
+    await runRefill(nextQueue, strategy, swipeHistory, discoveredGenres, region, preset, seenArtists);
   }
 
   async function applySteeringStrategy(kind: 'artist' | 'sound', next: Strategy) {
@@ -420,6 +425,8 @@ export default function HomeScreen() {
     if (!snapshot) return;
     refillEpochRef.current += 1;
     setUndoSnapshot(null);
+    setRevealTrack(null);
+    revealIdRef.current = null;
     setQueue(snapshot.queue);
     setStrategy(snapshot.strategy);
     setDiscoveredGenres(snapshot.discoveredGenres);
@@ -450,40 +457,17 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
-      {/* Absolutely positioned overlay, NOT a flow sibling of cardArea —
-          this mirrors bottomRows' own precedent (see its comment below) in
-          reverse. bottomRows consolidated independently-floating pills
-          into ONE flow container because they overlapped each other. This
-          header does the opposite move for the same underlying reason:
-          never let two things in the same screen region each guess their
-          own position. Undo, the genre pill, and the preset chips are laid
-          out relative to each other by real flexbox INSIDE this one block
-          (so they can't overlap each other), and the whole block is kept
-          OUT of cardArea's flex column (so it can never take space from
-          the card, no matter what's added in here later). Moving this back
-          into normal flow "to simplify it" silently reintroduces the exact
-          card-shrinking bug this fixed — see the 2026-09-15 conversation
-          this responds to before doing that.
-          pointerEvents="box-none" on this and headerRow so the empty space
-          between/around Undo and the genre pill lets taps through to the
-          card underneath instead of swallowing them. */}
-      <View
-        style={[styles.headerOverlay, { top: insets.top + Spacing.lg }]}
-        pointerEvents="box-none"
-        onLayout={handleHeaderLayout}>
-        <View style={styles.headerRow} pointerEvents="box-none">
-          <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
-          <GenrePicker
-            curatedGenres={GENRES}
-            discoveredGenres={discoveredGenres}
-            heardGenres={genresHeard}
-            currentGenre={currentGenre}
-            currentLabel={currentLabel}
-            onSelect={handlePickGenre}
-            onExplore={handleExplore}
-          />
-        </View>
-        <PresetChips activePreset={preset} loading={presetLoading} onSelect={handleSelectPreset} />
+      <View style={styles.headerRow}>
+        <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
+        <GenrePicker
+          curatedGenres={GENRES}
+          discoveredGenres={discoveredGenres}
+          heardGenres={genresHeard}
+          currentGenre={currentGenre}
+          currentLabel={currentLabel}
+          onSelect={handlePickGenre}
+          onExplore={handleExplore}
+        />
       </View>
 
       {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
@@ -491,30 +475,31 @@ export default function HomeScreen() {
       {currentTrack ? (
         <>
           <View style={styles.cardArea} onLayout={handleCardAreaLayout}>
-            <CardStack
-              queue={queue}
-              cardSize={cardSize}
-              onSwipe={handleCardSwipe}
-              onHold={handleCardHold}
-              showPlayIcon={showPlayIcon}
-              // Keeps the header overlay from visually sitting on top of
-              // artwork — see CardFace's own doc comment. +Spacing.sm so
-              // the chips don't look like they're touching the art directly.
-              artworkTopInset={headerHeight + Spacing.sm}
-            />
+            {revealTrack ? (
+              <RevealCard track={revealTrack} listeners={revealListeners} size={cardSize} onDone={handleRevealDone} />
+            ) : (
+              <CardStack
+                queue={queue}
+                cardSize={cardSize}
+                onSwipe={handleCardSwipe}
+                onHold={handleCardHold}
+                playing={status.playing}
+                showPlayIcon={showPlayIcon}
+              />
+            )}
           </View>
 
-          {/* Steering and the utility pills are separate rows, not floating
-              corner pills — they used to overlap when both floated
-              independently near the bottom. Both sit in normal flow above
-              the tab bar, which already handles its own bottom inset — this
-              screen only ever adds insets.top. */}
-          <View style={styles.bottomRows}>
-            <SteeringRow onArtist={handleMoreFromArtist} onSound={handleMoreLikeSound} />
-            <View style={styles.utilityRow}>
-              <RegionToggle region={region} onToggle={handleToggleRegion} />
-              <LikedTracksButton onPress={() => router.push('/modal')} />
-            </View>
+          <View style={styles.bottomRow}>
+            <TuneSheet
+              preset={preset}
+              presetLoading={presetLoading}
+              region={region}
+              onSelectPreset={handleSelectPreset}
+              onToggleRegion={handleToggleRegion}
+              onMoreFromArtist={handleMoreFromArtist}
+              onMoreLikeSound={handleMoreLikeSound}
+            />
+            <LikedTracksButton onPress={() => router.push('/modal')} />
           </View>
         </>
       ) : presetLoading ? (
@@ -541,22 +526,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerOverlay: {
-    position: 'absolute',
-    left: Spacing.lg,
-    right: Spacing.lg,
-    zIndex: 1,
-    gap: Spacing.sm,
-  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  bottomRows: {
-    gap: Spacing.sm,
-  },
-  utilityRow: {
+  bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

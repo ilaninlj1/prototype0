@@ -34,6 +34,9 @@ export type DiscoveryTrack = {
   // above is pool-stub-only.
   artistListeners?: number;
   trackRank?: number;
+  // Liked tracks only: when the like happened. artistListeners on a liked
+  // track is the count at that moment, i.e. what you "found them at".
+  likedAt?: number;
 };
 
 // 'steer-artist'/'steer-sound': logged when the user redirects discovery
@@ -129,6 +132,63 @@ export function mergeDiscoveredGenres(existing: string[], found: string[]): stri
 export function artworkUrl(url: string, size: number): string {
   if (!url) return url;
   return url.replace(/\d+x\d+bb\.jpg$/, `${size}x${size}bb.jpg`);
+}
+
+function compactCount(n: number): string {
+  const [value, suffix] = n >= 1_000_000 ? [n / 1_000_000, 'M'] : n >= 1_000 ? [n / 1_000, 'K'] : [n, ''];
+  const rounded = value < 100 ? Math.round(value * 10) / 10 : Math.round(value);
+  return `${rounded}${suffix}`;
+}
+
+/** The reveal's headline: an artist's Last.fm listener count and how rare that makes the find. */
+export function describeListeners(listeners: number): { count: string; verdict: string } {
+  const verdict =
+    listeners < 25_000
+      ? 'Almost nobody has heard this.'
+      : listeners < 100_000
+        ? 'Under the radar.'
+        : listeners < 1_000_000
+          ? 'Known, not famous.'
+          : 'Everyone knows this one.';
+  return { count: compactCount(listeners), verdict };
+}
+
+/** How an artist's listener count moved since you found them. "Called it" means it at least doubled. */
+export function describeGrowth(found: number, now: number): { pct: number; calledIt: boolean } {
+  return { pct: Math.round(((now - found) / found) * 100), calledIt: now >= found * 2 };
+}
+
+export type Find = { artistName: string; found?: number; now?: number };
+
+/** The Profile's headline numbers across every blind find. */
+export function summarizeFinds(finds: Find[]): {
+  count: number;
+  medianFound: number | null;
+  calledIt: number;
+  best: { artistName: string; pct: number } | null;
+} {
+  const founds = finds.flatMap((f) => (f.found != null ? [f.found] : [])).sort((a, b) => a - b);
+  let calledIt = 0;
+  let best: { artistName: string; pct: number } | null = null;
+  for (const f of finds) {
+    if (f.found == null || f.now == null) continue;
+    const growth = describeGrowth(f.found, f.now);
+    if (growth.calledIt) calledIt += 1;
+    if (growth.pct > 0 && (!best || growth.pct > best.pct)) best = { artistName: f.artistName, pct: growth.pct };
+  }
+  return {
+    count: finds.length,
+    medianFound: founds.length ? founds[Math.floor((founds.length - 1) / 2)] : null,
+    calledIt,
+    best,
+  };
+}
+
+/** Likes saved before likedAt existed get their date back from the swipe log. */
+export function withLikedAt(tracks: DiscoveryTrack[], history: SwipeEntry[]): DiscoveryTrack[] {
+  const lastLike = new Map<number, number>();
+  for (const e of history) if (e.action === 'like') lastLike.set(e.trackId, e.timestamp);
+  return tracks.map((t) => (t.likedAt != null || !lastLike.has(t.id) ? t : { ...t, likedAt: lastLike.get(t.id) }));
 }
 
 export type GenreTermOverrides = Record<string, string[]>;
@@ -560,210 +620,4 @@ export async function refillQueueWithFallback(
   }
 
   return { queue: currentQueue, fetched, strategy: currentStrategy };
-}
-
-// ---------- Profile: sessions, genre path, and listening-data derivations ----------
-
-// No field is added to persist sessions — they're recomputed from
-// swipeHistory's timestamps every time, which is what makes this work
-// retroactively on history already on disk. 30 minutes: long enough that a
-// pause to answer the door doesn't fracture one sitting into two, short
-// enough that "opened the app again this evening" reliably reads as a new one.
-export const SESSION_GAP_MS = 30 * 60 * 1000;
-
-export type Session = {
-  entries: SwipeEntry[]; // chronological
-  startedAt: number;
-  endedAt: number;
-};
-
-function toSession(entries: SwipeEntry[]): Session {
-  return { entries, startedAt: entries[0].timestamp, endedAt: entries[entries.length - 1].timestamp };
-}
-
-/** Splits history into sessions wherever the gap since the previous entry exceeds SESSION_GAP_MS. Oldest first. */
-export function deriveSessions(history: SwipeEntry[]): Session[] {
-  const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
-  const sessions: Session[] = [];
-  let current: SwipeEntry[] = [];
-
-  for (const entry of sorted) {
-    const prev = current[current.length - 1];
-    if (prev && entry.timestamp - prev.timestamp > SESSION_GAP_MS) {
-      sessions.push(toSession(current));
-      current = [];
-    }
-    current.push(entry);
-  }
-  if (current.length > 0) sessions.push(toSession(current));
-  return sessions;
-}
-
-export type GenreVisit = {
-  genre: string;
-  trackCount: number;
-  listenMs: number; // summed over the run; a missing listenMs contributes 0
-  startedAt: number;
-};
-
-/**
- * Collapses one session's chronological entries into runs of consecutive
- * same-genre swipes. Operates per-session (not across all of history)
- * because a session boundary should always end a run — resuming the same
- * genre after 30+ minutes away is a new visit, not a continuation.
- */
-export function deriveGenrePath(entries: SwipeEntry[]): GenreVisit[] {
-  const visits: GenreVisit[] = [];
-  for (const entry of entries) {
-    const current = visits[visits.length - 1];
-    // A steer entry never merges into the running visit, even when its genre
-    // matches — it's a deliberate re-arrival, not a continuation of drift.
-    const continuesRun = current && current.genre === entry.genre && !STEER_ACTIONS.has(entry.action);
-    if (continuesRun) {
-      current.trackCount += 1;
-      current.listenMs += entry.listenMs ?? 0;
-    } else {
-      visits.push({ genre: entry.genre, trackCount: 1, listenMs: entry.listenMs ?? 0, startedAt: entry.timestamp });
-    }
-  }
-  return visits;
-}
-
-export type GenrePathSegment = {
-  genre: string;
-  openedBy: 'steer-artist' | 'steer-sound' | null;
-};
-
-/**
- * Same boundary rule as deriveGenrePath (a steer entry always opens a new
- * visit; a non-steer entry merges when the genre matches), but for display:
- * each segment is tagged with which steer action opened it, or null for an
- * ordinary transition. Only the Profile screen's path rendering uses this —
- * ranking (rankGenresByVisits) goes through deriveGenrePath directly, since
- * trackCount/listenMs (which this doesn't need) matter there and openedBy
- * doesn't.
- */
-export function deriveGenrePathSegments(entries: SwipeEntry[]): GenrePathSegment[] {
-  const segments: GenrePathSegment[] = [];
-  for (const entry of entries) {
-    const isSteer = STEER_ACTIONS.has(entry.action);
-    const last = segments[segments.length - 1];
-    const continuesRun = last && last.genre === entry.genre && !isSteer;
-    if (!continuesRun) {
-      segments.push({
-        genre: entry.genre,
-        openedBy: isSteer ? (entry.action as 'steer-artist' | 'steer-sound') : null,
-      });
-    }
-  }
-  return segments;
-}
-
-/** Total listen time per genre across all of history, sorted descending. */
-export function rankGenresByListenTime(history: SwipeEntry[]): { genre: string; listenMs: number }[] {
-  const totals = new Map<string, number>();
-  for (const entry of history) {
-    totals.set(entry.genre, (totals.get(entry.genre) ?? 0) + (entry.listenMs ?? 0));
-  }
-  return Array.from(totals.entries())
-    .map(([genre, listenMs]) => ({ genre, listenMs }))
-    .sort((a, b) => b.listenMs - a.listenMs);
-}
-
-/**
- * How many separate times each genre was visited — runs, not tracks, and
- * counted per-session (see deriveGenrePath) so a genre resumed after a
- * session gap counts as another visit. Sorted descending.
- */
-export function rankGenresByVisits(sessions: Session[]): { genre: string; visits: number }[] {
-  const counts = new Map<string, number>();
-  for (const session of sessions) {
-    // Steering isn't a visit — it doesn't reflect time spent anywhere, so it's
-    // dropped before run-collapsing rather than merely not forcing a boundary
-    // (deriveGenrePath's forced-boundary rule is for the path *display*, which
-    // sees the unfiltered entries instead).
-    const heardEntries = session.entries.filter((e) => !STEER_ACTIONS.has(e.action));
-    for (const visit of deriveGenrePath(heardEntries)) {
-      counts.set(visit.genre, (counts.get(visit.genre) ?? 0) + 1);
-    }
-  }
-  return Array.from(counts.entries())
-    .map(([genre, visits]) => ({ genre, visits }))
-    .sort((a, b) => b.visits - a.visits);
-}
-
-/**
- * Average listenMs across history. Entries without listenMs are excluded
- * from both the sum and the denominator (not treated as 0) — same "missing
- * means don't count it" convention as deriveRatedGenres. 0 if none qualify.
- */
-export function averageListenMs(history: SwipeEntry[]): number {
-  const withListen = history.filter((e) => e.listenMs !== undefined);
-  if (withListen.length === 0) return 0;
-  const sum = withListen.reduce((total, e) => total + (e.listenMs as number), 0);
-  return sum / withListen.length;
-}
-
-// Track duration isn't stored anywhere — iTunes previews are nominally ~30s
-// but that's never verified per-track — so "reached the end" is approximated
-// by elapsed listen time alone. Loose on purpose given that approximation.
-export const PLAYED_TO_END_THRESHOLD_MS = 25000;
-
-/** Skips where the preview had all but played out first — newest first. */
-export function derivePlayedToEndButSkipped(history: SwipeEntry[]): SwipeEntry[] {
-  return history
-    .filter((e) => e.action === 'skip' && (e.listenMs ?? 0) >= PLAYED_TO_END_THRESHOLD_MS)
-    .sort((a, b) => b.timestamp - a.timestamp);
-}
-
-export type ArtistStat = {
-  artistId: number;
-  artistName: string;
-  avgListenMs: number;
-  trackCount: number;
-};
-
-/**
- * Artists whose average listen time beats the overall average, requiring at
- * least `minTracks` logged tracks (avoids a single long listen putting a
- * one-track artist at the top). artistName is only present on entries logged
- * after that field existed, so each artist's name is resolved from the most
- * recent entry (by timestamp) that has one; an artistId with no named entry
- * anywhere is excluded — there's nothing sensible to display. Sorted
- * descending by avgListenMs.
- */
-export function deriveTopArtists(history: SwipeEntry[], minTracks = 2): ArtistStat[] {
-  const overallAverage = averageListenMs(history);
-
-  const names = new Map<number, string>();
-  for (const entry of [...history].sort((a, b) => a.timestamp - b.timestamp)) {
-    if (entry.artistName) names.set(entry.artistId, entry.artistName);
-  }
-
-  // Name resolution above scans full history (a steer entry still carries a
-  // usable artistName), but grouping excludes steer entries — otherwise
-  // steering alone could inflate an artist's displayed trackCount without any
-  // track actually being judged.
-  const judged = history.filter((e) => !STEER_ACTIONS.has(e.action));
-  const groups = new Map<number, { count: number; listenSum: number; listenCount: number }>();
-  for (const entry of judged) {
-    const bucket = groups.get(entry.artistId) ?? { count: 0, listenSum: 0, listenCount: 0 };
-    bucket.count += 1;
-    if (entry.listenMs !== undefined) {
-      bucket.listenSum += entry.listenMs;
-      bucket.listenCount += 1;
-    }
-    groups.set(entry.artistId, bucket);
-  }
-
-  const result: ArtistStat[] = [];
-  for (const [artistId, bucket] of groups) {
-    const artistName = names.get(artistId);
-    if (!artistName || bucket.count < minTracks || bucket.listenCount === 0) continue;
-    const avgListenMs = bucket.listenSum / bucket.listenCount;
-    if (avgListenMs <= overallAverage) continue;
-    result.push({ artistId, artistName, avgListenMs, trackCount: bucket.count });
-  }
-
-  return result.sort((a, b) => b.avgListenMs - a.avgListenMs);
 }

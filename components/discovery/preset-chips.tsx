@@ -12,7 +12,7 @@ import type { PresetId } from '@/lib/pool-types';
 // Mixed is the neutral baseline the other four are compared against, which
 // reads left-to-right as "here's unfiltered, here's how each preset
 // differs from it," not as a 1st-place/default position.
-const PRESET_LABELS: Record<PresetId, string> = {
+export const PRESET_LABELS: Record<PresetId, string> = {
   M: 'Mixed',
   A: 'Hidden gems',
   B: 'Deep cuts',

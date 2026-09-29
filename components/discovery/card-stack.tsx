@@ -13,12 +13,11 @@ type CardStackProps = {
   onSwipe: (direction: SwipeDirection, track: DiscoveryTrack) => void;
   /** Fires on a ~400ms hold on the top card, not a tap — see SwipeCard. */
   onHold: () => void;
+  playing: boolean;
   showPlayIcon: boolean;
-  /** Passed through to every layered card uniformly — see CardFace's own doc comment. Uniform so swiping the top card away doesn't visibly shift where the next card's artwork starts. */
-  artworkTopInset?: number;
 };
 
-export function CardStack({ queue, cardSize, onSwipe, onHold, showPlayIcon, artworkTopInset }: CardStackProps) {
+export function CardStack({ queue, cardSize, onSwipe, onHold, playing, showPlayIcon }: CardStackProps) {
   const visible = queue.slice(0, STACK_DEPTH);
 
   return (
@@ -34,8 +33,8 @@ export function CardStack({ queue, cardSize, onSwipe, onHold, showPlayIcon, artw
                 size={cardSize}
                 onSwipe={onSwipe}
                 onHold={onHold}
+                playing={playing}
                 showPlayIcon={showPlayIcon}
-                artworkTopInset={artworkTopInset}
               />
             </View>
           ) : (
@@ -46,7 +45,7 @@ export function CardStack({ queue, cardSize, onSwipe, onHold, showPlayIcon, artw
                 styles.layer,
                 { transform: [{ scale: 1 - index * 0.04 }, { translateY: index * 10 }] },
               ]}>
-              <CardFace track={track} size={cardSize} artworkTopInset={artworkTopInset} />
+              <CardFace size={cardSize} />
             </View>
           )
         )}

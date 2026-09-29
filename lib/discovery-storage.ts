@@ -194,3 +194,27 @@ export async function appendPresetChangeEntry(entry: PresetChangeEntry): Promise
     // ignore
   }
 }
+
+// Current Last.fm listener counts for liked artists, keyed by artist name —
+// what the Liked list and Profile compare each find's found-at count against.
+const LISTENERS_NOW_KEY = `${STORAGE_PREFIX}:listenersNow`;
+
+export type ListenersNow = Record<string, { listeners: number; fetchedAt: number }>;
+
+export async function loadListenersNow(): Promise<ListenersNow> {
+  try {
+    const raw = await AsyncStorage.getItem(LISTENERS_NOW_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveListenersNow(cache: ListenersNow): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LISTENERS_NOW_KEY, JSON.stringify(cache));
+  } catch {
+    // ignore
+  }
+}

@@ -239,6 +239,29 @@ export async function fetchTopTracks(artistName: string): Promise<RankedTrack[]>
   }));
 }
 
+interface LastFmArtistInfoResponse {
+  artist?: { stats?: { listeners?: string } };
+}
+
+/** An artist's all-time Last.fm listener count, or null if Last.fm doesn't know them or the call fails. */
+export async function fetchArtistListeners(artistName: string): Promise<number | null> {
+  const apiKey = process.env.EXPO_PUBLIC_LASTFM_API_KEY;
+  if (!apiKey) return null;
+  const url = new URL(LASTFM_API_ROOT);
+  url.searchParams.set('method', 'artist.getInfo');
+  url.searchParams.set('artist', artistName);
+  url.searchParams.set('autocorrect', '1');
+  url.searchParams.set('api_key', apiKey);
+  url.searchParams.set('format', 'json');
+  try {
+    const body = (await pacedLastFm(() => fetchWithBackoff(url))) as LastFmArtistInfoResponse;
+    const listeners = Number(body.artist?.stats?.listeners);
+    return Number.isFinite(listeners) ? listeners : null;
+  } catch {
+    return null;
+  }
+}
+
 interface ItunesLookupTrack {
   wrapperType?: string;
   trackId?: number;

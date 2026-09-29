@@ -1,12 +1,13 @@
-import { BlurView } from 'expo-blur';
-import { Image } from 'expo-image';
+import { useEffect } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
   interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withSpring,
   withTiming,
   type AnimatedStyle,
@@ -15,92 +16,42 @@ import Animated, {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
+import type { DiscoveryTrack } from '@/lib/discovery';
 import { DEFAULT_SWIPE_THRESHOLDS, resolveSwipeDirection, rotationForDrag, type CardSize, type SwipeDirection } from './swipe-physics';
 
 const FLY_OUT_DISTANCE = 600;
-// artworkUrl100 is only 100x100, stretched to fill the full-width card —
-// visibly blurry. iTunes serves the same asset at any size via the URL, so
-// ask for one big enough for the card instead of upscaling a thumbnail.
-const CARD_ARTWORK_SIZE = 600;
 
-// Tint zones: fully transparent at rest — the album art is the point of the
-// screen, not a competing visual — visible only once a drag is actually in
-// progress, ramping to this max as translateX approaches the swipe
-// threshold (see leftTintStyle/rightTintStyle below). Previously had a
-// TINT_REST_OPACITY floor (0.08) so the zones stayed faintly visible even
-// with no drag; removed 2026-09-15 because that floor, combined with a
-// press-only jump to full opacity, was washing out artwork on a mere
-// touch-down before any actual swipe intent. 0.32 itself is unchanged from
-// the 2026-09-15 empirical check against two real iTunes covers (a
-// near-black one and a bright/colorful one, both composited with the exact
-// tint colors — see that conversation for the images) — that number is
-// about how strong the tint should get at full activation, independent of
-// when it starts appearing.
+// Skip/like tint: invisible at rest, ramping to this as a drag nears its commit threshold.
 const TINT_ACTIVE_OPACITY = 0.32;
 
 type CardFaceProps = {
-  track: DiscoveryTrack;
   /** Computed by the screen from the space actually available (see computeCardSize) — never a fixed constant, so the card shrinks to fit on a small screen. */
   size: CardSize;
-  /** Overlays a play icon on the artwork — paused or a finished preview. Never set by CardStack's static background cards. Doubles as the hold-to-pause indicator now (see SwipeCard) — pausing just sets this the same way finishing a preview already did. */
+  /** True only for the top card while its preview plays — drives the pulse. */
+  playing?: boolean;
+  /** Shows a play glyph instead of the pulse — paused or a finished preview. */
   showPlayIcon?: boolean;
-  /**
-   * Breathing room between the card's own top edge and where the artwork
-   * image starts — the app screen's absolutely-positioned header overlay
-   * (Undo/genre pill/preset chips) floats over the top of the card rather
-   * than taking space from it (see app/(tabs)/index.tsx), so without this
-   * the header would sit directly on top of artwork instead of a blank
-   * strip. This is an INTERNAL inset — the card's own outer `size` never
-   * changes because of it, only how much of that fixed box the artwork
-   * image fills. Defaults to 0 (edge-to-edge) for any caller that doesn't
-   * have a header floating over it.
-   */
-  artworkTopInset?: number;
-  /**
-   * Skip/like zone tint overlays — only ever set by the interactive top
-   * card (SwipeCard); CardStack's static background layers never pass
-   * these, since press/drag feedback on a card you can't currently touch
-   * would be misleading. Rendered INSIDE this component's own
-   * borderRadius+overflow:hidden container (rather than layered on top of
-   * it from SwipeCard) specifically so the tint respects the card's
-   * rounded corners instead of showing square edges past them.
-   */
+  /** Skip/like tint overlays — only the interactive top card passes these. */
   leftTintStyle?: AnimatedStyle<ViewStyle>;
   rightTintStyle?: AnimatedStyle<ViewStyle>;
 };
 
-// Artwork fills the card below artworkTopInset; title/artist/genre sit
-// directly over its bottom edge on a BlurView rather than a separate panel
-// below — the artwork stays the visual focus (just softened where the text
-// needs to sit, and inset at the top where the header floats) instead of
-// being pushed up to make room for a solid info block.
-export function CardFace({
-  track,
-  size,
-  showPlayIcon = false,
-  artworkTopInset = 0,
-  leftTintStyle,
-  rightTintStyle,
-}: CardFaceProps) {
+// Blind by design: no artwork, title, artist or genre until you like the
+// track (see RevealCard). All you get is the sound.
+export function CardFace({ size, playing = false, showPlayIcon = false, leftTintStyle, rightTintStyle }: CardFaceProps) {
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    pulse.value = playing ? withRepeat(withTiming(1, { duration: 1400, easing: Easing.out(Easing.quad) }), -1) : withTiming(0);
+  }, [playing, pulse]);
+
+  const ringStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(pulse.value, [0, 1], [0.5, 0]),
+    transform: [{ scale: interpolate(pulse.value, [0, 1], [1, 2.2]) }],
+  }));
+
   return (
     <ThemedView style={[styles.card, size]} backgroundColor={Colors.surface}>
-      {track.artworkUrl100 ? (
-        <Image
-          source={{ uri: artworkUrl(track.artworkUrl100, CARD_ARTWORK_SIZE) }}
-          style={[styles.artwork, { top: artworkTopInset }]}
-        />
-      ) : track.placeholderColor ? (
-        // No real artwork — a flat colored block instead of leaving the
-        // card's plain Colors.surface background showing through, so a
-        // stub deck (or any track a real source ever fails to find
-        // artwork for) still reads as "the card changed" at a glance.
-        <ThemedView
-          style={[styles.artwork, { top: artworkTopInset }]}
-          backgroundColor={track.placeholderColor}
-        />
-      ) : null}
-
       {leftTintStyle && (
         <Animated.View pointerEvents="none" style={[styles.tintZone, styles.tintZoneLeft, leftTintStyle]} />
       )}
@@ -108,25 +59,19 @@ export function CardFace({
         <Animated.View pointerEvents="none" style={[styles.tintZone, styles.tintZoneRight, rightTintStyle]} />
       )}
 
-      {showPlayIcon && (
-        <ThemedView style={styles.playOverlay} backgroundColor="transparent">
-          <ThemedView style={styles.playOverlayCircle} backgroundColor="rgba(0, 0, 0, 0.5)">
-            <ThemedText style={styles.playOverlayIcon}>▶</ThemedText>
-          </ThemedView>
+      <ThemedView style={styles.center} backgroundColor="transparent">
+        <Animated.View style={[styles.ring, ringStyle]} />
+        <ThemedView style={styles.core} backgroundColor={Colors.accent}>
+          {showPlayIcon && <ThemedText style={styles.playIcon}>▶</ThemedText>}
         </ThemedView>
-      )}
+      </ThemedView>
 
-      <BlurView intensity={55} tint="dark" style={styles.infoOverlay}>
-        <ThemedText type="subtitle" numberOfLines={1}>
-          {track.trackName}
+      <ThemedView style={styles.footer} backgroundColor="transparent">
+        <ThemedText type="subtitle">Just listen.</ThemedText>
+        <ThemedText type="caption" style={styles.hint}>
+          Like it to find out who it is.
         </ThemedText>
-        <ThemedText numberOfLines={1} style={styles.artist}>
-          {track.artistName}
-        </ThemedText>
-        <ThemedText type="caption" numberOfLines={1} style={styles.genre}>
-          {track.primaryGenreName}
-        </ThemedText>
-      </BlurView>
+      </ThemedView>
     </ThemedView>
   );
 }
@@ -137,11 +82,11 @@ type SwipeCardProps = {
   onSwipe: (direction: SwipeDirection, track: DiscoveryTrack) => void;
   /** Fires on a ~400ms hold, not a tap — see the gesture composition below for why tap was reassigned to skip/like. */
   onHold: () => void;
+  playing: boolean;
   showPlayIcon: boolean;
-  artworkTopInset?: number;
 };
 
-export function SwipeCard({ track, size, onSwipe, onHold, showPlayIcon, artworkTopInset }: SwipeCardProps) {
+export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon }: SwipeCardProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   // Which half is currently pressed, before/independent of any drag —
@@ -261,10 +206,9 @@ export function SwipeCard({ track, size, onSwipe, onHold, showPlayIcon, artworkT
     <GestureDetector gesture={gesture}>
       <Animated.View style={animatedStyle}>
         <CardFace
-          track={track}
           size={size}
+          playing={playing}
           showPlayIcon={showPlayIcon}
-          artworkTopInset={artworkTopInset}
           leftTintStyle={leftTintStyle}
           rightTintStyle={rightTintStyle}
         />
@@ -283,14 +227,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
   },
-  artwork: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    // top comes from the artworkTopInset prop, not from absoluteFill —
-    // that's the whole mechanism this style exists to support.
-  },
   tintZone: {
     position: 'absolute',
     top: 0,
@@ -305,36 +241,40 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: Colors.positive,
   },
-  playOverlay: {
+  center: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playOverlayCircle: {
-    width: 64,
-    height: 64,
+  ring: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.accent,
+  },
+  core: {
+    width: 96,
+    height: 96,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playOverlayIcon: {
-    color: Colors.text,
-    fontSize: 28,
-    marginLeft: 4, // optical centering — the glyph itself sits slightly left otherwise
+  playIcon: {
+    color: Colors.accentText,
+    fontSize: 32,
+    marginLeft: 5, // optical centering
   },
-  infoOverlay: {
+  footer: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    gap: 2,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    gap: Spacing.xs,
   },
-  artist: {
+  hint: {
     color: Colors.textSecondary,
-  },
-  genre: {
-    marginTop: 2,
   },
 });

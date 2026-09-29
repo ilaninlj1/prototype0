@@ -18,8 +18,9 @@ import { TrackRow } from '@/components/discovery/track-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
-import { buildSpotifySearchUrl, type DiscoveryTrack } from '@/lib/discovery';
+import { buildSpotifySearchUrl, summarizeFinds, type DiscoveryTrack } from '@/lib/discovery';
 import { appendExportBatch, loadLikedTracks, saveLikedTracks } from '@/lib/discovery-storage';
 
 // react-native-web's Alert.alert is a no-op (confirmed against the installed
@@ -72,6 +73,8 @@ export default function LikedTracksScreen() {
   // so starting a preview here always stops one already playing on the swipe
   // screen or export history, and vice versa, since it's the same player.
   const { player, status } = usePlayback();
+
+  const listenersNow = useListenersNow(tracks.map((t) => t.artistName));
 
   // Reload every time this screen gains focus, so a track liked after it was
   // last opened still shows up on return — mirrors the Profile tab's pattern.
@@ -231,6 +234,9 @@ export default function LikedTracksScreen() {
   }
 
   const newestFirst = [...tracks].reverse();
+  const { best, calledIt } = summarizeFinds(
+    tracks.map((t) => ({ artistName: t.artistName, found: t.artistListeners, now: listenersNow[t.artistName] }))
+  );
 
   return (
     <>
@@ -261,6 +267,19 @@ export default function LikedTracksScreen() {
             </TouchableOpacity>
           )}
 
+          {best && (
+            <ThemedView style={styles.summary} backgroundColor={Colors.surface}>
+              <ThemedText type="defaultSemiBold">
+                Best call: {best.artistName} ↑ {best.pct}%
+              </ThemedText>
+              <ThemedText type="caption">
+                {calledIt > 0
+                  ? `You called ${calledIt} — they've at least doubled since you found them.`
+                  : 'Nothing has doubled yet. Keep digging.'}
+              </ThemedText>
+            </ThemedView>
+          )}
+
           {newestFirst.length === 0 ? (
             <ThemedText style={styles.emptyText}>No liked tracks yet — swipe right on something you like.</ThemedText>
           ) : (
@@ -285,6 +304,7 @@ export default function LikedTracksScreen() {
                         isPlaying={isPlayingThis}
                         onTogglePlay={() => togglePlay(track)}
                         disabled={selectionMode}
+                        listenersNow={listenersNow[track.artistName]}
                       />
                     </ThemedView>
                   </ThemedView>
@@ -351,6 +371,11 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: Colors.textSecondary,
+  },
+  summary: {
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: 2,
   },
   historyLink: {
     alignSelf: 'flex-start',
