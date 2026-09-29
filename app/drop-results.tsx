@@ -5,6 +5,7 @@ import { FlatList, Pressable, ScrollView, Share, StyleSheet, TouchableOpacity, u
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
+import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -14,6 +15,7 @@ import {
   guessLine,
   pickHeadline,
   dropStreak,
+  dropToDiscoveryTracks,
   rankByListeners,
   rankLabel,
   shareText,
@@ -108,6 +110,7 @@ export default function DropResultsScreen() {
                   <ThemedText style={styles.count}>{verdict.count} listeners</ThemedText>
                   <ThemedText style={styles.dim}>{verdict.verdict}</ThemedText>
                   <View style={styles.links}>
+                    <LikeButton track={dropToDiscoveryTracks(drop)[position]} />
                     <AppleMusicLink trackId={song.itunesTrackId} />
                     <LastfmLink artist={song.artist} />
                   </View>
@@ -169,7 +172,7 @@ const styles = StyleSheet.create({
   art: { width: '100%', aspectRatio: 1, borderRadius: Radius.md, marginVertical: Spacing.sm },
   dim: { color: Colors.textSecondary },
   count: { fontSize: 32, lineHeight: 38, fontWeight: '800', color: Colors.accent, marginTop: Spacing.sm },
-  links: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.xs },
+  links: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.xs, alignItems: 'center' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginVertical: Spacing.xs },
   tag: { color: Colors.accent, fontWeight: '700' },
   bar: { height: 6, borderRadius: Radius.pill, overflow: 'hidden', marginVertical: 4 },

@@ -11,6 +11,8 @@ import {
   deriveGenresHeard,
   deriveRatedGenres,
   keepDropEntries,
+  likedGenres,
+  filterByGenre,
   pickJumpGenre,
   parseGenreSearchResponse,
   parseArtistLookupResponse,
@@ -499,4 +501,12 @@ test('keepDropEntries puts drop swipes back into an undo snapshot taken before t
   const drop2 = { ...swipe({ trackId: 8, action: 'like', timestamp: 300 }), source: 'drop' as const };
   assert.deepEqual(keepDropEntries([], [feed, drop1, drop2]), [drop1, drop2]);
   assert.deepEqual(keepDropEntries([drop1], [feed, drop1, drop2]), [drop1, drop2]);
+});
+
+test('likedGenres lists genres by how often they appear, and filterByGenre keeps order', () => {
+  const tr = (id: number, g: string) => ({ ...track({ id }), primaryGenreName: g });
+  const liked = [tr(1, 'Jazz'), tr(2, 'Rock'), tr(3, 'Jazz'), tr(4, '')];
+  assert.deepEqual(likedGenres(liked), ['Jazz', 'Rock']);
+  assert.deepEqual(filterByGenre(liked, 'Jazz').map((t) => t.id), [1, 3]);
+  assert.deepEqual(filterByGenre(liked, null).map((t) => t.id), [1, 2, 3, 4]);
 });

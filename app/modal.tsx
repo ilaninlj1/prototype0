@@ -20,7 +20,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
-import { buildSpotifySearchUrl, summarizeFinds, type DiscoveryTrack } from '@/lib/discovery';
+import { buildSpotifySearchUrl, filterByGenre, likedGenres, summarizeFinds, type DiscoveryTrack } from '@/lib/discovery';
 import { appendExportBatch, loadLikedTracks, saveLikedTracks } from '@/lib/discovery-storage';
 
 // react-native-web's Alert.alert is a no-op (confirmed against the installed
@@ -61,6 +61,7 @@ export default function LikedTracksScreen() {
   const [tracks, setTracks] = useState<DiscoveryTrack[]>([]);
   const [playingId, setPlayingId] = useState<number | null>(null);
 
+  const [genre, setGenre] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [fallbackText, setFallbackText] = useState<string | null>(null);
@@ -233,7 +234,8 @@ export default function LikedTracksScreen() {
     );
   }
 
-  const newestFirst = [...tracks].reverse();
+  const genres = likedGenres(tracks);
+  const newestFirst = filterByGenre([...tracks].reverse(), genre && genres.includes(genre) ? genre : null);
   const { best, calledIt } = summarizeFinds(
     tracks.map((t) => ({ artistName: t.artistName, found: t.artistListeners, now: listenersNow[t.artistName] }))
   );
@@ -278,6 +280,23 @@ export default function LikedTracksScreen() {
                   : 'Nothing has doubled yet. Keep digging.'}
               </ThemedText>
             </ThemedView>
+          )}
+
+          {genres.length > 1 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+              {[null, ...genres].map((g) => {
+                const on = g === genre || (g === null && genre === null);
+                return (
+                  <TouchableOpacity key={g ?? 'all'} onPress={() => setGenre(g)} activeOpacity={0.7}>
+                    <ThemedView style={styles.chip} backgroundColor={on ? Colors.accent : Colors.surfaceElevated}>
+                      <ThemedText type="label" style={{ color: on ? Colors.accentText : Colors.textSecondary }}>
+                        {g ?? 'All'}
+                      </ThemedText>
+                    </ThemedView>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           )}
 
           {newestFirst.length === 0 ? (
@@ -376,6 +395,14 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.md,
     gap: 2,
+  },
+  chips: {
+    gap: Spacing.sm,
+  },
+  chip: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.pill,
   },
   historyLink: {
     alignSelf: 'flex-start',

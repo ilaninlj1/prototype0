@@ -44,11 +44,9 @@ test('result wording', () => {
   assert.equal(testShareText(['Country', 'Metal'], 4), 'My Blindspot: said never Country & Metal, liked 4/5 blind 👀');
 });
 
-test('songToTrack gives a stable positive id and keeps the listener count', () => {
-  const s = pool[0];
-  const a = songToTrack(s);
-  assert.equal(a.id, songToTrack({ ...s }).id);
-  assert.ok(a.id > 0);
-  assert.notEqual(a.id, songToTrack(pool[1]).id);
+test('songToTrack uses the real iTunes id and an Apple Music link, and keeps the listener count', () => {
+  const a = songToTrack({ ...pool[0], itunesTrackId: 555 });
+  assert.equal(a.id, 555);
+  assert.equal(a.trackViewUrl, 'https://music.apple.com/us/song/555');
   assert.equal(a.artistListeners, 1000);
 });

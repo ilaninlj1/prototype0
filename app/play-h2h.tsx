@@ -9,6 +9,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useGamePool } from '@/hooks/use-game-pool';
 import { usePlayback } from '@/hooks/use-playback';
+import { songToTrack } from '@/lib/blind-test';
 import { saveBestStreak } from '@/lib/discovery-storage';
 import { challenger, type PoolSong } from '@/lib/game-pool';
 
@@ -92,6 +93,7 @@ export default function HeadToHeadScreen() {
             revealed={revealed}
             correct={i === winner}
             song={s}
+            likeTrack={songToTrack(s)}
             onPress={() => hear(i as 0 | 1)}
           />
         ))}

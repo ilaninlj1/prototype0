@@ -633,3 +633,14 @@ export function keepDropEntries(snapshot: SwipeEntry[], current: SwipeEntry[]): 
   const have = new Set(snapshot.map(key));
   return [...snapshot, ...current.filter((e) => e.source === 'drop' && !have.has(key(e)))];
 }
+
+/** Genres in the Liked list, most common first — the filter chips. */
+export function likedGenres(tracks: DiscoveryTrack[]): string[] {
+  const counts = new Map<string, number>();
+  for (const t of tracks) if (t.primaryGenreName) counts.set(t.primaryGenreName, (counts.get(t.primaryGenreName) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([g]) => g);
+}
+
+export function filterByGenre(tracks: DiscoveryTrack[], genre: string | null): DiscoveryTrack[] {
+  return genre ? tracks.filter((t) => t.primaryGenreName === genre) : tracks;
+}

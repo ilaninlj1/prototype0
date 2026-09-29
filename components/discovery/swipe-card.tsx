@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -62,7 +63,7 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
       <ThemedView style={styles.center} backgroundColor="transparent">
         <Animated.View style={[styles.ring, ringStyle]} />
         <ThemedView style={styles.core} backgroundColor={Colors.accent}>
-          {showPlayIcon && <ThemedText style={styles.playIcon}>▶</ThemedText>}
+          {showPlayIcon && <Ionicons name="play" size={36} color={Colors.accentText} style={styles.playIcon} />}
         </ThemedView>
       </ThemedView>
 
@@ -263,9 +264,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playIcon: {
-    color: Colors.accentText,
-    fontSize: 32,
-    marginLeft: 5, // optical centering
+    marginLeft: 4, // optical centering
   },
   footer: {
     position: 'absolute',

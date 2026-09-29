@@ -1,3 +1,4 @@
+import { appleMusicUrl } from './credits.ts';
 import type { DiscoveryTrack } from './discovery.ts';
 import type { PoolSong } from './game-pool.ts';
 
@@ -68,19 +69,17 @@ export function testShareText(never: string[], neverLiked: number): string {
   return `My Blindspot: said never ${listGenres(never)}, liked ${neverLiked}/${HALF} blind 👀`;
 }
 
-/** A pool song as a swipe card. Pool songs have no iTunes id, so the id is a stable hash of artist + title. */
+/** A pool song as a swipe card, with its real iTunes id and Apple Music link. */
 export function songToTrack(s: PoolSong): DiscoveryTrack {
-  let h = 0;
-  for (const c of `${s.artist}::${s.title}`) h = (h * 31 + c.charCodeAt(0)) | 0;
   return {
-    id: Math.abs(h) || 1,
+    id: s.itunesTrackId,
     trackName: s.title,
     artistId: 0,
     artistName: s.artist,
     artworkUrl100: s.artworkUrl,
     primaryGenreName: s.genre,
     previewUrl: s.previewUrl,
-    trackViewUrl: '',
+    trackViewUrl: appleMusicUrl(s.itunesTrackId),
     collectionName: null,
     artistListeners: s.listeners,
   };

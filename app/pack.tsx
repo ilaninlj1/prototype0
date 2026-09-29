@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CardStack } from '@/components/discovery/card-stack';
 import { computeCardSize, MAX_CARD_HEIGHT, MAX_CARD_WIDTH, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
 import { AppleMusicLink, CreditLine } from '@/components/credits';
+import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -140,7 +141,10 @@ export default function PackScreen() {
             <ThemedText numberOfLines={1} style={styles.dim}>
               {t.artistName} · {liked[i] ? '♥ you liked it' : '✕ you skipped it'}
             </ThemedText>
-            <AppleMusicLink trackId={t.id} url={t.trackViewUrl} />
+            <View style={styles.links}>
+              <LikeButton track={t} size={18} />
+              <AppleMusicLink trackId={t.id} url={t.trackViewUrl} />
+            </View>
           </View>
         </ThemedView>
       ))}
@@ -168,5 +172,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md },
   art: { width: 56, height: 56, borderRadius: Radius.sm },
   info: { flex: 1, gap: 2 },
+  links: { flexDirection: 'row', gap: Spacing.lg, alignItems: 'center' },
   button: { paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl, borderRadius: Radius.pill, alignItems: 'center' },
 });

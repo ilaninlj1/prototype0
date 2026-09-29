@@ -9,6 +9,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useGamePool } from '@/hooks/use-game-pool';
 import { usePlayback } from '@/hooks/use-playback';
+import { songToTrack } from '@/lib/blind-test';
 import { saveBestStreak } from '@/lib/discovery-storage';
 import { spotRound, type PoolSong } from '@/lib/game-pool';
 
@@ -79,6 +80,7 @@ export default function SpotTheStarScreen() {
             revealed={revealed}
             correct={s.listeners >= STAR}
             song={s}
+            likeTrack={songToTrack(s)}
             onPress={() => pick(i)}
           />
         ))}

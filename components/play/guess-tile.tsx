@@ -3,10 +3,11 @@ import { StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, { FlipInEasyY } from 'react-native-reanimated';
 
 import { AppleMusicLink } from '@/components/credits';
+import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { artworkUrl, describeListeners } from '@/lib/discovery';
+import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 
 type Props = {
   label: string;
@@ -16,10 +17,12 @@ type Props = {
   correct?: boolean;
   song?: { title: string; artist: string; artworkUrl: string; listeners: number; itunesTrackId?: number };
   onPress?: () => void;
+  /** When revealed, show a heart to save this song to Liked. */
+  likeTrack?: DiscoveryTrack;
 };
 
 /** A blind numbered tile that flips to show the song and its listener count. */
-export function GuessTile({ label, sub, selected, revealed, correct, song, onPress }: Props) {
+export function GuessTile({ label, sub, selected, revealed, correct, song, onPress, likeTrack }: Props) {
   const border = revealed && correct ? Colors.positive : selected ? Colors.accent : 'transparent';
   return (
     <TouchableOpacity onPress={onPress} disabled={!onPress} activeOpacity={0.8} style={styles.wrap}>
@@ -33,6 +36,7 @@ export function GuessTile({ label, sub, selected, revealed, correct, song, onPre
             <ThemedText type="caption" numberOfLines={1}>{song.artist}</ThemedText>
             <ThemedText style={styles.count}>{describeListeners(song.listeners).count}</ThemedText>
             {song.itunesTrackId != null && <AppleMusicLink trackId={song.itunesTrackId} />}
+            {likeTrack && <LikeButton track={likeTrack} />}
           </ThemedView>
         </Animated.View>
       ) : (

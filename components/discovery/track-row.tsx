@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Linking, StyleSheet, TouchableOpacity } from 'react-native';
 
@@ -92,7 +93,7 @@ export function TrackRow({ track, isPlaying, onTogglePlay, disabled = false, lis
       </ThemedView>
       <TouchableOpacity disabled={disabled} onPress={onTogglePlay} activeOpacity={0.7}>
         <ThemedView style={[styles.playButton, disabled && styles.dimmed]} backgroundColor={Colors.surfaceElevated}>
-          <ThemedText style={styles.playButtonText}>{isPlaying ? '⏸' : '▶'}</ThemedText>
+          <Ionicons name={isPlaying ? 'pause' : 'play'} size={18} color={Colors.text} />
         </ThemedView>
       </TouchableOpacity>
     </ThemedView>
@@ -149,9 +150,5 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  playButtonText: {
-    color: Colors.text,
-    fontSize: 14,
   },
 });

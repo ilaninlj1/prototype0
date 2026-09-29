@@ -22,9 +22,9 @@ export function orderByIds(tracks: DiscoveryTrack[], ids: number[]): DiscoveryTr
   return ids.flatMap((id) => tracks.filter((t) => t.id === id).slice(0, 1));
 }
 
-/** Only real iTunes tracks can be looked up by a friend (Blind Spot Test songs use a local hash id). */
+/** Only real iTunes tracks can be looked up by a friend (early Blind Spot Test likes used a local hash id). */
 export function packable(track: DiscoveryTrack): boolean {
-  return track.id > 0 && track.artistId > 0;
+  return track.id > 0 && (track.artistId > 0 || track.trackViewUrl.startsWith('https://music.apple.com/'));
 }
 
 export function matchLine(from: string, liked: number, total: number): string {

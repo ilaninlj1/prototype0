@@ -19,9 +19,10 @@ test('orderByIds restores the sender order and drops missing tracks', () => {
   assert.deepEqual(orderByIds([t(3), t(1)], [1, 2, 3]).map((x) => x.id), [1, 3]);
 });
 
-test('packable needs a real iTunes track and artist id', () => {
+test('packable needs a real iTunes track: an artist id or an Apple Music link', () => {
   assert.equal(packable(t(12, 34)), true);
-  assert.equal(packable(t(12, 0)), false);
+  assert.equal(packable({ ...t(12, 0), trackViewUrl: 'https://music.apple.com/us/song/12' }), true);
+  assert.equal(packable({ ...t(12, 0), trackViewUrl: '' }), false); // old Blind Spot Test likes used a hash id
 });
 
 test('match wording and share-back text', () => {
