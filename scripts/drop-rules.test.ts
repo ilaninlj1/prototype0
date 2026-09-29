@@ -1,7 +1,7 @@
 // scripts/drop-rules.test.ts
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { addDays, canRedo, daysBetween, distinctGenres, inRankWindow, seedWindow, slotFor } from './drop-rules.ts';
+import { addDays, canRedo, daysBetween, distinctGenres, inRankWindow, isRealArtist, seedWindow, slotFor } from './drop-rules.ts';
 
 test('slotFor uses the spec thresholds', () => {
   assert.equal(slotFor(4_999), 'buried');
@@ -45,4 +45,11 @@ test('distinctGenres rejects a day whose picks share a genre', () => {
   const s = (genre: string) => ({ genre }) as { genre: string };
   assert.equal(distinctGenres([s('Jazz'), s('Rock')]), true);
   assert.equal(distinctGenres([s('Jazz'), s('Jazz')]), false);
+});
+
+test('isRealArtist needs a MusicBrainz id and at least 500 listeners', () => {
+  assert.equal(isRealArtist('b1f0…', 500), true);
+  assert.equal(isRealArtist('b1f0…', 499), false);
+  assert.equal(isRealArtist(null, 50_000), false);
+  assert.equal(isRealArtist(undefined, 50_000), false);
 });

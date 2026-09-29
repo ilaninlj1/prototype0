@@ -7,7 +7,7 @@ import path from 'node:path';
 import type { DropSong, Slot } from '../lib/daily-drop.ts';
 import { todayKey } from '../lib/daily-drop.ts';
 import { fetchArtistListeners, fetchItunesCatalog, fetchTopTracks, intersectByTitle } from '../lib/pool.ts';
-import { addDays, canRedo, daysBetween, distinctGenres, inRankWindow, seedWindow, slotFor, SLOTS } from './drop-rules.ts';
+import { addDays, canRedo, daysBetween, distinctGenres, inRankWindow, isRealArtist, seedWindow, slotFor, SLOTS } from './drop-rules.ts';
 
 const LAST_DAY = '2026-12-31';
 const MAX_TRIES_PER_SLOT = 40;
@@ -20,7 +20,7 @@ const RAW = path.resolve(import.meta.dirname, '../assets/genres-raw.json');
 
 type DayEntry = { number: number; songs: DropSong[]; candidates?: Partial<Record<Slot, DropSong[]>> };
 type DropsFile = { firstDay: string; days: Record<string, DayEntry> };
-type Artist = { name: string; seedListeners: number; itunesArtistId: number; genre: string };
+type Artist = { name: string; seedListeners: number; itunesArtistId: number; genre: string; mbid: string | null };
 
 const args = process.argv.slice(2);
 const flag = (name: string) => {
@@ -39,14 +39,14 @@ function save(file: DropsFile) {
 }
 
 function loadArtists(): Artist[] {
-  const raw = JSON.parse(fs.readFileSync(RAW, 'utf8')) as Record<string, { name: string; listeners: number; itunesArtistId?: number | null }[]>;
+  const raw = JSON.parse(fs.readFileSync(RAW, 'utf8')) as Record<string, { name: string; listeners: number; itunesArtistId?: number | null; mbid?: string }[]>;
   const seen = new Set<string>();
   const out: Artist[] = [];
   for (const [genre, list] of Object.entries(raw)) {
     for (const a of list) {
       if (!a.itunesArtistId || seen.has(a.name)) continue;
       seen.add(a.name);
-      out.push({ name: a.name, seedListeners: a.listeners, itunesArtistId: a.itunesArtistId, genre });
+      out.push({ name: a.name, seedListeners: a.listeners, itunesArtistId: a.itunesArtistId, genre, mbid: a.mbid || null });
     }
   }
   return out;
@@ -84,6 +84,7 @@ async function pickSong(slot: Slot, artists: Artist[], usedArtists: Set<string>,
     if (!freshListeners.has(a.name)) freshListeners.set(a.name, await fetchArtistListeners(a.name));
     const listeners = freshListeners.get(a.name);
     if (listeners == null || slotFor(listeners) !== slot) continue; // cheap mismatch: not a try
+    if (!isRealArtist(a.mbid, listeners)) continue; // human-only guarantee
     tries++;
     usedArtists.add(a.name); // right slot: tried once, never retried
     const ranked = (await fetchTopTracks(a.name).catch(() => [])).filter((t) => inRankWindow(slot, t.rank));
@@ -170,6 +171,24 @@ async function main() {
     file.days[showcase] = { number: numberFor(showcase), songs: [], candidates };
     save(file);
     console.log(`Saved 3 candidates per slot for ${showcase}. Run npm run review-drops, then --choose.`);
+    return;
+  }
+
+  // Re-pick only the future songs that break the human-only rule; days up to
+  // tomorrow are left alone because the app can already see them.
+  if (args.includes('--enforce-real')) {
+    const byName = new Map(artists.map((a) => [a.name, a]));
+    for (const day of Object.keys(file.days).sort()) {
+      if (day <= addDays(today, 1) || file.days[day].songs.length !== 5) continue;
+      const bad = file.days[day].songs.filter((s) => !isRealArtist(byName.get(s.artist)?.mbid, s.listeners));
+      if (bad.length === 0) continue;
+      console.log(`${day}: replacing ${bad.map((s) => `${s.slot} (${s.artist})`).join(', ')}`);
+      const keep = file.days[day].songs.filter((s) => !bad.includes(s));
+      const picked = await pickSongs(1, artists, usedArtistsFor(file, day), keep);
+      file.days[day].songs = shuffled([...keep, ...Object.values(picked).flat()]);
+      save(file);
+    }
+    console.log('Every future day passes the human-only rule.');
     return;
   }
 

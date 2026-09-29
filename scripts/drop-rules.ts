@@ -52,3 +52,10 @@ export function seedWindow(slot: Slot): { min: number; max: number } {
 export function distinctGenres(songs: { genre: string }[]): boolean {
   return new Set(songs.map((s) => s.genre)).size === songs.length;
 }
+
+/** Human-only guarantee: a MusicBrainz id and a listener floor keep junk and AI uploads out of drops. */
+export const MIN_REAL_LISTENERS = 500;
+
+export function isRealArtist(mbid: string | null | undefined, listeners: number): boolean {
+  return !!mbid && listeners >= MIN_REAL_LISTENERS;
+}
