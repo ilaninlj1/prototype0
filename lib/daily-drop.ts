@@ -111,3 +111,17 @@ export function guessLine(drop: Drop, guess: number | undefined, results: GuessR
   const miss = `Nope — it was #${famous + 1}`;
   return pct == null ? miss : `${miss} · ${pct}% of people found it`;
 }
+
+/** The drop's songs from fewest to most listeners — the order results are swiped in. */
+export function rankByListeners(drop: Drop): { song: DropSong; position: number; rank: number }[] {
+  return drop.songs
+    .map((song, position) => ({ song, position }))
+    .sort((a, b) => a.song.listeners - b.song.listeners)
+    .map((x, i) => ({ ...x, rank: i + 1 }));
+}
+
+export function rankLabel(rank: number): string {
+  if (rank === 1) return '#1 · fewest listeners';
+  if (rank === 5) return '#5 · most listeners';
+  return `#${rank}`;
+}

@@ -10,6 +10,8 @@ import {
   todayKey,
   likedDropTracks,
   guessLine,
+  rankByListeners,
+  rankLabel,
   addPending,
   type Drop,
   type DropSong,
@@ -107,4 +109,17 @@ test('shareText adds the guess line when a guess was made', () => {
   const votes = [true, false, true, true, false].map((liked, position) => ({ position, liked }));
   assert.equal(shareText(drop, votes, 1), 'Blindspot Daily #3\n💜🖤💜💜🖤\nLiked 3 blind · 1 under 5K listeners\n🎯 Found the famous one');
   assert.equal(shareText(drop, votes, 0).split('\n')[3], '❌ Missed the famous one');
+});
+
+test('rankByListeners orders fewest to most and keeps drop positions', () => {
+  const ranked = rankByListeners(drop);
+  assert.deepEqual(ranked.map((r) => r.song.artist), ['B', 'T', 'R', 'K', 'F']);
+  assert.deepEqual(ranked.map((r) => r.position), [2, 4, 0, 3, 1]);
+  assert.deepEqual(ranked.map((r) => r.rank), [1, 2, 3, 4, 5]);
+});
+
+test('rankLabel names the ends of the ladder', () => {
+  assert.equal(rankLabel(1), '#1 · fewest listeners');
+  assert.equal(rankLabel(3), '#3');
+  assert.equal(rankLabel(5), '#5 · most listeners');
 });
