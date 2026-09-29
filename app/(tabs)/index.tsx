@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CardStack } from '@/components/discovery/card-stack';
@@ -18,8 +18,7 @@ import { TuneSheet } from '@/components/discovery/tune-sheet';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
-import { useDailyDrop } from '@/hooks/use-daily-drop';
+import { Colors, Spacing } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import {
   deriveGenresHeard,
@@ -119,6 +118,8 @@ export default function HomeScreen() {
   // steering doesn't dismiss the current card (see applySteeringStrategy).
   const cardsSeenSincePresetChangeRef = useRef(0);
 
+  const currentTrack = queue[0];
+
   const genresHeard = useMemo(() => deriveRatedGenres(swipeHistory), [swipeHistory]);
 
   const currentGenre = strategy.type === 'genre' ? strategy.genre : null;
@@ -126,11 +127,6 @@ export default function HomeScreen() {
 
   const { player, status } = usePlayback();
   const [hasEnded, setHasEnded] = useState(false);
-
-  // Today's drop plays before the feed; its cards replace the feed's while active.
-  const daily = useDailyDrop();
-  const [likedFlash, setLikedFlash] = useState(false);
-  const currentTrack = daily.active ? daily.cards[0] : queue[0];
 
   useEffect(() => {
     setHasEnded(false);
@@ -155,6 +151,13 @@ export default function HomeScreen() {
     useCallback(() => {
       return () => player.pause();
     }, [player])
+  );
+
+  // Drop swipes are logged from the Play tab; reload so a feed undo can't overwrite them.
+  useFocusEffect(
+    useCallback(() => {
+      loadSwipeHistory().then(setSwipeHistory);
+    }, [])
   );
 
   useEffect(() => {
@@ -252,7 +255,7 @@ export default function HomeScreen() {
     }
   }
 
-  async function logSwipe(track: DiscoveryTrack, action: SwipeEntry['action'], source?: 'drop') {
+  async function logSwipe(track: DiscoveryTrack, action: SwipeEntry['action']) {
     const isSteer = action === 'steer-artist' || action === 'steer-sound';
     const entry: SwipeEntry = {
       trackId: track.id,
@@ -272,7 +275,6 @@ export default function HomeScreen() {
       preset,
       artistListeners: track.artistListeners,
       trackRank: track.trackRank,
-      ...(source ? { source } : {}),
       ...(isSteer
         ? {}
         : {
@@ -341,7 +343,7 @@ export default function HomeScreen() {
   }
 
   function handleMoreFromArtist() {
-    if (daily.active || !currentTrack) return;
+    if (!currentTrack) return;
     captureUndoSnapshot();
     applySteeringStrategy('artist', {
       type: 'artist',
@@ -351,7 +353,7 @@ export default function HomeScreen() {
   }
 
   function handleMoreLikeSound() {
-    if (daily.active || !currentTrack) return;
+    if (!currentTrack) return;
     captureUndoSnapshot();
     applySteeringStrategy('sound', { type: 'genre', genre: currentTrack.primaryGenreName });
   }
@@ -372,30 +374,6 @@ export default function HomeScreen() {
     const newGenre = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
     const nextSeen = markArtistSeen(track);
     await commitGenreJump(newGenre, nextHistory, nextSeen);
-  }
-
-  async function handleDropSwipe(direction: SwipeDirection, track: DiscoveryTrack) {
-    if (direction === 'down') return;
-    const liked = direction === 'right';
-    await logSwipe(track, liked ? 'like' : 'skip', 'drop');
-    if (liked) {
-      setLikedFlash(true);
-      setTimeout(() => setLikedFlash(false), 600);
-    }
-    if ((await daily.vote(liked)) === 'done') {
-      setUndoSnapshot(null);
-      router.push('/drop-guess');
-    }
-  }
-
-  // Undo inside the drop: take back the vote and its swipe-log entry.
-  async function handleDropUndo() {
-    daily.undo();
-    const i = swipeHistory.findLastIndex((e) => e.source === 'drop');
-    if (i === -1) return;
-    const next = swipeHistory.filter((_, j) => j !== i);
-    setSwipeHistory(next);
-    await saveSwipeHistory(next);
   }
 
   function captureUndoSnapshot() {
@@ -487,54 +465,24 @@ export default function HomeScreen() {
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
       <View style={styles.headerRow}>
-        <UndoButton
-          disabled={daily.active ? !daily.canUndo : !undoSnapshot}
-          onPress={daily.active ? handleDropUndo : handleUndo}
+        <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
+        <GenrePicker
+          curatedGenres={GENRES}
+          discoveredGenres={discoveredGenres}
+          heardGenres={genresHeard}
+          currentGenre={currentGenre}
+          currentLabel={currentLabel}
+          onSelect={handlePickGenre}
+          onExplore={handleExplore}
         />
-        {daily.active ? (
-          <ThemedView style={styles.dropPill} backgroundColor={Colors.accent}>
-            <ThemedText type="label" style={styles.dropPillText}>
-              Daily Drop · {daily.played + 1}/5
-            </ThemedText>
-          </ThemedView>
-        ) : (
-          <ThemedView style={styles.headerRight} backgroundColor="transparent">
-            {daily.finishedToday && (
-              <TouchableOpacity onPress={() => router.push('/drop-results')} activeOpacity={0.7}>
-                <ThemedView style={styles.dropPill} backgroundColor={Colors.surfaceElevated}>
-                  <ThemedText type="label">Today&apos;s drop ✓</ThemedText>
-                </ThemedView>
-              </TouchableOpacity>
-            )}
-            <GenrePicker
-              curatedGenres={GENRES}
-              discoveredGenres={discoveredGenres}
-              heardGenres={genresHeard}
-              currentGenre={currentGenre}
-              currentLabel={currentLabel}
-              onSelect={handlePickGenre}
-              onExplore={handleExplore}
-            />
-          </ThemedView>
-        )}
       </View>
 
       {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
-      {currentTrack || daily.active ? (
+      {currentTrack ? (
         <>
           <View style={styles.cardArea} onLayout={handleCardAreaLayout}>
-            {daily.active ? (
-              <CardStack
-                queue={daily.cards}
-                cardSize={cardSize}
-                onSwipe={handleDropSwipe}
-                onHold={handleCardHold}
-                playing={status.playing}
-                showPlayIcon={showPlayIcon}
-                allowDown={false}
-              />
-            ) : revealTrack ? (
+            {revealTrack ? (
               <RevealCard track={revealTrack} listeners={revealListeners} size={cardSize} onDone={handleRevealDone} />
             ) : (
               <CardStack
@@ -545,13 +493,6 @@ export default function HomeScreen() {
                 playing={status.playing}
                 showPlayIcon={showPlayIcon}
               />
-            )}
-            {likedFlash && (
-              <ThemedView style={styles.likedFlash} backgroundColor="transparent" pointerEvents="none">
-                <ThemedText type="subtitle" style={styles.likedFlashText}>
-                  Liked
-                </ThemedText>
-              </ThemedView>
             )}
           </View>
 
@@ -596,29 +537,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-  },
-  dropPill: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.pill,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    alignItems: 'flex-start',
-  },
-  dropPillText: {
-    color: Colors.accentText,
-  },
-  likedFlash: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  likedFlashText: {
-    color: Colors.positive,
-    fontSize: 32,
-    lineHeight: 36,
   },
   bottomRow: {
     flexDirection: 'row',

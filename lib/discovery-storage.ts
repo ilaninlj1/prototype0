@@ -264,3 +264,13 @@ export const loadDropProgress = () => readJson<DropProgress | null>(DROP_PROGRES
 export const saveDropProgress = (p: DropProgress) => writeJson(DROP_PROGRESS_KEY, p);
 export const loadPendingVotes = () => readJson<DropProgress[]>(PENDING_VOTES_KEY, []);
 export const savePendingVotes = (p: DropProgress[]) => writeJson(PENDING_VOTES_KEY, p);
+
+const BEST_STREAKS_KEY = `${STORAGE_PREFIX}:bestStreaks`;
+export type BestStreaks = { spot: number; h2h: number };
+export const loadBestStreaks = () => readJson<BestStreaks>(BEST_STREAKS_KEY, { spot: 0, h2h: 0 });
+/** Saves `streak` if it beats the stored best; returns the best after saving. */
+export async function saveBestStreak(mode: keyof BestStreaks, streak: number): Promise<number> {
+  const best = await loadBestStreaks();
+  if (streak > best[mode]) await writeJson(BEST_STREAKS_KEY, { ...best, [mode]: streak });
+  return Math.max(best[mode], streak);
+}

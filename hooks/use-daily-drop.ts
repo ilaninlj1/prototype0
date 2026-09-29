@@ -17,6 +17,7 @@ import { fetchDrop } from '@/lib/supabase';
 export function useDailyDrop() {
   const [drop, setDrop] = useState<Drop | null>(null);
   const [votes, setVotes] = useState<DropVote[]>([]);
+  const [guess, setGuess] = useState<number | undefined>(undefined);
   const votesRef = useRef<DropVote[]>([]);
   const loadedDayRef = useRef<string | null>(null);
 
@@ -41,6 +42,7 @@ export function useDailyDrop() {
     loadedDayRef.current = day;
     await saveCachedDrop(d);
     setVotesBoth(progress?.day === day ? progress.votes : []);
+    setGuess(progress?.day === day ? progress.guess : undefined);
     setDrop(d);
   }, []);
 
@@ -53,6 +55,12 @@ export function useDailyDrop() {
       if (state === 'active' && !mid) load();
     });
     return () => sub.remove();
+  }, [load]);
+
+  /** Re-read progress from storage (another screen may have played or guessed). */
+  const refresh = useCallback(async () => {
+    loadedDayRef.current = null;
+    await load();
   }, [load]);
 
   const played = nextDropIndex(votes);
@@ -81,5 +89,20 @@ export function useDailyDrop() {
   }
 
   const finishedToday = !!drop && played === 5 && drop.day === todayKey(new Date());
-  return { active, finishedToday, drop, cards, played, vote, undo, canUndo: active && votes.length > 0 };
+  const likedCount = votes.filter((v) => v.liked).length;
+  const guessRight = !!drop && guess != null && drop.songs[guess]?.slot === 'famous';
+  return {
+    active,
+    finishedToday,
+    drop,
+    cards,
+    played,
+    guess,
+    likedCount,
+    guessRight,
+    refresh,
+    vote,
+    undo,
+    canUndo: active && votes.length > 0,
+  };
 }

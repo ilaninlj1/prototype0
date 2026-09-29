@@ -36,6 +36,9 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Liked Tracks' }} />
             <Stack.Screen name="export-history" options={{ presentation: 'modal', title: 'Export History' }} />
+            <Stack.Screen name="drop-play" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+            <Stack.Screen name="play-spot" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+            <Stack.Screen name="play-h2h" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="drop-guess" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="drop-results" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="spike-test" options={{ presentation: 'modal', title: 'Spike Test' }} />
