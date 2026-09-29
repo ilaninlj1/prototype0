@@ -26,6 +26,9 @@ export function GuessTile({ label, sub, selected, revealed, correct, song, onPre
         <Animated.View entering={FlipInEasyY.springify().damping(14)}>
           <ThemedView style={[styles.tile, { borderColor: border }]} backgroundColor={Colors.surface}>
             <Image source={{ uri: artworkUrl(song.artworkUrl, 300) }} style={styles.art} />
+            <ThemedText type="defaultSemiBold" numberOfLines={2} style={styles.title}>
+              {song.title}
+            </ThemedText>
             <ThemedText type="caption" numberOfLines={1}>{song.artist}</ThemedText>
             <ThemedText style={styles.count}>{describeListeners(song.listeners).count}</ThemedText>
           </ThemedView>
@@ -45,5 +48,6 @@ const styles = StyleSheet.create({
   tile: { aspectRatio: 0.85, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 3, padding: Spacing.sm, gap: 2 },
   label: { fontSize: 36, lineHeight: 40, fontWeight: '800' },
   art: { width: '70%', aspectRatio: 1, borderRadius: Radius.sm, marginBottom: 4 },
+  title: { textAlign: 'center', fontSize: 14, lineHeight: 18 },
   count: { color: Colors.accent, fontWeight: '800', fontSize: 18 },
 });
