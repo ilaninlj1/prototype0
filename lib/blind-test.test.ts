@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { pickTestSongs, scoreTest, songToTrack, testComparison, testHeadline, testShareText, testVerdict } from './blind-test.ts';
+import type { PoolSong } from './game-pool.ts';
+
+const genres = ['Country', 'Metal', 'Jazz', 'Pop', 'Rock', 'House', 'Salsa'];
+const pool: PoolSong[] = genres.flatMap((g) =>
+  Array.from({ length: 6 }, (_, i) => ({ artist: `${g}${i}`, title: `t${i}`, previewUrl: '', artworkUrl: '', listeners: 1000, genre: g }))
+);
+
+test('pickTestSongs deals 5 never + 5 other with distinct artists', () => {
+  for (let k = 0; k < 20; k++) {
+    const items = pickTestSongs(pool, ['Country', 'Metal']);
+    assert.equal(items.length, 10);
+    assert.equal(items.filter((x) => x.isNever).length, 5);
+    assert.ok(items.filter((x) => x.isNever).every((x) => ['Country', 'Metal'].includes(x.song.genre)));
+    assert.ok(items.filter((x) => !x.isNever).every((x) => !['Country', 'Metal'].includes(x.song.genre)));
+    assert.equal(new Set(items.map((x) => x.song.artist)).size, 10);
+  }
+});
+
+test('pickTestSongs spreads the never half across the chosen genres', () => {
+  const items = pickTestSongs(pool, ['Country', 'Metal']).filter((x) => x.isNever);
+  const country = items.filter((x) => x.song.genre === 'Country').length;
+  assert.ok(country === 2 || country === 3);
+});
+
+test('pickTestSongs returns [] when a half cannot be filled', () => {
+  assert.deepEqual(pickTestSongs(pool.filter((s) => s.genre !== 'Country' || s.artist === 'Country0'), ['Country']), []);
+});
+
+test('scoreTest counts likes on each half', () => {
+  const items = pickTestSongs(pool, ['Jazz']);
+  const liked = items.map((x) => x.isNever);
+  assert.deepEqual(scoreTest(items, liked), { neverLiked: 5, otherLiked: 0 });
+});
+
+test('result wording', () => {
+  assert.equal(testHeadline(['Country'], 4), 'You said never Country. You liked 4 of 5 blind.');
+  assert.equal(testHeadline(['Country', 'Metal', 'Jazz'], 1), 'You said never Country, Metal & Jazz. You liked 1 of 5 blind.');
+  assert.equal(testComparison(2), '…and 2 of 5 of everything else.');
+  assert.equal(testVerdict(3, 3), 'Your blind spot is real.');
+  assert.equal(testVerdict(1, 3), 'Fair, your ears agree with you.');
+  assert.equal(testShareText(['Country', 'Metal'], 4), 'My Blindspot: said never Country & Metal, liked 4/5 blind 👀');
+});
+
+test('songToTrack gives a stable positive id and keeps the listener count', () => {
+  const s = pool[0];
+  const a = songToTrack(s);
+  assert.equal(a.id, songToTrack({ ...s }).id);
+  assert.ok(a.id > 0);
+  assert.notEqual(a.id, songToTrack(pool[1]).id);
+  assert.equal(a.artistListeners, 1000);
+});
