@@ -623,3 +623,13 @@ export async function refillQueueWithFallback(
 
   return { queue: currentQueue, fetched, strategy: currentStrategy };
 }
+
+/**
+ * Home's undo restores a snapshot taken before the user may have played the
+ * Daily Drop elsewhere; carry those drop swipes over so undo can't erase them.
+ */
+export function keepDropEntries(snapshot: SwipeEntry[], current: SwipeEntry[]): SwipeEntry[] {
+  const key = (e: SwipeEntry) => `${e.trackId}:${e.timestamp}`;
+  const have = new Set(snapshot.map(key));
+  return [...snapshot, ...current.filter((e) => e.source === 'drop' && !have.has(key(e)))];
+}

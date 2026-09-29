@@ -10,6 +10,7 @@ import {
   deriveVisitedArtistIds,
   deriveGenresHeard,
   deriveRatedGenres,
+  keepDropEntries,
   pickJumpGenre,
   parseGenreSearchResponse,
   parseArtistLookupResponse,
@@ -490,4 +491,12 @@ test('withLikedAt backfills a missing like date from the latest like in swipe hi
   ] as unknown as SwipeEntry[];
   const out = withLikedAt([t(1), t(2), t(3, 50)], history);
   assert.deepEqual(out.map((x) => x.likedAt), [300, undefined, 50]);
+});
+
+test('keepDropEntries puts drop swipes back into an undo snapshot taken before them', () => {
+  const feed = swipe({ trackId: 1, action: 'like', timestamp: 100 });
+  const drop1 = { ...swipe({ trackId: 9, action: 'skip', timestamp: 200 }), source: 'drop' as const };
+  const drop2 = { ...swipe({ trackId: 8, action: 'like', timestamp: 300 }), source: 'drop' as const };
+  assert.deepEqual(keepDropEntries([], [feed, drop1, drop2]), [drop1, drop2]);
+  assert.deepEqual(keepDropEntries([drop1], [feed, drop1, drop2]), [drop1, drop2]);
 });

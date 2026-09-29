@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, ScrollView, Share, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, Share, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -35,7 +35,7 @@ export default function DropResultsScreen() {
   const [guess, setGuess] = useState<number | undefined>(undefined);
   const [guessResults, setGuessResults] = useState<GuessResult[]>([]);
   const [page, setPage] = useState(0);
-  const { player } = usePlayback();
+  const { player, status } = usePlayback();
 
   useEffect(() => {
     (async () => {
@@ -90,6 +90,7 @@ export default function DropResultsScreen() {
           const verdict = describeListeners(song.listeners);
           return (
             <View style={[styles.page, { width }]}>
+              <Pressable style={styles.pressFill} onLongPress={() => (status.playing ? player.pause() : player.play())} delayLongPress={400}>
               <ThemedView style={[styles.card, { width: cardWidth }]} backgroundColor={Colors.surface}>
                 <ScrollView contentContainerStyle={styles.cardBody}>
                   <ThemedText style={styles.rank}>{rankLabel(rank)}</ThemedText>
@@ -113,6 +114,7 @@ export default function DropResultsScreen() {
                   <ThemedText type="caption">{results ? crowdLabel(r) : "Results when you're back online"}</ThemedText>
                 </ScrollView>
               </ThemedView>
+              </Pressable>
             </View>
           );
         }}
@@ -151,6 +153,7 @@ const styles = StyleSheet.create({
   guess: { fontSize: 17, fontWeight: '700', color: Colors.accent },
   pager: { flexGrow: 1, marginVertical: Spacing.md },
   page: { alignItems: 'center' },
+  pressFill: { flex: 1 },
   card: { flex: 1, borderRadius: Radius.lg, overflow: 'hidden' },
   cardBody: { padding: Spacing.lg, gap: Spacing.xs },
   rank: { fontSize: 22, lineHeight: 28, fontWeight: '800', color: Colors.accent },

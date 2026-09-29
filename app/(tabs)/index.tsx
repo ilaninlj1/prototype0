@@ -25,6 +25,7 @@ import {
   deriveRatedGenres,
   extractGenres,
   fetchForStrategy,
+  keepDropEntries,
   mergeDiscoveredGenres,
   pickJumpGenre,
   refillQueueWithFallback,
@@ -437,10 +438,11 @@ export default function HomeScreen() {
     setQueue(snapshot.queue);
     setStrategy(snapshot.strategy);
     setDiscoveredGenres(snapshot.discoveredGenres);
-    setSwipeHistory(snapshot.swipeHistory);
+    const restoredHistory = keepDropEntries(snapshot.swipeHistory, await loadSwipeHistory());
+    setSwipeHistory(restoredHistory);
     setSeenArtists(snapshot.seenArtists);
     await Promise.all([
-      saveSwipeHistory(snapshot.swipeHistory),
+      saveSwipeHistory(restoredHistory),
       saveDiscoveredGenres(snapshot.discoveredGenres),
     ]);
   }
