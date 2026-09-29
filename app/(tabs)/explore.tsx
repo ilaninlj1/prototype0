@@ -1,12 +1,11 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useListenersNow } from '@/hooks/use-listeners-now';
-import { todayKey, type Drop, type DropVote } from '@/lib/daily-drop';
 import {
   describeGrowth,
   describeListeners,
@@ -15,7 +14,7 @@ import {
   type DiscoveryTrack,
   type SwipeEntry,
 } from '@/lib/discovery';
-import { loadCachedDrop, loadDropProgress, loadLikedTracks, loadSwipeHistory } from '@/lib/discovery-storage';
+import { loadBestStreaks, loadLikedTracks, loadSwipeHistory, type BestStreaks } from '@/lib/discovery-storage';
 
 const fmt = (n: number) => describeListeners(n).count;
 
@@ -30,23 +29,15 @@ export default function ProfileScreen() {
   const [loaded, setLoaded] = useState(false);
   const [finds, setFinds] = useState<DiscoveryTrack[]>([]);
   const [history, setHistory] = useState<SwipeEntry[]>([]);
-  const [todayDrop, setTodayDrop] = useState<{ drop: Drop; votes: DropVote[] } | null>(null);
-  const router = useRouter();
+  const [best, setBest] = useState<BestStreaks>({ spot: 0, h2h: 0 });
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const [liked, h, drop, progress] = await Promise.all([
-          loadLikedTracks(),
-          loadSwipeHistory(),
-          loadCachedDrop(),
-          loadDropProgress(),
-        ]);
+        const [liked, h, streaks] = await Promise.all([loadLikedTracks(), loadSwipeHistory(), loadBestStreaks()]);
         if (cancelled) return;
-        const finishedToday =
-          drop && drop.day === todayKey(new Date()) && progress?.day === drop.day && progress.votes.length === 5;
-        setTodayDrop(finishedToday ? { drop, votes: progress.votes } : null);
+        setBest(streaks);
         setFinds(withLikedAt(liked, h));
         setHistory(h);
         setLoaded(true);
@@ -79,14 +70,6 @@ export default function ProfileScreen() {
       <ThemedView style={styles.container}>
         <ThemedText type="title">Your ears</ThemedText>
 
-        {todayDrop && (
-          <TouchableOpacity onPress={() => router.push('/drop-results')}>
-            <ThemedText type="link">
-              Today&apos;s drop: liked {todayDrop.votes.filter((v) => v.liked).length}/5 · see results
-            </ThemedText>
-          </TouchableOpacity>
-        )}
-
         {finds.length === 0 ? (
           <ThemedText style={styles.dim}>Nothing found yet. Like a song blind and it shows up here.</ThemedText>
         ) : (
@@ -97,6 +80,12 @@ export default function ProfileScreen() {
                 songs found blind{heard > 0 ? `, out of ${heard} you heard` : ''}.
               </ThemedText>
             </ThemedView>
+
+            {(best.spot > 0 || best.h2h > 0) && (
+              <ThemedText style={styles.dim}>
+                Best streaks: Spot the Star {best.spot} · Head to Head {best.h2h}
+              </ThemedText>
+            )}
 
             {summary.medianFound != null && (
               <ThemedText style={styles.line}>
