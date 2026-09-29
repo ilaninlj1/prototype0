@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import type { Drop, DropVote } from './daily-drop';
 import type { DiscoveryTrack, Region, SwipeEntry } from './discovery';
 import type { PresetId } from './pool-types';
 
@@ -107,6 +108,7 @@ export async function loadLikedTracks(): Promise<DiscoveryTrack[]> {
 export async function appendLikedTrack(track: DiscoveryTrack): Promise<void> {
   try {
     const existing = await loadLikedTracks();
+    if (existing.some((t) => t.id === track.id)) return;
     existing.push(track);
     await AsyncStorage.setItem(LIKED_TRACKS_KEY, JSON.stringify(existing));
   } catch {
@@ -218,3 +220,47 @@ export async function saveListenersNow(cache: ListenersNow): Promise<void> {
     // ignore
   }
 }
+
+// ---------- Daily Drop ----------
+
+const DEVICE_ID_KEY = `${STORAGE_PREFIX}:deviceId`;
+const CACHED_DROP_KEY = `${STORAGE_PREFIX}:cachedDrop`;
+const DROP_PROGRESS_KEY = `${STORAGE_PREFIX}:dropProgress`;
+const PENDING_VOTES_KEY = `${STORAGE_PREFIX}:pendingVotes`;
+
+export type DropProgress = { day: string; votes: DropVote[] };
+
+async function readJson<T>(key: string, fallback: T): Promise<T> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+async function writeJson(key: string, value: unknown): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
+
+/** A random v4 UUID, made once per install — one vote per phone per song. */
+export async function loadDeviceId(): Promise<string> {
+  const existing = await readJson<string | null>(DEVICE_ID_KEY, null);
+  if (existing) return existing;
+  const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+  await writeJson(DEVICE_ID_KEY, id);
+  return id;
+}
+
+export const loadCachedDrop = () => readJson<Drop | null>(CACHED_DROP_KEY, null);
+export const saveCachedDrop = (d: Drop) => writeJson(CACHED_DROP_KEY, d);
+export const loadDropProgress = () => readJson<DropProgress | null>(DROP_PROGRESS_KEY, null);
+export const saveDropProgress = (p: DropProgress) => writeJson(DROP_PROGRESS_KEY, p);
+export const loadPendingVotes = () => readJson<DropProgress[]>(PENDING_VOTES_KEY, []);
+export const savePendingVotes = (p: DropProgress[]) => writeJson(PENDING_VOTES_KEY, p);
