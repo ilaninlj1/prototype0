@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import {
-  addPending,
   dropToDiscoveryTracks,
   likedDropTracks,
   nextDropIndex,
@@ -10,43 +9,9 @@ import {
   type Drop,
   type DropVote,
 } from '@/lib/daily-drop';
-import {
-  appendLikedTrack,
-  loadCachedDrop,
-  loadDeviceId,
-  loadDropProgress,
-  loadPendingVotes,
-  saveCachedDrop,
-  saveDropProgress,
-  savePendingVotes,
-  type DropProgress,
-} from '@/lib/discovery-storage';
-import { fetchDrop, sendVotes } from '@/lib/supabase';
-
-const SEND_WAIT_MS = 4_000;
-
-// One flush at a time, app-wide, so two flushes can't overwrite each other's
-// pending list. Votes are queued BEFORE sending and removed only once settled,
-// so a kill mid-request leaves them queued for the next launch.
-let flushing: Promise<void> = Promise.resolve();
-
-function flushPending(entry?: DropProgress): Promise<void> {
-  flushing = flushing.then(async () => {
-    const deviceId = await loadDeviceId();
-    let pending = await loadPendingVotes();
-    if (entry) {
-      pending = addPending(pending, entry);
-      await savePendingVotes(pending);
-    }
-    for (const p of pending) {
-      if (await sendVotes(p.day, deviceId, p.votes)) {
-        pending = pending.filter((x) => x.day !== p.day);
-        await savePendingVotes(pending);
-      }
-    }
-  });
-  return flushing;
-}
+import { appendLikedTrack, loadCachedDrop, loadDropProgress, saveCachedDrop, saveDropProgress } from '@/lib/discovery-storage';
+import { flushPending, flushPendingBriefly } from '@/lib/drop-sync';
+import { fetchDrop } from '@/lib/supabase';
 
 /** Today's drop: resumes mid-drop, reloads when a new day starts, sends votes when finished. */
 export function useDailyDrop() {
@@ -102,8 +67,8 @@ export function useDailyDrop() {
     await saveDropProgress({ day: drop.day, votes: next });
     if (next.length < 5) return 'more';
     for (const t of likedDropTracks(drop, next, Date.now())) await appendLikedTrack(t);
-    // Give the send a moment so the results include your own votes.
-    await Promise.race([flushPending({ day: drop.day, votes: next }), new Promise((r) => setTimeout(r, SEND_WAIT_MS))]);
+    // Votes go now; the guess follows from the guess screen.
+    flushPendingBriefly({ day: drop.day, votes: next });
     return 'done';
   }
 
@@ -115,5 +80,6 @@ export function useDailyDrop() {
     saveDropProgress({ day: drop.day, votes: next });
   }
 
-  return { active, drop, cards, played, vote, undo, canUndo: active && votes.length > 0 };
+  const finishedToday = !!drop && played === 5 && drop.day === todayKey(new Date());
+  return { active, finishedToday, drop, cards, played, vote, undo, canUndo: active && votes.length > 0 };
 }

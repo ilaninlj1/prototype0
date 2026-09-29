@@ -228,7 +228,7 @@ const CACHED_DROP_KEY = `${STORAGE_PREFIX}:cachedDrop`;
 const DROP_PROGRESS_KEY = `${STORAGE_PREFIX}:dropProgress`;
 const PENDING_VOTES_KEY = `${STORAGE_PREFIX}:pendingVotes`;
 
-export type DropProgress = { day: string; votes: DropVote[] };
+export type DropProgress = { day: string; votes: DropVote[]; guess?: number };
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {

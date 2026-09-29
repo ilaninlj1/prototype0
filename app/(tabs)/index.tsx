@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CardStack } from '@/components/discovery/card-stack';
@@ -384,7 +384,7 @@ export default function HomeScreen() {
     }
     if ((await daily.vote(liked)) === 'done') {
       setUndoSnapshot(null);
-      router.push('/drop-results');
+      router.push('/drop-guess');
     }
   }
 
@@ -498,15 +498,24 @@ export default function HomeScreen() {
             </ThemedText>
           </ThemedView>
         ) : (
-          <GenrePicker
-            curatedGenres={GENRES}
-            discoveredGenres={discoveredGenres}
-            heardGenres={genresHeard}
-            currentGenre={currentGenre}
-            currentLabel={currentLabel}
-            onSelect={handlePickGenre}
-            onExplore={handleExplore}
-          />
+          <ThemedView style={styles.headerRight} backgroundColor="transparent">
+            {daily.finishedToday && (
+              <TouchableOpacity onPress={() => router.push('/drop-results')} activeOpacity={0.7}>
+                <ThemedView style={styles.dropPill} backgroundColor={Colors.surfaceElevated}>
+                  <ThemedText type="label">Today&apos;s drop ✓</ThemedText>
+                </ThemedView>
+              </TouchableOpacity>
+            )}
+            <GenrePicker
+              curatedGenres={GENRES}
+              discoveredGenres={discoveredGenres}
+              heardGenres={genresHeard}
+              currentGenre={currentGenre}
+              currentLabel={currentLabel}
+              onSelect={handlePickGenre}
+              onExplore={handleExplore}
+            />
+          </ThemedView>
         )}
       </View>
 
@@ -592,6 +601,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     borderRadius: Radius.pill,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    alignItems: 'flex-start',
   },
   dropPillText: {
     color: Colors.accentText,

@@ -1,7 +1,7 @@
 // Supabase over plain REST (PostgREST) — no client library. The anon key is
 // safe to ship: row-level security (supabase/setup.sql) only allows reading
 // current drops and the vote counts view, and inserting votes.
-import type { Drop, DropVote, SongResult } from './daily-drop';
+import type { Drop, DropVote, GuessResult, SongResult } from './daily-drop';
 
 const URL_ROOT = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -44,6 +44,30 @@ export async function fetchResults(day: string): Promise<SongResult[] | null> {
   try {
     const res = await fetch(`${URL_ROOT}/rest/v1/drop_results?day=eq.${day}&select=position,voters,likes`, { headers: headers() });
     return res.ok ? ((await res.json()) as SongResult[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function sendGuess(day: string, deviceId: string, position: number): Promise<boolean> {
+  if (!URL_ROOT || !KEY) return false;
+  try {
+    const res = await fetch(`${URL_ROOT}/rest/v1/guesses`, {
+      method: 'POST',
+      headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify({ day, device_id: deviceId, position }),
+    });
+    return res.status < 500; // same settling rule as sendVotes
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchGuessResults(day: string): Promise<GuessResult[] | null> {
+  if (!URL_ROOT || !KEY) return null;
+  try {
+    const res = await fetch(`${URL_ROOT}/rest/v1/guess_results?day=eq.${day}&select=position,count`, { headers: headers() });
+    return res.ok ? ((await res.json()) as GuessResult[]) : null;
   } catch {
     return null;
   }

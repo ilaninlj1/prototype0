@@ -9,6 +9,7 @@ import {
   shareText,
   todayKey,
   likedDropTracks,
+  guessLine,
   addPending,
   type Drop,
   type DropSong,
@@ -89,4 +90,21 @@ test('addPending replaces an entry for the same day instead of duplicating it', 
   const b = { day: '2026-10-01', votes: [{ position: 0, liked: false }] };
   const c = { day: '2026-10-02', votes: [] };
   assert.deepEqual(addPending([a, c], b), [c, b]);
+});
+
+test('guessLine: right or wrong, with the share of people who found it', () => {
+  const guesses = [
+    { position: 1, count: 3 },
+    { position: 0, count: 5 },
+  ];
+  assert.equal(guessLine(drop, 1, guesses), 'You found the famous one ✓ · 38% of people did');
+  assert.equal(guessLine(drop, 0, guesses), 'Nope — it was #2 · 38% of people found it');
+  assert.equal(guessLine(drop, 1, []), 'You found the famous one ✓');
+  assert.equal(guessLine(drop, undefined, guesses), null);
+});
+
+test('shareText adds the guess line when a guess was made', () => {
+  const votes = [true, false, true, true, false].map((liked, position) => ({ position, liked }));
+  assert.equal(shareText(drop, votes, 1), 'Blindspot Daily #3\n💜🖤💜💜🖤\nLiked 3 blind · 1 under 5K listeners\n🎯 Found the famous one');
+  assert.equal(shareText(drop, votes, 0).split('\n')[3], '❌ Missed the famous one');
 });

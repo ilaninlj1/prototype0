@@ -15,6 +15,7 @@ export type DropSong = {
 export type Drop = { day: string; number: number; songs: DropSong[] };
 export type DropVote = { position: number; liked: boolean };
 export type SongResult = { position: number; voters: number; likes: number };
+export type GuessResult = { position: number; count: number };
 
 const CROWD_PERCENT_FROM = 20;
 const LONELY_MAX_SHARE = 0.25;
@@ -56,13 +57,15 @@ export function pickHeadline(drop: Drop, votes: DropVote[], results: SongResult[
   return `You skipped a song with ${count} listeners — so did ${skipped}% of people.`;
 }
 
-export function shareText(drop: Drop, votes: DropVote[]): string {
+export function shareText(drop: Drop, votes: DropVote[], guess?: number): string {
   const ordered = [...votes].sort((a, b) => a.position - b.position);
   const grid = ordered.map((v) => (v.liked ? '💜' : '🖤')).join('');
   const liked = ordered.filter((v) => v.liked);
   const buried = liked.filter((v) => drop.songs[v.position].listeners < 5_000).length;
   const tail = buried > 0 ? ` · ${buried} under 5K listeners` : '';
-  return `Blindspot Daily #${drop.number}\n${grid}\nLiked ${liked.length} blind${tail}`;
+  const text = `Blindspot Daily #${drop.number}\n${grid}\nLiked ${liked.length} blind${tail}`;
+  if (guess == null) return text;
+  return `${text}\n${guess === famousPosition(drop) ? '🎯 Found the famous one' : '❌ Missed the famous one'}`;
 }
 
 export function dropToDiscoveryTracks(drop: Drop): DiscoveryTrack[] {
@@ -86,9 +89,25 @@ export function likedDropTracks(drop: Drop, votes: DropVote[], likedAt: number):
   return votes.filter((v) => v.liked).map((v) => ({ ...tracks[v.position], likedAt }));
 }
 
-export type PendingVotes = { day: string; votes: DropVote[] };
+export type PendingVotes = { day: string; votes: DropVote[]; guess?: number };
 
 /** Queue a day's votes for sending; a newer entry for the same day replaces the old one. */
 export function addPending(pending: PendingVotes[], entry: PendingVotes): PendingVotes[] {
   return [...pending.filter((p) => p.day !== entry.day), entry];
+}
+
+function famousPosition(drop: Drop): number {
+  return drop.songs.findIndex((s) => s.slot === 'famous');
+}
+
+/** The guess result line: whether you picked the famous song, and how many people did. Null before a guess. */
+export function guessLine(drop: Drop, guess: number | undefined, results: GuessResult[]): string | null {
+  if (guess == null) return null;
+  const famous = famousPosition(drop);
+  const total = results.reduce((n, r) => n + r.count, 0);
+  const right = results.find((r) => r.position === famous)?.count ?? 0;
+  const pct = total > 0 ? Math.round((right / total) * 100) : null;
+  if (guess === famous) return pct == null ? 'You found the famous one ✓' : `You found the famous one ✓ · ${pct}% of people did`;
+  const miss = `Nope — it was #${famous + 1}`;
+  return pct == null ? miss : `${miss} · ${pct}% of people found it`;
 }
