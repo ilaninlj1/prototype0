@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import {
+  dropStreak,
   dropToDiscoveryTracks,
   likedDropTracks,
   nextDropIndex,
@@ -9,7 +10,15 @@ import {
   type Drop,
   type DropVote,
 } from '@/lib/daily-drop';
-import { appendLikedTrack, loadCachedDrop, loadDropProgress, saveCachedDrop, saveDropProgress } from '@/lib/discovery-storage';
+import {
+  addFinishedDay,
+  appendLikedTrack,
+  loadCachedDrop,
+  loadDropProgress,
+  loadFinishedDays,
+  saveCachedDrop,
+  saveDropProgress,
+} from '@/lib/discovery-storage';
 import { flushPending, flushPendingBriefly } from '@/lib/drop-sync';
 import { fetchDrop } from '@/lib/supabase';
 
@@ -18,6 +27,7 @@ export function useDailyDrop() {
   const [drop, setDrop] = useState<Drop | null>(null);
   const [votes, setVotes] = useState<DropVote[]>([]);
   const [guess, setGuess] = useState<number | undefined>(undefined);
+  const [finishedDays, setFinishedDays] = useState<string[]>([]);
   const votesRef = useRef<DropVote[]>([]);
   const loadedDayRef = useRef<string | null>(null);
 
@@ -29,6 +39,8 @@ export function useDailyDrop() {
   const load = useCallback(async () => {
     flushPending();
     const progress = await loadDropProgress();
+    // A drop finished before streaks existed still counts.
+    setFinishedDays(progress && progress.votes.length === 5 ? await addFinishedDay(progress.day) : await loadFinishedDays());
     // A drop in progress keeps its own day across midnight, but only
     // yesterday's — an older unfinished drop is a missed day.
     const today = todayKey(new Date());
@@ -75,6 +87,7 @@ export function useDailyDrop() {
     await saveDropProgress({ day: drop.day, votes: next });
     if (next.length < 5) return 'more';
     for (const t of likedDropTracks(drop, next, Date.now())) await appendLikedTrack(t);
+    setFinishedDays(await addFinishedDay(drop.day));
     // Votes go now; the guess follows from the guess screen.
     flushPendingBriefly({ day: drop.day, votes: next });
     return 'done';
@@ -100,6 +113,7 @@ export function useDailyDrop() {
     guess,
     likedCount,
     guessRight,
+    streak: dropStreak(finishedDays, todayKey(new Date())),
     refresh,
     vote,
     undo,

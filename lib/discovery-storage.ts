@@ -274,3 +274,14 @@ export async function saveBestStreak(mode: keyof BestStreaks, streak: number): P
   if (streak > best[mode]) await writeJson(BEST_STREAKS_KEY, { ...best, [mode]: streak });
   return Math.max(best[mode], streak);
 }
+
+// Days whose Daily Drop was finished (all 5 swipes) — the streak is derived from this.
+const FINISHED_DAYS_KEY = `${STORAGE_PREFIX}:finishedDropDays`;
+export const loadFinishedDays = () => readJson<string[]>(FINISHED_DAYS_KEY, []);
+export async function addFinishedDay(day: string): Promise<string[]> {
+  const days = await loadFinishedDays();
+  if (days.includes(day)) return days;
+  const next = [...days, day];
+  await writeJson(FINISHED_DAYS_KEY, next);
+  return next;
+}

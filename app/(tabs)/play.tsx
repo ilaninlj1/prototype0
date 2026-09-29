@@ -48,7 +48,12 @@ export default function PlayScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <ThemedText type="title">Play</ThemedText>
-      <Entry title={d ? `Daily Drop #${d.number}` : 'Daily Drop'} line={dropLine} onPress={dropGo} />
+      <Entry
+        title={d ? `Daily Drop #${d.number}` : 'Daily Drop'}
+        line={dropLine}
+        detail={daily.streak > 0 ? `🔥 ${daily.streak} day streak` : undefined}
+        onPress={dropGo}
+      />
       <Entry
         title="Spot the Star"
         line="Find the one with 1M+ listeners"

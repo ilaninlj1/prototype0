@@ -12,6 +12,7 @@ import {
   crowdLabel,
   guessLine,
   pickHeadline,
+  dropStreak,
   rankByListeners,
   rankLabel,
   shareText,
@@ -21,7 +22,7 @@ import {
   type SongResult,
 } from '@/lib/daily-drop';
 import { artworkUrl, describeListeners } from '@/lib/discovery';
-import { loadCachedDrop, loadDropProgress } from '@/lib/discovery-storage';
+import { loadCachedDrop, loadDropProgress, loadFinishedDays } from '@/lib/discovery-storage';
 import { fetchGuessResults, fetchResults } from '@/lib/supabase';
 
 /** The drop's five songs as full cards, swiped from fewest to most listeners. */
@@ -35,6 +36,7 @@ export default function DropResultsScreen() {
   const [guess, setGuess] = useState<number | undefined>(undefined);
   const [guessResults, setGuessResults] = useState<GuessResult[]>([]);
   const [page, setPage] = useState(0);
+  const [streak, setStreak] = useState(0);
   const { player, status } = usePlayback();
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function DropResultsScreen() {
       setDrop(d);
       setVotes(p.votes);
       setGuess(p.guess);
+      setStreak(dropStreak(await loadFinishedDays(), d.day));
       const [r, g] = await Promise.all([fetchResults(d.day), fetchGuessResults(d.day)]);
       setResults(r);
       setGuessResults(g ?? []);
@@ -130,7 +133,7 @@ export default function DropResultsScreen() {
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.action} onPress={() => Share.share({ message: shareText(drop, votes, guess) }).catch(() => {})}>
+        <TouchableOpacity style={styles.action} onPress={() => Share.share({ message: shareText(drop, votes, guess, streak) }).catch(() => {})}>
           <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
             <ThemedText type="label">Share</ThemedText>
           </ThemedView>

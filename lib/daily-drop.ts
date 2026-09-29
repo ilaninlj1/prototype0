@@ -57,15 +57,16 @@ export function pickHeadline(drop: Drop, votes: DropVote[], results: SongResult[
   return `You skipped a song with ${count} listeners — so did ${skipped}% of people.`;
 }
 
-export function shareText(drop: Drop, votes: DropVote[], guess?: number): string {
+export function shareText(drop: Drop, votes: DropVote[], guess?: number, streak = 0): string {
   const ordered = [...votes].sort((a, b) => a.position - b.position);
   const grid = ordered.map((v) => (v.liked ? '💜' : '🖤')).join('');
   const liked = ordered.filter((v) => v.liked);
   const buried = liked.filter((v) => drop.songs[v.position].listeners < 5_000).length;
   const tail = buried > 0 ? ` · ${buried} under 5K listeners` : '';
-  const text = `Blindspot Daily #${drop.number}\n${grid}\nLiked ${liked.length} blind${tail}`;
-  if (guess == null) return text;
-  return `${text}\n${guess === famousPosition(drop) ? '🎯 Found the famous one' : '❌ Missed the famous one'}`;
+  const lines = [`Blindspot Daily #${drop.number}`, grid, `Liked ${liked.length} blind${tail}`];
+  if (guess != null) lines.push(guess === famousPosition(drop) ? '🎯 Found the famous one' : '❌ Missed the famous one');
+  if (streak >= 2) lines.push(`🔥 ${streak}-day streak`);
+  return lines.join('\n');
 }
 
 export function dropToDiscoveryTracks(drop: Drop): DiscoveryTrack[] {
@@ -124,4 +125,21 @@ export function rankLabel(rank: number): string {
   if (rank === 1) return '#1 · fewest listeners';
   if (rank === 5) return '#5 · most listeners';
   return `#${rank}`;
+}
+
+function previousDay(day: string): string {
+  const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10)) - 86_400_000);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Days in a row with a finished drop, ending today — or yesterday, while today is still unplayed. */
+export function dropStreak(finishedDays: string[], today: string): number {
+  const done = new Set(finishedDays);
+  let day = done.has(today) ? today : previousDay(today);
+  let n = 0;
+  while (done.has(day)) {
+    n++;
+    day = previousDay(day);
+  }
+  return n;
 }

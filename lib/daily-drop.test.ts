@@ -10,6 +10,7 @@ import {
   todayKey,
   likedDropTracks,
   guessLine,
+  dropStreak,
   rankByListeners,
   rankLabel,
   addPending,
@@ -122,4 +123,19 @@ test('rankLabel names the ends of the ladder', () => {
   assert.equal(rankLabel(1), '#1 · fewest listeners');
   assert.equal(rankLabel(3), '#3');
   assert.equal(rankLabel(5), '#5 · most listeners');
+});
+
+test('dropStreak counts consecutive finished days ending today, or yesterday if today is not played', () => {
+  assert.equal(dropStreak([], '2026-10-05'), 0);
+  assert.equal(dropStreak(['2026-10-03', '2026-10-04', '2026-10-05'], '2026-10-05'), 3);
+  assert.equal(dropStreak(['2026-10-03', '2026-10-04'], '2026-10-05'), 2);
+  assert.equal(dropStreak(['2026-10-01', '2026-10-03', '2026-10-04'], '2026-10-04'), 2);
+  assert.equal(dropStreak(['2026-10-02'], '2026-10-05'), 0);
+  assert.equal(dropStreak(['2026-09-30', '2026-10-01'], '2026-10-01'), 2);
+});
+
+test('shareText adds a streak line from 2 days', () => {
+  const votes = [true, false, true, true, false].map((liked, position) => ({ position, liked }));
+  assert.equal(shareText(drop, votes, 1, 4).split('\n').at(-1), '🔥 4-day streak');
+  assert.equal(shareText(drop, votes, 1, 1).includes('streak'), false);
 });
