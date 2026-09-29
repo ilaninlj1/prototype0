@@ -291,3 +291,8 @@ const BLIND_TEST_KEY = `${STORAGE_PREFIX}:blindTest`;
 export type BlindTestResult = { never: string[]; neverLiked: number; otherLiked: number; at: number };
 export const loadBlindTest = () => readJson<BlindTestResult | null>(BLIND_TEST_KEY, null);
 export const saveBlindTest = (r: BlindTestResult) => writeJson(BLIND_TEST_KEY, r);
+
+// Name shown to friends on Blind Pack links.
+const SENDER_NAME_KEY = `${STORAGE_PREFIX}:senderName`;
+export const loadSenderName = () => readJson<string>(SENDER_NAME_KEY, '');
+export const saveSenderName = (name: string) => writeJson(SENDER_NAME_KEY, name);

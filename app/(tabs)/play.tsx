@@ -63,6 +63,11 @@ export default function PlayScreen() {
         onPress={() => router.push('/blind-test')}
       />
       <Entry
+        title="Blind Pack"
+        line="Send 5 of your finds to a friend — they hear them blind"
+        onPress={() => router.push('/pack-send')}
+      />
+      <Entry
         title="Spot the Star"
         line="Find the one with 1M+ listeners"
         detail={best.spot > 0 ? `Best streak ${best.spot}` : undefined}

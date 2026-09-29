@@ -1,13 +1,15 @@
 import * as Notifications from 'expo-notifications';
-import { router, Stack } from 'expo-router';
+import { router, Stack, usePathname } from 'expo-router';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { DarkTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
-import { Colors } from '@/constants/theme';
+import { CreditLine } from '@/components/credits';
+import { ThemedText } from '@/components/themed-text';
+import { Colors, Spacing } from '@/constants/theme';
 import { PlaybackProvider } from '@/hooks/use-playback';
 
 export const unstable_settings = {
@@ -47,6 +49,21 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
+  // The public website only serves Blind Pack links. Every other screen uses
+  // Last.fm, whose terms need written approval for public web pages.
+  const pathname = usePathname();
+  if (Platform.OS === 'web' && !pathname.startsWith('/pack')) {
+    return (
+      <View style={styles.webLanding}>
+        <ThemedText type="title">Blindspot</ThemedText>
+        <ThemedText style={styles.webText}>
+          Blindspot is a phone app for finding music blind. Got a Blind Pack link from a friend? Open it to play here.
+        </ThemedText>
+        <CreditLine lastfm={false} />
+      </View>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: Colors.background }}>
       <ThemeProvider value={customTheme}>
@@ -60,6 +77,8 @@ export default function RootLayout() {
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Liked Tracks' }} />
             <Stack.Screen name="export-history" options={{ presentation: 'modal', title: 'Export History' }} />
             <Stack.Screen name="drop-play" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+            <Stack.Screen name="pack-send" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+            <Stack.Screen name="pack" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="blind-test" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="play-spot" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="play-h2h" options={{ presentation: 'fullScreenModal', headerShown: false }} />
@@ -73,3 +92,15 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  webLanding: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+    gap: Spacing.lg,
+  },
+  webText: { color: Colors.textSecondary, textAlign: 'center', maxWidth: 420 },
+});
