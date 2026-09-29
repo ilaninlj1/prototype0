@@ -381,12 +381,21 @@ export default function HomeScreen() {
     if (liked) {
       setLikedFlash(true);
       setTimeout(() => setLikedFlash(false), 600);
-      await appendLikedTrack({ ...track, likedAt: Date.now() });
     }
     if ((await daily.vote(liked)) === 'done') {
       setUndoSnapshot(null);
       router.push('/drop-results');
     }
+  }
+
+  // Undo inside the drop: take back the vote and its swipe-log entry.
+  async function handleDropUndo() {
+    daily.undo();
+    const i = swipeHistory.findLastIndex((e) => e.source === 'drop');
+    if (i === -1) return;
+    const next = swipeHistory.filter((_, j) => j !== i);
+    setSwipeHistory(next);
+    await saveSwipeHistory(next);
   }
 
   function captureUndoSnapshot() {
@@ -480,7 +489,7 @@ export default function HomeScreen() {
       <View style={styles.headerRow}>
         <UndoButton
           disabled={daily.active ? !daily.canUndo : !undoSnapshot}
-          onPress={daily.active ? daily.undo : handleUndo}
+          onPress={daily.active ? handleDropUndo : handleUndo}
         />
         {daily.active ? (
           <ThemedView style={styles.dropPill} backgroundColor={Colors.accent}>

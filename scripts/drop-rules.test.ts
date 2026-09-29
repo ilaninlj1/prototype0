@@ -1,7 +1,7 @@
 // scripts/drop-rules.test.ts
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { addDays, canRedo, daysBetween, inRankWindow, slotFor } from './drop-rules.ts';
+import { addDays, canRedo, daysBetween, distinctGenres, inRankWindow, seedWindow, slotFor } from './drop-rules.ts';
 
 test('slotFor uses the spec thresholds', () => {
   assert.equal(slotFor(4_999), 'buried');
@@ -32,4 +32,17 @@ test('canRedo refuses today and the past', () => {
   assert.equal(canRedo('2026-10-01', '2026-10-01'), false);
   assert.equal(canRedo('2026-09-30', '2026-10-01'), false);
   assert.equal(canRedo('2026-10-02', '2026-10-01'), true);
+});
+
+test('seedWindow widens each slot so a seed count that drifted still gets checked', () => {
+  assert.equal(seedWindow('known').min <= 60_000, true);
+  assert.equal(seedWindow('known').max >= 1_500_000, true);
+  assert.equal(seedWindow('buried').min, 0);
+  assert.equal(seedWindow('famous').max, Infinity);
+});
+
+test('distinctGenres rejects a day whose picks share a genre', () => {
+  const s = (genre: string) => ({ genre }) as { genre: string };
+  assert.equal(distinctGenres([s('Jazz'), s('Rock')]), true);
+  assert.equal(distinctGenres([s('Jazz'), s('Jazz')]), false);
 });

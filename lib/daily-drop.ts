@@ -79,3 +79,16 @@ export function dropToDiscoveryTracks(drop: Drop): DiscoveryTrack[] {
     artistListeners: s.listeners,
   }));
 }
+
+/** The drop songs you liked, as Liked-list entries — written only once the drop is finished, so an undone like never lands. */
+export function likedDropTracks(drop: Drop, votes: DropVote[], likedAt: number): DiscoveryTrack[] {
+  const tracks = dropToDiscoveryTracks(drop);
+  return votes.filter((v) => v.liked).map((v) => ({ ...tracks[v.position], likedAt }));
+}
+
+export type PendingVotes = { day: string; votes: DropVote[] };
+
+/** Queue a day's votes for sending; a newer entry for the same day replaces the old one. */
+export function addPending(pending: PendingVotes[], entry: PendingVotes): PendingVotes[] {
+  return [...pending.filter((p) => p.day !== entry.day), entry];
+}

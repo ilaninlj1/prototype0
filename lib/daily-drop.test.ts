@@ -8,6 +8,8 @@ import {
   pickHeadline,
   shareText,
   todayKey,
+  likedDropTracks,
+  addPending,
   type Drop,
   type DropSong,
 } from './daily-drop.ts';
@@ -72,4 +74,19 @@ test('dropToDiscoveryTracks keeps drop order and found-at listeners', () => {
   assert.deepEqual(tracks.map((t) => t.id), [1, 2, 3, 4, 5]);
   assert.equal(tracks[2].artistListeners, 900);
   assert.equal(tracks[0].artistId, 1001);
+});
+
+test('likedDropTracks returns only liked songs, stamped with the like time and found-at count', () => {
+  const votes = [true, false, true, false, false].map((liked, position) => ({ position, liked }));
+  const liked = likedDropTracks(drop, votes, 1234);
+  assert.deepEqual(liked.map((t) => t.id), [1, 3]);
+  assert.equal(liked[1].likedAt, 1234);
+  assert.equal(liked[1].artistListeners, 900);
+});
+
+test('addPending replaces an entry for the same day instead of duplicating it', () => {
+  const a = { day: '2026-10-01', votes: [{ position: 0, liked: true }] };
+  const b = { day: '2026-10-01', votes: [{ position: 0, liked: false }] };
+  const c = { day: '2026-10-02', votes: [] };
+  assert.deepEqual(addPending([a, c], b), [c, b]);
 });
