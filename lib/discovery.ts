@@ -82,6 +82,8 @@ export type SwipeEntry = {
   // — steering doesn't dismiss the current card, so neither "how long
   // dwelled" nor "how long listened" has a real endpoint yet.
   preset?: PresetId;
+  // Set for Daily Drop swipes, so analysis can separate them from the feed.
+  source?: 'drop';
   artistListeners?: number;
   trackRank?: number;
   dwellMs?: number;

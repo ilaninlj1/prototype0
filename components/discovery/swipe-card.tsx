@@ -84,9 +84,11 @@ type SwipeCardProps = {
   onHold: () => void;
   playing: boolean;
   showPlayIcon: boolean;
+  /** False turns off swipe-down (the Daily Drop has no genre to jump from). */
+  allowDown?: boolean;
 };
 
-export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon }: SwipeCardProps) {
+export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon, allowDown = true }: SwipeCardProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   // Which half is currently pressed, before/independent of any drag —
@@ -134,7 +136,7 @@ export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon 
       const direction = resolveSwipeDirection(e.translationX, e.translationY);
       if (direction === 'right' || direction === 'left') {
         runOnJS(flyOutHorizontally)(direction);
-      } else if (direction === 'down') {
+      } else if (direction === 'down' && allowDown) {
         translateY.value = withTiming(FLY_OUT_DISTANCE, { duration: 250 }, () => runOnJS(commit)('down'));
       } else {
         translateX.value = withSpring(0);

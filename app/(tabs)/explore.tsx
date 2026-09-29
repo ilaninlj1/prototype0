@@ -1,11 +1,12 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useListenersNow } from '@/hooks/use-listeners-now';
+import { todayKey, type Drop, type DropVote } from '@/lib/daily-drop';
 import {
   describeGrowth,
   describeListeners,
@@ -14,7 +15,7 @@ import {
   type DiscoveryTrack,
   type SwipeEntry,
 } from '@/lib/discovery';
-import { loadLikedTracks, loadSwipeHistory } from '@/lib/discovery-storage';
+import { loadCachedDrop, loadDropProgress, loadLikedTracks, loadSwipeHistory } from '@/lib/discovery-storage';
 
 const fmt = (n: number) => describeListeners(n).count;
 
@@ -29,13 +30,23 @@ export default function ProfileScreen() {
   const [loaded, setLoaded] = useState(false);
   const [finds, setFinds] = useState<DiscoveryTrack[]>([]);
   const [history, setHistory] = useState<SwipeEntry[]>([]);
+  const [todayDrop, setTodayDrop] = useState<{ drop: Drop; votes: DropVote[] } | null>(null);
+  const router = useRouter();
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const [liked, h] = await Promise.all([loadLikedTracks(), loadSwipeHistory()]);
+        const [liked, h, drop, progress] = await Promise.all([
+          loadLikedTracks(),
+          loadSwipeHistory(),
+          loadCachedDrop(),
+          loadDropProgress(),
+        ]);
         if (cancelled) return;
+        const finishedToday =
+          drop && drop.day === todayKey(new Date()) && progress?.day === drop.day && progress.votes.length === 5;
+        setTodayDrop(finishedToday ? { drop, votes: progress.votes } : null);
         setFinds(withLikedAt(liked, h));
         setHistory(h);
         setLoaded(true);
@@ -67,6 +78,14 @@ export default function ProfileScreen() {
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <ThemedView style={styles.container}>
         <ThemedText type="title">Your ears</ThemedText>
+
+        {todayDrop && (
+          <TouchableOpacity onPress={() => router.push('/drop-results')}>
+            <ThemedText type="link">
+              Today&apos;s drop: liked {todayDrop.votes.filter((v) => v.liked).length}/5 · see results
+            </ThemedText>
+          </TouchableOpacity>
+        )}
 
         {finds.length === 0 ? (
           <ThemedText style={styles.dim}>Nothing found yet. Like a song blind and it shows up here.</ThemedText>

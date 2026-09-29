@@ -1,4 +1,3 @@
-// lib/daily-drop.ts
 import { describeListeners, type DiscoveryTrack } from './discovery.ts';
 
 export type Slot = 'buried' | 'tiny' | 'radar' | 'known' | 'famous';
