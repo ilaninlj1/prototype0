@@ -269,6 +269,7 @@ interface ItunesLookupTrack {
   previewUrl?: string;
   artworkUrl100?: string;
   collectionName?: string;
+  trackExplicitness?: string;
 }
 interface ItunesLookupResponse {
   results: ItunesLookupTrack[];
@@ -280,6 +281,7 @@ export interface ItunesEntry {
   itunesTrackId: number;
   artworkUrl: string | null;
   album: string | null;
+  explicit: boolean;
 }
 
 // Exported for scripts/precompute-catalogs.ts — see fetchTopTracks above.
@@ -298,6 +300,7 @@ export async function fetchItunesCatalog(itunesArtistId: number): Promise<Itunes
       itunesTrackId: r.trackId,
       artworkUrl: r.artworkUrl100 ?? null,
       album: r.collectionName ?? null,
+      explicit: r.trackExplicitness === 'explicit',
     }));
 }
 
