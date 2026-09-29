@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
+import { GuessTile } from '@/components/play/guess-tile';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -57,18 +58,15 @@ export default function DropGuessScreen() {
       <ThemedText style={styles.dim}>One of these is secretly famous. Tap to hear it again, then lock in your guess.</ThemedText>
 
       <ThemedView style={styles.grid} backgroundColor="transparent">
-        {drop.songs.map((_, i) => {
-          const liked = votes.find((v) => v.position === i)?.liked;
-          const isPicked = picked === i;
-          return (
-            <TouchableOpacity key={i} onPress={() => pick(i)} activeOpacity={0.8} style={styles.tileWrap}>
-              <ThemedView style={[styles.tile, isPicked && styles.tilePicked]} backgroundColor={Colors.surface}>
-                <ThemedText style={styles.tileNumber}>{i + 1}</ThemedText>
-                <ThemedText type="caption">{liked ? '♥ liked' : '✕ skipped'}</ThemedText>
-              </ThemedView>
-            </TouchableOpacity>
-          );
-        })}
+        {drop.songs.map((_, i) => (
+          <GuessTile
+            key={i}
+            label={String(i + 1)}
+            sub={votes.find((v) => v.position === i)?.liked ? '♥ liked' : '✕ skipped'}
+            selected={picked === i}
+            onPress={() => pick(i)}
+          />
+        ))}
       </ThemedView>
 
       <TouchableOpacity onPress={lockIn} disabled={picked == null || locking} activeOpacity={0.8}>
@@ -88,17 +86,6 @@ const styles = StyleSheet.create({
   container: { padding: Spacing.lg, gap: Spacing.md, backgroundColor: Colors.background, flexGrow: 1, justifyContent: 'center' },
   dim: { color: Colors.textSecondary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginVertical: Spacing.lg },
-  tileWrap: { width: '30%', flexGrow: 1 },
-  tile: {
-    aspectRatio: 1,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  tilePicked: { borderColor: Colors.accent },
-  tileNumber: { fontSize: 36, lineHeight: 40, fontWeight: '800' },
   button: { paddingVertical: Spacing.md, borderRadius: Radius.pill, alignItems: 'center' },
   disabled: { opacity: 0.4 },
 });
