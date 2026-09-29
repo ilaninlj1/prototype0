@@ -46,6 +46,7 @@ import {
   saveRegion,
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
+import { ensureWeeklyNudge } from '@/lib/nudge';
 import { fetchArtistListeners, getTracks, trackToDiscoveryTrack } from '@/lib/pool';
 import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
@@ -320,6 +321,7 @@ export default function HomeScreen() {
     const found = track.artistListeners ?? (await fetchArtistListeners(track.artistName));
     if (revealIdRef.current === track.id) setRevealListeners(found);
     await appendLikedTrack({ ...track, artistListeners: found ?? undefined, likedAt });
+    ensureWeeklyNudge();
   }
 
   async function handleRevealDone() {

@@ -20,6 +20,7 @@ import {
   saveDropProgress,
 } from '@/lib/discovery-storage';
 import { flushPending, flushPendingBriefly } from '@/lib/drop-sync';
+import { ensureWeeklyNudge } from '@/lib/nudge';
 import { fetchDrop } from '@/lib/supabase';
 
 /** Today's drop: resumes mid-drop, reloads when a new day starts, sends votes when finished. */
@@ -88,6 +89,7 @@ export function useDailyDrop() {
     if (next.length < 5) return 'more';
     for (const t of likedDropTracks(drop, next, Date.now())) await appendLikedTrack(t);
     setFinishedDays(await addFinishedDay(drop.day));
+    if (next.some((v) => v.liked)) ensureWeeklyNudge();
     // Votes go now; the guess follows from the guess screen.
     flushPendingBriefly({ day: drop.day, votes: next });
     return 'done';
