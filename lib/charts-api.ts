@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Network side of World Charts: Apple's official daily feeds, plus the
 // shared snapshots in Supabase that make day-over-day arrows possible.
 
-import { movement, parseChartFeed, risers, risingBaseline, type ChartEntry, type Move, type TrackHistory } from './charts';
+import { movement, parseChartFeed, risingSection, type ChartEntry, type Move, type TrackHistory } from './charts';
 
 const URL_ROOT = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -93,26 +93,6 @@ function utcToday(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-async function saveSnapshot(day: string, country: string, entries: ChartEntry[]): Promise<void> {
-  if (!URL_ROOT || !KEY || entries.length === 0) return;
-  try {
-    await fetch(`${URL_ROOT}/rest/v1/chart_snapshots?on_conflict=day,country,rank`, {
-      method: 'POST',
-      headers: {
-        apikey: KEY,
-        Authorization: `Bearer ${KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=ignore-duplicates,return=minimal',
-      },
-      body: JSON.stringify(
-        entries.map((e) => ({ day, country, rank: e.rank, track_id: e.id, title: e.title, artist: e.artist, artwork_url: e.artworkUrl }))
-      ),
-    });
-  } catch {
-    // snapshots are best-effort
-  }
-}
-
 async function fetchSnapshot(day: string, country: string): Promise<ChartEntry[]> {
   if (!URL_ROOT || !KEY) return [];
   try {
@@ -133,6 +113,8 @@ export type Chart = {
   entries: ChartEntry[];
   moves: Record<number, Move>;
   rising: ChartEntry[];
+  /** Each riser's move over the rising span (a week, or a day). */
+  risingMoves: Record<number, Move>;
   /** False until a previous day has been saved, i.e. arrows start tomorrow. */
   hasHistory: boolean;
   /** What "rising fastest" compares against. */
@@ -148,14 +130,15 @@ function withMoves(
   weekAgo: ChartEntry[] = [],
   history: Record<number, TrackHistory> = {}
 ): Chart {
-  const baseline = risingBaseline(weekAgo, yesterday);
+  const r = risingSection(entries, yesterday, weekAgo);
   return {
     day,
     entries,
     moves: movement(entries, yesterday),
-    rising: risers(entries, baseline.entries, 8),
-    hasHistory: yesterday.length > 0,
-    risingSpan: baseline.span,
+    rising: r.rising,
+    risingMoves: r.moves,
+    hasHistory: r.hasHistory,
+    risingSpan: r.span,
     history,
   };
 }
@@ -168,8 +151,8 @@ export async function peekChart(country: string): Promise<Chart | null> {
 
 /**
  * Today's chart for a country, fastest source first: today's shared copy in
- * Supabase (~0.3s, saved by whoever opened it first), then Apple's feed
- * (saved for everyone), then the phone's last copy. Arrows compare against
+ * Supabase (~0.3s, saved each morning by the server), then Apple's feed,
+ * then the phone's last copy. Arrows compare against
  * yesterday's shared copy.
  */
 export async function loadChart(country: string): Promise<Chart> {
@@ -185,12 +168,11 @@ export async function loadChart(country: string): Promise<Chart> {
   }
   const feed = await fetchFeed(country);
   if (feed.day && feed.entries.length > 0) {
-    saveSnapshot(feed.day, country, feed.entries);
     writeCached(country, feed.day, feed.entries);
     const before = feed.day === today ? yesterday : await fetchSnapshot(yesterdayOf(feed.day), country);
     return withMoves(feed.day, feed.entries, before, weekAgo, await fetchHistory(country, feed.entries.map((e) => e.id)));
   }
   const cached = await readCached(country);
   if (cached) return withMoves(cached.day, cached.entries, []);
-  return { day: null, entries: [], moves: {}, rising: [], hasHistory: false, risingSpan: 'today', history: {} };
+  return { day: null, entries: [], moves: {}, rising: [], risingMoves: {}, hasHistory: false, risingSpan: 'today', history: {} };
 }

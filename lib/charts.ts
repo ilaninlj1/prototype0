@@ -49,6 +49,17 @@ export function risingBaseline(weekAgo: ChartEntry[], yesterday: ChartEntry[]): 
   return weekAgo.length > 0 ? { entries: weekAgo, span: 'this week' } : { entries: yesterday, span: 'today' };
 }
 
+/** The "Rising fastest" row: risers against last week (else yesterday), each with its move over that same span. */
+export function risingSection(today: ChartEntry[], yesterday: ChartEntry[], weekAgo: ChartEntry[]) {
+  const baseline = risingBaseline(weekAgo, yesterday);
+  return {
+    rising: risers(today, baseline.entries, 8),
+    moves: movement(today, baseline.entries),
+    span: baseline.span,
+    hasHistory: baseline.entries.length > 0,
+  };
+}
+
 export type TrackHistory = { peak: number; days: number };
 
 /** The small line under a chart song: "peak #3 · 12 days on chart", or "at its peak". */

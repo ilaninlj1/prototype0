@@ -29,6 +29,7 @@ export default function CommentsScreen() {
   const [deviceId, setDeviceId] = useState('');
   const [reported, setReported] = useState<Set<number>>(new Set());
   const [now, setNow] = useState(0);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     loadDeviceId().then(setDeviceId);
@@ -57,12 +58,19 @@ export default function CommentsScreen() {
 
   async function send() {
     const body = cleanComment(draft);
-    if (!body) return;
+    if (!body || !deviceId) return;
     setDraft('');
+    setFailed(false);
     const optimistic: Comment = { id: -Date.now(), name, body, created_at: new Date().toISOString() };
     setComments((cur) => [optimistic, ...(cur ?? [])]);
-    await postComment(trackId, deviceId, name, body);
+    if (await postComment(trackId, deviceId, name, body)) return;
+    // Didn't go through: take it back off the list and give the text back.
+    setComments((cur) => (cur ?? []).filter((c) => c.id !== optimistic.id));
+    setDraft(body);
+    setFailed(true);
   }
+
+  const canSend = !!cleanComment(draft) && !!deviceId;
 
   async function report(c: Comment) {
     setReported(new Set(reported).add(c.id));
@@ -141,6 +149,7 @@ export default function CommentsScreen() {
         )}
       </ScrollView>
 
+      {failed && <ThemedText style={styles.failed}>That didn&apos;t send. Check your connection and try again.</ThemedText>}
       <View style={[styles.composer, { paddingBottom: insets.bottom + Spacing.sm }]}>
         <TextInput
           value={draft}
@@ -151,8 +160,8 @@ export default function CommentsScreen() {
           multiline
           style={styles.input}
         />
-        <TouchableOpacity onPress={send} disabled={!cleanComment(draft)} hitSlop={8}>
-          <Ionicons name="arrow-up-circle" size={36} color={cleanComment(draft) ? Colors.signal : Colors.textTertiary} />
+        <TouchableOpacity onPress={send} disabled={!canSend} hitSlop={8}>
+          <Ionicons name="arrow-up-circle" size={36} color={canSend ? Colors.signal : Colors.textTertiary} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -178,6 +187,7 @@ const styles = StyleSheet.create({
   commentName: { fontFamily: 'Figtree_700Bold', fontSize: 14 },
   commentTime: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.textTertiary },
   flag: { marginLeft: 'auto' },
+  failed: { fontSize: 13, color: Colors.text, backgroundColor: Colors.surfaceElevated, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, backgroundColor: Colors.surface },
   input: { flex: 1, color: Colors.text, fontFamily: Fonts.sans, fontSize: 16, maxHeight: 120, paddingVertical: Spacing.sm },
 });

@@ -94,7 +94,7 @@ export default function ChartsScreen() {
                 {chart.rising.map((e) => (
                   <Pressable key={e.id} style={styles.riser} onPress={() => openSong(e)}>
                     <Image source={{ uri: artworkUrl(e.artworkUrl, 300) }} style={styles.riserArt} />
-                    <MoveTag move={chart.moves[e.id]} big />
+                    <MoveTag move={chart.risingMoves[e.id]} big />
                     <ThemedText style={styles.riserTitle} numberOfLines={1}>
                       {e.title}
                     </ThemedText>

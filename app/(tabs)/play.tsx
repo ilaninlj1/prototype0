@@ -212,6 +212,10 @@ export default function PlayScreen() {
           contentContainerStyle={{ paddingHorizontal: sidePad }}
           onScroll={onScroll}
           scrollEventThrottle={16}
+          onScrollEndDrag={(e) => {
+            // A slow release may never fire a momentum end, so settle here too.
+            if (Math.abs(e.nativeEvent.velocity?.x ?? 0) < 0.1) settle(e.nativeEvent.contentOffset.x);
+          }}
           onMomentumScrollEnd={(e) => settle(e.nativeEvent.contentOffset.x)}>
           {modes.map((m, i) => (
             <OrbitEmblem key={m.key} index={i} itemWidth={itemWidth} height={orbitHeight} scrollX={scrollX} onPress={() => goTo(i)}>

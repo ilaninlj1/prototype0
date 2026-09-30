@@ -5,7 +5,8 @@ import {
   type AudioPlayer,
   type AudioStatus,
 } from 'expo-audio';
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { createContext, useCallback, useContext, useEffect, type ReactNode } from 'react';
 
 type PlaybackContextValue = {
   player: AudioPlayer;
@@ -42,4 +43,22 @@ export function usePlayback(): PlaybackContextValue {
     throw new Error('usePlayback must be used within a PlaybackProvider');
   }
   return context;
+}
+
+/**
+ * Play `url` while this screen is focused, and take the shared player back
+ * when you return to it (another screen may have loaded a different song in
+ * the meantime). Pauses when the screen loses focus.
+ */
+export function usePreviewWhileFocused(url: string | undefined) {
+  const { player } = usePlayback();
+  useFocusEffect(
+    useCallback(() => {
+      if (url) {
+        player.replace(url);
+        player.play();
+      }
+      return () => player.pause();
+    }, [url, player])
+  );
 }

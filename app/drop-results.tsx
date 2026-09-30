@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, Share, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,7 +11,7 @@ import { DoubleTapLike } from '@/components/double-tap-like';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
-import { usePlayback } from '@/hooks/use-playback';
+import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import {
   crowdLabel,
   guessLine,
@@ -63,13 +63,7 @@ export default function DropResultsScreen() {
 
   // The card in view plays its song, like the feed.
   const currentUrl = ranked[page]?.song.previewUrl;
-  useEffect(() => {
-    if (!currentUrl) return;
-    player.replace(currentUrl);
-    player.play();
-  }, [currentUrl, player]);
-
-  useFocusEffect(useCallback(() => () => player.pause(), [player]));
+  usePreviewWhileFocused(currentUrl);
 
   if (!drop) return <ThemedView style={styles.fill} />;
 

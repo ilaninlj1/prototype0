@@ -105,8 +105,8 @@ end $$;
 create trigger comment_reported after insert on comment_reports
   for each row execute function hide_reported_comment();
 
--- Daily chart snapshots, so the app can show what's rising. The first phone
--- to open a country's chart each day saves it; later copies are ignored.
+-- Daily chart snapshots, so the app can show what's rising.
+-- Only the server's daily job (charts-auto.sql) writes them.
 create table chart_snapshots (
   day date not null,
   country text not null check (char_length(country) = 2),
@@ -120,8 +120,6 @@ create table chart_snapshots (
 
 alter table chart_snapshots enable row level security;
 create policy read_snapshots on chart_snapshots for select to anon using (true);
-create policy save_snapshots on chart_snapshots for insert to anon
-  with check (day between (now() at time zone 'utc')::date - 1 and (now() at time zone 'utc')::date + 1);
 
 -- World Charts, part 2: save all 18 countries' charts every morning on
 -- Supabase's own scheduler (no phone needed), and summarise each song's
@@ -185,3 +183,8 @@ select cron.schedule('charts-request-1', '15 5 * * *', 'select request_chart_fee
 select cron.schedule('charts-store-1', '25 5 * * *', 'select store_chart_feeds()');
 select cron.schedule('charts-request-2', '15 6 * * *', 'select request_chart_feeds()');
 select cron.schedule('charts-store-2', '25 6 * * *', 'select store_chart_feeds()');
+
+-- Lockdown (review fixes): only the server writes charts; comment authors stay private.
+revoke insert, update, delete on chart_snapshots from anon, authenticated;
+revoke select on comments from anon;
+grant select (id, track_id, name, body, created_at) on comments to anon;

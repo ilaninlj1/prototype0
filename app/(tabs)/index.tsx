@@ -23,7 +23,7 @@ import { CreditLine } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
-import { usePlayback } from '@/hooks/use-playback';
+import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import {
   deriveGenresHeard,
   deriveRatedGenres,
@@ -143,24 +143,11 @@ export default function HomeScreen() {
     // dwellMs needs a start time for — stamped here rather than a separate
     // effect with the same dependency array.
     cardShownAtRef.current = Date.now();
-    // A falsy previewUrl means "nothing to play" (the stub deliberately
-    // uses this now — see lib/pool.ts), not an error — pause rather than
-    // hand expo-audio an empty/invalid source. Defensive for real tracks
-    // too: previewUrl is typed as guaranteed non-empty, but that's a type
-    // contract, not a runtime guarantee against every future data source.
-    if (currentTrack?.previewUrl) {
-      player.replace(currentTrack.previewUrl);
-      player.play();
-    } else {
-      player.pause();
-    }
   }, [currentTrack?.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      return () => player.pause();
-    }, [player])
-  );
+  // The top card plays while Home is in view. A falsy previewUrl means
+  // "nothing to play" (see lib/pool.ts), so nothing is loaded.
+  usePreviewWhileFocused(currentTrack?.previewUrl || undefined);
 
   // Drop swipes are logged from the Play tab; reload so a feed undo can't overwrite them.
   useFocusEffect(
@@ -340,8 +327,10 @@ export default function HomeScreen() {
     return artist ? { type: 'artist', artistId: artist.id, artistName: artist.name } : null;
   }
   async function hopToSimilar(fromArtist: string) {
+    const epoch = ++refillEpochRef.current;
     const next = await similarStrategy(fromArtist);
-    if (next) applySteeringStrategy('artist', next);
+    // A swipe during the lookup moved the feed on; this hop is stale.
+    if (next && refillEpochRef.current === epoch) applySteeringStrategy('artist', next);
   }
   async function strategyAfterSwipe(track: DiscoveryTrack, history: SwipeEntry[]): Promise<Strategy> {
     if (nextMode !== 'similar') return nextFeedStrategy(history);
@@ -359,7 +348,12 @@ export default function HomeScreen() {
     const nextSeen = markArtistSeen(track);
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, await strategyAfterSwipe(track, nextHistory), nextHistory, discoveredGenres, region, preset, nextSeen);
+    // A similar-artist hop can take seconds; if another swipe lands first,
+    // its refill wins and this one (with its older queue) is dropped.
+    const epoch = ++refillEpochRef.current;
+    const nextStrategy = await strategyAfterSwipe(track, nextHistory);
+    if (refillEpochRef.current !== epoch) return;
+    await runRefill(nextQueue, nextStrategy, nextHistory, discoveredGenres, region, preset, nextSeen);
   }
 
   // Swipe right: "who is this?" — flip to the reveal (and its comments)
@@ -389,9 +383,12 @@ export default function HomeScreen() {
     revealIdRef.current = null;
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
+    const epoch = ++refillEpochRef.current;
+    const nextStrategy = revealed ? await strategyAfterSwipe(revealed, swipeHistory) : nextFeedStrategy(swipeHistory);
+    if (refillEpochRef.current !== epoch) return;
     await runRefill(
       nextQueue,
-      revealed ? await strategyAfterSwipe(revealed, swipeHistory) : nextFeedStrategy(swipeHistory),
+      nextStrategy,
       swipeHistory,
       discoveredGenres,
       region,

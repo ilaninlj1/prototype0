@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppleMusicLink, SpotifyLink, CreditLine, LastfmLink } from '@/components/credits';
 import { DoubleTapLike } from '@/components/double-tap-like';
 import { LikeButton } from '@/components/like-button';
+import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
@@ -36,7 +37,7 @@ export default function SongScreen() {
   const { id, country } = useLocalSearchParams<{ id: string; country?: string }>();
   const { player, status } = usePlayback();
 
-  const [track, setTrack] = useState<DiscoveryTrack | null>(null);
+  const [track, setTrack] = useState<DiscoveryTrack | null | undefined>(LOADING);
   const [artistListeners, setArtistListeners] = useState<number | null | undefined>(LOADING);
   const [stats, setStats] = useState<TrackStats | null | undefined>(LOADING);
   const [credits, setCredits] = useState<Credits | null | undefined>(LOADING);
@@ -47,7 +48,7 @@ export default function SongScreen() {
 
   useEffect(() => {
     lookupTracks([Number(id)], country ?? 'US').then(([t]) => {
-      if (!t) return;
+      if (!t) return setTrack(null);
       setTrack(t);
       fetchArtistListeners(t.artistName).then(setArtistListeners);
       fetchTrackStats(t.artistName, t.trackName).then(setStats);
@@ -76,7 +77,16 @@ export default function SongScreen() {
   if (!track) {
     return (
       <View style={[styles.screen, styles.center]}>
-        <ActivityIndicator color={Colors.text} />
+        {track === LOADING ? (
+          <ActivityIndicator color={Colors.text} />
+        ) : (
+          <>
+            <ThemedText style={styles.missing}>Couldn&apos;t load this song. It may not have a preview here.</ThemedText>
+            <PressableScale onPress={() => router.back()} style={styles.missingBack}>
+              <ThemedText style={styles.missingBackText}>Go back</ThemedText>
+            </PressableScale>
+          </>
+        )}
       </View>
     );
   }
@@ -220,7 +230,10 @@ function Line({ label, value, dim }: { label: string; value: string; dim?: boole
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
-  center: { alignItems: 'center', justifyContent: 'center' },
+  center: { alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, gap: Spacing.lg },
+  missing: { textAlign: 'center', color: Colors.textSecondary },
+  missingBack: { backgroundColor: Colors.accent, borderRadius: Radius.lg, paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl },
+  missingBackText: { fontFamily: 'Figtree_700Bold', color: Colors.accentText },
   scrim: { backgroundColor: 'rgba(19, 33, 63, 0.82)' },
   scroll: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl * 2, gap: Spacing.xs },
   back: { alignSelf: 'flex-start', marginBottom: Spacing.sm },

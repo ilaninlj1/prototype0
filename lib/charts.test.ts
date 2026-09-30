@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { historyLine, movement, parseChartFeed, pickSimilar, risers, risingBaseline, type ChartEntry } from './charts.ts';
+import { historyLine, movement, parseChartFeed, pickSimilar, risers, risingBaseline, risingSection, type ChartEntry } from './charts.ts';
 
 const e = (rank: number, id: number): ChartEntry => ({ rank, id, title: `t${id}`, artist: `a${id}`, artworkUrl: '' });
 
@@ -51,4 +51,20 @@ test('historyLine: peak, days on chart, and "at its peak"', () => {
   assert.equal(historyLine(8, { peak: 3, days: 12 }), 'peak #3 · 12 days on chart');
   assert.equal(historyLine(8, { peak: 8, days: 1 }), 'first day on chart');
   assert.equal(historyLine(8, undefined), null);
+});
+
+test('risingSection: weekly risers carry their weekly move, not yesterday’s', () => {
+  const today = [e(1, 10), e(2, 20)];
+  const yesterday = [e(1, 20), e(2, 10)]; // 10 climbed 1 since yesterday
+  const weekAgo = [e(1, 30), e(9, 10)]; // 10 climbed 8 this week
+  const s = risingSection(today, yesterday, weekAgo);
+  assert.equal(s.span, 'this week');
+  assert.deepEqual(s.moves[10], { delta: 8, isNew: false });
+  assert.equal(s.hasHistory, true);
+});
+
+test('risingSection: last week alone is enough history', () => {
+  const s = risingSection([e(1, 10)], [], [e(5, 10)]);
+  assert.equal(s.hasHistory, true);
+  assert.deepEqual(s.rising.map((x) => x.id), [10]);
 });

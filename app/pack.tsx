@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { type LayoutChangeEvent, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,7 +11,7 @@ import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
-import { usePlayback } from '@/hooks/use-playback';
+import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import { matchLine, orderByIds, packUrl, parsePack, shareBackText } from '@/lib/blind-pack';
 import { artworkUrl, parseArtistLookupResponse, type DiscoveryTrack } from '@/lib/discovery';
 
@@ -49,13 +49,7 @@ export default function PackScreen() {
   const done = !!tracks && tracks.length > 0 && liked.length === tracks.length;
   const previewUrl = started && !done ? cards[0]?.previewUrl : undefined;
 
-  useEffect(() => {
-    if (!previewUrl) return;
-    player.replace(previewUrl);
-    player.play();
-  }, [previewUrl, player]);
-
-  useFocusEffect(useCallback(() => () => player.pause(), [player]));
+  usePreviewWhileFocused(previewUrl);
 
   function handleSwipe(direction: SwipeDirection) {
     if (direction === 'down') return;

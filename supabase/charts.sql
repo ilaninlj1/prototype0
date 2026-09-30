@@ -1,5 +1,5 @@
--- Daily chart snapshots, so the app can show what's rising. The first phone
--- to open a country's chart each day saves it; later copies are ignored.
+-- Daily chart snapshots, so the app can show what's rising.
+-- Only the server's daily job (charts-auto.sql) writes them.
 create table chart_snapshots (
   day date not null,
   country text not null check (char_length(country) = 2),
@@ -13,5 +13,3 @@ create table chart_snapshots (
 
 alter table chart_snapshots enable row level security;
 create policy read_snapshots on chart_snapshots for select to anon using (true);
-create policy save_snapshots on chart_snapshots for insert to anon
-  with check (day between (now() at time zone 'utc')::date - 1 and (now() at time zone 'utc')::date + 1);

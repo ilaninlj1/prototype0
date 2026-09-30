@@ -15,6 +15,7 @@ import {
     View,
 } from 'react-native';
 
+import { CreditLine } from '@/components/credits';
 import { CoverCell } from '@/components/discovery/cover-cell';
 import { MiniPlayer } from '@/components/mini-player';
 import { ThemedText } from '@/components/themed-text';
@@ -308,6 +309,7 @@ export default function LikedTracksScreen() {
               ))}
             </View>
           )}
+          <CreditLine />
         </ThemedView>
       </ScrollView>
 
