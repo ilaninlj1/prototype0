@@ -59,7 +59,7 @@ async function fetchFeed(country: string): Promise<{ day: string | null; entries
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), FEED_TIMEOUT_MS);
     try {
-      const res = await fetch(`https://rss.applemarketingtools.com/api/v2/${country}/music/most-played/50/songs.json`, {
+      const res = await fetch(`https://rss.marketingtools.apple.com/api/v2/${country}/music/most-played/50/songs.json`, {
         signal: abort.signal,
       });
       if (res.ok) return parseChartFeed(await res.json());
