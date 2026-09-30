@@ -14,8 +14,9 @@ import {
   SpotTheStarEmblem,
 } from '@/components/emblems';
 import { PressableScale } from '@/components/pressable-scale';
+import { Sticker } from '@/components/sticker';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import { useDailyDrop } from '@/hooks/use-daily-drop';
 import { packable } from '@/lib/blind-pack';
 import {
@@ -37,6 +38,8 @@ type Mode = {
   statLabel: string;
   cta: string;
   href?: Href;
+  /** A hand-placed sticker on the card, e.g. "Recommended". */
+  badge?: string;
 };
 
 const ORBIT_RADIUS = 520; // matches lib/orbit.ts
@@ -87,18 +90,30 @@ export default function PlayScreen() {
       emblem: (s) => <DailyDropEmblem size={s} />,
       eyebrow: d ? `Daily · No. ${d.number}` : 'Daily',
       title: 'Daily Drop',
-      blurb: 'Five songs, blind, the same for everyone. One of them is secretly famous. Find it.',
+      blurb: "Same five songs for everybody today. One of them is secretly huge. Bet you can't tell which.",
       stat: String(daily.streak),
       statLabel: daily.streak === 1 ? 'day streak' : 'day streak',
       cta: dropCta,
       href: dropHref,
     },
     {
+      key: 'h2h',
+      emblem: (s) => <HeadToHeadEmblem size={s} />,
+      eyebrow: 'Endless · 2 songs',
+      title: 'Head to Head',
+      blurb: 'Two songs, no names. Pick the one more people listen to. Winner stays on. Harder than it sounds, trust me.',
+      badge: 'Recommended',
+      stat: String(best.h2h),
+      statLabel: 'best streak',
+      cta: 'Play',
+      href: '/play-h2h',
+    },
+    {
       key: 'test',
       emblem: (s) => <BlindTestEmblem size={s} />,
       eyebrow: 'Test · 10 songs',
       title: 'Blind Spot Test',
-      blurb: "Pick the genres you'd never play. Half of the next ten songs are secretly from them.",
+      blurb: 'Tell us the genres you swear you hate. We sneak five of them into the next ten songs and see what happens.',
       stat: test ? `${test.neverLiked}/5` : '—',
       statLabel: test ? `of your nevers liked` : 'not taken yet',
       cta: test ? 'Retake' : 'Start',
@@ -109,7 +124,7 @@ export default function PlayScreen() {
       emblem: (s) => <BlindPackEmblem size={s} />,
       eyebrow: 'Send · 5 songs',
       title: 'Blind Pack',
-      blurb: 'Send five of your finds as a link. A friend hears them blind in their browser and sees how well your taste matches.',
+      blurb: 'Pick five songs you found and send them to a friend. They listen blind, and you find out if they actually get you.',
       stat: String(sendable),
       statLabel: 'songs ready to send',
       cta: 'Build a pack',
@@ -120,22 +135,11 @@ export default function PlayScreen() {
       emblem: (s) => <SpotTheStarEmblem size={s} />,
       eyebrow: 'Endless · 4 tiles',
       title: 'Spot the Star',
-      blurb: 'Four blind songs. One artist has over a million listeners. Hear it, pick it, keep the streak alive.',
+      blurb: 'Four songs, and one of them has a million-plus listeners. Your ears against the charts.',
       stat: String(best.spot),
       statLabel: 'best streak',
       cta: 'Play',
       href: '/play-spot',
-    },
-    {
-      key: 'h2h',
-      emblem: (s) => <HeadToHeadEmblem size={s} />,
-      eyebrow: 'Endless · 2 songs',
-      title: 'Head to Head',
-      blurb: 'Two blind songs. Which artist has more listeners? The winner stays, and the gap keeps shrinking.',
-      stat: String(best.h2h),
-      statLabel: 'best streak',
-      cta: 'Play',
-      href: '/play-h2h',
     },
   ];
 
@@ -168,15 +172,16 @@ export default function PlayScreen() {
       <View style={styles.header}>
         <ThemedText type="eyebrow">Pick a game · {modes.length} modes</ThemedText>
         <ThemedText type="hero">Play</ThemedText>
+        <ThemedText style={styles.hint}>swipe for more →</ThemedText>
       </View>
 
       <View style={styles.stage}>
-      <View style={{ height: cardHeight + 90 }}>
+      <View style={{ height: cardHeight + 112 }}>
         {/* The orbit the cards ride on. */}
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
           <Circle
             cx={width / 2}
-            cy={cardHeight / 2 + ORBIT_RADIUS}
+            cy={22 + cardHeight / 2 + ORBIT_RADIUS}
             r={ORBIT_RADIUS}
             stroke={Colors.textTertiary}
             strokeWidth={1.5}
@@ -190,7 +195,7 @@ export default function PlayScreen() {
           showsHorizontalScrollIndicator={false}
           snapToInterval={itemWidth}
           decelerationRate="fast"
-          contentContainerStyle={{ paddingHorizontal: sidePad }}
+          contentContainerStyle={{ paddingHorizontal: sidePad, paddingTop: 22 }}
           onScroll={onScroll}
           scrollEventThrottle={16}
           onMomentumScrollEnd={(e) => settle(e.nativeEvent.contentOffset.x)}>
@@ -263,6 +268,11 @@ function OrbitCard({
 function ModeCard({ mode, focused, onPlay }: { mode: Mode; focused: boolean; onPlay: () => void }) {
   return (
     <View style={styles.card}>
+      {mode.badge && (
+        <View style={styles.badge}>
+          <Sticker label={mode.badge} />
+        </View>
+      )}
       <View style={styles.cardTop}>
         {mode.emblem(focused ? 112 : 96)}
         <View style={styles.stat}>
@@ -296,6 +306,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: Spacing.lg, gap: Spacing.xs, marginBottom: Spacing.lg },
   fill: { flex: 1 },
+  hint: { fontFamily: Fonts.note, fontSize: 20, lineHeight: 22, color: Colors.textSecondary, transform: [{ rotate: '-3deg' }], alignSelf: 'flex-start', marginTop: 2 },
+  badge: { position: 'absolute', top: -16, right: 14, zIndex: 3 },
   stage: { flex: 1, justifyContent: 'center' },
   card: {
     flex: 1,

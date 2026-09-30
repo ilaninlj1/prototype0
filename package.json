@@ -21,8 +21,10 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@expo-google-fonts/caveat": "^0.4.2",
     "@expo-google-fonts/dm-mono": "^0.4.2",
     "@expo-google-fonts/figtree": "^0.4.1",
+    "@expo-google-fonts/permanent-marker": "^0.4.0",
     "@expo-google-fonts/syne": "^0.4.2",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",

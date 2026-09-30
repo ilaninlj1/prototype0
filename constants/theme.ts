@@ -27,6 +27,10 @@ export const Colors = {
   // The one sharp color: symbols, the heart, streaks, big numbers.
   signal: '#e63946',
 
+  // Rare third color for hand-placed notes (the Recommended sticker). Navy,
+  // red and gold is a classic trio; navy text on it is 9.8:1.
+  highlight: '#f4c542',
+
   destructive: '#e63946',
   positive: '#6cc38a',
 
@@ -61,6 +65,9 @@ export const Fonts = {
   sans: 'Figtree_400Regular',
   mono: 'DMMono_400Regular',
   monoMedium: 'DMMono_500Medium',
+  // Handwritten touches, used sparingly: stickers and margin notes.
+  marker: 'PermanentMarker_400Regular',
+  note: 'Caveat_700Bold',
 };
 
 const FIGTREE: Record<string, string> = {

@@ -6,6 +6,8 @@ import {
   Figtree_700Bold,
   Figtree_800ExtraBold,
 } from '@expo-google-fonts/figtree';
+import { Caveat_700Bold } from '@expo-google-fonts/caveat';
+import { PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker';
 import { Syne_700Bold, Syne_800ExtraBold } from '@expo-google-fonts/syne';
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
@@ -72,6 +74,8 @@ export default function RootLayout() {
     Figtree_800ExtraBold,
     DMMono_400Regular,
     DMMono_500Medium,
+    PermanentMarker_400Regular,
+    Caveat_700Bold,
   });
   if (!fontsLoaded) return <View style={styles.boot} />;
   if (Platform.OS === 'web' && !pathname.startsWith('/pack')) {
