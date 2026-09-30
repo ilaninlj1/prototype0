@@ -23,6 +23,7 @@ import { CreditLine } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
 import { PlaybackProvider } from '@/hooks/use-playback';
+import { startTwinSync } from '@/lib/twins-api';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -55,6 +56,7 @@ export default function RootLayout() {
   // Tapping the weekly "Called it" reminder opens the Liked list.
   useEffect(() => {
     if (Platform.OS === 'web') return;
+    startTwinSync(); // Taste Twins members: saves and unsaves follow them to the server
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       if (response.notification.request.content.data?.url === '/modal') router.push('/modal');
     });
@@ -108,6 +110,8 @@ export default function RootLayout() {
             <Stack.Screen name="song" options={{ headerShown: false }} />
             <Stack.Screen name="art" options={{ headerShown: false }} />
             <Stack.Screen name="dj-picks" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+            <Stack.Screen name="twins" options={{ headerShown: false }} />
+            <Stack.Screen name="twin" options={{ headerShown: false }} />
             <Stack.Screen name="songs" options={{ headerShown: false }} />
             <Stack.Screen name="comments" options={{ presentation: 'modal', headerShown: false }} />
             <Stack.Screen name="pack-send" options={{ presentation: 'fullScreenModal', headerShown: false }} />
