@@ -308,6 +308,7 @@ export default function HomeScreen() {
   // Tune → Next songs. 'artist' and 'genre' steer from the playing song;
   // 'random' lets each refill hop genres. Only genre/random is remembered.
   function handleSetNextMode(mode: NextMode) {
+    if (mode === nextMode) return;
     setNextMode(mode);
     saveShuffleGenres(mode === 'random');
     if (mode === 'similar' && currentTrack) hopToSimilar(currentTrack.artistName);
@@ -373,11 +374,12 @@ export default function HomeScreen() {
   async function handleSave(track: DiscoveryTrack) {
     const likedAt = Date.now();
     await logSwipe(track, 'like');
-    const found = track.artistListeners ?? (await fetchArtistListeners(track.artistName));
-    await saveLike({ ...track, artistListeners: found ?? undefined, likedAt });
+    await saveLike({ ...track, likedAt });
   }
 
   async function handleRevealDone() {
+    // A double-tap on Next lands twice; only the first moves on.
+    if (revealIdRef.current == null) return;
     const revealed = revealTrack;
     setRevealTrack(null);
     revealIdRef.current = null;

@@ -11,7 +11,6 @@
     "report-itunes-resolution": "node --experimental-strip-types scripts/report-itunes-resolution.ts",
     "test-pool": "node --experimental-strip-types --env-file=.env.local scripts/test-pool.ts",
     "precompute-catalogs": "node --experimental-strip-types --env-file=.env.local scripts/precompute-catalogs.ts",
-    "spike-sound-features": "node --experimental-strip-types scripts/spike-sound-features.ts",
     "make-drops": "node --experimental-strip-types --env-file=.env.local scripts/make-drops.ts",
     "review-drops": "node --experimental-strip-types scripts/review-drops.ts",
     "upload-drops": "node --experimental-strip-types --env-file=.env.local scripts/upload-drops.ts",

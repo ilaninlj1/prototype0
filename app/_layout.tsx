@@ -78,7 +78,7 @@ export default function RootLayout() {
     Caveat_700Bold,
   });
   if (!fontsLoaded) return <View style={styles.boot} />;
-  if (Platform.OS === 'web' && !pathname.startsWith('/pack')) {
+  if (Platform.OS === 'web' && pathname !== '/pack') {
     return (
       <View style={styles.webLanding}>
         <ThemedText type="title">Blindspot</ThemedText>
@@ -115,7 +115,6 @@ export default function RootLayout() {
             <Stack.Screen name="play-h2h" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="drop-guess" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="drop-results" options={{ presentation: 'fullScreenModal', headerShown: false }} />
-            <Stack.Screen name="spike-test" options={{ presentation: 'modal', title: 'Spike Test' }} />
           </Stack>
           <StatusBar style="light" />
         </PlaybackProvider>

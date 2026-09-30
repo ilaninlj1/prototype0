@@ -40,7 +40,7 @@ export type DiscoveryTrack = {
 };
 
 // 'steer-artist'/'steer-sound': logged when the user redirects discovery
-// (SteeringRow) without swiping the current track away — see the derivations
+// (Tune → Next songs) without swiping the current track away — see the derivations
 // below for how these are kept out of listen-time and visit-count metrics.
 // 'reveal' = Home's swipe right: see who it is (and its comments) without saving it.
 export type SwipeAction = 'skip' | 'like' | 'reveal' | 'genre-jump' | 'steer-artist' | 'steer-sound';
@@ -659,4 +659,13 @@ export function growthLabel(
   if (now != null) return { text: `${fmt(now)} listeners`, change: null, calledIt: false };
   if (found != null) return { text: `found at ${fmt(found)}`, change: null, calledIt: false };
   return null;
+}
+
+/** How many different songs you've heard in the feed (a double-tap save and the swipe after it are one song). */
+export function countSongsHeard(history: SwipeEntry[]): number {
+  const heard = new Set<number>();
+  for (const e of history) {
+    if (e.action === 'skip' || e.action === 'like' || e.action === 'reveal' || e.action === 'genre-jump') heard.add(e.trackId);
+  }
+  return heard.size;
 }

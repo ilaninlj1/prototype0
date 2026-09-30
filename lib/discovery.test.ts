@@ -34,6 +34,7 @@ import {
   type DiscoveryTrack,
   type SwipeEntry,
   type Strategy,
+  countSongsHeard,
 } from './discovery.ts';
 
 function track(overrides: Partial<DiscoveryTrack>): DiscoveryTrack {
@@ -519,4 +520,9 @@ test('growthLabel reads like a view count: found → now, with the change', () =
   assert.deepEqual(growthLabel(undefined, 48_000), { text: '48K listeners', change: null, calledIt: false });
   assert.deepEqual(growthLabel(900, undefined), { text: 'found at 900', change: null, calledIt: false });
   assert.equal(growthLabel(undefined, undefined), null);
+});
+
+test('countSongsHeard: a double-tapped card that is then swiped counts once', () => {
+  const h = (trackId: number, action: string) => ({ trackId, artistId: 1, genre: 'g', action, timestamp: 0 }) as unknown as SwipeEntry;
+  assert.equal(countSongsHeard([h(1, 'like'), h(1, 'reveal'), h(2, 'skip'), h(3, 'steer-artist')]), 2);
 });

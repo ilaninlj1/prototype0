@@ -105,15 +105,24 @@ export async function loadLikedTracks(): Promise<DiscoveryTrack[]> {
   }
 }
 
-export async function appendLikedTrack(track: DiscoveryTrack): Promise<void> {
-  try {
-    const existing = await loadLikedTracks();
-    if (existing.some((t) => t.id === track.id)) return;
-    existing.push(track);
-    await AsyncStorage.setItem(LIKED_TRACKS_KEY, JSON.stringify(existing));
-  } catch {
-    // ignore
-  }
+// Likes are read-modify-write; run them one at a time so two quick taps
+// can't each read the old list and drop the other's change.
+let likedQueue: Promise<void> = Promise.resolve();
+export function updateLikedTracks(change: (tracks: DiscoveryTrack[]) => DiscoveryTrack[]): Promise<void> {
+  likedQueue = likedQueue.then(async () => {
+    try {
+      const existing = await loadLikedTracks();
+      const next = change(existing);
+      if (next !== existing) await AsyncStorage.setItem(LIKED_TRACKS_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  });
+  return likedQueue;
+}
+
+export function appendLikedTrack(track: DiscoveryTrack): Promise<void> {
+  return updateLikedTracks((existing) => (existing.some((t) => t.id === track.id) ? existing : [...existing, track]));
 }
 
 /**

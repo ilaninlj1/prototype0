@@ -5,8 +5,9 @@ import { Platform, TouchableOpacity } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import type { DiscoveryTrack } from '@/lib/discovery';
-import { appendLikedTrack, loadLikedTracks, saveLikedTracks } from '@/lib/discovery-storage';
+import { appendLikedTrack, loadLikedTracks, updateLikedTracks } from '@/lib/discovery-storage';
 import { ensureWeeklyNudge } from '@/lib/nudge';
+import { fetchArtistListeners } from '@/lib/pool';
 
 // Every heart on screen listens here, so a double-tap anywhere fills them in.
 const listeners = new Set<(id: number, liked: boolean) => void>();
@@ -16,15 +17,17 @@ function announce(id: number, liked: boolean) {
 
 /** Save a song to Liked (idempotent) — used by hearts and double-taps alike. */
 export async function saveLike(track: DiscoveryTrack): Promise<void> {
-  await appendLikedTrack({ ...track, likedAt: track.likedAt ?? Date.now() });
+  const likedAt = track.likedAt ?? Date.now();
+  // "Called it" needs the listener count at the moment you found it.
+  const found = track.artistListeners ?? (await fetchArtistListeners(track.artistName)) ?? undefined;
+  await appendLikedTrack({ ...track, artistListeners: found, likedAt });
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   announce(track.id, true);
   ensureWeeklyNudge();
 }
 
 async function removeLike(id: number): Promise<void> {
-  const all = await loadLikedTracks();
-  await saveLikedTracks(all.filter((t) => t.id !== id));
+  await updateLikedTracks((all) => all.filter((t) => t.id !== id));
   announce(id, false);
 }
 
