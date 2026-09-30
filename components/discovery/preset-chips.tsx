@@ -2,7 +2,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'rea
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
 import type { PresetId } from '@/lib/pool-types';
 
 // Shortened from the full intent strings ("their best, unknown to you", …)
@@ -46,11 +46,11 @@ export function PresetChips({ activePreset, loading, onSelect }: PresetChipsProp
         const isActive = preset === activePreset;
         return (
           <TouchableOpacity key={preset} onPress={() => onSelect(preset)} activeOpacity={0.7} disabled={loading}>
-            <ThemedView style={styles.chip} backgroundColor={isActive ? Colors.accent : Colors.surfaceElevated}>
+            <ThemedView style={[styles.chip, isActive && styles.chipActive]} backgroundColor={isActive ? Colors.accent : 'transparent'}>
               {isActive && loading ? (
                 <ActivityIndicator size="small" color={Colors.accentText} />
               ) : (
-                <ThemedText type="label" numberOfLines={1} style={isActive ? styles.textActive : styles.textInactive}>
+                <ThemedText numberOfLines={1} style={[Ui.label, isActive ? styles.textActive : styles.textInactive]}>
                   {PRESET_LABELS[preset]}
                 </ThemedText>
               )}
@@ -71,13 +71,13 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingRight: Spacing.lg,
   },
+  // Thin cream outlines; the chosen one is filled cream.
   chip: {
-    minHeight: 36,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.pill,
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...Ui.outlineButton,
+    borderRadius: Radius.sm,
+  },
+  chipActive: {
+    borderColor: Colors.accent,
   },
   textActive: {
     color: Colors.accentText,

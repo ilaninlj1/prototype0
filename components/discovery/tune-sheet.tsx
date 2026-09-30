@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
+import { Colors, Radius, Spacing, TapTarget, Ui } from '@/constants/theme';
 import type { Region } from '@/lib/discovery';
 import { setAllowAi, useAllowAi } from '@/lib/human-check-api';
 import type { PresetId } from '@/lib/pool-types';
@@ -57,19 +57,19 @@ export function TuneSheet({
       <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
         <Pressable style={styles.backdrop} onPress={close}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <ThemedText type="label">How well-known</ThemedText>
+            <ThemedText style={Ui.label}>How well-known</ThemedText>
             <PresetChips activePreset={preset} loading={presetLoading} onSelect={onSelectPreset} />
 
-            <ThemedText type="label" style={styles.heading}>
+            <ThemedText style={[Ui.label, styles.heading]}>
               Next songs
             </ThemedText>
-            <ThemedView style={styles.segment} backgroundColor={Colors.surfaceElevated}>
+            <ThemedView style={styles.segment} backgroundColor="transparent">
               {NEXT_MODES.map((o) => {
                 const active = nextMode === o.mode;
                 return (
                   <TouchableOpacity key={o.mode} style={styles.segmentSlot} onPress={() => onSetNextMode(o.mode)} activeOpacity={0.7}>
                     <ThemedView style={styles.segmentItem} backgroundColor={active ? Colors.accent : 'transparent'}>
-                      <ThemedText type="label" style={{ color: active ? Colors.accentText : Colors.textSecondary }}>
+                      <ThemedText style={[Ui.label, { color: active ? Colors.accentText : Colors.textSecondary }]}>
                         {o.label}
                       </ThemedText>
                     </ThemedView>
@@ -80,20 +80,20 @@ export function TuneSheet({
             <ThemedText type="caption">{NEXT_MODES.find((o) => o.mode === nextMode)?.hint}</ThemedText>
 
             <ThemedView style={styles.regionRow} backgroundColor="transparent">
-              <ThemedText type="label">Store region</ThemedText>
+              <ThemedText style={Ui.label}>Store region</ThemedText>
               <RegionToggle region={region} onToggle={onToggleRegion} />
             </ThemedView>
 
-            <ThemedText type="label" style={styles.heading}>
+            <ThemedText style={[Ui.label, styles.heading]}>
               AI-made music
             </ThemedText>
-            <ThemedView style={styles.segment} backgroundColor={Colors.surfaceElevated}>
+            <ThemedView style={styles.segment} backgroundColor="transparent">
               {[false, true].map((show) => {
                 const active = allowAi === show;
                 return (
                   <TouchableOpacity key={String(show)} style={styles.segmentSlot} onPress={() => setAllowAi(show)} activeOpacity={0.7}>
                     <ThemedView style={styles.segmentItem} backgroundColor={active ? Colors.accent : 'transparent'}>
-                      <ThemedText type="label" style={{ color: active ? Colors.accentText : Colors.textSecondary }}>
+                      <ThemedText style={[Ui.label, { color: active ? Colors.accentText : Colors.textSecondary }]}>
                         {show ? 'Show' : 'Hide'}
                       </ThemedText>
                     </ThemedView>
@@ -119,10 +119,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
+  // Flat navy like every screen, set off by a thin rule instead of a raised box.
   sheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
+    backgroundColor: Colors.background,
+    borderTopWidth: 1,
+    borderTopColor: Colors.hairline,
+    borderTopLeftRadius: Radius.md,
+    borderTopRightRadius: Radius.md,
     padding: Spacing.xl,
     paddingBottom: Spacing.xxl,
     gap: Spacing.sm,
@@ -130,19 +133,23 @@ const styles = StyleSheet.create({
   heading: {
     marginTop: Spacing.lg,
   },
+  // A thin outline around the options; the chosen one is filled cream.
   segment: {
     flexDirection: 'row',
-    borderRadius: Radius.pill,
-    padding: 3,
+    borderWidth: 1,
+    borderColor: Colors.hairline,
+    borderRadius: Radius.sm,
+    padding: 2,
   },
   segmentSlot: {
     flex: 1,
   },
   segmentItem: {
-    paddingVertical: Spacing.sm,
+    minHeight: TapTarget - 6,
     paddingHorizontal: Spacing.sm,
-    borderRadius: Radius.pill - 2,
+    borderRadius: Radius.sm - 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   regionRow: {
     marginTop: Spacing.lg,

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Fonts, Ui } from '@/constants/theme';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import {
   countSongsHeard,
@@ -78,7 +78,7 @@ export default function ProfileScreen() {
           <ThemedText style={styles.dim}>Nothing found yet. Like a song blind and it shows up here.</ThemedText>
         ) : (
           <>
-            <ThemedView style={styles.hero} backgroundColor={Colors.surface}>
+            <ThemedView style={styles.hero} backgroundColor="transparent">
               <ThemedText style={styles.heroNumber}>{finds.length}</ThemedText>
               <ThemedText style={styles.dim}>
                 songs found blind{heard > 0 ? `, out of ${heard} you heard` : ''}.
@@ -86,8 +86,8 @@ export default function ProfileScreen() {
             </ThemedView>
 
             {(best.spot > 0 || best.h2h > 0) && (
-              <ThemedText style={styles.dim}>
-                Best streaks: Spot the Star {best.spot} · Head to Head {best.h2h}
+              <ThemedText style={styles.streaks}>
+                Best streaks · Spot the Star {best.spot} · Head to Head {best.h2h}
               </ThemedText>
             )}
 
@@ -159,10 +159,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // No box: the big number sits on a thin rule, like the collage on Home.
   hero: {
-    borderRadius: Radius.lg,
-    padding: Spacing.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.rule,
+    paddingBottom: Spacing.lg,
     gap: 2,
+  },
+  streaks: {
+    ...Ui.label,
+    color: Colors.textSecondary,
   },
   heroNumber: {
     fontSize: 56,
@@ -178,10 +184,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 26,
   },
+  // Cream, not red: red is kept for the one big number at the top.
   em: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.signal,
+    color: Colors.text,
   },
   about: {
     color: Colors.textTertiary,

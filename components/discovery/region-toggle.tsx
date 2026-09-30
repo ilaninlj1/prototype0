@@ -1,8 +1,7 @@
 import { StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Ui } from '@/constants/theme';
 import type { Region } from '@/lib/discovery';
 
 type RegionToggleProps = {
@@ -19,23 +18,15 @@ type RegionToggleProps = {
  */
 export function RegionToggle({ region, onToggle }: RegionToggleProps) {
   return (
-    <TouchableOpacity onPress={onToggle} activeOpacity={0.7}>
-      <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
-        <ThemedText type="label" style={styles.text}>
-          {region}
-        </ThemedText>
-      </ThemedView>
+    <TouchableOpacity onPress={onToggle} activeOpacity={0.6} style={Ui.outlineButton}>
+      <ThemedText style={styles.text}>{region}</ThemedText>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.pill,
-  },
   text: {
-    color: Colors.textSecondary,
+    ...Ui.label,
+    color: Colors.text,
   },
 });
