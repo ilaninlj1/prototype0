@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isAiTagged, isBlocked, normalizeArtist, proofLine } from './human-check.ts';
+import { isAiTagged, isAiWeighted, isBlocked, normalizeArtist, proofLine } from './human-check.ts';
 
 test('isAiTagged: the tags listeners actually use for AI acts', () => {
   assert.equal(isAiTagged(['AI', 'blues rock', 'AI slop']), true);
@@ -36,4 +36,18 @@ test('proofLine: says what was found, and nothing when nothing was', () => {
   assert.equal(proofLine({ shows: 0, physical: 3 }), 'Real person · on vinyl or CD');
   assert.equal(proofLine({ shows: 0, physical: 0 }), null);
   assert.equal(proofLine(null), null);
+});
+
+test('isAiWeighted: one troll vote on a famous artist is not enough', () => {
+  const dre = [{ name: 'hip hop', count: 14 }, { name: 'west coast hip hop', count: 8 }, { name: 'ai slop', count: 1 }];
+  assert.equal(isAiWeighted(dre, 'Dr. Dre', 2), false);
+});
+
+test('isAiWeighted: real AI acts carry the tag as a main tag (MusicBrainz votes, Last.fm 0–100 weights)', () => {
+  assert.equal(isAiWeighted([{ name: 'ai', count: 7 }, { name: 'ai generated', count: 5 }], 'The Velvet Sundown', 2), true);
+  assert.equal(isAiWeighted([{ name: 'ai', count: 2 }], 'Xania Monet', 2), true);
+  const xaniaLastfm = [{ name: 'soul', count: 100 }, { name: 'rnb', count: 44 }, { name: 'AI', count: 29 }];
+  assert.equal(isAiWeighted(xaniaLastfm, 'Xania Monet', 10), true);
+  const minorLastfm = [{ name: 'indie', count: 100 }, { name: 'AI', count: 12 }];
+  assert.equal(isAiWeighted(minorLastfm, 'Someone', 10), false);
 });

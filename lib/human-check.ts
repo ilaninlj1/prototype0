@@ -36,6 +36,17 @@ export function isAiTagged(tags: string[], artistName?: string): boolean {
   });
 }
 
+/**
+ * The same check with vote weights, so one stray vote can't brand a famous
+ * artist: the strongest AI tag needs `minCount` votes (MusicBrainz: 2; Last.fm
+ * weights run 0–100: 10) and a quarter of the weight of the artist's top tag.
+ */
+export function isAiWeighted(tags: { name: string; count: number }[], artistName: string, minCount: number): boolean {
+  const top = Math.max(0, ...tags.map((t) => t.count));
+  const ai = Math.max(0, ...tags.filter((t) => isAiTagged([t.name], artistName)).map((t) => t.count));
+  return ai >= minCount && ai >= top * 0.25;
+}
+
 export function normalizeArtist(name: string): string {
   return name.toLowerCase().trim().replace(/^the\s+/, '').replace(/\s+/g, ' ');
 }

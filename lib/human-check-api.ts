@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react';
 
 import scanned from '@/assets/ai-artists.json';
 import { loadDeviceId } from './discovery-storage';
-import { isAiTagged, isBlocked, normalizeArtist, type Proof } from './human-check';
-import { fetchArtistTags } from './pool';
+import { isAiWeighted, isBlocked, normalizeArtist, type Proof } from './human-check';
 import { fetchReportedAiArtists, reportAiArtist } from './supabase';
 
 // The network side of human-only discovery: who is AI (built-in scan, crowd
@@ -64,12 +63,27 @@ export async function isAiArtist(name: string): Promise<boolean> {
   if (knownAi(name)) return true;
   const key = normalizeArtist(name);
   if (checked.has(key)) return checked.get(key)!;
-  const ai = isAiTagged(await fetchArtistTags(name, 10), name);
+  const ai = isAiWeighted(await lastfmTags(name), name, 10);
   checked.set(key, ai);
   return ai;
 }
 
 /** Same as hideFromDiscovery, but checks artists the app hasn't seen before. */
+/** Last.fm's top tags with their 0–100 weights; empty on any failure (never treated as AI). */
+async function lastfmTags(name: string): Promise<{ name: string; count: number }[]> {
+  const key = process.env.EXPO_PUBLIC_LASTFM_API_KEY;
+  if (!key) return [];
+  try {
+    const res = await fetch(
+      `https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encodeURIComponent(name)}&autocorrect=1&api_key=${key}&format=json`
+    );
+    const body = (await res.json()) as { toptags?: { tag?: { name: string; count: number | string }[] } };
+    return (body.toptags?.tag ?? []).slice(0, 15).map((t) => ({ name: t.name, count: Number(t.count) }));
+  } catch {
+    return [];
+  }
+}
+
 export async function shouldSkip(name: string): Promise<boolean> {
   return !allowAi && (await isAiArtist(name));
 }

@@ -5,7 +5,7 @@
 //   npm run scan-ai-artists            (~30 min for ~6,000 artists; resumable)
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { isAiTagged, normalizeArtist } from '../lib/human-check.ts';
+import { isAiTagged, isAiWeighted, normalizeArtist } from '../lib/human-check.ts';
 
 const KEY = process.env.EXPO_PUBLIC_LASTFM_API_KEY;
 if (!KEY) throw new Error('EXPO_PUBLIC_LASTFM_API_KEY missing from .env.local');
@@ -35,11 +35,11 @@ for (const tag of ['ai', 'ai generated', 'ai-generated', 'ai slop', 'artificial 
     });
     await sleep(1100);
     if (!res.ok) break;
-    const body = (await res.json()) as { artists?: { id: string; name: string; tags?: { name: string }[] }[] };
+    const body = (await res.json()) as { artists?: { id: string; name: string; tags?: { name: string; count: number }[] }[] };
     const page = body.artists ?? [];
     for (const a of page) {
-      const tags = (a.tags ?? []).map((t) => t.name);
-      if (isAiTagged(tags, a.name)) mbTagged.set(a.id, tags);
+      // Weighted: one stray "ai slop" vote on a famous artist doesn't count.
+      if (isAiWeighted(a.tags ?? [], a.name, 2)) mbTagged.set(a.id, (a.tags ?? []).map((t) => t.name));
     }
     if (page.length < 100) break;
   }
@@ -47,7 +47,9 @@ for (const tag of ['ai', 'ai generated', 'ai-generated', 'ai slop', 'artificial 
 console.log(`MusicBrainz: ${mbTagged.size} artists tagged AI worldwide`);
 
 // 2. Last.fm: each built-in artist's top tags (resumable — progress is saved as it goes).
-const progress: Record<string, string[]> = existsSync(PROGRESS) ? JSON.parse(readFileSync(PROGRESS, 'utf8')) : {};
+// Entries are {name, count}[]; older runs saved plain names (already filtered to count ≥ 5).
+type Tag = { name: string; count: number };
+const progress: Record<string, (string | Tag)[]> = existsSync(PROGRESS) ? JSON.parse(readFileSync(PROGRESS, 'utf8')) : {};
 let done = 0;
 for (const name of names.keys()) {
   done++;
@@ -58,7 +60,7 @@ for (const name of names.keys()) {
     );
     const body = (await res.json()) as { toptags?: { tag?: { name: string; count: number }[] } };
     // Only tags with real weight: one stray vote shouldn't hide an artist.
-    progress[name] = (body.toptags?.tag ?? []).filter((t) => t.count >= 5).slice(0, 15).map((t) => t.name);
+    progress[name] = (body.toptags?.tag ?? []).slice(0, 15).map((t) => ({ name: t.name, count: Number(t.count) }));
   } catch {
     progress[name] = [];
   }
@@ -70,10 +72,15 @@ for (const name of names.keys()) {
 }
 writeFileSync(PROGRESS, JSON.stringify(progress));
 
+function lastfmSaysAi(tags: (string | Tag)[], name: string): boolean {
+  if (tags.every((t) => typeof t === 'string')) return isAiTagged(tags as string[], name);
+  return isAiWeighted(tags.filter((t): t is Tag => typeof t !== 'string'), name, 10);
+}
+
 const found: Found[] = [];
 for (const [name, mbid] of names) {
   if (mbid && mbTagged.has(mbid)) found.push({ name, source: 'musicbrainz', tags: mbTagged.get(mbid)! });
-  else if (isAiTagged(progress[name] ?? [], name)) found.push({ name, source: 'lastfm', tags: progress[name] });
+  else if (lastfmSaysAi(progress[name] ?? [], name)) found.push({ name, source: 'lastfm', tags: (progress[name] ?? []).map((t) => (typeof t === 'string' ? t : t.name)) });
 }
 writeFileSync(
   OUT,
