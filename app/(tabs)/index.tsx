@@ -193,7 +193,8 @@ export default function HomeScreen() {
       mark,
       // The revealed cover is the full-width square at the top of the card area.
       from: { x: area.x + area.width / 2, y: area.y + cardSize.width / 2 },
-      to: { x: strip.x + (tile.x + tile.w / 2) * scale, y: strip.y + (tile.y + tile.h / 2) * scale },
+      // The first cover lands in a collage that doesn't exist yet: it'll open up just above the label.
+      to: { x: strip.x + (tile.x + tile.w / 2) * scale, y: strip.y - (count === 0 ? ART.height * scale : 0) + (tile.y + tile.h / 2) * scale },
       endPx: Math.min(tile.w, tile.h) * scale,
     });
   }
@@ -656,24 +657,19 @@ export default function HomeScreen() {
             onPress={() => router.push('/art')}
             onLayout={(e) => (stripRef.current = e.nativeEvent.layout)}
             accessibilityLabel={`Your piece, ${canvas.marks.length} of ${ART.slots} songs`}>
-            <ArtPiece canvas={canvas} style={styles.strip} />
-            {canvas.marks.length === 0 ? (
-              // Just the label until the first swipe — the space stays, so nothing jumps when the first cover lands.
-              <View style={styles.stripEmpty} pointerEvents="none">
-                <ThemedText style={styles.stripLabel}>Your collage starts with your first swipe</ThemedText>
-              </View>
-            ) : (
-              <View style={styles.stripCaption}>
-                <ThemedText style={styles.stripLabel}>Your collage</ThemedText>
-                <ThemedText style={styles.stripLabel}>
-                  {canvas.marks.length}/{ART.slots}
-                </ThemedText>
-              </View>
-            )}
+            {/* Until the first swipe it's a single line and the card takes the room; then the covers appear above it. */}
+            {canvas.marks.length > 0 && <ArtPiece canvas={canvas} style={styles.strip} />}
+            <View style={styles.stripCaption}>
+              <ThemedText style={styles.stripLabel}>Your collage</ThemedText>
+              <ThemedText style={styles.stripLabel}>
+                {canvas.marks.length === 0 ? 'starts with your first swipe' : `${canvas.marks.length}/${ART.slots}`}
+              </ThemedText>
+            </View>
           </Pressable>
 
           <View style={styles.bottomRow}>
-            <TuneSheet
+            <View style={styles.half}>
+              <TuneSheet
               preset={preset}
               presetLoading={presetLoading}
               region={region}
@@ -681,8 +677,11 @@ export default function HomeScreen() {
               onToggleRegion={handleToggleRegion}
               nextMode={nextMode}
               onSetNextMode={handleSetNextMode}
-            />
-            <LikedTracksButton onPress={() => router.push('/modal')} />
+              />
+            </View>
+            <View style={styles.half}>
+              <LikedTracksButton onPress={() => router.push('/modal')} />
+            </View>
           </View>
           <CreditLine />
         </>
@@ -739,11 +738,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: Radius.sm,
   },
-  stripEmpty: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   stripCaption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -757,10 +751,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: Colors.textTertiary,
   },
+  // Tune and Liked: equal halves of one row.
   bottomRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  half: {
+    flex: 1,
   },
   centered: {
     flex: 1,

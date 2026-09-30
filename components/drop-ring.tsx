@@ -5,10 +5,10 @@ import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 import { DailyDropEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts } from '@/constants/theme';
+import { Colors, TapTarget, Ui } from '@/constants/theme';
 import { useDailyDrop } from '@/hooks/use-daily-drop';
 
-const SIZE = 54;
+const SIZE = 38;
 const STROKE = 3;
 
 /** Instagram-story ring for today's drop: bright until you've played it, grey after. */
@@ -48,7 +48,7 @@ export function DropRing() {
           />
         </Svg>
         <View style={styles.face}>
-          <DailyDropEmblem size={30} />
+          <DailyDropEmblem size={22} />
         </View>
       </View>
       <ThemedText style={[styles.label, { color: done ? Colors.textTertiary : Colors.text }]}>
@@ -59,7 +59,8 @@ export function DropRing() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'center', gap: 3 },
+  // One 44px-tall row: the ring, then its label, centered with Undo beside it.
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TapTarget },
   ring: { width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
   face: {
     width: SIZE - 10,
@@ -69,5 +70,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: { fontFamily: Fonts.monoMedium, fontSize: 10, lineHeight: 12, letterSpacing: 1, textTransform: 'uppercase' },
+  label: Ui.label,
 });

@@ -63,8 +63,8 @@ export function computeCardSize(available: CardSize): CardSize {
   return { width: widthFromMax, height: widthFromMax / CARD_ASPECT_RATIO };
 }
 
-/** Home: the card spans the same width as the rows around it; on a short screen it gets shorter, never narrower. */
+/** Home: the card spans the same width as the rows around it and fills the space down to them — no dead gap. */
 export function fitCardToWidth(available: CardSize): CardSize {
   if (available.width <= 0 || available.height <= 0) return { width: MAX_CARD_WIDTH, height: MAX_CARD_HEIGHT };
-  return { width: available.width, height: Math.min(available.height, available.width / CARD_ASPECT_RATIO) };
+  return { width: available.width, height: available.height };
 }

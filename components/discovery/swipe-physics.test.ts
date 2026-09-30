@@ -67,7 +67,7 @@ test('computeCardSize falls back to the max size for zero or negative available 
   });
 });
 
-test('fitCardToWidth: the card spans the full row width, shortening only if the screen is short', () => {
-  assert.deepEqual(fitCardToWidth({ width: 358, height: 600 }), { width: 358, height: 358 / (320 / 420) });
+test('fitCardToWidth: the card spans the full row width and fills the space down to the next row', () => {
+  assert.deepEqual(fitCardToWidth({ width: 358, height: 600 }), { width: 358, height: 600 });
   assert.deepEqual(fitCardToWidth({ width: 358, height: 400 }), { width: 358, height: 400 });
 });

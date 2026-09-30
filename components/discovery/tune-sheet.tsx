@@ -51,7 +51,9 @@ export function TuneSheet({
   return (
     <>
       <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.6} style={Ui.outlineButton}>
-        <ThemedText style={Ui.label}>Tune · {PRESET_LABELS[preset]}</ThemedText>
+        <ThemedText style={Ui.label} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          Tune · {PRESET_LABELS[preset]}
+        </ThemedText>
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>

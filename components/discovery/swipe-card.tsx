@@ -1,23 +1,19 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  cancelAnimation,
-  Easing,
   interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSpring,
   withTiming,
   type AnimatedStyle,
 } from 'react-native-reanimated';
 
-import { DailyDropEmblem } from '@/components/emblems';
+import { SpinningRecord } from './spinning-record';
 import { HeartBurst } from '@/components/heart-burst';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -50,14 +46,6 @@ type CardFaceProps = {
 export const COVER_BLUR = 28;
 
 export function CardFace({ size, playing = false, showPlayIcon = false, leftTintStyle, rightTintStyle, artwork }: CardFaceProps) {
-  // The record turns only while the preview is actually playing — paused or
-  // finished, it stops where it is. It's the song, not decoration.
-  const spin = useSharedValue(0);
-  useEffect(() => {
-    if (playing) spin.set(withRepeat(withTiming(spin.get() + 360, { duration: 3600, easing: Easing.linear }), -1, false));
-    else cancelAnimation(spin);
-  }, [playing, spin]);
-  const spinStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.get()}deg` }] }));
 
   return (
     <ThemedView style={[styles.card, size]} backgroundColor={Colors.surface}>
@@ -75,14 +63,8 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
       )}
 
       <ThemedView style={styles.center} backgroundColor="transparent">
-        <Animated.View style={spinStyle}>
-          <DailyDropEmblem size={132} />
-        </Animated.View>
-        {showPlayIcon && (
-          <ThemedView style={styles.playBadge} backgroundColor={Colors.accent}>
-            <Ionicons name="play" size={22} color={Colors.accentText} style={styles.playIcon} />
-          </ThemedView>
-        )}
+        {/* The song: spinning while it plays, stopped with a play button when paused. */}
+        <SpinningRecord size={140} playing={playing} paused={showPlayIcon} />
       </ThemedView>
 
       <ThemedView style={styles.footer} backgroundColor="transparent">
@@ -286,18 +268,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  playBadge: {
-    position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: Radius.round,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ translateX: 44 }, { translateY: 44 }],
-  },
-  playIcon: {
-    marginLeft: 3, // optical centering
   },
   footer: {
     position: 'absolute',
