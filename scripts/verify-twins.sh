@@ -10,7 +10,7 @@ uid() { python3 -c "import json,sys;print(json.load(sys.stdin)['user']['id'])"; 
 A=$(signup); TA=$(echo "$A" | tok); IA=$(echo "$A" | uid)
 B=$(signup); TB=$(echo "$B" | tok); IB=$(echo "$B" | uid)
 call() { curl -s -X "$1" "$U/rest/v1/$2" -H "apikey: $K" -H "Authorization: Bearer $3" -H "Content-Type: application/json" -H "Prefer: return=minimal" ${4:+-d "$4"}; }
-rpc() { curl -s -X POST "$U/rest/v1/rpc/$1" -H "apikey: $K" -H "Authorization: Bearer $2" -H "Content-Type: application/json" -d "${3:-{\}}"; }
+rpc() { local body="${3:-}"; [ -n "$body" ] || body='{}'; curl -s -X POST "$U/rest/v1/rpc/$1" -H "apikey: $K" -H "Authorization: Bearer $2" -H "Content-Type: application/json" -d "$body"; }
 call POST twin_profiles "$TA" "{\"device_id\":\"$(uuidgen)\",\"name\":\"Test A\",\"handle\":\"test_a\",\"platform\":\"instagram\",\"adult\":true}"
 call POST twin_profiles "$TB" "{\"device_id\":\"$(uuidgen)\",\"name\":\"Test B\",\"handle\":\"test_b\",\"platform\":\"snapchat\",\"adult\":true}"
 for t in 1 2 3; do call POST twin_likes "$TA" "{\"track_id\":$t,\"artist_key\":\"artist $t\"}"; call POST twin_likes "$TB" "{\"track_id\":$t,\"artist_key\":\"artist $t\"}"; done
