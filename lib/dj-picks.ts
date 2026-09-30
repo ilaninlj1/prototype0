@@ -55,7 +55,7 @@ export function parsePlays(body: { results?: RawPlay[] }): DjPick[] {
       album: p.album ?? null,
       airdate: p.airdate,
       rotation: p.rotation_status ?? null,
-      note: cleanNote(p.comment),
+      note: usefulNote(p.comment),
       isLocal: !!p.is_local,
       location: p.location_name ?? null,
       showId: p.show ?? null,
@@ -88,6 +88,28 @@ export function cleanNote(note: string | null | undefined): string {
     .trim();
   if (text.length <= 200) return text;
   const cut = text.slice(0, 200);
+  return `${cut.slice(0, cut.lastIndexOf(' ')).trim()}…`;
+}
+
+// Sentences that point somewhere else instead of saying something.
+const FILLER = /\b(video|watch|check (it |them )?out|stream(ing)?|listen (to it |here|now)|follow|subscribe|click|link|youtube|instagram|spotify|apple music|bandcamp|pre-?order|pre-?save|below|above)\b/i;
+
+// On-air shout-outs that mean nothing on a card.
+const SHOUTOUT = /^(welcome back|dedicated to|happy birthday|shout ?out|rip\b|thanks? (to|you))/i;
+
+/** The part of a DJ's note worth reading on a card: what's new and when, not "watch the video". */
+export function usefulNote(note: string | null | undefined): string {
+  const text = cleanNote(note)
+    .replace(/:\s*-\s*/g, ': ') // "Playing: - Portland …"
+    .replace(/\s+-\s+(?=[A-Z])/g, ', '); // "… Polaris Hall - San Francisco …"
+  const sentences = text.split(/(?<=[.!?])\s+(?=["“'A-Z0-9])/).filter((x) => x && !FILLER.test(x) && !SHOUTOUT.test(x));
+  let out = '';
+  for (const x of sentences.slice(0, 2)) {
+    if (out && out.length + x.length + 1 > 160) break;
+    out = out ? `${out} ${x}` : x;
+  }
+  if (out.length <= 160) return out;
+  const cut = out.slice(0, 160);
   return `${cut.slice(0, cut.lastIndexOf(' ')).trim()}…`;
 }
 

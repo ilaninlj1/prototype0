@@ -49,7 +49,7 @@ export function CardStack({ queue, cardSize, onSwipe, onHold, playing, showPlayI
                 styles.layer,
                 { transform: [{ scale: 1 - index * 0.04 }, { translateY: index * 10 }] },
               ]}>
-              <CardFace size={cardSize} />
+              <CardFace size={cardSize} artwork={track.artworkUrl100} />
             </View>
           )
         )}

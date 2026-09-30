@@ -45,6 +45,9 @@ type CardFaceProps = {
 
 // Blind by design: no artwork, title, artist or genre until you like the
 // track (see RevealCard). All you get is the sound.
+/** How blurred the cover is before the reveal: its shapes and colors show, never text or faces. The reveal starts from the same blur. */
+export const COVER_BLUR = 28;
+
 export function CardFace({ size, playing = false, showPlayIcon = false, leftTintStyle, rightTintStyle, artwork }: CardFaceProps) {
   const pulse = useSharedValue(0);
 
@@ -62,7 +65,7 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
     <ThemedView style={[styles.card, size]} backgroundColor={Colors.surface}>
       {!!artwork && (
         <>
-          <Image source={{ uri: artworkUrl(artwork, 60) }} style={StyleSheet.absoluteFill} blurRadius={40} transition={250} />
+          <Image source={{ uri: artworkUrl(artwork, 300) }} style={StyleSheet.absoluteFill} blurRadius={COVER_BLUR} transition={250} />
           <ThemedView style={[StyleSheet.absoluteFill, styles.blurScrim]} backgroundColor="transparent" />
         </>
       )}
@@ -278,7 +281,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.positive,
   },
   blurScrim: {
-    backgroundColor: 'rgba(19, 33, 63, 0.55)',
+    backgroundColor: 'rgba(19, 33, 63, 0.3)',
   },
   center: {
     ...StyleSheet.absoluteFill,

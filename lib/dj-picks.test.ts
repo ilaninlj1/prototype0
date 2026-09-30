@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cleanNote, djLine, matchItunes, parsePlays, rankPicks, type DjPick } from './dj-picks.ts';
+import { cleanNote, djLine, matchItunes, parsePlays, rankPicks, usefulNote, type DjPick } from './dj-picks.ts';
 
 const play = (over: Record<string, unknown> = {}) => ({
   id: 1,
@@ -74,4 +74,34 @@ test('djLine: who played it, how long ago, and how much they play it', () => {
   assert.equal(djLine(pick, { host: 'Atticus', program: 'Variety Mix' }, now), 'Played 3h ago by Atticus on Variety Mix · heavy rotation');
   assert.equal(djLine({ ...pick, rotation: null }, null, Date.parse('2026-09-30T05:44:00Z')), 'Played 20m ago on KEXP');
   assert.equal(djLine({ ...pick, rotation: 'R/N' }, { host: 'Troy', program: null }, now), 'Played 3h ago by Troy · just added');
+});
+
+test('usefulNote: keeps what\'s new and when, drops "watch the video" filler', () => {
+  assert.equal(
+    usefulNote('New from Vancouver, BC\'s Art d\'Ecco. Check out the official video for "Disappear Here" below.'),
+    'New from Vancouver, BC\'s Art d\'Ecco.'
+  );
+  assert.equal(
+    usefulNote('New record from the L.A. band out October 16th! https://notdummy.bandcamp.com'),
+    'New record from the L.A. band out October 16th!'
+  );
+  assert.equal(usefulNote('Watch the video here. Stream it on Spotify!'), '');
+});
+
+test('usefulNote: tour dates read as one line', () => {
+  assert.equal(
+    usefulNote('Playing: - Portland September 30 @ Polaris Hall - San Francisco Oct 4'),
+    'Playing: Portland September 30 @ Polaris Hall, San Francisco Oct 4'
+  );
+});
+
+test('usefulNote: at most two sentences and ~160 characters', () => {
+  const note = usefulNote('One fact here. Second fact here. Third fact here that is extra.');
+  assert.equal(note, 'One fact here. Second fact here.');
+  assert.ok(usefulNote('word '.repeat(60)).length <= 161);
+});
+
+test('usefulNote: on-air shout-outs are dropped', () => {
+  assert.equal(usefulNote('Welcome back, John!'), '');
+  assert.equal(usefulNote('Dedicated to Christa Pike'), '');
 });

@@ -98,7 +98,7 @@ export default function DjPicksScreen() {
               </ThemedText>
               <ThemedText style={styles.line}>{c.line}</ThemedText>
               {!!c.pick.note && (
-                <ThemedText style={styles.noteSmall} numberOfLines={3}>
+                <ThemedText style={styles.noteSmall}>
                   “{c.pick.note}”
                 </ThemedText>
               )}
@@ -173,7 +173,7 @@ function DjNote({ card }: { card: DjCard }) {
         {card.pick.isLocal ? ' · Seattle local' : ''}
       </ThemedText>
       {!!card.pick.note && (
-        <ThemedText style={styles.note} numberOfLines={3}>
+        <ThemedText style={styles.note}>
           “{card.pick.note}”
         </ThemedText>
       )}
@@ -204,8 +204,8 @@ const styles = StyleSheet.create({
   dim: { color: Colors.textSecondary },
   dj: { gap: 2, marginTop: Spacing.xs },
   line: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, color: Colors.textSecondary },
-  note: { fontFamily: Fonts.note, fontSize: 18, lineHeight: 21, color: Colors.text },
-  noteSmall: { fontFamily: Fonts.note, fontSize: 16, lineHeight: 19, color: Colors.text },
+  note: { fontFamily: Fonts.sans, fontStyle: 'italic', fontSize: 13, lineHeight: 18, color: Colors.text },
+  noteSmall: { fontFamily: Fonts.sans, fontStyle: 'italic', fontSize: 13, lineHeight: 18, color: Colors.text },
   credit: { textAlign: 'center', color: Colors.textTertiary },
   row: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md },
   art: { width: 64, height: 64, borderRadius: Radius.sm },

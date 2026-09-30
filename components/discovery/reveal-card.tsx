@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, type ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FlipInEasyY, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { AppleMusicLink, SpotifyLink, CreditLine, LastfmLink } from '@/components/credits';
@@ -14,6 +14,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
+import { COVER_BLUR } from './swipe-card';
 import type { CardSize } from './swipe-physics';
 
 type RevealCardProps = {
@@ -33,7 +34,7 @@ export function RevealCard({ track, listeners, size, onDone, extra }: RevealCard
   const blur = useSharedValue(1);
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    blur.set(withDelay(250, withTiming(0, { duration: 750 })));
+    blur.set(withDelay(450, withTiming(0, { duration: 1000 })));
   }, [blur]);
   const blurStyle = useAnimatedStyle(() => ({ opacity: blur.get() }));
 
@@ -49,15 +50,16 @@ export function RevealCard({ track, listeners, size, onDone, extra }: RevealCard
           <View style={styles.artwork}>
             <Image source={{ uri: artworkUrl(track.artworkUrl100, 600) }} style={StyleSheet.absoluteFill} />
             <Animated.View style={[StyleSheet.absoluteFill, blurStyle]} pointerEvents="none">
-              <Image source={{ uri: artworkUrl(track.artworkUrl100, 60) }} style={StyleSheet.absoluteFill} blurRadius={40} />
+              <Image source={{ uri: artworkUrl(track.artworkUrl100, 300) }} style={StyleSheet.absoluteFill} blurRadius={COVER_BLUR} />
             </Animated.View>
           </View>
 
-          <ThemedView style={styles.body} backgroundColor="transparent">
-            <ThemedText type="subtitle" numberOfLines={1}>
+          {/* Never cut off: when the text is long the cover gives up room, then the text scrolls. */}
+          <ScrollView style={styles.bodyScroll} contentContainerStyle={styles.body} bounces={false} showsVerticalScrollIndicator={false}>
+            <ThemedText type="subtitle" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
               {track.trackName}
             </ThemedText>
-            <ThemedText numberOfLines={1} style={styles.secondary}>
+            <ThemedText numberOfLines={2} style={styles.secondary}>
               {track.artistName}
             </ThemedText>
 
@@ -104,7 +106,7 @@ export function RevealCard({ track, listeners, size, onDone, extra }: RevealCard
               </Pressable>
             </View>
             <ThemedText style={styles.hint}>double-tap to save it</ThemedText>
-          </ThemedView>
+          </ScrollView>
         </ThemedView>
       </Animated.View>
     </DoubleTapLike>
@@ -121,6 +123,11 @@ const styles = StyleSheet.create({
   },
   artwork: {
     flex: 1,
+    minHeight: 96,
+  },
+  bodyScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   body: {
     padding: Spacing.lg,
