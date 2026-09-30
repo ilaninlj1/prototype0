@@ -6,6 +6,7 @@ import {
   MAX_CARD_WIDTH,
   resolveSwipeDirection,
   rotationForDrag,
+  fitCardToWidth,
 } from './swipe-physics.ts';
 
 test('resolveSwipeDirection returns right past the horizontal threshold', () => {
@@ -64,4 +65,9 @@ test('computeCardSize falls back to the max size for zero or negative available 
     width: MAX_CARD_WIDTH,
     height: MAX_CARD_HEIGHT,
   });
+});
+
+test('fitCardToWidth: the card spans the full row width, shortening only if the screen is short', () => {
+  assert.deepEqual(fitCardToWidth({ width: 358, height: 600 }), { width: 358, height: 358 / (320 / 420) });
+  assert.deepEqual(fitCardToWidth({ width: 358, height: 400 }), { width: 358, height: 400 });
 });

@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppleMusicLink, CreditLine, SpotifyLink } from '@/components/credits';
 import { CardStack } from '@/components/discovery/card-stack';
 import { RevealCard } from '@/components/discovery/reveal-card';
-import { computeCardSize, MAX_CARD_HEIGHT, MAX_CARD_WIDTH, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
+import { fitCardToWidth, MAX_CARD_HEIGHT, MAX_CARD_WIDTH, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -137,16 +137,18 @@ export default function DjPicksScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <View style={styles.cardArea} onLayout={(e: LayoutChangeEvent) => setCardSize(computeCardSize(e.nativeEvent.layout))}>
+      <View style={styles.cardArea} onLayout={(e: LayoutChangeEvent) => setCardSize(fitCardToWidth(e.nativeEvent.layout))}>
         {revealed && current ? (
-          <RevealCard
-            key={current.track.id}
-            track={{ ...current.track, artistListeners: listeners ?? undefined }}
-            listeners={listeners}
-            size={cardSize}
-            onDone={next}
-            extra={<DjNote card={current} />}
-          />
+          <ScrollView style={styles.revealScroll} showsVerticalScrollIndicator={false}>
+            <RevealCard
+              key={current.track.id}
+              track={{ ...current.track, artistListeners: listeners ?? undefined }}
+              listeners={listeners}
+              width={cardSize.width}
+              onDone={next}
+              extra={<DjNote card={current} />}
+            />
+          </ScrollView>
         ) : (
           <CardStack
             queue={cards.slice(index).map((c) => c.track)}
@@ -201,7 +203,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerSpacer: { width: 26 },
   pill: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: Radius.pill },
-  cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  cardArea: { flex: 1, alignItems: 'center', justifyContent: 'flex-start' },
+  revealScroll: { alignSelf: 'stretch' },
   dim: { color: Colors.textSecondary },
   dj: { gap: 2, marginTop: Spacing.xs },
   line: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, color: Colors.textSecondary },

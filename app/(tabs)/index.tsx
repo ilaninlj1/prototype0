@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArtPiece } from '@/components/art/art-piece';
@@ -12,7 +12,7 @@ import { RevealCard } from '@/components/discovery/reveal-card';
 import { DropRing } from '@/components/drop-ring';
 import { onLikeChange, saveLike } from '@/components/like-button';
 import {
-  computeCardSize,
+  fitCardToWidth,
   MAX_CARD_HEIGHT,
   MAX_CARD_WIDTH,
   type CardSize,
@@ -81,7 +81,7 @@ export default function HomeScreen() {
 
   // Starts at the card's max size (a reasonable default before the first
   // layout pass) then shrinks to whatever cardArea actually measures — see
-  // handleCardAreaLayout and computeCardSize — so the card fits a small
+  // handleCardAreaLayout and fitCardToWidth — so the card fits a small
   // screen (e.g. iPhone SE) instead of overflowing behind the button rows.
   const [cardSize, setCardSize] = useState<CardSize>({
     width: MAX_CARD_WIDTH,
@@ -91,7 +91,7 @@ export default function HomeScreen() {
   function handleCardAreaLayout(e: LayoutChangeEvent) {
     cardAreaRef.current = e.nativeEvent.layout;
     const { width, height } = e.nativeEvent.layout;
-    setCardSize(computeCardSize({ width, height }));
+    setCardSize(fitCardToWidth({ width, height }));
   }
 
   const [queue, setQueue] = useState<DiscoveryTrack[]>([]);
@@ -191,7 +191,8 @@ export default function HomeScreen() {
     flyingIdRef.current = mark.trackId;
     setFlying({
       mark,
-      from: { x: area.x + area.width / 2, y: area.y + (area.height - cardSize.height) / 2 + cardSize.height * 0.3 },
+      // The revealed cover is the full-width square at the top of the card area.
+      from: { x: area.x + area.width / 2, y: area.y + cardSize.width / 2 },
       to: { x: strip.x + (tile.x + tile.w / 2) * scale, y: strip.y + (tile.y + tile.h / 2) * scale },
       endPx: Math.min(tile.w, tile.h) * scale,
     });
@@ -629,12 +630,15 @@ export default function HomeScreen() {
         <>
           <View style={styles.cardArea} onLayout={handleCardAreaLayout}>
             {revealTrack ? (
-              <RevealCard
-                track={{ ...revealTrack, artistListeners: revealListeners ?? revealTrack.artistListeners }}
-                listeners={revealListeners}
-                size={cardSize}
-                onDone={handleRevealDone}
-              />
+              // The card grows to fit everything; this area scrolls, the card never clips.
+              <ScrollView style={styles.revealScroll} showsVerticalScrollIndicator={false}>
+                <RevealCard
+                  track={{ ...revealTrack, artistListeners: revealListeners ?? revealTrack.artistListeners }}
+                  listeners={revealListeners}
+                  width={cardSize.width}
+                  onDone={handleRevealDone}
+                />
+              </ScrollView>
             ) : (
               <CardStack
                 queue={queue}
@@ -652,13 +656,20 @@ export default function HomeScreen() {
             onPress={() => router.push('/art')}
             onLayout={(e) => (stripRef.current = e.nativeEvent.layout)}
             accessibilityLabel={`Your piece, ${canvas.marks.length} of ${ART.slots} songs`}>
-            <ArtPiece canvas={canvas} style={styles.strip} preview={queue.slice(0, 3).map((t) => t.artworkUrl100)} />
-            <View style={styles.stripCaption}>
-              <ThemedText style={styles.stripLabel}>Your collage</ThemedText>
-              <ThemedText style={styles.stripLabel}>
-                {canvas.marks.length === 0 ? 'starts with your first swipe' : `${canvas.marks.length}/${ART.slots}`}
-              </ThemedText>
-            </View>
+            <ArtPiece canvas={canvas} style={styles.strip} />
+            {canvas.marks.length === 0 ? (
+              // Just the label until the first swipe — the space stays, so nothing jumps when the first cover lands.
+              <View style={styles.stripEmpty} pointerEvents="none">
+                <ThemedText style={styles.stripLabel}>Your collage starts with your first swipe</ThemedText>
+              </View>
+            ) : (
+              <View style={styles.stripCaption}>
+                <ThemedText style={styles.stripLabel}>Your collage</ThemedText>
+                <ThemedText style={styles.stripLabel}>
+                  {canvas.marks.length}/{ART.slots}
+                </ThemedText>
+              </View>
+            )}
           </Pressable>
 
           <View style={styles.bottomRow}>
@@ -708,7 +719,10 @@ const styles = StyleSheet.create({
   cardArea: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+  },
+  revealScroll: {
+    alignSelf: 'stretch',
   },
   headerRow: {
     flexDirection: 'row',
@@ -724,6 +738,11 @@ const styles = StyleSheet.create({
   strip: {
     width: '100%',
     borderRadius: Radius.sm,
+  },
+  stripEmpty: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stripCaption: {
     flexDirection: 'row',

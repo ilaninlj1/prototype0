@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, type ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FlipInEasyY, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { AppleMusicLink, SpotifyLink, LastfmLink } from '@/components/credits';
@@ -15,20 +15,20 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Fonts, Ui } from '@/constants/theme';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 import { COVER_BLUR } from './swipe-card';
-import type { CardSize } from './swipe-physics';
 
 type RevealCardProps = {
   track: DiscoveryTrack;
   /** The artist's Last.fm listeners: undefined while loading, null if unknown. */
   listeners: number | null | undefined;
-  size: CardSize;
+  /** The card is this wide and as tall as its content; the screen scrolls, the card never clips. */
+  width: number;
   onDone: () => void;
   /** Extra lines under the listener count — DJ Picks puts the DJ's note here. */
   extra?: ReactNode;
 };
 
 /** Shown after a right swipe: who it is, how few people know them, and what people say. */
-export function RevealCard({ track, listeners, size, onDone, extra }: RevealCardProps) {
+export function RevealCard({ track, listeners, width, onDone, extra }: RevealCardProps) {
   const router = useRouter();
   // The cover arrives still blurred, as it was on the blind card, then sharpens.
   const blur = useSharedValue(1);
@@ -39,13 +39,13 @@ export function RevealCard({ track, listeners, size, onDone, extra }: RevealCard
   const blurStyle = useAnimatedStyle(() => ({ opacity: blur.get() }));
 
   const described = listeners != null ? describeListeners(listeners) : null;
-  // A full square cover, never cropped: as wide as the card allows, or smaller on a short screen.
-  const side = Math.round(Math.min(size.width - Spacing.lg * 2, size.height * 0.5));
+  // A full-width square cover, never cropped (inside the 1px outline).
+  const side = Math.round(width - 2);
 
   return (
     <DoubleTapLike track={track}>
       <Animated.View entering={FlipInEasyY.springify().damping(14)}>
-        <ThemedView style={[styles.card, size]} backgroundColor="transparent">
+        <ThemedView style={[styles.card, { width }]} backgroundColor="transparent">
           <View style={[styles.artwork, { width: side, height: side }]}>
             <Image source={{ uri: artworkUrl(track.artworkUrl100, 600) }} style={StyleSheet.absoluteFill} />
             <Animated.View style={[StyleSheet.absoluteFill, blurStyle]} pointerEvents="none">
@@ -53,8 +53,7 @@ export function RevealCard({ track, listeners, size, onDone, extra }: RevealCard
             </Animated.View>
           </View>
 
-          {/* Never cut off: long text scrolls under the cover instead of clipping. */}
-          <ScrollView style={styles.bodyScroll} contentContainerStyle={styles.body} bounces={false} showsVerticalScrollIndicator={false}>
+          <View style={styles.body}>
             <ThemedText type="subtitle" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
               {track.trackName}
             </ThemedText>
@@ -104,7 +103,7 @@ export function RevealCard({ track, listeners, size, onDone, extra }: RevealCard
               </Pressable>
             </View>
             <ThemedText style={styles.hint}>double-tap to save it</ThemedText>
-          </ScrollView>
+          </View>
         </ThemedView>
       </Animated.View>
     </DoubleTapLike>
@@ -120,14 +119,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   artwork: {
-    marginTop: Spacing.lg,
-    marginHorizontal: Spacing.lg,
-    borderRadius: Radius.sm,
     overflow: 'hidden',
-  },
-  bodyScroll: {
-    flexGrow: 0,
-    flexShrink: 1,
   },
   body: {
     padding: Spacing.lg,
