@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
@@ -20,7 +21,7 @@ import { HeartBurst } from '@/components/heart-burst';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import type { DiscoveryTrack } from '@/lib/discovery';
+import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { DEFAULT_SWIPE_THRESHOLDS, resolveSwipeDirection, rotationForDrag, type CardSize, type SwipeDirection } from './swipe-physics';
 
 const FLY_OUT_DISTANCE = 600;
@@ -38,11 +39,13 @@ type CardFaceProps = {
   /** Skip/like tint overlays — only the interactive top card passes these. */
   leftTintStyle?: AnimatedStyle<ViewStyle>;
   rightTintStyle?: AnimatedStyle<ViewStyle>;
+  /** The song's cover, shown only as a heavy blur — its colors, never the picture — until the reveal. */
+  artwork?: string;
 };
 
 // Blind by design: no artwork, title, artist or genre until you like the
 // track (see RevealCard). All you get is the sound.
-export function CardFace({ size, playing = false, showPlayIcon = false, leftTintStyle, rightTintStyle }: CardFaceProps) {
+export function CardFace({ size, playing = false, showPlayIcon = false, leftTintStyle, rightTintStyle, artwork }: CardFaceProps) {
   const pulse = useSharedValue(0);
 
   useEffect(() => {
@@ -57,6 +60,12 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
 
   return (
     <ThemedView style={[styles.card, size]} backgroundColor={Colors.surface}>
+      {!!artwork && (
+        <>
+          <Image source={{ uri: artworkUrl(artwork, 60) }} style={StyleSheet.absoluteFill} blurRadius={40} transition={250} />
+          <ThemedView style={[StyleSheet.absoluteFill, styles.blurScrim]} backgroundColor="transparent" />
+        </>
+      )}
       {leftTintStyle && (
         <Animated.View pointerEvents="none" style={[styles.tintZone, styles.tintZoneLeft, leftTintStyle]} />
       )}
@@ -236,6 +245,7 @@ export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon,
           showPlayIcon={showPlayIcon}
           leftTintStyle={leftTintStyle}
           rightTintStyle={rightTintStyle}
+          artwork={track.artworkUrl100}
         />
         {burst > 0 && <HeartBurst key={burst} size={120} />}
       </Animated.View>
@@ -266,6 +276,9 @@ const styles = StyleSheet.create({
   tintZoneRight: {
     right: 0,
     backgroundColor: Colors.positive,
+  },
+  blurScrim: {
+    backgroundColor: 'rgba(19, 33, 63, 0.55)',
   },
   center: {
     ...StyleSheet.absoluteFill,

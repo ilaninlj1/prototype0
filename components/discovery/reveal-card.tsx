@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FlipInEasyY } from 'react-native-reanimated';
+import Animated, { FadeIn, FlipInEasyY, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { AppleMusicLink, SpotifyLink, CreditLine, LastfmLink } from '@/components/credits';
 import { DoubleTapLike } from '@/components/double-tap-like';
@@ -26,9 +26,13 @@ type RevealCardProps = {
 /** Shown after a right swipe: who it is, how few people know them, and what people say. */
 export function RevealCard({ track, listeners, size, onDone }: RevealCardProps) {
   const router = useRouter();
+  // The cover arrives still blurred, as it was on the blind card, then sharpens.
+  const blur = useSharedValue(1);
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, []);
+    blur.set(withDelay(250, withTiming(0, { duration: 750 })));
+  }, [blur]);
+  const blurStyle = useAnimatedStyle(() => ({ opacity: blur.get() }));
 
   const described = listeners != null ? describeListeners(listeners) : null;
 
@@ -39,7 +43,12 @@ export function RevealCard({ track, listeners, size, onDone }: RevealCardProps) 
           {/* The song's own colors: its art, blurred behind the whole card. */}
           <Image source={{ uri: artworkUrl(track.artworkUrl100, 100) }} style={StyleSheet.absoluteFill} blurRadius={50} />
           <ThemedView style={[StyleSheet.absoluteFill, styles.scrim]} backgroundColor="transparent" />
-          <Image source={{ uri: artworkUrl(track.artworkUrl100, 600) }} style={styles.artwork} />
+          <View style={styles.artwork}>
+            <Image source={{ uri: artworkUrl(track.artworkUrl100, 600) }} style={StyleSheet.absoluteFill} />
+            <Animated.View style={[StyleSheet.absoluteFill, blurStyle]} pointerEvents="none">
+              <Image source={{ uri: artworkUrl(track.artworkUrl100, 60) }} style={StyleSheet.absoluteFill} blurRadius={40} />
+            </Animated.View>
+          </View>
 
           <ThemedView style={styles.body} backgroundColor="transparent">
             <ThemedText type="subtitle" numberOfLines={1}>

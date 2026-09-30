@@ -1,15 +1,17 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ArtPiece, markPosition } from '@/components/art/art-piece';
+import { FlyingPrint } from '@/components/art/flying-print';
 import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
 import { RevealCard } from '@/components/discovery/reveal-card';
 import { DropRing } from '@/components/drop-ring';
 import { HomeBackdrop } from '@/components/home-backdrop';
-import { saveLike } from '@/components/like-button';
+import { onLikeChange, saveLike } from '@/components/like-button';
 import {
   computeCardSize,
   MAX_CARD_HEIGHT,
@@ -22,7 +24,8 @@ import { UndoButton } from '@/components/discovery/undo-button';
 import { CreditLine } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { addToCanvas, saveOnCanvas, undoOnCanvas, useArt } from '@/hooks/use-art';
 import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import {
   deriveGenresHeard,
@@ -56,6 +59,8 @@ import { fetchArtistListeners, fetchSimilarArtists, getTracks, trackToDiscoveryT
 import { findItunesArtist } from '@/lib/song-details';
 import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
+import { ART, type ArtCanvas, type Mark } from '@/lib/print';
+import { prefetchPrints, printFor } from '@/lib/print-data';
 
 function randomGenre(): string {
   return GENRES[Math.floor(Math.random() * GENRES.length)];
@@ -85,6 +90,7 @@ export default function HomeScreen() {
   });
 
   function handleCardAreaLayout(e: LayoutChangeEvent) {
+    cardAreaRef.current = e.nativeEvent.layout;
     const { width, height } = e.nativeEvent.layout;
     setCardSize(computeCardSize({ width, height }));
   }
@@ -148,6 +154,64 @@ export default function HomeScreen() {
   // The top card plays while Home is in view. A falsy previewUrl means
   // "nothing to play" (see lib/pool.ts), so nothing is loaded.
   usePreviewWhileFocused(currentTrack?.previewUrl || undefined);
+
+  // ---- The piece: every swipe adds the song's print (see lib/print.ts) ----
+  const { canvas } = useArt();
+  const cardAreaRef = useRef<LayoutRectangle | null>(null);
+  const stripRef = useRef<LayoutRectangle | null>(null);
+  const savedIdsRef = useRef(new Set<number>());
+  const [flying, setFlying] = useState<{ mark: Mark; from: { x: number; y: number }; to: { x: number; y: number }; scale: number } | null>(null);
+  const flyingIdRef = useRef<number | null>(null);
+
+  // Covers and song facts for the next few cards load ahead, so a swipe never waits on them.
+  const upcomingKey = queue.slice(0, 10).map((t) => t.id).join(',');
+  useEffect(() => {
+    prefetchPrints(queue.slice(0, 10), region);
+    // upcomingKey stands in for the queue's first ten ids
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upcomingKey, region]);
+
+  // A save anywhere (double-tap, heart) gets the song's red dot.
+  useEffect(
+    () =>
+      onLikeChange((id, liked) => {
+        if (!liked) return;
+        savedIdsRef.current.add(id);
+        saveOnCanvas(id);
+      }),
+    []
+  );
+
+  async function commitMark(mark: Mark) {
+    const finished: ArtCanvas | undefined = await addToCanvas(mark);
+    if (finished) router.push({ pathname: '/art', params: { piece: String(finished.number) } });
+  }
+
+  async function markSwipe(track: DiscoveryTrack, kind: Mark['kind']) {
+    const print = await printFor(track);
+    const mark: Mark = { trackId: track.id, kind, saved: savedIdsRef.current.has(track.id), print };
+    const area = cardAreaRef.current;
+    const strip = stripRef.current;
+    if (kind === 'ghost' || !area || !strip) return commitMark(mark);
+    // A reveal: its print stamps onto the cover, then drops into the piece.
+    if (flying) commitMark(flying.mark); // one still in the air lands now
+    const scale = strip.width / ART.width;
+    const at = markPosition(mark, canvas.marks.length + (flying ? 1 : 0));
+    flyingIdRef.current = mark.trackId;
+    setFlying({
+      mark,
+      from: { x: area.x + area.width / 2, y: area.y + (area.height - cardSize.height) / 2 + cardSize.height * 0.28 },
+      to: { x: strip.x + at.x * scale, y: strip.y + at.y * scale },
+      scale,
+    });
+  }
+
+  function handleLanded(mark: Mark) {
+    if (flyingIdRef.current !== mark.trackId) return; // undone mid-flight
+    flyingIdRef.current = null;
+    setFlying(null);
+    commitMark({ ...mark, saved: mark.saved || savedIdsRef.current.has(mark.trackId) });
+  }
 
   // Drop swipes are logged from the Play tab; reload so a feed undo can't overwrite them.
   useFocusEffect(
@@ -345,6 +409,7 @@ export default function HomeScreen() {
 
   async function handleSkip(track: DiscoveryTrack) {
     cardsSeenSincePresetChangeRef.current += 1;
+    markSwipe(track, 'ghost');
     const nextHistory = await logSwipe(track, 'skip');
     const nextSeen = markArtistSeen(track);
     const nextQueue = queue.slice(1);
@@ -361,6 +426,7 @@ export default function HomeScreen() {
   // without saving it. Saving is a double-tap (handleSave).
   async function handleReveal(track: DiscoveryTrack) {
     cardsSeenSincePresetChangeRef.current += 1;
+    markSwipe(track, 'bold');
     await logSwipe(track, 'reveal');
     markArtistSeen(track);
     setRevealTrack(track);
@@ -502,6 +568,13 @@ export default function HomeScreen() {
     const snapshot = undoSnapshot;
     if (!snapshot) return;
     refillEpochRef.current += 1;
+    const undone = snapshot.queue[0];
+    if (undone) {
+      if (flyingIdRef.current === undone.id) {
+        flyingIdRef.current = null;
+        setFlying(null);
+      } else undoOnCanvas(undone.id);
+    }
     setUndoSnapshot(null);
     setRevealTrack(null);
     revealIdRef.current = null;
@@ -578,6 +651,22 @@ export default function HomeScreen() {
             )}
           </View>
 
+          <Pressable
+            onPress={() => router.push('/art')}
+            onLayout={(e) => (stripRef.current = e.nativeEvent.layout)}
+            accessibilityLabel={`Your piece, ${canvas.marks.length} of ${ART.slots} songs`}>
+            <ArtPiece canvas={canvas} style={styles.strip} />
+            {canvas.marks.length === 0 ? (
+              <ThemedText style={styles.stripEmpty} pointerEvents="none">
+                every swipe prints here
+              </ThemedText>
+            ) : (
+              <ThemedText style={styles.stripCount} pointerEvents="none">
+                {canvas.marks.length}/{ART.slots}
+              </ThemedText>
+            )}
+          </Pressable>
+
           <View style={styles.bottomRow}>
             <TuneSheet
               preset={preset}
@@ -598,6 +687,17 @@ export default function HomeScreen() {
         </ThemedView>
       ) : (
         <ThemedText style={styles.emptyText}>No more tracks — try again in a bit.</ThemedText>
+      )}
+      {flying && (
+        <FlyingPrint
+          key={flying.mark.trackId}
+          mark={flying.mark}
+          from={flying.from}
+          to={flying.to}
+          scale={flying.scale}
+          delay={900}
+          onLanded={() => handleLanded(flying.mark)}
+        />
       )}
     </ThemedView>
   );
@@ -625,6 +725,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+  },
+  strip: {
+    width: '100%',
+    borderRadius: Radius.lg,
+  },
+  stripCount: {
+    position: 'absolute',
+    right: Spacing.sm,
+    bottom: 4,
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: Colors.textTertiary,
+  },
+  stripEmpty: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '30%',
+    fontFamily: Fonts.note,
+    fontSize: 18,
+    color: Colors.textTertiary,
   },
   bottomRow: {
     flexDirection: 'row',

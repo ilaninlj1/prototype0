@@ -15,6 +15,14 @@ function announce(id: number, liked: boolean) {
   listeners.forEach((fn) => fn(id, liked));
 }
 
+/** Hear about every save and unsave, wherever it happens. Returns an unsubscribe. */
+export function onLikeChange(fn: (id: number, liked: boolean) => void): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
 /** Save a song to Liked (idempotent) — used by hearts and double-taps alike. */
 export async function saveLike(track: DiscoveryTrack): Promise<void> {
   const likedAt = track.likedAt ?? Date.now();
