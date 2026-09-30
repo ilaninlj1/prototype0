@@ -7,6 +7,7 @@ import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
 import { RevealCard } from '@/components/discovery/reveal-card';
+import { saveLike } from '@/components/like-button';
 import {
   computeCardSize,
   MAX_CARD_HEIGHT,
@@ -37,7 +38,6 @@ import {
   type SwipeEntry,
 } from '@/lib/discovery';
 import {
-  appendLikedTrack,
   appendPresetChangeEntry,
   appendSwipeEntry,
   loadDiscoveredGenres,
@@ -47,7 +47,6 @@ import {
   saveRegion,
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
-import { ensureWeeklyNudge } from '@/lib/nudge';
 import { fetchArtistListeners, getTracks, trackToDiscoveryTrack } from '@/lib/pool';
 import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
@@ -311,18 +310,25 @@ export default function HomeScreen() {
     await runRefill(nextQueue, strategy, nextHistory, discoveredGenres, region, preset, nextSeen);
   }
 
-  async function handleLike(track: DiscoveryTrack) {
+  // Swipe right: "who is this?" — flip to the reveal (and its comments)
+  // without saving it. Saving is a double-tap (handleSave).
+  async function handleReveal(track: DiscoveryTrack) {
     cardsSeenSincePresetChangeRef.current += 1;
-    const likedAt = Date.now();
-    await logSwipe(track, 'like');
+    await logSwipe(track, 'reveal');
     markArtistSeen(track);
     setRevealTrack(track);
     setRevealListeners(track.artistListeners);
     revealIdRef.current = track.id;
     const found = track.artistListeners ?? (await fetchArtistListeners(track.artistName));
     if (revealIdRef.current === track.id) setRevealListeners(found);
-    await appendLikedTrack({ ...track, artistListeners: found ?? undefined, likedAt });
-    ensureWeeklyNudge();
+  }
+
+  // Double-tap: save to Liked while staying blind; the card stays put.
+  async function handleSave(track: DiscoveryTrack) {
+    const likedAt = Date.now();
+    await logSwipe(track, 'like');
+    const found = track.artistListeners ?? (await fetchArtistListeners(track.artistName));
+    await saveLike({ ...track, artistListeners: found ?? undefined, likedAt });
   }
 
   async function handleRevealDone() {
@@ -387,7 +393,7 @@ export default function HomeScreen() {
   function handleCardSwipe(direction: SwipeDirection, track: DiscoveryTrack) {
     captureUndoSnapshot();
     if (direction === 'left') handleSkip(track);
-    else if (direction === 'right') handleLike(track);
+    else if (direction === 'right') handleReveal(track);
     else handleGenreJump(track);
   }
 
@@ -488,12 +494,18 @@ export default function HomeScreen() {
         <>
           <View style={styles.cardArea} onLayout={handleCardAreaLayout}>
             {revealTrack ? (
-              <RevealCard track={revealTrack} listeners={revealListeners} size={cardSize} onDone={handleRevealDone} />
+              <RevealCard
+                track={{ ...revealTrack, artistListeners: revealListeners ?? revealTrack.artistListeners }}
+                listeners={revealListeners}
+                size={cardSize}
+                onDone={handleRevealDone}
+              />
             ) : (
               <CardStack
                 queue={queue}
                 cardSize={cardSize}
                 onSwipe={handleCardSwipe}
+                onDoubleTap={handleSave}
                 onHold={handleCardHold}
                 playing={status.playing}
                 showPlayIcon={showPlayIcon}

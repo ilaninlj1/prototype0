@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -16,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { BlindspotMark } from '@/components/emblems';
+import { HeartBurst } from '@/components/heart-burst';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -93,9 +94,16 @@ type SwipeCardProps = {
   showPlayIcon: boolean;
   /** False turns off swipe-down (the Daily Drop has no genre to jump from). */
   allowDown?: boolean;
+  /** Home only: double-tap saves the song to Liked (still blind). Single taps then wait a beat for a second tap. */
+  onDoubleTap?: (track: DiscoveryTrack) => void;
 };
 
-export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon, allowDown = true }: SwipeCardProps) {
+export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon, allowDown = true, onDoubleTap }: SwipeCardProps) {
+  const [burst, setBurst] = useState(0);
+  function doubleTapped() {
+    setBurst((n) => n + 1);
+    onDoubleTap?.(track);
+  }
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   // Which half is currently pressed, before/independent of any drag —
@@ -181,7 +189,13 @@ export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon,
       runOnJS(onHold)();
     });
 
-  const gesture = Gesture.Race(pan, longPress, tap);
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd((_e, success) => {
+      if (success) runOnJS(doubleTapped)();
+    });
+
+  const gesture = onDoubleTap ? Gesture.Race(pan, longPress, Gesture.Exclusive(doubleTap, tap)) : Gesture.Race(pan, longPress, tap);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -223,6 +237,7 @@ export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon,
           leftTintStyle={leftTintStyle}
           rightTintStyle={rightTintStyle}
         />
+        {burst > 0 && <HeartBurst key={burst} size={120} />}
       </Animated.View>
     </GestureDetector>
   );

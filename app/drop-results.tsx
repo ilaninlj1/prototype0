@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -6,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
+import { DoubleTapLike } from '@/components/double-tap-like';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
@@ -96,6 +98,7 @@ export default function DropResultsScreen() {
           const verdict = describeListeners(song.listeners);
           return (
             <View style={[styles.page, { width }]}>
+              <DoubleTapLike track={dropToDiscoveryTracks(drop)[position]} style={styles.pressFill}>
               <Pressable style={styles.pressFill} onLongPress={() => (status.playing ? player.pause() : player.play())} delayLongPress={400}>
               <ThemedView style={[styles.card, { width: cardWidth }]} backgroundColor={Colors.surface}>
                 <Image source={{ uri: artworkUrl(song.artworkUrl, 100) }} style={StyleSheet.absoluteFill} blurRadius={50} />
@@ -113,6 +116,13 @@ export default function DropResultsScreen() {
                   <ThemedText style={styles.dim}>{verdict.verdict}</ThemedText>
                   <View style={styles.links}>
                     <LikeButton track={dropToDiscoveryTracks(drop)[position]} />
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() =>
+                        router.push({ pathname: '/comments', params: { trackId: String(song.itunesTrackId), title: song.title, artist: song.artist } })
+                      }>
+                      <Ionicons name="chatbubble-outline" size={20} color={Colors.text} />
+                    </Pressable>
                     <AppleMusicLink trackId={song.itunesTrackId} />
                     <LastfmLink artist={song.artist} />
                   </View>
@@ -128,6 +138,7 @@ export default function DropResultsScreen() {
                 </ScrollView>
               </ThemedView>
               </Pressable>
+              </DoubleTapLike>
             </View>
           );
         }}

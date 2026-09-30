@@ -42,7 +42,8 @@ export type DiscoveryTrack = {
 // 'steer-artist'/'steer-sound': logged when the user redirects discovery
 // (SteeringRow) without swiping the current track away — see the derivations
 // below for how these are kept out of listen-time and visit-count metrics.
-export type SwipeAction = 'skip' | 'like' | 'genre-jump' | 'steer-artist' | 'steer-sound';
+// 'reveal' = Home's swipe right: see who it is (and its comments) without saving it.
+export type SwipeAction = 'skip' | 'like' | 'reveal' | 'genre-jump' | 'steer-artist' | 'steer-sound';
 
 const STEER_ACTIONS = new Set<SwipeAction>(['steer-artist', 'steer-sound']);
 

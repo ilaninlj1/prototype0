@@ -262,6 +262,30 @@ export async function fetchArtistListeners(artistName: string): Promise<number |
   }
 }
 
+interface LastFmTopTagsResponse {
+  toptags?: { tag?: { name: string }[] | { name: string } };
+}
+
+/** An artist's top Last.fm tags (words real listeners use for them), or [] on any failure. */
+export async function fetchArtistTags(artistName: string, limit = 6): Promise<string[]> {
+  const apiKey = process.env.EXPO_PUBLIC_LASTFM_API_KEY;
+  if (!apiKey) return [];
+  const url = new URL(LASTFM_API_ROOT);
+  url.searchParams.set('method', 'artist.getTopTags');
+  url.searchParams.set('artist', artistName);
+  url.searchParams.set('autocorrect', '1');
+  url.searchParams.set('api_key', apiKey);
+  url.searchParams.set('format', 'json');
+  try {
+    const body = (await pacedLastFm(() => fetchWithBackoff(url))) as LastFmTopTagsResponse;
+    const raw = body.toptags?.tag;
+    const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    return list.map((t) => t.name).slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
 interface ItunesLookupTrack {
   wrapperType?: string;
   trackId?: number;

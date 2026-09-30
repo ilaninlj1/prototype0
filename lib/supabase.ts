@@ -1,6 +1,7 @@
 // Supabase over plain REST (PostgREST) — no client library. The anon key is
 // safe to ship: row-level security (supabase/setup.sql) only allows reading
 // current drops and the vote counts view, and inserting votes.
+import type { Comment, Vibe } from './comments';
 import type { Drop, DropVote, GuessResult, SongResult } from './daily-drop';
 
 const URL_ROOT = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -72,3 +73,43 @@ export async function fetchGuessResults(day: string): Promise<GuessResult[] | nu
     return null;
   }
 }
+
+// ---------- Comments and vibes ----------
+
+async function get<T>(path: string): Promise<T | null> {
+  if (!URL_ROOT || !KEY) return null;
+  try {
+    const res = await fetch(`${URL_ROOT}/rest/v1/${path}`, { headers: headers() });
+    return res.ok ? ((await res.json()) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function post(table: string, body: unknown): Promise<boolean> {
+  if (!URL_ROOT || !KEY) return false;
+  try {
+    const res = await fetch(`${URL_ROOT}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify(body),
+    });
+    return res.ok || res.status === 409;
+  } catch {
+    return false;
+  }
+}
+
+export const fetchComments = (trackId: number) =>
+  get<Comment[]>(`comments?track_id=eq.${trackId}&select=id,name,body,created_at&order=created_at.desc&limit=100`);
+
+export const postComment = (trackId: number, deviceId: string, name: string, body: string) =>
+  post('comments', { track_id: trackId, device_id: deviceId, name, body });
+
+export const reportComment = (commentId: number, deviceId: string) =>
+  post('comment_reports', { comment_id: commentId, device_id: deviceId });
+
+export const fetchVibes = (trackId: number) => get<Vibe[]>(`vibe_counts?track_id=eq.${trackId}&select=word,count`);
+
+export const addVibe = (trackId: number, deviceId: string, word: string) =>
+  post('vibes', { track_id: trackId, device_id: deviceId, word });

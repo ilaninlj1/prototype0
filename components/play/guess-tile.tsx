@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, { FlipInEasyY } from 'react-native-reanimated';
 
 import { AppleMusicLink } from '@/components/credits';
+import { DoubleTapLike } from '@/components/double-tap-like';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -24,20 +25,25 @@ type Props = {
 /** A blind numbered tile that flips to show the song and its listener count. */
 export function GuessTile({ label, sub, selected, revealed, correct, song, onPress, likeTrack }: Props) {
   const border = revealed && correct ? Colors.positive : selected ? Colors.accent : 'transparent';
+  const face = (song: NonNullable<Props['song']>) => (
+    <ThemedView style={[styles.tile, { borderColor: border }]} backgroundColor={Colors.surface}>
+      <Image source={{ uri: artworkUrl(song.artworkUrl, 300) }} style={styles.art} />
+      <ThemedText type="defaultSemiBold" numberOfLines={2} style={styles.title}>
+        {song.title}
+      </ThemedText>
+      <ThemedText type="caption" numberOfLines={1}>
+        {song.artist}
+      </ThemedText>
+      <ThemedText style={styles.count}>{describeListeners(song.listeners).count}</ThemedText>
+      {song.itunesTrackId != null && <AppleMusicLink trackId={song.itunesTrackId} />}
+      {likeTrack && <LikeButton track={likeTrack} />}
+    </ThemedView>
+  );
   return (
     <TouchableOpacity onPress={onPress} disabled={!onPress} activeOpacity={0.8} style={styles.wrap}>
       {revealed && song ? (
         <Animated.View entering={FlipInEasyY.springify().damping(14)}>
-          <ThemedView style={[styles.tile, { borderColor: border }]} backgroundColor={Colors.surface}>
-            <Image source={{ uri: artworkUrl(song.artworkUrl, 300) }} style={styles.art} />
-            <ThemedText type="defaultSemiBold" numberOfLines={2} style={styles.title}>
-              {song.title}
-            </ThemedText>
-            <ThemedText type="caption" numberOfLines={1}>{song.artist}</ThemedText>
-            <ThemedText style={styles.count}>{describeListeners(song.listeners).count}</ThemedText>
-            {song.itunesTrackId != null && <AppleMusicLink trackId={song.itunesTrackId} />}
-            {likeTrack && <LikeButton track={likeTrack} />}
-          </ThemedView>
+          {likeTrack ? <DoubleTapLike track={likeTrack}>{face(song)}</DoubleTapLike> : face(song)}
         </Animated.View>
       ) : (
         <ThemedView style={[styles.tile, { borderColor: border }]} backgroundColor={Colors.surface}>

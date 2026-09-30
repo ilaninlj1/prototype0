@@ -54,7 +54,7 @@ export default function ProfileScreen() {
     (t) => t.artistListeners != null && now[t.artistName] != null && describeGrowth(t.artistListeners, now[t.artistName]).calledIt
   );
   const genre = useMemo(() => topGenre(finds), [finds]);
-  const heard = history.filter((e) => e.action === 'skip' || e.action === 'like' || e.action === 'genre-jump').length;
+  const heard = history.filter((e) => e.action === 'skip' || e.action === 'like' || e.action === 'reveal' || e.action === 'genre-jump').length;
   const firstFind = finds.find((t) => t.likedAt != null);
 
   if (!loaded) {

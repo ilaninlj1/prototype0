@@ -16,9 +16,10 @@ type CardStackProps = {
   playing: boolean;
   showPlayIcon: boolean;
   allowDown?: boolean;
+  onDoubleTap?: (track: DiscoveryTrack) => void;
 };
 
-export function CardStack({ queue, cardSize, onSwipe, onHold, playing, showPlayIcon, allowDown }: CardStackProps) {
+export function CardStack({ queue, cardSize, onSwipe, onHold, playing, showPlayIcon, allowDown, onDoubleTap }: CardStackProps) {
   const visible = queue.slice(0, STACK_DEPTH);
 
   return (
@@ -37,6 +38,7 @@ export function CardStack({ queue, cardSize, onSwipe, onHold, playing, showPlayI
                 playing={playing}
                 showPlayIcon={showPlayIcon}
                 allowDown={allowDown}
+                onDoubleTap={onDoubleTap}
               />
             </View>
           ) : (
