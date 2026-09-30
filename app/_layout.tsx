@@ -8,7 +8,7 @@ import {
 } from '@expo-google-fonts/figtree';
 import { Caveat_700Bold } from '@expo-google-fonts/caveat';
 import { PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker';
-import { Syne_700Bold, Syne_800ExtraBold } from '@expo-google-fonts/syne';
+import { Archivo_700Bold, Archivo_800ExtraBold } from '@expo-google-fonts/archivo';
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { router, Stack, usePathname } from 'expo-router';
@@ -65,8 +65,8 @@ export default function RootLayout() {
   // Last.fm, whose terms need written approval for public web pages.
   const pathname = usePathname();
   const [fontsLoaded] = useFonts({
-    Syne_700Bold,
-    Syne_800ExtraBold,
+    Archivo_700Bold,
+    Archivo_800ExtraBold,
     Figtree_400Regular,
     Figtree_500Medium,
     Figtree_600SemiBold,

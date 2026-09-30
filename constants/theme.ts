@@ -57,11 +57,12 @@ export const Radius = {
   round: 999,
 };
 
-// Syne for display, Figtree for text, DM Mono for numbers. Loaded in
+// Archivo for display (heavy but plain enough to read at a glance), Figtree
+// for text, DM Mono for numbers. Loaded in
 // app/_layout.tsx; ThemedText picks the right weight file (see fontFor).
 export const Fonts = {
-  display: 'Syne_800ExtraBold',
-  displayBold: 'Syne_700Bold',
+  display: 'Archivo_800ExtraBold',
+  displayBold: 'Archivo_700Bold',
   sans: 'Figtree_400Regular',
   mono: 'DMMono_400Regular',
   monoMedium: 'DMMono_500Medium',
@@ -84,41 +85,41 @@ export function fontFor(family: string | undefined, weight: string | number | un
   return FIGTREE[String(weight)] ?? (Number(weight) >= 700 ? FIGTREE['700'] : family);
 }
 
-// Type with a point of view: tight, heavy Syne for anything you should read
+// Type with a point of view: heavy Archivo for anything you should read
 // first; small tracked-out mono "eyebrows" above it, like a label's catalog
 // line; Figtree for everything you read after.
 export const Typography = {
   hero: {
     fontFamily: Fonts.display,
-    fontSize: 60,
-    lineHeight: 58,
-    letterSpacing: -2,
+    fontSize: 48,
+    lineHeight: 52,
+    letterSpacing: -1,
   },
   title: {
     fontFamily: Fonts.display,
-    fontSize: 38,
-    lineHeight: 40,
-    letterSpacing: -1.2,
+    fontSize: 32,
+    lineHeight: 36,
+    letterSpacing: -0.6,
   },
   subtitle: {
     fontFamily: Fonts.displayBold,
-    fontSize: 22,
+    fontSize: 21,
     lineHeight: 26,
-    letterSpacing: -0.4,
+    letterSpacing: -0.2,
   },
   eyebrow: {
     fontFamily: Fonts.monoMedium,
-    fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: 2,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: 1.2,
     textTransform: 'uppercase' as const,
     color: Colors.textSecondary,
   },
   number: {
     fontFamily: Fonts.display,
-    fontSize: 44,
-    lineHeight: 46,
-    letterSpacing: -1.5,
+    fontSize: 40,
+    lineHeight: 44,
+    letterSpacing: -0.8,
     fontVariant: ['tabular-nums' as const],
     color: Colors.signal,
   },
