@@ -107,6 +107,7 @@ export default function RootLayout() {
             <Stack.Screen name="charts" options={{ headerShown: false }} />
             <Stack.Screen name="song" options={{ headerShown: false }} />
             <Stack.Screen name="art" options={{ headerShown: false }} />
+            <Stack.Screen name="dj-picks" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="songs" options={{ headerShown: false }} />
             <Stack.Screen name="comments" options={{ presentation: 'modal', headerShown: false }} />
             <Stack.Screen name="pack-send" options={{ presentation: 'fullScreenModal', headerShown: false }} />

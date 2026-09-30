@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
@@ -22,10 +22,12 @@ type RevealCardProps = {
   listeners: number | null | undefined;
   size: CardSize;
   onDone: () => void;
+  /** Extra lines under the listener count — DJ Picks puts the DJ's note here. */
+  extra?: ReactNode;
 };
 
 /** Shown after a right swipe: who it is, how few people know them, and what people say. */
-export function RevealCard({ track, listeners, size, onDone }: RevealCardProps) {
+export function RevealCard({ track, listeners, size, onDone, extra }: RevealCardProps) {
   const router = useRouter();
   // The cover arrives still blurred, as it was on the blind card, then sharpens.
   const blur = useSharedValue(1);
@@ -72,6 +74,7 @@ export function RevealCard({ track, listeners, size, onDone }: RevealCardProps) 
               )}
             </ThemedView>
             <HumanBadge artist={track.artistName} />
+            {extra}
 
             <ThemedView style={styles.links} backgroundColor="transparent">
               <AppleMusicLink trackId={track.id} url={track.trackViewUrl} />
