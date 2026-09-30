@@ -8,7 +8,7 @@ import { CreditLine } from '@/components/credits';
 import { SpotTheStarEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Ui } from '@/constants/theme';
 import { useGamePool } from '@/hooks/use-game-pool';
 import { usePlayback } from '@/hooks/use-playback';
 import { songToTrack } from '@/lib/blind-test';
@@ -69,7 +69,7 @@ export default function SpotTheStarScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="close" size={26} color={Colors.textSecondary} style={styles.close} />
         </TouchableOpacity>
-        <ThemedText type="label">Streak {streak}</ThemedText>
+        <ThemedText style={Ui.label}>Streak {streak}</ThemedText>
       </ThemedView>
       <SpotTheStarEmblem size={64} />
       <ThemedText type="eyebrow">Spot the Star · endless</ThemedText>
@@ -96,7 +96,7 @@ export default function SpotTheStarScreen() {
       )}
       <TouchableOpacity onPress={revealed ? next : lockIn} disabled={!revealed && picked == null}>
         <ThemedView style={[styles.button, !revealed && picked == null && styles.disabled]} backgroundColor={Colors.accent}>
-          <ThemedText type="label" style={{ color: Colors.accentText }}>
+          <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
             {revealed ? (right ? 'Next' : 'Play again') : picked == null ? 'Pick one' : `Lock in #${picked + 1}`}
           </ThemedText>
         </ThemedView>
@@ -112,6 +112,6 @@ const styles = StyleSheet.create({
   close: { fontSize: 22, color: Colors.textSecondary },
   dim: { color: Colors.textSecondary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginVertical: Spacing.md },
-  button: { paddingVertical: Spacing.md, borderRadius: Radius.pill, alignItems: 'center' },
+  button: { ...Ui.outlineButton },
   disabled: { opacity: 0.4 },
 });

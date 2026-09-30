@@ -9,7 +9,7 @@ import { AppleMusicLink, CreditLine } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { handleUrl, type Platform } from '@/lib/twins';
@@ -200,12 +200,12 @@ const styles = StyleSheet.create({
   percent: { fontFamily: Fonts.display, fontSize: 32, lineHeight: 36, color: Colors.signal },
   dim: { color: Colors.textSecondary },
   spinner: { marginTop: Spacing.xl },
-  waveBox: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.sm, marginTop: Spacing.md },
+  waveBox: { borderWidth: 1, borderColor: Colors.hairline, borderRadius: Radius.sm, padding: Spacing.lg, gap: Spacing.sm, marginTop: Spacing.md },
   wavedAtYou: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.highlight },
   contact: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   contactText: { flex: 1, fontFamily: 'Figtree_700Bold', fontSize: 16 },
-  primary: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.accent, borderRadius: Radius.lg, paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl },
-  primaryText: { fontFamily: 'Figtree_700Bold', color: Colors.accentText },
+  primary: { ...Ui.outlineButton, backgroundColor: Colors.accent, borderColor: Colors.accent },
+  primaryText: { ...Ui.label, color: Colors.accentText },
   section: { marginTop: Spacing.xl, marginBottom: Spacing.xs },
   row: { flexDirection: 'row', gap: Spacing.md, alignItems: 'center', paddingVertical: 6 },
   artWrap: { width: 56, height: 56 },

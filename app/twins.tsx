@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, Ui, TapTarget } from '@/constants/theme';
 import { cleanHandle, nameLooksLikeContact, type Platform, type Twin } from '@/lib/twins';
 import { fetchTwins, leaveTwins, myProfile, saveProfile, syncLikesNow, type MyProfile } from '@/lib/twins-api';
 
@@ -151,7 +151,7 @@ function JoinForm({ initial, onSaved }: { initial: MyProfile | null; onSaved: ()
       <ThemedText style={styles.dim}>Your handle stays hidden until you both wave.</ThemedText>
       <ThemedText style={styles.dim}>Leave any time and it’s all deleted.</ThemedText>
 
-      <ThemedText type="label" style={styles.label}>
+      <ThemedText style={[Ui.label, styles.label]}>
         Name
       </ThemedText>
       <TextInput value={name} onChangeText={setName} maxLength={30} placeholder="A nickname" placeholderTextColor={Colors.textTertiary} style={styles.input} />
@@ -169,7 +169,7 @@ function JoinForm({ initial, onSaved }: { initial: MyProfile | null; onSaved: ()
 
       {adult && (
         <>
-          <ThemedText type="label" style={styles.label}>
+          <ThemedText style={[Ui.label, styles.label]}>
             A handle to share (optional)
           </ThemedText>
           <View style={styles.segment}>
@@ -177,7 +177,7 @@ function JoinForm({ initial, onSaved }: { initial: MyProfile | null; onSaved: ()
               const on = platform === p.key;
               return (
                 <Pressable key={p.label} style={[styles.segmentItem, on && styles.segmentOn]} onPress={() => setPlatform(p.key)}>
-                  <ThemedText type="label" style={{ color: on ? Colors.accentText : Colors.textSecondary }}>
+                  <ThemedText style={[Ui.label, { color: on ? Colors.accentText : Colors.textSecondary }]}>
                     {p.label}
                   </ThemedText>
                 </Pressable>
@@ -216,8 +216,8 @@ const styles = StyleSheet.create({
   back: { alignSelf: 'flex-start', marginBottom: Spacing.sm },
   spinner: { marginTop: Spacing.xl },
   dim: { color: Colors.textSecondary },
-  empty: { fontFamily: Fonts.note, fontSize: 20, lineHeight: 24, color: Colors.textSecondary, marginTop: Spacing.lg },
-  twin: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, marginTop: Spacing.sm },
+  empty: { color: Colors.textSecondary, marginTop: Spacing.lg },
+  twin: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, borderWidth: 1, borderColor: Colors.hairline, borderRadius: Radius.sm, padding: Spacing.lg, marginTop: Spacing.sm },
   twinText: { flex: 1, gap: 2 },
   twinName: { fontFamily: 'Figtree_700Bold', fontSize: 17, lineHeight: 22 },
   waved: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.highlight, marginTop: 2 },
@@ -226,13 +226,13 @@ const styles = StyleSheet.create({
   link: { color: Colors.textSecondary, textDecorationLine: 'underline' },
   form: { gap: Spacing.sm, marginTop: Spacing.md },
   label: { marginTop: Spacing.md },
-  input: { backgroundColor: Colors.surface, color: Colors.text, fontFamily: Fonts.sans, fontSize: 16, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md },
+  input: Ui.input,
   check: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.md },
-  segment: { flexDirection: 'row', backgroundColor: Colors.surfaceElevated, borderRadius: Radius.pill, padding: 3 },
-  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: Spacing.sm, borderRadius: Radius.pill - 2 },
+  segment: { flexDirection: 'row', borderWidth: 1, borderColor: Colors.hairline, borderRadius: Radius.sm, padding: 2 },
+  segmentItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: TapTarget - 6, borderRadius: Radius.sm - 1 },
   segmentOn: { backgroundColor: Colors.accent },
   error: { color: Colors.text, fontSize: 13 },
-  primary: { backgroundColor: Colors.accent, borderRadius: Radius.lg, paddingVertical: Spacing.md, alignItems: 'center', marginTop: Spacing.lg },
-  primaryText: { fontFamily: 'Figtree_700Bold', color: Colors.accentText },
+  primary: { ...Ui.outlineButton, backgroundColor: Colors.accent, borderColor: Colors.accent, marginTop: Spacing.lg },
+  primaryText: { ...Ui.label, color: Colors.accentText },
   disabled: { opacity: 0.5 },
 });

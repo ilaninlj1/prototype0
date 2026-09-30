@@ -10,7 +10,7 @@ import { UndoButton } from '@/components/discovery/undo-button';
 import { CreditLine } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Ui } from '@/constants/theme';
 import { useDailyDrop } from '@/hooks/use-daily-drop';
 import { usePlayback } from '@/hooks/use-playback';
 import type { DiscoveryTrack, SwipeEntry } from '@/lib/discovery';
@@ -85,8 +85,8 @@ export default function DropPlayScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="close" size={26} color={Colors.textSecondary} style={styles.close} />
         </TouchableOpacity>
-        <ThemedView style={styles.pill} backgroundColor={Colors.accent}>
-          <ThemedText type="label" style={{ color: Colors.accentText }}>
+        <ThemedView style={styles.pill} backgroundColor="transparent">
+          <ThemedText style={Ui.label}>
             Daily Drop · {Math.min(daily.played + 1, 5)}/5
           </ThemedText>
         </ThemedView>
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl, gap: Spacing.md },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   close: { fontSize: 22, color: Colors.textSecondary, width: 60 },
-  pill: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: Radius.pill },
+  pill: { ...Ui.outlineButton, minHeight: 32 },
   cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   flash: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   flashText: { color: Colors.positive, fontSize: 32, lineHeight: 36 },

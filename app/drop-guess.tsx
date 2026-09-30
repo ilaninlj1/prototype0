@@ -6,7 +6,7 @@ import { GuessTile } from '@/components/play/guess-tile';
 import { CreditLine } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Ui } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import type { Drop, DropVote } from '@/lib/daily-drop';
 import { loadCachedDrop, loadDropProgress, saveDropProgress } from '@/lib/discovery-storage';
@@ -74,7 +74,7 @@ export default function DropGuessScreen() {
         <ThemedView
           style={[styles.button, (picked == null || locking) && styles.disabled]}
           backgroundColor={Colors.accent}>
-          <ThemedText type="label" style={{ color: Colors.accentText }}>
+          <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
             {picked == null ? 'Pick one' : `Lock in #${picked + 1}`}
           </ThemedText>
         </ThemedView>
@@ -88,6 +88,6 @@ const styles = StyleSheet.create({
   container: { padding: Spacing.lg, gap: Spacing.md, backgroundColor: Colors.background, flexGrow: 1, justifyContent: 'center' },
   dim: { color: Colors.textSecondary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginVertical: Spacing.lg },
-  button: { paddingVertical: Spacing.md, borderRadius: Radius.pill, alignItems: 'center' },
+  button: { ...Ui.outlineButton },
   disabled: { opacity: 0.4 },
 });

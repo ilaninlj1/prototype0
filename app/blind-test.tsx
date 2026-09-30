@@ -12,7 +12,7 @@ import { LikeButton } from '@/components/like-button';
 import { BlindTestEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts, Ui } from '@/constants/theme';
 import { useGamePool } from '@/hooks/use-game-pool';
 import { usePlayback } from '@/hooks/use-playback';
 import {
@@ -116,8 +116,8 @@ export default function BlindTestScreen() {
             const on = never.includes(g);
             return (
               <TouchableOpacity key={g} onPress={() => toggleGenre(g)} activeOpacity={0.7}>
-                <ThemedView style={styles.chip} backgroundColor={on ? Colors.accent : Colors.surfaceElevated}>
-                  <ThemedText type="label" style={{ color: on ? Colors.accentText : Colors.textSecondary }}>
+                <ThemedView style={[styles.chip, on && styles.chipOn]} backgroundColor={on ? Colors.accent : 'transparent'}>
+                  <ThemedText style={[Ui.label, { color: on ? Colors.accentText : Colors.textSecondary }]}>
                     {g}
                   </ThemedText>
                 </ThemedView>
@@ -127,7 +127,7 @@ export default function BlindTestScreen() {
         </View>
         <TouchableOpacity onPress={start} disabled={never.length === 0}>
           <ThemedView style={[styles.button, never.length === 0 && styles.disabled]} backgroundColor={Colors.accent}>
-            <ThemedText type="label" style={{ color: Colors.accentText }}>
+            <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
               {never.length === 0 ? 'Pick at least one' : 'Start'}
             </ThemedText>
           </ThemedView>
@@ -141,8 +141,8 @@ export default function BlindTestScreen() {
       <ThemedView style={[styles.fill, { paddingTop: insets.top + Spacing.lg }]}>
         <View style={styles.header}>
           {close}
-          <ThemedView style={styles.pill} backgroundColor={Colors.accent}>
-            <ThemedText type="label" style={{ color: Colors.accentText }}>
+          <ThemedView style={styles.pill} backgroundColor="transparent">
+            <ThemedText style={Ui.label}>
               Blind Spot Test · {liked.length + 1}/{items.length}
             </ThemedText>
           </ThemedView>
@@ -168,7 +168,7 @@ export default function BlindTestScreen() {
   return (
     <ScrollView contentContainerStyle={[styles.pad, { paddingTop: insets.top + Spacing.lg }]}>
       {close}
-      <ThemedView style={styles.result} backgroundColor={Colors.surface}>
+      <ThemedView style={styles.result} backgroundColor="transparent">
         <ThemedText style={styles.big}>{neverLiked}/5</ThemedText>
         <ThemedText type="subtitle">{testHeadline(never, neverLiked)}</ThemedText>
         <ThemedText style={styles.dim}>{testComparison(otherLiked)}</ThemedText>
@@ -177,7 +177,7 @@ export default function BlindTestScreen() {
 
       {items.map((x, i) => (
         <TouchableOpacity key={x.song.artist} onPress={() => togglePlay(i)} activeOpacity={0.8}>
-          <ThemedView style={styles.row} backgroundColor={Colors.surface}>
+          <ThemedView style={styles.row} backgroundColor="transparent">
             <Image source={{ uri: artworkUrl(x.song.artworkUrl, 200) }} style={styles.art} />
             <View style={styles.info}>
               <ThemedText style={styles.rowTitle} numberOfLines={1}>
@@ -205,13 +205,13 @@ export default function BlindTestScreen() {
       <CreditLine />
       <View style={styles.actions}>
         <TouchableOpacity style={styles.action} onPress={() => Share.share({ message: testShareText(never, neverLiked) }).catch(() => {})}>
-          <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
-            <ThemedText type="label">Share</ThemedText>
+          <ThemedView style={styles.button} backgroundColor="transparent">
+            <ThemedText style={Ui.label}>Share</ThemedText>
           </ThemedView>
         </TouchableOpacity>
         <TouchableOpacity style={styles.action} onPress={retake}>
           <ThemedView style={styles.button} backgroundColor={Colors.accent}>
-            <ThemedText type="label" style={{ color: Colors.accentText }}>
+            <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
               Retake
             </ThemedText>
           </ThemedView>
@@ -227,17 +227,20 @@ const styles = StyleSheet.create({
   close: { fontSize: 22, color: Colors.textSecondary, width: 60 },
   dim: { color: Colors.textSecondary },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginVertical: Spacing.md },
-  chip: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: Radius.pill },
-  button: { paddingVertical: Spacing.md, borderRadius: Radius.pill, alignItems: 'center' },
+  // Thin cream outlines; the chosen option and the main action are filled cream.
+  chip: Ui.outlineButton,
+  chipOn: { borderColor: Colors.accent },
+  button: Ui.outlineButton,
   disabled: { opacity: 0.4 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerSpacer: { width: 60 },
-  pill: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: Radius.pill },
+  pill: { ...Ui.outlineButton, minHeight: 32 },
   cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  result: { borderRadius: Radius.lg, padding: Spacing.xl, gap: Spacing.xs },
+  // No box: the big number sits on a thin rule, like You.
+  result: { borderBottomWidth: 1, borderBottomColor: Colors.rule, paddingBottom: Spacing.lg, gap: Spacing.xs },
   big: { fontSize: 56, lineHeight: 60, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display },
   verdict: { fontSize: 18, fontWeight: '700', marginTop: Spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.rule },
   art: { width: 64, height: 64, borderRadius: Radius.sm },
   info: { flex: 1, gap: 1 },
   rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },

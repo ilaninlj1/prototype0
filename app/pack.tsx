@@ -10,7 +10,7 @@ import { AppleMusicLink, SpotifyLink, CreditLine } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts, Ui } from '@/constants/theme';
 import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import { matchLine, orderByIds, packUrl, parsePack, shareBackText } from '@/lib/blind-pack';
 import { artworkUrl, parseArtistLookupResponse, type DiscoveryTrack } from '@/lib/discovery';
@@ -93,7 +93,7 @@ export default function PackScreen() {
         {/* Browsers only allow sound after a tap, so starting is a tap. */}
         <TouchableOpacity onPress={() => setStarted(true)}>
           <ThemedView style={styles.button} backgroundColor={Colors.accent}>
-            <ThemedText type="label" style={{ color: Colors.accentText }}>
+            <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
               Start listening
             </ThemedText>
           </ThemedView>
@@ -106,8 +106,8 @@ export default function PackScreen() {
   if (!done) {
     return (
       <ThemedView style={[styles.fill, pad]}>
-        <ThemedView style={styles.pill} backgroundColor={Colors.accent}>
-          <ThemedText type="label" style={{ color: Colors.accentText }}>
+        <ThemedView style={styles.pill} backgroundColor="transparent">
+          <ThemedText style={Ui.label}>
             {pack.from}&apos;s pack · {liked.length + 1}/{tracks.length}
           </ThemedText>
         </ThemedView>
@@ -141,7 +141,7 @@ export default function PackScreen() {
       </ThemedText>
       {!isArtist && !isRegion && <ThemedText style={styles.dim}>These are all songs {pack.from} found and liked.</ThemedText>}
       {tracks.map((t, i) => (
-        <ThemedView key={t.id} style={styles.row} backgroundColor={Colors.surface}>
+        <ThemedView key={t.id} style={styles.row} backgroundColor="transparent">
           <Image source={{ uri: artworkUrl(t.artworkUrl100, 200) }} style={styles.art} />
           <View style={styles.info}>
             <ThemedText style={styles.rowTitle} numberOfLines={1}>
@@ -161,7 +161,7 @@ export default function PackScreen() {
       {isArtist || isRegion ? (
         <TouchableOpacity onPress={() => router.back()}>
           <ThemedView style={styles.button} backgroundColor={Colors.accent}>
-            <ThemedText type="label" style={{ color: Colors.accentText }}>
+            <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
               Done
             </ThemedText>
           </ThemedView>
@@ -169,7 +169,7 @@ export default function PackScreen() {
       ) : (
         <TouchableOpacity onPress={() => Share.share({ message: shareBackText(pack.from, likedCount, tracks.length, link) }).catch(() => {})}>
           <ThemedView style={styles.button} backgroundColor={Colors.accent}>
-            <ThemedText type="label" style={{ color: Colors.accentText }}>
+            <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
               Send your score back
             </ThemedText>
           </ThemedView>
@@ -186,13 +186,13 @@ const styles = StyleSheet.create({
   centerText: { textAlign: 'center' },
   scroll: { padding: Spacing.lg, gap: Spacing.md, flexGrow: 1, backgroundColor: Colors.background },
   dim: { color: Colors.textSecondary },
-  pill: { alignSelf: 'center', paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: Radius.pill },
+  pill: { ...Ui.outlineButton, minHeight: 32, alignSelf: 'center' },
   cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   big: { fontSize: 56, lineHeight: 60, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.rule },
   art: { width: 64, height: 64, borderRadius: Radius.sm },
   info: { flex: 1, gap: 1 },
   rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
   links: { flexDirection: 'row', gap: Spacing.lg, alignItems: 'center' },
-  button: { paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl, borderRadius: Radius.pill, alignItems: 'center' },
+  button: { ...Ui.outlineButton },
 });

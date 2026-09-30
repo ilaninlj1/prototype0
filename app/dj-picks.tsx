@@ -12,7 +12,7 @@ import { fitCardToWidth, MAX_CARD_HEIGHT, MAX_CARD_WIDTH, type CardSize, type Sw
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
 import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import { artworkUrl } from '@/lib/discovery';
 import { loadDjPicks, type DjCard } from '@/lib/dj-picks-api';
@@ -70,7 +70,7 @@ export default function DjPicksScreen() {
         {cards && (
           <TouchableOpacity onPress={() => router.back()}>
             <ThemedView style={styles.button} backgroundColor={Colors.accent}>
-              <ThemedText type="label" style={{ color: Colors.accentText }}>
+              <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
                 Back
               </ThemedText>
             </ThemedView>
@@ -87,7 +87,7 @@ export default function DjPicksScreen() {
         <ThemedText type="title">You wanted to know {revealedIds.size} of {cards.length}.</ThemedText>
         <ThemedText style={styles.dim}>Every one of these was picked by a person, on the air, in the last day.</ThemedText>
         {cards.map((c) => (
-          <ThemedView key={c.track.id} style={styles.row} backgroundColor={Colors.surface}>
+          <ThemedView key={c.track.id} style={styles.row} backgroundColor="transparent">
             <Image source={{ uri: artworkUrl(c.track.artworkUrl100, 200) }} style={styles.art} />
             <View style={styles.info}>
               <ThemedText style={styles.rowTitle} numberOfLines={1}>
@@ -112,7 +112,7 @@ export default function DjPicksScreen() {
         ))}
         <TouchableOpacity onPress={() => router.back()}>
           <ThemedView style={styles.button} backgroundColor={Colors.accent}>
-            <ThemedText type="label" style={{ color: Colors.accentText }}>
+            <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
               Done
             </ThemedText>
           </ThemedView>
@@ -129,8 +129,8 @@ export default function DjPicksScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="close" size={26} color={Colors.textSecondary} />
         </TouchableOpacity>
-        <ThemedView style={styles.pill} backgroundColor={Colors.accent}>
-          <ThemedText type="label" style={{ color: Colors.accentText }}>
+        <ThemedView style={styles.pill} backgroundColor="transparent">
+          <ThemedText style={Ui.label}>
             DJ Picks · {index + 1}/{cards.length}
           </ThemedText>
         </ThemedView>
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: Spacing.lg, gap: Spacing.md },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerSpacer: { width: 26 },
-  pill: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: Radius.pill },
+  pill: { ...Ui.outlineButton, minHeight: 32 },
   cardArea: { flex: 1, alignItems: 'center', justifyContent: 'flex-start' },
   revealScroll: { alignSelf: 'stretch' },
   dim: { color: Colors.textSecondary },
@@ -211,10 +211,10 @@ const styles = StyleSheet.create({
   note: { fontFamily: Fonts.sans, fontStyle: 'italic', fontSize: 13, lineHeight: 18, color: Colors.text },
   noteSmall: { fontFamily: Fonts.sans, fontStyle: 'italic', fontSize: 13, lineHeight: 18, color: Colors.text },
   credit: { textAlign: 'center', color: Colors.textTertiary },
-  row: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md },
+  row: { flexDirection: 'row', gap: Spacing.md, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.rule },
   art: { width: 64, height: 64, borderRadius: Radius.sm },
   info: { flex: 1, gap: 2 },
   rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 16, lineHeight: 20 },
   links: { flexDirection: 'row', gap: Spacing.lg, alignItems: 'center', marginTop: 4 },
-  button: { paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl, borderRadius: Radius.pill, alignItems: 'center' },
+  button: { ...Ui.outlineButton },
 });

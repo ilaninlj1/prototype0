@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlindPackEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
 import { packable, packUrl } from '@/lib/blind-pack';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { loadLikedTracks, loadSenderName, saveSenderName } from '@/lib/discovery-storage';
@@ -75,7 +75,7 @@ export default function PackSendScreen() {
           const on = picked.includes(t.id);
           return (
             <TouchableOpacity key={t.id} onPress={() => toggle(t.id)} activeOpacity={0.8}>
-              <ThemedView style={[styles.row, on && styles.rowOn]} backgroundColor={Colors.surface}>
+              <ThemedView style={[styles.row, on && styles.rowOn]} backgroundColor="transparent">
                 <Image source={{ uri: artworkUrl(t.artworkUrl100, 200) }} style={styles.art} />
                 <View style={styles.info}>
                   <ThemedText style={styles.rowTitle} numberOfLines={1}>
@@ -94,7 +94,7 @@ export default function PackSendScreen() {
 
       <TouchableOpacity onPress={send} disabled={!ready}>
         <ThemedView style={[styles.button, !ready && styles.disabled]} backgroundColor={Colors.accent}>
-          <ThemedText type="label" style={{ color: Colors.accentText }}>
+          <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
             {!WEB_URL ? 'Pack links are not set up yet' : `Send pack · ${picked.length}/${PACK_SIZE}`}
           </ThemedText>
         </ThemedView>
@@ -107,20 +107,14 @@ const styles = StyleSheet.create({
   pad: { padding: Spacing.lg, gap: Spacing.md, flexGrow: 1, backgroundColor: Colors.background },
   close: { fontSize: 22, color: Colors.textSecondary },
   dim: { color: Colors.textSecondary },
-  input: {
-    backgroundColor: Colors.surface,
-    color: Colors.text,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    fontSize: 16,
-  },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 2, borderColor: 'transparent' },
+  input: Ui.input,
+  // Picked songs get a thin cream outline.
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.sm, borderWidth: 1, borderColor: 'transparent', borderRadius: Radius.sm },
   rowOn: { borderColor: Colors.accent },
   art: { width: 56, height: 56, borderRadius: Radius.sm },
   info: { flex: 1, gap: 1 },
   rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
   check: { color: Colors.accent, fontSize: 20, fontWeight: '800', width: 24 },
-  button: { paddingVertical: Spacing.md, borderRadius: Radius.pill, alignItems: 'center', marginTop: Spacing.md },
+  button: { ...Ui.outlineButton, marginTop: Spacing.md  },
   disabled: { opacity: 0.4 },
 });

@@ -8,7 +8,7 @@ import { CreditLine } from '@/components/credits';
 import { HeadToHeadEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Ui } from '@/constants/theme';
 import { useGamePool } from '@/hooks/use-game-pool';
 import { usePlayback } from '@/hooks/use-playback';
 import { songToTrack } from '@/lib/blind-test';
@@ -81,7 +81,7 @@ export default function HeadToHeadScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="close" size={26} color={Colors.textSecondary} style={styles.close} />
         </TouchableOpacity>
-        <ThemedText type="label">Streak {streak}</ThemedText>
+        <ThemedText style={Ui.label}>Streak {streak}</ThemedText>
       </ThemedView>
       <HeadToHeadEmblem size={64} />
       <ThemedText type="eyebrow">Head to Head · endless</ThemedText>
@@ -109,7 +109,7 @@ export default function HeadToHeadScreen() {
           </ThemedText>
           <TouchableOpacity onPress={next}>
             <ThemedView style={styles.button} backgroundColor={Colors.accent}>
-              <ThemedText type="label" style={{ color: Colors.accentText }}>{right ? 'Next' : 'Play again'}</ThemedText>
+              <ThemedText style={[Ui.label, { color: Colors.accentText }]}>{right ? 'Next' : 'Play again'}</ThemedText>
             </ThemedView>
           </TouchableOpacity>
         </>
@@ -118,7 +118,7 @@ export default function HeadToHeadScreen() {
           {(['A', 'B'] as const).map((l, i) => (
             <TouchableOpacity key={l} style={styles.choice} onPress={() => choose(i as 0 | 1)}>
               <ThemedView style={styles.button} backgroundColor={Colors.accent}>
-                <ThemedText type="label" style={{ color: Colors.accentText }}>{l} has more</ThemedText>
+                <ThemedText style={[Ui.label, { color: Colors.accentText }]}>{l} has more</ThemedText>
               </ThemedView>
             </TouchableOpacity>
           ))}
@@ -137,5 +137,5 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', gap: Spacing.md, marginVertical: Spacing.md },
   choices: { flexDirection: 'row', gap: Spacing.md },
   choice: { flex: 1 },
-  button: { paddingVertical: Spacing.md, borderRadius: Radius.pill, alignItems: 'center' },
+  button: { ...Ui.outlineButton },
 });

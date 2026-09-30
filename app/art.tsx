@@ -11,7 +11,7 @@ import { captureRef } from 'react-native-view-shot';
 import { ArtPiece } from '@/components/art/art-piece';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
 import { useArt } from '@/hooks/use-art';
 import { ART, type ArtCanvas } from '@/lib/collage';
 
@@ -132,10 +132,10 @@ const styles = StyleSheet.create({
   caption: { gap: 2 },
   captionText: { fontFamily: Fonts.mono, fontSize: 10, letterSpacing: 1, color: Colors.textTertiary },
   actions: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
-  primary: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.accent, borderRadius: Radius.lg, paddingVertical: Spacing.md },
-  primaryText: { fontFamily: 'Figtree_700Bold', color: Colors.accentText },
-  secondary: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingVertical: Spacing.md },
-  secondaryText: { fontFamily: 'Figtree_700Bold', color: Colors.text },
+  primary: { ...Ui.outlineButton, flex: 1, backgroundColor: Colors.accent, borderColor: Colors.accent },
+  primaryText: { ...Ui.label, color: Colors.accentText },
+  secondary: { ...Ui.outlineButton, flex: 1 },
+  secondaryText: Ui.label,
   note: { color: Colors.textSecondary, marginTop: Spacing.sm },
   section: { marginTop: Spacing.xl, marginBottom: Spacing.sm },
   past: { gap: 4, marginBottom: Spacing.md },

@@ -182,6 +182,17 @@ export const Ui = {
     justifyContent: 'center' as const,
     gap: 6,
   },
+  /** Text fields: a thin outline, no fill. */
+  input: {
+    minHeight: TapTarget,
+    borderWidth: 1,
+    borderColor: Colors.hairline,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    color: Colors.text,
+    fontFamily: Fonts.sans,
+    fontSize: 16,
+  },
   /** Mono uppercase, for button labels and section labels. */
   label: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: 1.2, textTransform: 'uppercase' as const, color: Colors.text },
 };

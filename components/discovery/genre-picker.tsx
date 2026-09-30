@@ -11,7 +11,7 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
+import { Colors, Radius, Spacing, TapTarget, Ui } from '@/constants/theme';
 import { buildGenreSections, type GenreSection } from './genre-taxonomy';
 
 type GenrePickerProps = {
@@ -117,11 +117,9 @@ export function GenrePicker({
         onLayout={(e) => registerRowOffset(genre, e)}>
         <ThemedView
           style={[styles.leafRow, indented && styles.rowIndented, isCurrent && styles.rowCurrent]}
-          backgroundColor={Colors.surface}>
-          <ThemedText type="label" style={styles.rowText}>
-            {genre}
-          </ThemedText>
-          {heard && <ThemedText style={styles.checkmark}>✓</ThemedText>}
+          backgroundColor={isCurrent ? Colors.accent : 'transparent'}>
+          <ThemedText style={[styles.rowText, isCurrent && styles.onCream]}>{genre}</ThemedText>
+          {heard && <ThemedText style={[styles.checkmark, isCurrent && styles.onCream]}>✓</ThemedText>}
         </ThemedView>
       </TouchableOpacity>
     );
@@ -135,19 +133,17 @@ export function GenrePicker({
       <ThemedView key={section.label}>
         <ThemedView
           style={[styles.groupRow, isCurrent && styles.rowCurrent]}
-          backgroundColor={Colors.surface}
+          backgroundColor={isCurrent ? Colors.accent : 'transparent'}
           onLayout={section.genre ? (e) => registerRowOffset(section.genre as string, e) : undefined}>
           <TouchableOpacity
             onPress={() => (section.genre ? pick(section.genre) : toggleGroup(section.label))}
             activeOpacity={0.7}
             style={styles.groupLabelTap}>
-            <ThemedText type="label" style={styles.rowText}>
-              {section.label}
-            </ThemedText>
-            {heard && <ThemedText style={styles.checkmark}>✓</ThemedText>}
+            <ThemedText style={[styles.rowText, isCurrent && styles.onCream]}>{section.label}</ThemedText>
+            {heard && <ThemedText style={[styles.checkmark, isCurrent && styles.onCream]}>✓</ThemedText>}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => toggleGroup(section.label)} activeOpacity={0.7} style={styles.chevronTap}>
-            <ThemedText style={styles.chevron}>{isOpen ? '▾' : '▸'}</ThemedText>
+            <ThemedText style={[styles.chevron, isCurrent && styles.onCream]}>{isOpen ? '▾' : '▸'}</ThemedText>
           </TouchableOpacity>
         </ThemedView>
         {isOpen && section.children.map((child) => renderRow(child, true))}
@@ -168,12 +164,9 @@ export function GenrePicker({
         <Pressable style={styles.backdrop} onPress={close}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <ScrollView ref={scrollRef} contentContainerStyle={styles.list}>
-              <TouchableOpacity onPress={explore} activeOpacity={0.7}>
-                <ThemedView style={styles.exploreRow} backgroundColor={Colors.surface}>
-                  <ThemedText type="label" style={styles.exploreText}>
-                    Explore
-                  </ThemedText>
-                </ThemedView>
+              <TouchableOpacity onPress={explore} activeOpacity={0.6} style={[Ui.outlineButton, styles.exploreButton]}>
+                <Ionicons name="shuffle" size={14} color={Colors.text} />
+                <ThemedText style={Ui.label}>Explore somewhere new</ThemedText>
               </TouchableOpacity>
               {sections.map((section) =>
                 section.type === 'leaf' ? renderRow(section.genre, false) : renderGroup(section)
@@ -202,36 +195,41 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
+  // Same sheet as Tune: flat navy under a thin rule.
   sheet: {
     maxHeight: '70%',
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
+    backgroundColor: Colors.background,
+    borderTopWidth: 1,
+    borderTopColor: Colors.hairline,
+    borderTopLeftRadius: Radius.md,
+    borderTopRightRadius: Radius.md,
     overflow: 'hidden',
   },
   list: {
     paddingVertical: Spacing.sm,
   },
-  exploreRow: {
-    paddingVertical: Spacing.md + 2,
-    paddingHorizontal: Spacing.xl,
-  },
-  exploreText: {
-    color: Colors.accent,
-    fontSize: 16,
+  exploreButton: {
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   leafRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.md + 2,
+    minHeight: TapTarget,
     paddingHorizontal: Spacing.xl,
   },
   rowIndented: {
     paddingLeft: Spacing.xxl + Spacing.md,
   },
+  // The chosen genre is filled cream.
   rowCurrent: {
-    backgroundColor: Colors.surfaceElevated,
+    marginHorizontal: Spacing.sm,
+    borderRadius: Radius.sm,
+  },
+  onCream: {
+    color: Colors.accentText,
   },
   groupRow: {
     flexDirection: 'row',
@@ -243,18 +241,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.md + 2,
+    minHeight: TapTarget,
   },
   chevronTap: {
-    paddingVertical: Spacing.md + 2,
-    paddingLeft: Spacing.md,
+    minHeight: TapTarget,
+    minWidth: TapTarget,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   chevron: {
     color: Colors.textTertiary,
     fontSize: 16,
   },
   rowText: {
-    fontSize: 16,
+    ...Ui.label,
+    fontSize: 13,
   },
   checkmark: {
     color: Colors.accent,

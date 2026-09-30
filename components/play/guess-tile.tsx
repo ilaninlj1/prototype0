@@ -7,7 +7,7 @@ import { DoubleTapLike } from '@/components/double-tap-like';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts, Ui } from '@/constants/theme';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 
 type Props = {
@@ -24,9 +24,10 @@ type Props = {
 
 /** A blind numbered tile that flips to show the song and its listener count. */
 export function GuessTile({ label, sub, selected, revealed, correct, song, onPress, likeTrack }: Props) {
-  const border = revealed && correct ? Colors.positive : selected ? Colors.accent : 'transparent';
+  // A thin outline; the picked tile is filled cream; after the reveal the right one gets a green outline.
+  const faceBorder = correct ? { borderColor: Colors.positive, borderWidth: 2 } : null;
   const face = (song: NonNullable<Props['song']>) => (
-    <ThemedView style={[styles.tile, { borderColor: border }]} backgroundColor={Colors.surface}>
+    <ThemedView style={[styles.tile, faceBorder]} backgroundColor="transparent">
       <Image source={{ uri: artworkUrl(song.artworkUrl, 300) }} style={styles.art} />
       <ThemedText type="defaultSemiBold" numberOfLines={2} style={styles.title}>
         {song.title}
@@ -47,9 +48,9 @@ export function GuessTile({ label, sub, selected, revealed, correct, song, onPre
           {likeTrack ? <DoubleTapLike track={likeTrack}>{face(song)}</DoubleTapLike> : face(song)}
         </Animated.View>
       ) : (
-        <ThemedView style={[styles.tile, { borderColor: border }]} backgroundColor={Colors.surface}>
-          <ThemedText style={styles.label}>{label}</ThemedText>
-          {sub && <ThemedText type="caption">{sub}</ThemedText>}
+        <ThemedView style={[styles.tile, selected && styles.tileOn]} backgroundColor={selected ? Colors.accent : 'transparent'}>
+          <ThemedText style={[styles.label, selected && styles.onCream]}>{label}</ThemedText>
+          {sub && <ThemedText style={[styles.sub, selected && styles.onCream]}>{sub}</ThemedText>}
         </ThemedView>
       )}
     </TouchableOpacity>
@@ -58,7 +59,10 @@ export function GuessTile({ label, sub, selected, revealed, correct, song, onPre
 
 const styles = StyleSheet.create({
   wrap: { width: '46%', flexGrow: 1 },
-  tile: { aspectRatio: 0.85, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 3, padding: Spacing.sm, gap: 2 },
+  tile: { aspectRatio: 0.85, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.hairline, padding: Spacing.sm, gap: 2 },
+  tileOn: { borderColor: Colors.accent },
+  onCream: { color: Colors.accentText },
+  sub: { ...Ui.label, color: Colors.textSecondary },
   label: { fontSize: 36, lineHeight: 40, fontWeight: '800' },
   art: { width: '70%', aspectRatio: 1, borderRadius: Radius.sm, marginBottom: 4 },
   title: { textAlign: 'center', fontSize: 14, lineHeight: 18 },

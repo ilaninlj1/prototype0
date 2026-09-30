@@ -10,7 +10,7 @@ import { LikeButton } from '@/components/like-button';
 import { DoubleTapLike } from '@/components/double-tap-like';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts, Ui } from '@/constants/theme';
 import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import {
   crowdLabel,
@@ -94,7 +94,7 @@ export default function DropResultsScreen() {
             <View style={[styles.page, { width }]}>
               <DoubleTapLike track={dropToDiscoveryTracks(drop)[position]} style={styles.pressFill}>
               <Pressable style={styles.pressFill} onLongPress={() => (status.playing ? player.pause() : player.play())} delayLongPress={400}>
-              <ThemedView style={[styles.card, { width: cardWidth }]} backgroundColor={Colors.surface}>
+              <ThemedView style={[styles.card, { width: cardWidth }]} backgroundColor="transparent">
                 <Image source={{ uri: artworkUrl(song.artworkUrl, 100) }} style={StyleSheet.absoluteFill} blurRadius={50} />
                 <View style={[StyleSheet.absoluteFill, styles.scrim]} />
                 <ScrollView contentContainerStyle={styles.cardBody}>
@@ -142,7 +142,7 @@ export default function DropResultsScreen() {
       <View style={styles.ladder}>
         <View style={styles.dots}>
           {ranked.map((_, i) => (
-            <ThemedView key={i} style={styles.dot} backgroundColor={i <= page ? Colors.accent : Colors.surfaceElevated} />
+            <ThemedView key={i} style={[styles.dot, i === page && styles.dotOn]} backgroundColor={i <= page ? Colors.accent : Colors.rule} />
           ))}
         </View>
         <ThemedText type="caption">Fewest ← → Most listeners</ThemedText>
@@ -151,13 +151,13 @@ export default function DropResultsScreen() {
       <CreditLine />
       <View style={styles.actions}>
         <TouchableOpacity style={styles.action} onPress={() => Share.share({ message: shareText(drop, votes, guess, streak) }).catch(() => {})}>
-          <ThemedView style={styles.button} backgroundColor={Colors.surfaceElevated}>
-            <ThemedText type="label">Share</ThemedText>
+          <ThemedView style={styles.button} backgroundColor="transparent">
+            <ThemedText style={Ui.label}>Share</ThemedText>
           </ThemedView>
         </TouchableOpacity>
         <TouchableOpacity style={styles.action} onPress={() => router.back()}>
           <ThemedView style={styles.button} backgroundColor={Colors.accent}>
-            <ThemedText type="label" style={{ color: Colors.accentText }}>
+            <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
               Done
             </ThemedText>
           </ThemedView>
@@ -175,7 +175,8 @@ const styles = StyleSheet.create({
   page: { alignItems: 'center' },
   pressFill: { flex: 1 },
   scrim: { backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-  card: { flex: 1, borderRadius: Radius.lg, overflow: 'hidden' },
+  // Same as Home's revealed card: a thin outline, no fill.
+  card: { flex: 1, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.hairline, overflow: 'hidden' },
   cardBody: { padding: Spacing.lg, gap: Spacing.xs },
   rank: { fontSize: 22, lineHeight: 28, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display },
   art: { width: '100%', aspectRatio: 1, borderRadius: Radius.md, marginVertical: Spacing.sm },
@@ -188,8 +189,10 @@ const styles = StyleSheet.create({
   barFill: { height: 6 },
   ladder: { alignItems: 'center', gap: Spacing.xs },
   dots: { flexDirection: 'row', gap: Spacing.sm },
-  dot: { width: 10, height: 10, borderRadius: Radius.round },
+  // Thin bars, like the tab bar's marker.
+  dot: { width: 14, height: 2 },
+  dotOn: { width: 24 },
   actions: { flexDirection: 'row', gap: Spacing.md, paddingHorizontal: Spacing.lg, marginTop: Spacing.md },
   action: { flex: 1 },
-  button: { paddingVertical: Spacing.md, borderRadius: Radius.pill, alignItems: 'center' },
+  button: { ...Ui.outlineButton },
 });
