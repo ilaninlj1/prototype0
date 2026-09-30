@@ -7,6 +7,8 @@ import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
 import { RevealCard } from '@/components/discovery/reveal-card';
+import { DropRing } from '@/components/drop-ring';
+import { HomeBackdrop } from '@/components/home-backdrop';
 import { saveLike } from '@/components/like-button';
 import {
   computeCardSize,
@@ -475,8 +477,12 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
+      <HomeBackdrop />
       <View style={styles.headerRow}>
-        <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
+        <View style={styles.headerLeft}>
+          <DropRing />
+          <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
+        </View>
         <GenrePicker
           curatedGenres={GENRES}
           discoveredGenres={discoveredGenres}
@@ -554,7 +560,12 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
   },
   bottomRow: {
     flexDirection: 'row',
