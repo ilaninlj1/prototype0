@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
+import { AppleMusicLink, SpotifyLink, CreditLine, LastfmLink } from '@/components/credits';
 import { DoubleTapLike } from '@/components/double-tap-like';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
@@ -175,6 +175,7 @@ export default function SongScreen() {
 
         <View style={styles.links}>
           <AppleMusicLink trackId={track.id} url={track.trackViewUrl} />
+          <SpotifyLink artist={track.artistName} title={track.trackName} />
           <LastfmLink artist={track.artistName} />
         </View>
         <CreditLine />

@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { AppleMusicLink } from '@/components/credits';
+import { AppleMusicLink, SpotifyLink } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -35,6 +35,7 @@ export function MiniPlayer({
               {track.artistName}
             </ThemedText>
             <AppleMusicLink trackId={track.id} url={track.trackViewUrl} />
+            <SpotifyLink artist={track.artistName} title={track.trackName} />
           </View>
         </View>
         <Pressable

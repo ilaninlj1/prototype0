@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FlipInEasyY } from 'react-native-reanimated';
 
-import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
+import { AppleMusicLink, SpotifyLink, CreditLine, LastfmLink } from '@/components/credits';
 import { DoubleTapLike } from '@/components/double-tap-like';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
@@ -64,6 +64,7 @@ export function RevealCard({ track, listeners, size, onDone }: RevealCardProps) 
 
             <ThemedView style={styles.links} backgroundColor="transparent">
               <AppleMusicLink trackId={track.id} url={track.trackViewUrl} />
+              <SpotifyLink artist={track.artistName} title={track.trackName} />
               {described && <LastfmLink artist={track.artistName} />}
             </ThemedView>
             <CreditLine />

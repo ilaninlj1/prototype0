@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, Share, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
+import { AppleMusicLink, SpotifyLink, CreditLine, LastfmLink } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
 import { DoubleTapLike } from '@/components/double-tap-like';
 import { ThemedText } from '@/components/themed-text';
@@ -124,6 +124,7 @@ export default function DropResultsScreen() {
                       <Ionicons name="chatbubble-outline" size={20} color={Colors.text} />
                     </Pressable>
                     <AppleMusicLink trackId={song.itunesTrackId} />
+                    <SpotifyLink artist={song.artist} title={song.title} />
                     <LastfmLink artist={song.artist} />
                   </View>
                   <View style={styles.tags}>

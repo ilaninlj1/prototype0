@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CardStack } from '@/components/discovery/card-stack';
 import { computeCardSize, MAX_CARD_HEIGHT, MAX_CARD_WIDTH, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
-import { AppleMusicLink, CreditLine } from '@/components/credits';
+import { AppleMusicLink, SpotifyLink, CreditLine } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -149,6 +149,7 @@ export default function PackScreen() {
             <View style={styles.links}>
               <LikeButton track={t} size={18} />
               <AppleMusicLink trackId={t.id} url={t.trackViewUrl} />
+              <SpotifyLink artist={t.artistName} title={t.trackName} />
             </View>
           </View>
         </ThemedView>

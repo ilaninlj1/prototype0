@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CardStack } from '@/components/discovery/card-stack';
 import { computeCardSize, MAX_CARD_HEIGHT, MAX_CARD_WIDTH, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
-import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
+import { AppleMusicLink, SpotifyLink, CreditLine, LastfmLink } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
 import { BlindTestEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
@@ -193,6 +193,7 @@ export default function BlindTestScreen() {
               <View style={styles.links}>
                 <LikeButton track={songToTrack(x.song)} size={18} />
                 <AppleMusicLink trackId={x.song.itunesTrackId} />
+                <SpotifyLink artist={x.song.artist} title={x.song.title} />
                 <LastfmLink artist={x.song.artist} />
               </View>
             </View>

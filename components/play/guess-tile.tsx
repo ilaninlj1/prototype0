@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, { FlipInEasyY } from 'react-native-reanimated';
 
-import { AppleMusicLink } from '@/components/credits';
+import { AppleMusicLink, SpotifyLink } from '@/components/credits';
 import { DoubleTapLike } from '@/components/double-tap-like';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
@@ -36,6 +36,7 @@ export function GuessTile({ label, sub, selected, revealed, correct, song, onPre
       </ThemedText>
       <ThemedText style={styles.count}>{describeListeners(song.listeners).count}</ThemedText>
       {song.itunesTrackId != null && <AppleMusicLink trackId={song.itunesTrackId} />}
+      <SpotifyLink artist={song.artist} title={song.title} />
       {likeTrack && <LikeButton track={likeTrack} />}
     </ThemedView>
   );
