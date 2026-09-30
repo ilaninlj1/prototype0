@@ -10,7 +10,7 @@ import { AppleMusicLink, CreditLine } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import { matchLine, orderByIds, packUrl, parsePack, shareBackText } from '@/lib/blind-pack';
 import { artworkUrl, parseArtistLookupResponse, type DiscoveryTrack } from '@/lib/discovery';
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   dim: { color: Colors.textSecondary },
   pill: { alignSelf: 'center', paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: Radius.pill },
   cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  big: { fontSize: 56, lineHeight: 60, fontWeight: '800', color: Colors.accent },
+  big: { fontSize: 56, lineHeight: 60, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md },
   art: { width: 56, height: 56, borderRadius: Radius.sm },
   info: { flex: 1, gap: 2 },

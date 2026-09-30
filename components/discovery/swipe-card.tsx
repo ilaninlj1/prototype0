@@ -15,6 +15,7 @@ import Animated, {
   type AnimatedStyle,
 } from 'react-native-reanimated';
 
+import { BlindspotMark } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -48,7 +49,8 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
   }, [playing, pulse]);
 
   const ringStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(pulse.value, [0, 1], [0.5, 0]),
+    // Invisible at rest; only a playing preview sends rings out.
+    opacity: interpolate(pulse.value, [0, 0.05, 1], [0, 0.4, 0]),
     transform: [{ scale: interpolate(pulse.value, [0, 1], [1, 2.2]) }],
   }));
 
@@ -63,9 +65,12 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
 
       <ThemedView style={styles.center} backgroundColor="transparent">
         <Animated.View style={[styles.ring, ringStyle]} />
-        <ThemedView style={styles.core} backgroundColor={Colors.accent}>
-          {showPlayIcon && <Ionicons name="play" size={36} color={Colors.accentText} style={styles.playIcon} />}
-        </ThemedView>
+        <BlindspotMark size={120} />
+        {showPlayIcon && (
+          <ThemedView style={styles.playBadge} backgroundColor={Colors.accent}>
+            <Ionicons name="play" size={22} color={Colors.accentText} style={styles.playIcon} />
+          </ThemedView>
+        )}
       </ThemedView>
 
       <ThemedView style={styles.footer} backgroundColor="transparent">
@@ -254,20 +259,22 @@ const styles = StyleSheet.create({
   },
   ring: {
     position: 'absolute',
-    width: 96,
-    height: 96,
+    width: 120,
+    height: 120,
     borderRadius: Radius.round,
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.signal,
   },
-  core: {
-    width: 96,
-    height: 96,
+  playBadge: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
     borderRadius: Radius.round,
     alignItems: 'center',
     justifyContent: 'center',
+    transform: [{ translateX: 44 }, { translateY: 44 }],
   },
   playIcon: {
-    marginLeft: 4, // optical centering
+    marginLeft: 3, // optical centering
   },
   footer: {
     position: 'absolute',

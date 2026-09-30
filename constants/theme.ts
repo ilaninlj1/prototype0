@@ -6,35 +6,32 @@
  * one nobody was actually using.
  */
 
-import { Platform } from 'react-native';
 
 export const Colors = {
-  background: '#0d0d0f',
-  surface: '#1a1a1e',
-  surfaceElevated: '#26262b',
-  border: 'rgba(255, 255, 255, 0.08)',
+  // Navy is the room; cream carries text and every symbol's line; one red
+  // marks what matters. Imperial red on navy is a classic pairing and passes
+  // 3:1 for symbols and large text (3.8:1), so small text stays cream.
+  background: '#13213f',
+  surface: '#1b2c52',
+  surfaceElevated: '#26396a',
+  border: 'rgba(243, 234, 216, 0.10)',
 
-  text: '#f2f2f4',
-  textSecondary: 'rgba(242, 242, 244, 0.62)',
-  textTertiary: 'rgba(242, 242, 244, 0.38)',
+  text: '#f3ead8',
+  textSecondary: 'rgba(243, 234, 216, 0.68)',
+  textTertiary: 'rgba(243, 234, 216, 0.42)',
 
-  // Near-colorless on purpose: emphasis comes from off-white and weight, and
-  // the only real color on screen is album art (see RevealCard). Replaces
-  // Tailwind's default violet, the most recognizable "AI-built app" tell.
-  accent: '#f2f0ea',
-  accentText: '#0d0d0f',
+  // Buttons and selected states: cream with navy text (13:1).
+  accent: '#f3ead8',
+  accentText: '#13213f',
 
-  // One destructive red, replacing the two slightly different ones that had
-  // accumulated (an error banner's red and a delete action's red).
-  destructive: '#e0645a',
+  // The one sharp color: symbols, the heart, streaks, big numbers.
+  signal: '#e63946',
 
-  // Paired with destructive for the swipe-zone tints (skip/like) — same
-  // Tailwind-500-ish saturation level as destructive, so the two read as a
-  // deliberate pair rather than one themed color and one arbitrary one.
+  destructive: '#e63946',
   positive: '#6cc38a',
 
-  tint: '#f2f0ea',
-  icon: 'rgba(242, 242, 244, 0.62)',
+  tint: '#f3ead8',
+  icon: 'rgba(243, 234, 216, 0.68)',
 };
 
 export const Spacing = {
@@ -56,45 +53,39 @@ export const Radius = {
   round: 999,
 };
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-})!;
+// Syne for display, Figtree for text, DM Mono for numbers. Loaded in
+// app/_layout.tsx; ThemedText picks the right weight file (see fontFor).
+export const Fonts = {
+  display: 'Syne_800ExtraBold',
+  displayBold: 'Syne_700Bold',
+  sans: 'Figtree_400Regular',
+  mono: 'DMMono_400Regular',
+  monoMedium: 'DMMono_500Medium',
+};
 
-// `rounded` only resolves to something distinctive on iOS and web — Android's
-// `default` branch falls back to the plain system sans. Known, accepted gap
-// rather than pulling in a cross-platform font package to paper over it.
+const FIGTREE: Record<string, string> = {
+  '400': 'Figtree_400Regular',
+  '500': 'Figtree_500Medium',
+  '600': 'Figtree_600SemiBold',
+  '700': 'Figtree_700Bold',
+  '800': 'Figtree_800ExtraBold',
+};
+
+/** Custom fonts ship one file per weight, so a fontWeight has to become a family name. */
+export function fontFor(family: string | undefined, weight: string | number | undefined): string | undefined {
+  if (!weight || !family?.startsWith('Figtree')) return family;
+  return FIGTREE[String(weight)] ?? (Number(weight) >= 700 ? FIGTREE['700'] : family);
+}
+
 export const Typography = {
   title: {
-    fontFamily: Fonts.rounded,
-    fontSize: 30,
-    fontWeight: '700' as const,
-    lineHeight: 36,
+    fontFamily: Fonts.display,
+    fontSize: 34,
+    lineHeight: 38,
   },
   subtitle: {
-    fontFamily: Fonts.rounded,
+    fontFamily: Fonts.displayBold,
     fontSize: 20,
-    fontWeight: '700' as const,
     lineHeight: 26,
   },
   defaultSemiBold: {
@@ -118,7 +109,7 @@ export const Typography = {
     textDecorationLine: 'underline' as const,
   },
   label: {
-    fontFamily: Fonts.rounded,
+    fontFamily: Fonts.sans,
     fontSize: 14,
     fontWeight: '600' as const,
     lineHeight: 18,

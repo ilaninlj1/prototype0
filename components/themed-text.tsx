@@ -1,11 +1,13 @@
-import { Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, type TextProps, type TextStyle } from 'react-native';
 
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, fontFor, Typography } from '@/constants/theme';
 
 export type ThemedTextProps = TextProps & {
   type?: keyof typeof Typography;
 };
 
 export function ThemedText({ style, type = 'default', ...rest }: ThemedTextProps) {
-  return <Text style={[{ color: Colors.text }, Typography[type], style]} {...rest} />;
+  const flat: TextStyle = StyleSheet.flatten([{ color: Colors.text }, Typography[type], style]);
+  const fontFamily = fontFor(flat.fontFamily, flat.fontWeight);
+  return <Text style={[flat, { fontFamily, fontWeight: undefined }]} {...rest} />;
 }

@@ -8,7 +8,7 @@ import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import {
   crowdLabel,
@@ -164,20 +164,20 @@ export default function DropResultsScreen() {
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: Colors.background },
   head: { paddingHorizontal: Spacing.lg, gap: Spacing.xs },
-  guess: { fontSize: 17, fontWeight: '700', color: Colors.accent },
+  guess: { fontSize: 17, fontWeight: '700', color: Colors.signal },
   pager: { flexGrow: 1, marginVertical: Spacing.md },
   page: { alignItems: 'center' },
   pressFill: { flex: 1 },
   scrim: { backgroundColor: 'rgba(0, 0, 0, 0.5)' },
   card: { flex: 1, borderRadius: Radius.lg, overflow: 'hidden' },
   cardBody: { padding: Spacing.lg, gap: Spacing.xs },
-  rank: { fontSize: 22, lineHeight: 28, fontWeight: '800', color: Colors.accent },
+  rank: { fontSize: 22, lineHeight: 28, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display },
   art: { width: '100%', aspectRatio: 1, borderRadius: Radius.md, marginVertical: Spacing.sm },
   dim: { color: Colors.textSecondary },
-  count: { fontSize: 32, lineHeight: 38, fontWeight: '800', color: Colors.accent, marginTop: Spacing.sm },
+  count: { fontSize: 32, lineHeight: 38, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display, marginTop: Spacing.sm },
   links: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.xs, alignItems: 'center' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginVertical: Spacing.xs },
-  tag: { color: Colors.accent, fontWeight: '700' },
+  tag: { color: Colors.signal, fontWeight: '700' },
   bar: { height: 6, borderRadius: Radius.pill, overflow: 'hidden', marginVertical: 4 },
   barFill: { height: 6 },
   ladder: { alignItems: 'center', gap: Spacing.xs },

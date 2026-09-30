@@ -9,9 +9,10 @@ import { CardStack } from '@/components/discovery/card-stack';
 import { computeCardSize, MAX_CARD_HEIGHT, MAX_CARD_WIDTH, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
 import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
+import { BlindTestEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
 import { useGamePool } from '@/hooks/use-game-pool';
 import { usePlayback } from '@/hooks/use-playback';
 import {
@@ -106,6 +107,7 @@ export default function BlindTestScreen() {
     return (
       <ScrollView contentContainerStyle={[styles.pad, { paddingTop: insets.top + Spacing.lg }]}>
         {close}
+        <BlindTestEmblem size={64} />
         <ThemedText type="subtitle">Which genres would you never listen to?</ThemedText>
         <ThemedText style={styles.dim}>Pick up to {MAX_NEVER}. Then you&apos;ll hear 10 songs blind.</ThemedText>
         <View style={styles.chips}>
@@ -231,7 +233,7 @@ const styles = StyleSheet.create({
   pill: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: Radius.pill },
   cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   result: { borderRadius: Radius.lg, padding: Spacing.xl, gap: Spacing.xs },
-  big: { fontSize: 56, lineHeight: 60, fontWeight: '800', color: Colors.accent },
+  big: { fontSize: 56, lineHeight: 60, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display },
   verdict: { fontSize: 18, fontWeight: '700', marginTop: Spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md },
   art: { width: 56, height: 56, borderRadius: Radius.sm },

@@ -1,3 +1,13 @@
+import { DMMono_400Regular, DMMono_500Medium } from '@expo-google-fonts/dm-mono';
+import {
+  Figtree_400Regular,
+  Figtree_500Medium,
+  Figtree_600SemiBold,
+  Figtree_700Bold,
+  Figtree_800ExtraBold,
+} from '@expo-google-fonts/figtree';
+import { Syne_700Bold, Syne_800ExtraBold } from '@expo-google-fonts/syne';
+import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { router, Stack, usePathname } from 'expo-router';
 import { useEffect } from 'react';
@@ -52,6 +62,18 @@ export default function RootLayout() {
   // The public website only serves Blind Pack links. Every other screen uses
   // Last.fm, whose terms need written approval for public web pages.
   const pathname = usePathname();
+  const [fontsLoaded] = useFonts({
+    Syne_700Bold,
+    Syne_800ExtraBold,
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
+    Figtree_800ExtraBold,
+    DMMono_400Regular,
+    DMMono_500Medium,
+  });
+  if (!fontsLoaded) return <View style={styles.boot} />;
   if (Platform.OS === 'web' && !pathname.startsWith('/pack')) {
     return (
       <View style={styles.webLanding}>
@@ -94,6 +116,7 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  boot: { flex: 1, backgroundColor: Colors.background },
   webLanding: {
     flex: 1,
     backgroundColor: Colors.background,

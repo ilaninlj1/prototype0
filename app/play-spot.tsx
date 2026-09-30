@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { GuessTile } from '@/components/play/guess-tile';
 import { CreditLine } from '@/components/credits';
+import { SpotTheStarEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -70,6 +71,7 @@ export default function SpotTheStarScreen() {
         </TouchableOpacity>
         <ThemedText type="label">Streak {streak}</ThemedText>
       </ThemedView>
+      <SpotTheStarEmblem size={64} />
       <ThemedText type="subtitle">Which one has 1M+ listeners?</ThemedText>
       <ThemedText style={styles.dim}>Tap a tile to hear it. Last.fm listeners (Sept 2026).</ThemedText>
       <ThemedView style={styles.grid} backgroundColor="transparent">

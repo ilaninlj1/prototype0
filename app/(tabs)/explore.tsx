@@ -4,7 +4,7 @@ import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import {
   describeGrowth,
@@ -164,7 +164,8 @@ const styles = StyleSheet.create({
     fontSize: 56,
     lineHeight: 60,
     fontWeight: '800',
-    color: Colors.accent,
+    color: Colors.signal,
+    fontFamily: Fonts.display,
   },
   block: {
     gap: Spacing.xs,
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
   em: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.accent,
+    color: Colors.signal,
   },
   about: {
     color: Colors.textTertiary,

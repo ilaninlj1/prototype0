@@ -7,7 +7,7 @@ import Animated, { FadeIn, FlipInEasyY } from 'react-native-reanimated';
 import { AppleMusicLink, CreditLine, LastfmLink } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 import type { CardSize } from './swipe-physics';
 
@@ -102,7 +102,8 @@ const styles = StyleSheet.create({
     fontSize: 40,
     lineHeight: 44,
     fontWeight: '800',
-    color: Colors.accent,
+    color: Colors.signal,
+    fontFamily: Fonts.display,
   },
   links: {
     flexDirection: 'row',

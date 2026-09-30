@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ScrollView, Share, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BlindPackEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -50,6 +51,7 @@ export default function PackSendScreen() {
       <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
         <Ionicons name="close" size={26} color={Colors.textSecondary} style={styles.close} />
       </TouchableOpacity>
+      <BlindPackEmblem size={64} />
       <ThemedText type="subtitle">Send a Blind Pack</ThemedText>
       <ThemedText style={styles.dim}>
         Pick {PACK_SIZE} of your finds. Your friend hears them blind in their browser — no app needed — and sees how

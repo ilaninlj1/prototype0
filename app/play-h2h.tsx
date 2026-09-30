@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { GuessTile } from '@/components/play/guess-tile';
 import { CreditLine } from '@/components/credits';
+import { HeadToHeadEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -82,6 +83,7 @@ export default function HeadToHeadScreen() {
         </TouchableOpacity>
         <ThemedText type="label">Streak {streak}</ThemedText>
       </ThemedView>
+      <HeadToHeadEmblem size={64} />
       <ThemedText type="subtitle">Which has more listeners?</ThemedText>
       <ThemedText style={styles.dim}>Tap A or B to hear it. Last.fm listeners (Sept 2026).</ThemedText>
       <ThemedView style={styles.grid} backgroundColor="transparent">

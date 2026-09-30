@@ -1,40 +1,26 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { BlindspotTabBar } from '@/components/tab-bar';
 
 export default function TabLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors.tint,
-        tabBarInactiveTintColor: Colors.textTertiary,
-        tabBarStyle: { backgroundColor: Colors.surface, borderTopColor: Colors.border },
-        headerShown: false,
-        tabBarButton: HapticTab,
-        animation: 'shift',
-      }}>
+    <Tabs tabBar={(props) => <BlindspotTabBar {...props} />} screenOptions={{ headerShown: false, animation: 'shift' }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="play"
         options={{
           title: 'Play',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gamecontroller.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
         }}
       />
     </Tabs>

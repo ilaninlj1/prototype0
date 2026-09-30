@@ -6,7 +6,7 @@ import { AppleMusicLink } from '@/components/credits';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 
 type Props = {
@@ -55,5 +55,5 @@ const styles = StyleSheet.create({
   label: { fontSize: 36, lineHeight: 40, fontWeight: '800' },
   art: { width: '70%', aspectRatio: 1, borderRadius: Radius.sm, marginBottom: 4 },
   title: { textAlign: 'center', fontSize: 14, lineHeight: 18 },
-  count: { color: Colors.accent, fontWeight: '800', fontSize: 18 },
+  count: { color: Colors.signal, fontFamily: Fonts.display, fontWeight: '800', fontSize: 18 },
 });
