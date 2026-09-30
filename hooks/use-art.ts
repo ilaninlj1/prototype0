@@ -1,13 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 
-import { addMark, markSaved, removeLastMark, type ArtCanvas, type Mark } from '@/lib/print';
+import { addMark, markSaved, removeLastMark, type ArtCanvas, type Mark } from '@/lib/collage';
 
 // The piece in progress and the finished ones, shared by Home and the art
 // screen. One copy in memory, saved to the phone after every change.
 
-const CANVAS_KEY = 'art-canvas-v1';
-const PIECES_KEY = 'art-pieces-v1';
+const CANVAS_KEY = 'art-canvas-v2'; // v1 held the old shape prints
+const PIECES_KEY = 'art-pieces-v2';
 
 let canvas: ArtCanvas = { number: 1, startedAt: Date.now(), marks: [] };
 let pieces: ArtCanvas[] = [];

@@ -15,6 +15,10 @@ export const Colors = {
   surface: '#1b2c52',
   surfaceElevated: '#26396a',
   border: 'rgba(243, 234, 216, 0.10)',
+  /** Thin cream outlines on buttons and the revealed card. */
+  hairline: 'rgba(243, 234, 216, 0.28)',
+  /** Section rules (tab bar top, the collage). */
+  rule: 'rgba(243, 234, 216, 0.14)',
 
   text: '#f3ead8',
   textSecondary: 'rgba(243, 234, 216, 0.68)',
@@ -156,4 +160,28 @@ export const Typography = {
     lineHeight: 17,
     color: Colors.textSecondary,
   },
+};
+
+/** Smallest comfortable tap target, even when the visual is smaller. */
+export const TapTarget = 44;
+
+/**
+ * Flat controls shared across screens: plain text or a thin cream outline,
+ * never a filled rounded pill.
+ */
+export const Ui = {
+  textButton: { minHeight: TapTarget, minWidth: TapTarget, justifyContent: 'center' as const },
+  outlineButton: {
+    minHeight: TapTarget,
+    paddingHorizontal: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.hairline,
+    borderRadius: Radius.sm,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+  },
+  /** Mono uppercase, for button labels and section labels. */
+  label: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: 1.2, textTransform: 'uppercase' as const, color: Colors.text },
 };
