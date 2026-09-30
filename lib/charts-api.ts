@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 // Network side of World Charts: Apple's official daily feeds, plus the
 // shared snapshots in Supabase that make day-over-day arrows possible.
 
@@ -31,17 +33,47 @@ function yesterdayOf(day: string): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 }
 
+const FEED_TIMEOUT_MS = 5_000;
+
 async function fetchFeed(country: string): Promise<{ day: string | null; entries: ChartEntry[] }> {
-  // Apple's feed occasionally times out (504); one quiet retry covers it.
+  // Apple's feed usually answers in 1–2s but sometimes hangs ~30s then 504s;
+  // give up after 5s and retry once rather than waiting it out.
   for (let attempt = 0; attempt < 2; attempt++) {
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), FEED_TIMEOUT_MS);
     try {
-      const res = await fetch(`https://rss.applemarketingtools.com/api/v2/${country}/music/most-played/50/songs.json`);
+      const res = await fetch(`https://rss.applemarketingtools.com/api/v2/${country}/music/most-played/50/songs.json`, {
+        signal: abort.signal,
+      });
       if (res.ok) return parseChartFeed(await res.json());
     } catch {
-      // retry
+      // timed out or failed; retry
+    } finally {
+      clearTimeout(timer);
     }
   }
   return { day: null, entries: [] };
+}
+
+// Last chart seen per country, kept on the phone: instant reopen, and a
+// fallback when Apple is down.
+const CACHE_PREFIX = 'blindspotDiscovery:chart:';
+
+async function readCached(country: string): Promise<{ day: string; entries: ChartEntry[] } | null> {
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_PREFIX + country);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCached(country: string, day: string, entries: ChartEntry[]) {
+  AsyncStorage.setItem(CACHE_PREFIX + country, JSON.stringify({ day, entries })).catch(() => {});
+}
+
+function utcToday(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 async function saveSnapshot(day: string, country: string, entries: ChartEntry[]): Promise<void> {
@@ -88,12 +120,7 @@ export type Chart = {
   hasHistory: boolean;
 };
 
-/** Today's chart for a country, saved for tomorrow's comparison, with arrows against yesterday. */
-export async function loadChart(country: string): Promise<Chart> {
-  const { day, entries } = await fetchFeed(country);
-  if (!day) return { day: null, entries: [], moves: {}, rising: [], hasHistory: false };
-  saveSnapshot(day, country, entries);
-  const yesterday = await fetchSnapshot(yesterdayOf(day), country);
+function withMoves(day: string, entries: ChartEntry[], yesterday: ChartEntry[]): Chart {
   return {
     day,
     entries,
@@ -101,4 +128,35 @@ export async function loadChart(country: string): Promise<Chart> {
     rising: risers(entries, yesterday, 8),
     hasHistory: yesterday.length > 0,
   };
+}
+
+/** The phone's last copy of a country's chart, shown instantly while the fresh one loads. */
+export async function peekChart(country: string): Promise<Chart | null> {
+  const cached = await readCached(country);
+  return cached ? withMoves(cached.day, cached.entries, []) : null;
+}
+
+/**
+ * Today's chart for a country, fastest source first: today's shared copy in
+ * Supabase (~0.3s, saved by whoever opened it first), then Apple's feed
+ * (saved for everyone), then the phone's last copy. Arrows compare against
+ * yesterday's shared copy.
+ */
+export async function loadChart(country: string): Promise<Chart> {
+  const today = utcToday();
+  const [shared, yesterday] = await Promise.all([fetchSnapshot(today, country), fetchSnapshot(yesterdayOf(today), country)]);
+  if (shared.length > 0) {
+    writeCached(country, today, shared);
+    return withMoves(today, shared, yesterday);
+  }
+  const feed = await fetchFeed(country);
+  if (feed.day && feed.entries.length > 0) {
+    saveSnapshot(feed.day, country, feed.entries);
+    writeCached(country, feed.day, feed.entries);
+    const before = feed.day === today ? yesterday : await fetchSnapshot(yesterdayOf(feed.day), country);
+    return withMoves(feed.day, feed.entries, before);
+  }
+  const cached = await readCached(country);
+  if (cached) return withMoves(cached.day, cached.entries, []);
+  return { day: null, entries: [], moves: {}, rising: [], hasHistory: false };
 }

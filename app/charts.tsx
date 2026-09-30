@@ -9,7 +9,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import type { ChartEntry, Move } from '@/lib/charts';
-import { COUNTRIES, loadChart, type Chart } from '@/lib/charts-api';
+import { COUNTRIES, loadChart, peekChart, type Chart } from '@/lib/charts-api';
 import { artworkUrl } from '@/lib/discovery';
 import { pickLesserKnown } from '@/lib/song-facts';
 
@@ -23,6 +23,8 @@ export default function ChartsScreen() {
 
   useEffect(() => {
     let cancelled = false;
+    // Show the phone's last copy right away, then swap in today's.
+    peekChart(country).then((c) => !cancelled && c && setChart((cur) => cur ?? c));
     loadChart(country).then((c) => !cancelled && setChart(c));
     return () => {
       cancelled = true;
