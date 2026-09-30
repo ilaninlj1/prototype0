@@ -78,7 +78,7 @@ export default function PackSendScreen() {
               <ThemedView style={[styles.row, on && styles.rowOn]} backgroundColor={Colors.surface}>
                 <Image source={{ uri: artworkUrl(t.artworkUrl100, 200) }} style={styles.art} />
                 <View style={styles.info}>
-                  <ThemedText type="defaultSemiBold" numberOfLines={1}>
+                  <ThemedText style={styles.rowTitle} numberOfLines={1}>
                     {t.trackName}
                   </ThemedText>
                   <ThemedText numberOfLines={1} style={styles.dim}>
@@ -117,8 +117,9 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 2, borderColor: 'transparent' },
   rowOn: { borderColor: Colors.accent },
-  art: { width: 48, height: 48, borderRadius: Radius.sm },
-  info: { flex: 1, gap: 2 },
+  art: { width: 56, height: 56, borderRadius: Radius.sm },
+  info: { flex: 1, gap: 1 },
+  rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
   check: { color: Colors.accent, fontSize: 20, fontWeight: '800', width: 24 },
   button: { paddingVertical: Spacing.md, borderRadius: Radius.pill, alignItems: 'center', marginTop: Spacing.md },
   disabled: { opacity: 0.4 },

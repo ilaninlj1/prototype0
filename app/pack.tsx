@@ -135,7 +135,7 @@ export default function PackScreen() {
         <ThemedView key={t.id} style={styles.row} backgroundColor={Colors.surface}>
           <Image source={{ uri: artworkUrl(t.artworkUrl100, 200) }} style={styles.art} />
           <View style={styles.info}>
-            <ThemedText type="defaultSemiBold" numberOfLines={1}>
+            <ThemedText style={styles.rowTitle} numberOfLines={1}>
               {t.trackName}
             </ThemedText>
             <ThemedText numberOfLines={1} style={styles.dim}>
@@ -170,8 +170,9 @@ const styles = StyleSheet.create({
   cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   big: { fontSize: 56, lineHeight: 60, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md },
-  art: { width: 56, height: 56, borderRadius: Radius.sm },
-  info: { flex: 1, gap: 2 },
+  art: { width: 64, height: 64, borderRadius: Radius.sm },
+  info: { flex: 1, gap: 1 },
+  rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
   links: { flexDirection: 'row', gap: Spacing.lg, alignItems: 'center' },
   button: { paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl, borderRadius: Radius.pill, alignItems: 'center' },
 });

@@ -180,7 +180,7 @@ export default function BlindTestScreen() {
           <ThemedView style={styles.row} backgroundColor={Colors.surface}>
             <Image source={{ uri: artworkUrl(x.song.artworkUrl, 200) }} style={styles.art} />
             <View style={styles.info}>
-              <ThemedText type="defaultSemiBold" numberOfLines={1}>
+              <ThemedText style={styles.rowTitle} numberOfLines={1}>
                 {x.song.title}
               </ThemedText>
               <ThemedText numberOfLines={1} style={styles.dim}>
@@ -237,8 +237,9 @@ const styles = StyleSheet.create({
   big: { fontSize: 56, lineHeight: 60, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display },
   verdict: { fontSize: 18, fontWeight: '700', marginTop: Spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md },
-  art: { width: 56, height: 56, borderRadius: Radius.sm },
-  info: { flex: 1, gap: 2 },
+  art: { width: 64, height: 64, borderRadius: Radius.sm },
+  info: { flex: 1, gap: 1 },
+  rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
   links: { flexDirection: 'row', gap: Spacing.lg, alignItems: 'center' },
   actions: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
   action: { flex: 1 },

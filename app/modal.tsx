@@ -11,10 +11,11 @@ import {
     Share,
     StyleSheet,
     TouchableOpacity,
+    View,
 } from 'react-native';
-import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 
-import { TrackRow } from '@/components/discovery/track-row';
+import { CoverCell } from '@/components/discovery/cover-cell';
+import { MiniPlayer } from '@/components/mini-player';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -148,23 +149,6 @@ export default function LikedTracksScreen() {
     });
   }
 
-  // ---------- Single-track delete (swipe, outside selection mode) ----------
-
-  async function handleRequestDelete(track: DiscoveryTrack, closeRow: () => void) {
-    const confirmed = await confirmDialog(
-      'Remove from liked tracks?',
-      `"${track.trackName}" will be removed.`
-    );
-    if (confirmed) {
-      stopIfPlaying(new Set([track.id]));
-      const next = tracks.filter((t) => t.id !== track.id);
-      setTracks(next);
-      await saveLikedTracks(next);
-    } else {
-      closeRow();
-    }
-  }
-
   // ---------- Bulk actions (selection mode) ----------
 
   async function handleBulkDelete() {
@@ -235,6 +219,7 @@ export default function LikedTracksScreen() {
   }
 
   const genres = likedGenres(tracks);
+  const nowPlaying = tracks.find((t) => t.id === playingId) ?? null;
   const newestFirst = filterByGenre([...tracks].reverse(), genre && genres.includes(genre) ? genre : null);
   const { best, calledIt } = summarizeFinds(
     tracks.map((t) => ({ artistName: t.artistName, found: t.artistListeners, now: listenersNow[t.artistName] }))
@@ -302,54 +287,34 @@ export default function LikedTracksScreen() {
           {newestFirst.length === 0 ? (
             <ThemedText style={styles.emptyText}>No liked tracks yet — swipe right on something you like.</ThemedText>
           ) : (
-            newestFirst.map((track) => {
-              const isPlayingThis = playingId === track.id && status.playing;
-              const isSelected = selectedIds.has(track.id);
-              const row = (
-                <TouchableOpacity
-                  activeOpacity={selectionMode ? 0.7 : 1}
-                  onPress={selectionMode ? () => toggleSelected(track) : undefined}
-                  onLongPress={() => handleLongPressRow(track)}
-                  delayLongPress={350}>
-                  <ThemedView style={[styles.rowWrapper, isSelected && styles.rowSelected]} backgroundColor="transparent">
-                    {selectionMode && (
-                      <ThemedView style={[styles.checkbox, isSelected && styles.checkboxChecked]} backgroundColor="transparent">
-                        {isSelected && <ThemedText style={styles.checkboxMark}>✓</ThemedText>}
-                      </ThemedView>
-                    )}
-                    <ThemedView style={styles.rowContent} backgroundColor="transparent">
-                      <TrackRow
-                        track={track}
-                        isPlaying={isPlayingThis}
-                        onTogglePlay={() => togglePlay(track)}
-                        disabled={selectionMode}
-                        listenersNow={listenersNow[track.artistName]}
-                      />
-                    </ThemedView>
-                  </ThemedView>
-                </TouchableOpacity>
-              );
-              return (
-                <Swipeable
+            <View style={styles.grid}>
+              {newestFirst.map((track) => (
+                <CoverCell
                   key={track.id}
-                  enabled={!selectionMode}
-                  overshootRight={false}
-                  renderRightActions={(_progress, _translation, swipeableMethods) => (
-                    <TouchableOpacity
-                      onPress={() => handleRequestDelete(track, swipeableMethods.close)}
-                      style={styles.deleteAction}>
-                      <ThemedText type="label" style={styles.deleteActionText}>
-                        Delete
-                      </ThemedText>
-                    </TouchableOpacity>
-                  )}>
-                  {row}
-                </Swipeable>
-              );
-            })
+                  track={track}
+                  listenersNow={listenersNow[track.artistName]}
+                  playing={playingId === track.id && status.playing}
+                  selecting={selectionMode}
+                  selected={selectedIds.has(track.id)}
+                  onPress={() => (selectionMode ? toggleSelected(track) : togglePlay(track))}
+                  onLongPress={() => handleLongPressRow(track)}
+                />
+              ))}
+            </View>
           )}
         </ThemedView>
       </ScrollView>
+
+      {nowPlaying && (
+        <View style={styles.mini}>
+          <MiniPlayer
+            track={nowPlaying}
+            playing={status.playing}
+            progress={status.duration ? status.currentTime / status.duration : 0}
+            onToggle={() => togglePlay(nowPlaying)}
+          />
+        </View>
+      )}
 
       <Modal visible={fallbackText !== null} transparent animationType="fade" onRequestClose={dismissFallback}>
         <Pressable style={styles.backdrop} onPress={dismissFallback}>
@@ -377,6 +342,7 @@ export default function LikedTracksScreen() {
 const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
+    paddingBottom: 110,
   },
   container: {
     flex: 1,
@@ -404,6 +370,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.pill,
   },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  mini: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: Spacing.xl,
+  },
   historyLink: {
     alignSelf: 'flex-start',
   },
@@ -421,44 +398,6 @@ const styles = StyleSheet.create({
   },
   cancelLink: {
     color: Colors.textSecondary,
-  },
-  rowWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  rowSelected: {
-    backgroundColor: 'rgba(139, 92, 246, 0.14)',
-  },
-  rowContent: {
-    flex: 1,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: Colors.textTertiary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-  },
-  checkboxMark: {
-    color: Colors.accentText,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  deleteAction: {
-    backgroundColor: Colors.destructive,
-    width: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteActionText: {
-    color: Colors.accentText,
   },
   backdrop: {
     flex: 1,

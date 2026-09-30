@@ -645,3 +645,18 @@ export function likedGenres(tracks: DiscoveryTrack[]): string[] {
 export function filterByGenre(tracks: DiscoveryTrack[], genre: string | null): DiscoveryTrack[] {
   return genre ? tracks.filter((t) => t.primaryGenreName === genre) : tracks;
 }
+
+/** A Liked cover's caption, like a view count: "12.4K → 48K" plus the change. */
+export function growthLabel(
+  found: number | undefined,
+  now: number | undefined
+): { text: string; change: string | null; calledIt: boolean } | null {
+  const fmt = (n: number) => describeListeners(n).count;
+  if (found != null && now != null && now !== found) {
+    const { pct, calledIt } = describeGrowth(found, now);
+    return { text: `${fmt(found)} → ${fmt(now)}`, change: `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}%`, calledIt };
+  }
+  if (now != null) return { text: `${fmt(now)} listeners`, change: null, calledIt: false };
+  if (found != null) return { text: `found at ${fmt(found)}`, change: null, calledIt: false };
+  return null;
+}

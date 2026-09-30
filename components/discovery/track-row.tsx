@@ -58,7 +58,7 @@ export function TrackRow({ track, isPlaying, onTogglePlay, disabled = false, lis
         <Image source={{ uri: artworkUrl(track.artworkUrl100, ROW_ARTWORK_SIZE) }} style={styles.artwork} />
       ) : null}
       <ThemedView style={styles.info} backgroundColor="transparent">
-        <ThemedText type="defaultSemiBold" numberOfLines={1}>
+        <ThemedText style={styles.title} numberOfLines={1}>
           {track.trackName}
         </ThemedText>
         <ThemedText numberOfLines={1} style={styles.artist}>
@@ -107,13 +107,19 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   artwork: {
-    width: 56,
-    height: 56,
+    width: 64,
+    height: 64,
     borderRadius: Radius.sm,
   },
   info: {
     flex: 1,
-    gap: 2,
+    gap: 1,
+  },
+  title: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 16,
+    lineHeight: 20,
+    letterSpacing: -0.2,
   },
   artist: {
     color: Colors.textSecondary,

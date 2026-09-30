@@ -12,6 +12,7 @@ import {
   deriveRatedGenres,
   keepDropEntries,
   likedGenres,
+  growthLabel,
   filterByGenre,
   pickJumpGenre,
   parseGenreSearchResponse,
@@ -509,4 +510,13 @@ test('likedGenres lists genres by how often they appear, and filterByGenre keeps
   assert.deepEqual(likedGenres(liked), ['Jazz', 'Rock']);
   assert.deepEqual(filterByGenre(liked, 'Jazz').map((t) => t.id), [1, 3]);
   assert.deepEqual(filterByGenre(liked, null).map((t) => t.id), [1, 2, 3, 4]);
+});
+
+test('growthLabel reads like a view count: found → now, with the change', () => {
+  assert.deepEqual(growthLabel(12_400, 48_000), { text: '12.4K → 48K', change: '↑ 287%', calledIt: true });
+  assert.deepEqual(growthLabel(10_000, 9_000), { text: '10K → 9K', change: '↓ 10%', calledIt: false });
+  assert.deepEqual(growthLabel(10_000, 10_000), { text: '10K listeners', change: null, calledIt: false });
+  assert.deepEqual(growthLabel(undefined, 48_000), { text: '48K listeners', change: null, calledIt: false });
+  assert.deepEqual(growthLabel(900, undefined), { text: 'found at 900', change: null, calledIt: false });
+  assert.equal(growthLabel(undefined, undefined), null);
 });

@@ -77,7 +77,7 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
       <ThemedView style={styles.footer} backgroundColor="transparent">
         <ThemedText type="subtitle">Just listen.</ThemedText>
         <ThemedText type="caption" style={styles.hint}>
-          Like it to find out who it is.
+          Swipe right to see who it is. Double-tap to save it.
         </ThemedText>
       </ThemedView>
     </ThemedView>
