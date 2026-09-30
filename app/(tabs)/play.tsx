@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { type SharedValue, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, { FadeInDown, type SharedValue, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
@@ -143,9 +143,10 @@ export default function PlayScreen() {
     },
   ];
 
-  const itemWidth = Math.round(width * 0.64);
+  // Emblems ride the orbit; only the focused mode's details show, full width.
+  const itemWidth = Math.round(width * 0.42);
   const sidePad = (width - itemWidth) / 2;
-  const cardHeight = Math.min(Math.round(height * 0.58), 500);
+  const orbitHeight = Math.min(Math.round(height * 0.3), 260);
 
   const onScroll = useAnimatedScrollHandler((e) => {
     scrollX.set(e.contentOffset.x);
@@ -167,21 +168,22 @@ export default function PlayScreen() {
     }
   }
 
+  const mode = modes[focused];
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top + Spacing.xl }]}>
       <View style={styles.header}>
         <ThemedText type="eyebrow">Pick a game · {modes.length} modes</ThemedText>
         <ThemedText type="hero">Play</ThemedText>
-        <ThemedText style={styles.hint}>swipe for more →</ThemedText>
+        <ThemedText style={styles.hint}>swipe the orbit →</ThemedText>
       </View>
 
-      <View style={styles.stage}>
-      <View style={{ height: cardHeight + 112 }}>
-        {/* The orbit the cards ride on. */}
-        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={{ height: orbitHeight }}>
+        {/* The orbit the symbols ride on. */}
+        <Svg width={width} height={orbitHeight} style={StyleSheet.absoluteFill} pointerEvents="none">
           <Circle
             cx={width / 2}
-            cy={22 + cardHeight / 2 + ORBIT_RADIUS}
+            cy={orbitHeight / 2 + ORBIT_RADIUS}
             r={ORBIT_RADIUS}
             stroke={Colors.textTertiary}
             strokeWidth={1.5}
@@ -195,32 +197,52 @@ export default function PlayScreen() {
           showsHorizontalScrollIndicator={false}
           snapToInterval={itemWidth}
           decelerationRate="fast"
-          contentContainerStyle={{ paddingHorizontal: sidePad, paddingTop: 22 }}
+          contentContainerStyle={{ paddingHorizontal: sidePad }}
           onScroll={onScroll}
           scrollEventThrottle={16}
           onMomentumScrollEnd={(e) => settle(e.nativeEvent.contentOffset.x)}>
           {modes.map((m, i) => (
-            <OrbitCard
-              key={m.key}
-              index={i}
-              itemWidth={itemWidth}
-              height={cardHeight}
-              scrollX={scrollX}
-              focused={focused === i}
-              onPressUnfocused={() => goTo(i)}>
-              <ModeCard mode={m} focused={focused === i} onPlay={() => m.href && router.push(m.href)} />
-            </OrbitCard>
+            <OrbitEmblem key={m.key} index={i} itemWidth={itemWidth} height={orbitHeight} scrollX={scrollX} onPress={() => goTo(i)}>
+              {m.emblem(Math.round(orbitHeight * 0.62))}
+            </OrbitEmblem>
           ))}
         </Animated.ScrollView>
       </View>
-      </View>
 
-      {/* Every mode at a glance; tap to fly to it. */}
-      <View style={styles.strip}>
+      <Animated.View key={mode.key} entering={FadeInDown.duration(260)} style={styles.details}>
+        <View style={styles.titleRow}>
+          <View style={styles.titleText}>
+            <ThemedText type="eyebrow" style={styles.eyebrow}>
+              {mode.eyebrow}
+            </ThemedText>
+            <ThemedText type="title" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+              {mode.title}
+            </ThemedText>
+          </View>
+          {mode.badge && (
+            <View style={styles.badge}>
+              <Sticker label={mode.badge} />
+            </View>
+          )}
+        </View>
+        <ThemedText style={styles.blurb}>{mode.blurb}</ThemedText>
+        <View style={styles.statRow}>
+          <ThemedText type="number">{mode.stat}</ThemedText>
+          <ThemedText type="eyebrow" style={styles.statLabel}>
+            {mode.statLabel}
+          </ThemedText>
+        </View>
+        <PressableScale onPress={() => mode.href && router.push(mode.href)} disabled={!mode.href} style={[styles.cta, !mode.href && styles.ctaOff]}>
+          <ThemedText type="label" style={styles.ctaText}>
+            {mode.cta}
+          </ThemedText>
+        </PressableScale>
+      </Animated.View>
+
+      <View style={styles.dots}>
         {modes.map((m, i) => (
-          <Pressable key={m.key} onPress={() => goTo(i)} style={styles.stripItem} accessibilityLabel={m.title}>
-            <View style={{ opacity: focused === i ? 1 : 0.45 }}>{m.emblem(30)}</View>
-            <View style={[styles.stripMark, focused === i && styles.stripMarkOn]} />
+          <Pressable key={m.key} onPress={() => goTo(i)} hitSlop={8} accessibilityLabel={m.title}>
+            <View style={[styles.dot, focused === i && styles.dotOn]} />
           </Pressable>
         ))}
       </View>
@@ -228,106 +250,52 @@ export default function PlayScreen() {
   );
 }
 
-function OrbitCard({
+function OrbitEmblem({
   index,
   itemWidth,
   height,
   scrollX,
-  focused,
-  onPressUnfocused,
+  onPress,
   children,
 }: {
   index: number;
   itemWidth: number;
   height: number;
   scrollX: SharedValue<number>;
-  focused: boolean;
-  onPressUnfocused: () => void;
+  onPress: () => void;
   children: ReactNode;
 }) {
   const pose = useAnimatedStyle(() => {
     const p = orbitPose((scrollX.get() - index * itemWidth) / itemWidth);
     return {
       opacity: p.opacity,
-      transform: [{ translateY: p.translateY }, { scale: p.scale }, { rotate: `${p.rotate}deg` }],
+      transform: [{ translateY: p.translateY * 0.35 }, { scale: p.scale }, { rotate: `${p.rotate}deg` }],
     };
   });
   return (
-    <Animated.View style={[{ width: itemWidth, height, zIndex: focused ? 2 : 1 }, pose]}>
-      {focused ? (
-        children
-      ) : (
-        <Pressable style={styles.fill} onPress={onPressUnfocused}>
-          {children}
-        </Pressable>
-      )}
-    </Animated.View>
-  );
-}
-
-function ModeCard({ mode, focused, onPlay }: { mode: Mode; focused: boolean; onPlay: () => void }) {
-  return (
-    <View style={styles.card}>
-      {mode.badge && (
-        <View style={styles.badge}>
-          <Sticker label={mode.badge} />
-        </View>
-      )}
-      <View style={styles.cardTop}>
-        {mode.emblem(focused ? 112 : 96)}
-        <View style={styles.stat}>
-          <ThemedText type="number">{mode.stat}</ThemedText>
-          <ThemedText type="eyebrow" style={styles.statLabel}>
-            {mode.statLabel}
-          </ThemedText>
-        </View>
-      </View>
-      <View style={styles.cardText}>
-        <ThemedText type="eyebrow" style={styles.cardEyebrow}>
-          {mode.eyebrow}
-        </ThemedText>
-        <ThemedText type="title" numberOfLines={2}>
-          {mode.title}
-        </ThemedText>
-        <ThemedText style={styles.blurb} numberOfLines={4}>
-          {mode.blurb}
-        </ThemedText>
-      </View>
-      <PressableScale onPress={onPlay} disabled={!focused || !mode.href} style={[styles.cta, !mode.href && styles.ctaOff]}>
-        <ThemedText type="label" style={styles.ctaText}>
-          {mode.cta}
-        </ThemedText>
-      </PressableScale>
-    </View>
+    <Pressable onPress={onPress} style={{ width: itemWidth, height }}>
+      <Animated.View style={[styles.emblemSlot, pose]}>{children}</Animated.View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: Spacing.lg, gap: Spacing.xs, marginBottom: Spacing.lg },
-  fill: { flex: 1 },
+  header: { paddingHorizontal: Spacing.lg, gap: Spacing.xs, marginBottom: Spacing.md },
   hint: { fontFamily: Fonts.note, fontSize: 20, lineHeight: 22, color: Colors.textSecondary, transform: [{ rotate: '-3deg' }], alignSelf: 'flex-start', marginTop: 2 },
-  badge: { position: 'absolute', top: -16, right: 14, zIndex: 3 },
-  stage: { flex: 1, justifyContent: 'center' },
-  card: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.xl,
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-  },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  stat: { alignItems: 'flex-end', maxWidth: '50%' },
-  statLabel: { textAlign: 'right' },
-  cardText: { gap: Spacing.xs },
-  cardEyebrow: { color: Colors.signal },
-  blurb: { color: Colors.textSecondary, fontSize: 15, lineHeight: 21 },
-  cta: { backgroundColor: Colors.accent, borderRadius: Radius.pill, paddingVertical: Spacing.md, alignItems: 'center' },
+  emblemSlot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  details: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, gap: Spacing.md },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
+  titleText: { flex: 1, gap: Spacing.xs },
+  eyebrow: { color: Colors.signal },
+  badge: { marginTop: -6 },
+  blurb: { color: Colors.textSecondary, fontSize: 16, lineHeight: 23 },
+  statRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm },
+  statLabel: { flexShrink: 1 },
+  cta: { backgroundColor: Colors.accent, borderRadius: Radius.pill, paddingVertical: Spacing.md, alignItems: 'center', marginTop: 'auto' },
   ctaOff: { opacity: 0.4 },
   ctaText: { color: Colors.accentText },
-  strip: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, paddingBottom: Spacing.md },
-  stripItem: { alignItems: 'center', gap: 6 },
-  stripMark: { width: 16, height: 3, borderRadius: Radius.round, backgroundColor: 'transparent' },
-  stripMarkOn: { backgroundColor: Colors.signal },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.sm, paddingVertical: Spacing.md },
+  dot: { width: 6, height: 6, borderRadius: Radius.round, backgroundColor: Colors.textTertiary },
+  dotOn: { width: 18, backgroundColor: Colors.signal },
 });
