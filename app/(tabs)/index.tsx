@@ -10,7 +10,6 @@ import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
 import { RevealCard } from '@/components/discovery/reveal-card';
 import { DropRing } from '@/components/drop-ring';
-import { HomeBackdrop } from '@/components/home-backdrop';
 import { onLikeChange, saveLike } from '@/components/like-button';
 import {
   computeCardSize,
@@ -24,7 +23,7 @@ import { UndoButton } from '@/components/discovery/undo-button';
 import { CreditLine } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
 import { addToCanvas, saveOnCanvas, undoOnCanvas, useArt } from '@/hooks/use-art';
 import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import {
@@ -608,7 +607,6 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
-      <HomeBackdrop />
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           <DropRing />
@@ -654,16 +652,13 @@ export default function HomeScreen() {
             onPress={() => router.push('/art')}
             onLayout={(e) => (stripRef.current = e.nativeEvent.layout)}
             accessibilityLabel={`Your piece, ${canvas.marks.length} of ${ART.slots} songs`}>
-            <ArtPiece canvas={canvas} style={styles.strip} />
-            {canvas.marks.length === 0 ? (
-              <ThemedText style={styles.stripEmpty} pointerEvents="none">
-                every song you swipe adds its cover here
+            <ArtPiece canvas={canvas} style={styles.strip} preview={queue.slice(0, 3).map((t) => t.artworkUrl100)} />
+            <View style={styles.stripCaption}>
+              <ThemedText style={styles.stripLabel}>Your collage</ThemedText>
+              <ThemedText style={styles.stripLabel}>
+                {canvas.marks.length === 0 ? 'starts with your first swipe' : `${canvas.marks.length}/${ART.slots}`}
               </ThemedText>
-            ) : (
-              <ThemedText style={styles.stripCount} pointerEvents="none">
-                {canvas.marks.length}/{ART.slots}
-              </ThemedText>
-            )}
+            </View>
           </Pressable>
 
           <View style={styles.bottomRow}>
@@ -725,24 +720,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
   },
+  // Part of the page, not a box: tiles straight on the navy, a rule and a label under them.
   strip: {
     width: '100%',
-    borderRadius: Radius.lg,
+    borderRadius: Radius.sm,
   },
-  stripCount: {
-    position: 'absolute',
-    right: Spacing.sm,
-    bottom: 4,
-    fontFamily: Fonts.mono,
+  stripCaption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: Colors.rule,
+    marginTop: Spacing.xs,
+    paddingTop: Spacing.xs,
+  },
+  stripLabel: {
+    ...Ui.label,
     fontSize: 10,
-    color: Colors.textTertiary,
-  },
-  stripEmpty: {
-    position: 'absolute',
-    alignSelf: 'center',
-    top: '30%',
-    fontFamily: Fonts.note,
-    fontSize: 18,
     color: Colors.textTertiary,
   },
   bottomRow: {

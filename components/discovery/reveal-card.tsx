@@ -6,13 +6,13 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FlipInEasyY, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
-import { AppleMusicLink, SpotifyLink, CreditLine, LastfmLink } from '@/components/credits';
+import { AppleMusicLink, SpotifyLink, LastfmLink } from '@/components/credits';
 import { DoubleTapLike } from '@/components/double-tap-like';
 import { HumanBadge } from '@/components/human-badge';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Fonts } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts, Ui } from '@/constants/theme';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 import { COVER_BLUR } from './swipe-card';
 import type { CardSize } from './swipe-physics';
@@ -39,22 +39,21 @@ export function RevealCard({ track, listeners, size, onDone, extra }: RevealCard
   const blurStyle = useAnimatedStyle(() => ({ opacity: blur.get() }));
 
   const described = listeners != null ? describeListeners(listeners) : null;
+  // A full square cover, never cropped: as wide as the card allows, or smaller on a short screen.
+  const side = Math.round(Math.min(size.width - Spacing.lg * 2, size.height * 0.5));
 
   return (
     <DoubleTapLike track={track}>
       <Animated.View entering={FlipInEasyY.springify().damping(14)}>
-        <ThemedView style={[styles.card, size]} backgroundColor={Colors.surface}>
-          {/* The song's own colors: its art, blurred behind the whole card. */}
-          <Image source={{ uri: artworkUrl(track.artworkUrl100, 100) }} style={StyleSheet.absoluteFill} blurRadius={50} />
-          <ThemedView style={[StyleSheet.absoluteFill, styles.scrim]} backgroundColor="transparent" />
-          <View style={styles.artwork}>
+        <ThemedView style={[styles.card, size]} backgroundColor="transparent">
+          <View style={[styles.artwork, { width: side, height: side }]}>
             <Image source={{ uri: artworkUrl(track.artworkUrl100, 600) }} style={StyleSheet.absoluteFill} />
             <Animated.View style={[StyleSheet.absoluteFill, blurStyle]} pointerEvents="none">
               <Image source={{ uri: artworkUrl(track.artworkUrl100, 300) }} style={StyleSheet.absoluteFill} blurRadius={COVER_BLUR} />
             </Animated.View>
           </View>
 
-          {/* Never cut off: when the text is long the cover gives up room, then the text scrolls. */}
+          {/* Never cut off: long text scrolls under the cover instead of clipping. */}
           <ScrollView style={styles.bodyScroll} contentContainerStyle={styles.body} bounces={false} showsVerticalScrollIndicator={false}>
             <ThemedText type="subtitle" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
               {track.trackName}
@@ -83,7 +82,6 @@ export function RevealCard({ track, listeners, size, onDone, extra }: RevealCard
               <SpotifyLink artist={track.artistName} title={track.trackName} />
               {described && <LastfmLink artist={track.artistName} />}
             </ThemedView>
-            <CreditLine />
 
             <View style={styles.actions}>
               <LikeButton track={track} size={26} />
@@ -96,10 +94,10 @@ export function RevealCard({ track, listeners, size, onDone, extra }: RevealCard
                   })
                 }>
                 <Ionicons name="chatbubble-outline" size={18} color={Colors.text} />
-                <ThemedText type="label">Comments</ThemedText>
+                <ThemedText style={Ui.label}>Comments</ThemedText>
               </Pressable>
               <Pressable style={styles.next} onPress={onDone}>
-                <ThemedText type="label" style={{ color: Colors.accentText }}>
+                <ThemedText style={[Ui.label, { color: Colors.accentText }]}>
                   Next
                 </ThemedText>
                 <Ionicons name="arrow-forward" size={16} color={Colors.accentText} />
@@ -114,16 +112,18 @@ export function RevealCard({ track, listeners, size, onDone, extra }: RevealCard
 }
 
 const styles = StyleSheet.create({
+  // No fill: a thin cream outline, like the buttons.
   card: {
-    borderRadius: Radius.lg,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.hairline,
     overflow: 'hidden',
   },
-  scrim: {
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-  },
   artwork: {
-    flex: 1,
-    minHeight: 96,
+    marginTop: Spacing.lg,
+    marginHorizontal: Spacing.lg,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
   },
   bodyScroll: {
     flexGrow: 0,
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
   },
   actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginTop: Spacing.md },
-  commentsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: Radius.pill, backgroundColor: 'rgba(255,255,255,0.12)' },
-  next: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: Radius.pill, backgroundColor: Colors.accent },
-  hint: { fontFamily: Fonts.note, fontSize: 17, lineHeight: 20, color: Colors.textSecondary, textAlign: 'center', marginTop: Spacing.xs },
+  commentsBtn: Ui.outlineButton,
+  next: { ...Ui.outlineButton, marginLeft: 'auto', backgroundColor: Colors.accent, borderColor: Colors.accent },
+  hint: { fontFamily: Fonts.sans, fontSize: 12, lineHeight: 16, color: Colors.textTertiary, marginTop: Spacing.xs },
 });

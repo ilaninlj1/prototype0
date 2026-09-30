@@ -30,11 +30,19 @@ function Tile({ mark, rect }: { mark: Mark; rect: { x: number; y: number; w: num
  * splits the biggest tile (lib/collage.ts), so one swipe already fills it.
  * The newest tile fades in.
  */
-export function ArtPiece({ canvas, style }: { canvas: ArtCanvas; style?: StyleProp<ViewStyle> }) {
+export function ArtPiece({ canvas, style, preview }: { canvas: ArtCanvas; style?: StyleProp<ViewStyle>; preview?: string[] }) {
   const rects = collageRects(canvas.marks.length);
   const last = canvas.marks.length - 1;
+  // Before the first swipe: the next few covers, faint and heavily blurred — a hint of what's coming.
+  const ghosts = canvas.marks.length === 0 ? (preview ?? []).filter(Boolean).slice(0, 3) : [];
+  const ghostRects = collageRects(ghosts.length);
   return (
     <View style={[styles.piece, style]}>
+      {ghosts.map((art, i) => (
+        <View key={art} style={[styles.tile, styles.preview, { left: pct(ghostRects[i].x, ART.width), top: pct(ghostRects[i].y, ART.height), width: pct(ghostRects[i].w, ART.width), height: pct(ghostRects[i].h, ART.height) }]}>
+          <Image source={{ uri: artworkUrl(art, 60) }} style={styles.cover} blurRadius={24} contentFit="cover" />
+        </View>
+      ))}
       {canvas.marks.map((m, i) =>
         i === last ? (
           <Animated.View key={m.trackId} entering={FadeIn.duration(500)} style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -49,7 +57,8 @@ export function ArtPiece({ canvas, style }: { canvas: ArtCanvas; style?: StylePr
 }
 
 const styles = StyleSheet.create({
-  piece: { aspectRatio: ART.width / ART.height, backgroundColor: '#0e1830', overflow: 'hidden' },
+  piece: { aspectRatio: ART.width / ART.height, overflow: 'hidden' },
+  preview: { opacity: 0.22 },
   tile: { position: 'absolute', padding: 1 },
   cover: { flex: 1, borderRadius: 3 },
   ghost: { opacity: 0.45 },

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
@@ -10,7 +11,7 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
 import { buildGenreSections, type GenreSection } from './genre-taxonomy';
 
 type GenrePickerProps = {
@@ -156,12 +157,11 @@ export function GenrePicker({
 
   return (
     <>
-      <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.7} style={styles.trigger}>
-        <ThemedView style={styles.triggerButton} backgroundColor={Colors.surfaceElevated}>
-          <ThemedText type="label" numberOfLines={1} style={styles.triggerText}>
-            {currentLabel}
-          </ThemedText>
-        </ThemedView>
+      <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.6} style={[Ui.textButton, styles.trigger]} accessibilityLabel={`Genre: ${currentLabel}. Change genre`}>
+        <ThemedText numberOfLines={1} style={styles.triggerText}>
+          {currentLabel}
+        </ThemedText>
+        <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
@@ -188,15 +188,14 @@ export function GenrePicker({
 
 const styles = StyleSheet.create({
   trigger: {
-    maxWidth: 200,
-  },
-  triggerButton: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.pill,
+    maxWidth: 220,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   triggerText: {
-    color: Colors.textSecondary,
+    ...Ui.label,
+    flexShrink: 1,
   },
   backdrop: {
     flex: 1,

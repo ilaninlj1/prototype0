@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
 import type { Region } from '@/lib/discovery';
 import { setAllowAi, useAllowAi } from '@/lib/human-check-api';
 import type { PresetId } from '@/lib/pool-types';
@@ -50,12 +50,8 @@ export function TuneSheet({
 
   return (
     <>
-      <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.7}>
-        <ThemedView style={styles.trigger} backgroundColor={Colors.surfaceElevated}>
-          <ThemedText type="label" style={styles.triggerText}>
-            Tune · {PRESET_LABELS[preset]}
-          </ThemedText>
-        </ThemedView>
+      <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.6} style={Ui.outlineButton}>
+        <ThemedText style={Ui.label}>Tune · {PRESET_LABELS[preset]}</ThemedText>
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
@@ -118,14 +114,6 @@ export function TuneSheet({
 }
 
 const styles = StyleSheet.create({
-  trigger: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.pill,
-  },
-  triggerText: {
-    color: Colors.text,
-  },
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',

@@ -7,7 +7,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -20,7 +20,7 @@ const ICONS: Record<string, { idle: keyof typeof Ionicons.glyphMap; active: keyo
 
 const INDICATOR = 22;
 
-/** A floating navy bar; a red marker springs to the active tab. */
+/** Edge to edge under a thin rule; a short red bar springs to the active tab. */
 export function BlindspotTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const [tabWidth, setTabWidth] = useState(0);
@@ -71,21 +71,18 @@ export function BlindspotTabBar({ state, navigation }: TabBarProps) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { backgroundColor: Colors.background, paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
+  wrap: { backgroundColor: Colors.background, borderTopWidth: 1, borderTopColor: Colors.rule },
   bar: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
     paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.xs,
   },
   indicator: {
     position: 'absolute',
-    top: 0,
+    top: -1, // sits on the rule
     left: 0,
     width: INDICATOR,
-    height: 3,
-    borderRadius: Radius.round,
+    height: 2,
     backgroundColor: Colors.signal,
   },
   tab: { flex: 1, alignItems: 'center', gap: 4 },

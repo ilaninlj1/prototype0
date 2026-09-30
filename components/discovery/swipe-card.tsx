@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  cancelAnimation,
   Easing,
   interpolate,
   runOnJS,
@@ -16,7 +17,7 @@ import Animated, {
   type AnimatedStyle,
 } from 'react-native-reanimated';
 
-import { BlindspotMark } from '@/components/emblems';
+import { DailyDropEmblem } from '@/components/emblems';
 import { HeartBurst } from '@/components/heart-burst';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -49,17 +50,14 @@ type CardFaceProps = {
 export const COVER_BLUR = 28;
 
 export function CardFace({ size, playing = false, showPlayIcon = false, leftTintStyle, rightTintStyle, artwork }: CardFaceProps) {
-  const pulse = useSharedValue(0);
-
+  // The record turns only while the preview is actually playing — paused or
+  // finished, it stops where it is. It's the song, not decoration.
+  const spin = useSharedValue(0);
   useEffect(() => {
-    pulse.value = playing ? withRepeat(withTiming(1, { duration: 1400, easing: Easing.out(Easing.quad) }), -1) : withTiming(0);
-  }, [playing, pulse]);
-
-  const ringStyle = useAnimatedStyle(() => ({
-    // Invisible at rest; only a playing preview sends rings out.
-    opacity: interpolate(pulse.value, [0, 0.05, 1], [0, 0.4, 0]),
-    transform: [{ scale: interpolate(pulse.value, [0, 1], [1, 2.2]) }],
-  }));
+    if (playing) spin.set(withRepeat(withTiming(spin.get() + 360, { duration: 3600, easing: Easing.linear }), -1, false));
+    else cancelAnimation(spin);
+  }, [playing, spin]);
+  const spinStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.get()}deg` }] }));
 
   return (
     <ThemedView style={[styles.card, size]} backgroundColor={Colors.surface}>
@@ -77,8 +75,9 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
       )}
 
       <ThemedView style={styles.center} backgroundColor="transparent">
-        <Animated.View style={[styles.ring, ringStyle]} />
-        <BlindspotMark size={120} />
+        <Animated.View style={spinStyle}>
+          <DailyDropEmblem size={132} />
+        </Animated.View>
         {showPlayIcon && (
           <ThemedView style={styles.playBadge} backgroundColor={Colors.accent}>
             <Ionicons name="play" size={22} color={Colors.accentText} style={styles.playIcon} />
@@ -288,13 +287,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ring: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: Radius.round,
-    backgroundColor: Colors.signal,
-  },
   playBadge: {
     position: 'absolute',
     width: 44,
@@ -313,7 +305,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: Spacing.xl,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.xs,
   },
   hint: {

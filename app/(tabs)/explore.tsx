@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -27,6 +28,7 @@ function topGenre(tracks: DiscoveryTrack[]): { genre: string; genres: number } |
 }
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const [loaded, setLoaded] = useState(false);
   const [finds, setFinds] = useState<DiscoveryTrack[]>([]);
   const [history, setHistory] = useState<SwipeEntry[]>([]);
@@ -67,7 +69,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
+    <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top }]}>
       <ThemedView style={styles.container}>
         <ThemedText type="eyebrow">Blindspot · what you hear</ThemedText>
         <ThemedText type="hero">Your ears</ThemedText>

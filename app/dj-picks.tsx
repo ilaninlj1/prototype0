@@ -160,6 +160,7 @@ export default function DjPicksScreen() {
         )}
       </View>
       <KexpCredit />
+      <CreditLine />
     </ThemedView>
   );
 }
