@@ -19,7 +19,7 @@ import {
 import { PressableScale } from '@/components/pressable-scale';
 import { Sticker } from '@/components/sticker';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Ui, TapTarget } from '@/constants/theme';
 import { useDailyDrop } from '@/hooks/use-daily-drop';
 import { packable } from '@/lib/blind-pack';
 import {
@@ -211,7 +211,7 @@ export default function PlayScreen() {
       <View style={styles.header}>
         <ThemedText type="eyebrow">Pick a game · {modes.length} modes</ThemedText>
         <ThemedText type="hero">Play</ThemedText>
-        <ThemedText style={styles.hint}>swipe the orbit →</ThemedText>
+        <ThemedText style={styles.hint}>Swipe the orbit →</ThemedText>
       </View>
 
       <View style={{ height: orbitHeight }}>
@@ -273,9 +273,7 @@ export default function PlayScreen() {
           </ThemedText>
         </View>
         <PressableScale onPress={() => mode.href && router.push(mode.href)} disabled={!mode.href} style={[styles.cta, !mode.href && styles.ctaOff]}>
-          <ThemedText type="label" style={styles.ctaText}>
-            {mode.cta}
-          </ThemedText>
+          <ThemedText style={styles.ctaText}>{mode.cta}</ThemedText>
         </PressableScale>
       </Animated.View>
 
@@ -322,20 +320,23 @@ function OrbitEmblem({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: Spacing.lg, gap: Spacing.xs, marginBottom: Spacing.md },
-  hint: { fontFamily: Fonts.note, fontSize: 20, lineHeight: 22, color: Colors.textSecondary, transform: [{ rotate: '-3deg' }], alignSelf: 'flex-start', marginTop: 2 },
+  hint: { ...Ui.label, color: Colors.textTertiary, marginTop: 2 },
   emblemSlot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   details: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, gap: Spacing.md },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
   titleText: { flex: 1, gap: Spacing.xs },
-  eyebrow: { color: Colors.signal },
+  // Red is for big numbers and symbols only; at label size it's too dim on navy.
+  eyebrow: { color: Colors.textSecondary },
   badge: { marginTop: -6 },
   blurb: { color: Colors.textSecondary, fontSize: 16, lineHeight: 23 },
   statRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm },
   statLabel: { flexShrink: 1 },
-  cta: { backgroundColor: Colors.accent, borderRadius: Radius.pill, paddingVertical: Spacing.md, alignItems: 'center', marginTop: 'auto' },
+  // The one filled control on the page: cream, small radius, mono label.
+  cta: { ...Ui.outlineButton, backgroundColor: Colors.accent, borderColor: Colors.accent, marginTop: 'auto' },
   ctaOff: { opacity: 0.4 },
-  ctaText: { color: Colors.accentText },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.sm, paddingVertical: Spacing.md },
-  dot: { width: 6, height: 6, borderRadius: Radius.round, backgroundColor: Colors.textTertiary },
-  dotOn: { width: 18, backgroundColor: Colors.signal },
+  ctaText: { ...Ui.label, color: Colors.accentText },
+  // Thin bars, like the tab bar's marker.
+  dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: Spacing.sm, minHeight: TapTarget },
+  dot: { width: 8, height: 2, backgroundColor: Colors.textTertiary },
+  dotOn: { width: 22, backgroundColor: Colors.signal },
 });
