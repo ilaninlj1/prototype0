@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useEffect } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -106,6 +107,8 @@ export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon,
   // before this fires (the fly-out animation's runOnJS callback lands ~250ms
   // after the gesture ends).
   function commit(direction: SwipeDirection) {
+    // Each direction feels different: a like lands heavier than a skip.
+    Haptics.impactAsync(direction === 'right' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
     onSwipe(direction, track);
   }
 
@@ -253,13 +256,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 96,
     height: 96,
-    borderRadius: Radius.pill,
+    borderRadius: Radius.round,
     backgroundColor: Colors.accent,
   },
   core: {
     width: 96,
     height: 96,
-    borderRadius: Radius.pill,
+    borderRadius: Radius.round,
     alignItems: 'center',
     justifyContent: 'center',
   },

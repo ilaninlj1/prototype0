@@ -31,9 +31,12 @@ export function RevealCard({ track, listeners, size, onDone }: RevealCardProps) 
     <Pressable onPress={onDone}>
       <Animated.View entering={FlipInEasyY.springify().damping(14)}>
         <ThemedView style={[styles.card, size]} backgroundColor={Colors.surface}>
+          {/* The song's own colors: its art, blurred behind the whole card. */}
+          <Image source={{ uri: artworkUrl(track.artworkUrl100, 100) }} style={StyleSheet.absoluteFill} blurRadius={50} />
+          <ThemedView style={[StyleSheet.absoluteFill, styles.scrim]} backgroundColor="transparent" />
           <Image source={{ uri: artworkUrl(track.artworkUrl100, 600) }} style={styles.artwork} />
 
-          <ThemedView style={styles.body} backgroundColor={Colors.surface}>
+          <ThemedView style={styles.body} backgroundColor="transparent">
             <ThemedText type="subtitle" numberOfLines={1}>
               {track.trackName}
             </ThemedText>
@@ -74,6 +77,9 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: Radius.lg,
     overflow: 'hidden',
+  },
+  scrim: {
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
   },
   artwork: {
     flex: 1,

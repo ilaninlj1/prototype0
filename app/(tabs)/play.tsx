@@ -1,22 +1,25 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
+import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { useDailyDrop } from '@/hooks/use-daily-drop';
 import { loadBestStreaks, loadBlindTest, type BestStreaks, type BlindTestResult } from '@/lib/discovery-storage';
 
+// A plain list row, not a card: title, one line of state, and a chevron.
 function Entry({ title, line, detail, onPress }: { title: string; line: string; detail?: string; onPress?: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} disabled={!onPress} activeOpacity={0.8}>
-      <ThemedView style={styles.entry} backgroundColor={Colors.surface}>
+    <PressableScale onPress={onPress} disabled={!onPress} style={styles.entry}>
+      <View style={styles.entryText}>
         <ThemedText type="subtitle">{title}</ThemedText>
         <ThemedText style={styles.line}>{line}</ThemedText>
         {detail && <ThemedText type="caption">{detail}</ThemedText>}
-      </ThemedView>
-    </TouchableOpacity>
+      </View>
+      {onPress && <Ionicons name="chevron-forward" size={20} color={Colors.textTertiary} />}
+    </PressableScale>
   );
 }
 
@@ -43,7 +46,7 @@ export default function PlayScreen() {
   else if (d && daily.guess == null) [dropLine, dropGo] = ['Make your guess', () => router.push('/drop-guess')];
   else if (d)
     [dropLine, dropGo] = [
-      `Liked ${daily.likedCount}/5 · 🎯 ${daily.guessRight ? '✓' : '✗'} — see your songs`,
+      `Liked ${daily.likedCount}/5 · ${daily.guessRight ? 'found the famous one' : 'missed the famous one'}`,
       () => router.push('/drop-results'),
     ];
 
@@ -53,7 +56,7 @@ export default function PlayScreen() {
       <Entry
         title={d ? `Daily Drop #${d.number}` : 'Daily Drop'}
         line={dropLine}
-        detail={daily.streak > 0 ? `🔥 ${daily.streak} day streak` : undefined}
+        detail={daily.streak > 0 ? `${daily.streak}-day streak` : undefined}
         onPress={dropGo}
       />
       <Entry
@@ -84,7 +87,8 @@ export default function PlayScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: Spacing.lg, paddingTop: Spacing.xxl * 2, gap: Spacing.lg, flexGrow: 1 },
-  entry: { borderRadius: Radius.lg, padding: Spacing.xl, gap: Spacing.xs },
-  line: { color: Colors.accent, fontWeight: '600' },
+  container: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xxl * 2, paddingBottom: Spacing.xl, gap: Spacing.sm, flexGrow: 1 },
+  entry: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.lg },
+  entryText: { flex: 1, gap: 2 },
+  line: { color: Colors.textSecondary },
 });

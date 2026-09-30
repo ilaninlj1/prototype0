@@ -14,6 +14,7 @@ export default function TabLayout() {
         tabBarStyle: { backgroundColor: Colors.surface, borderTopColor: Colors.border },
         headerShown: false,
         tabBarButton: HapticTab,
+        animation: 'shift',
       }}>
       <Tabs.Screen
         name="index"

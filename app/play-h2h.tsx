@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
@@ -77,7 +78,7 @@ export default function HeadToHeadScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <ThemedView style={styles.top} backgroundColor="transparent">
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <ThemedText style={styles.close}>✕</ThemedText>
+          <Ionicons name="close" size={26} color={Colors.textSecondary} style={styles.close} />
         </TouchableOpacity>
         <ThemedText type="label">Streak {streak}</ThemedText>
       </ThemedView>

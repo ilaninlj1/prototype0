@@ -98,7 +98,7 @@ export default function BlindTestScreen() {
 
   const close = (
     <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-      <ThemedText style={styles.close}>✕</ThemedText>
+      <Ionicons name="close" size={26} color={Colors.textSecondary} style={styles.close} />
     </TouchableOpacity>
   );
 
@@ -185,7 +185,7 @@ export default function BlindTestScreen() {
                 {x.isNever ? ' · your never' : ''}
               </ThemedText>
               <ThemedText type="caption">
-                {liked[i] ? '♥ liked' : '✕ skipped'} · {describeListeners(x.song.listeners).count} listeners
+                {liked[i] ? 'Liked' : 'Skipped'} · {describeListeners(x.song.listeners).count} listeners
               </ThemedText>
               <View style={styles.links}>
                 <LikeButton track={songToTrack(x.song)} size={18} />

@@ -98,6 +98,8 @@ export default function DropResultsScreen() {
             <View style={[styles.page, { width }]}>
               <Pressable style={styles.pressFill} onLongPress={() => (status.playing ? player.pause() : player.play())} delayLongPress={400}>
               <ThemedView style={[styles.card, { width: cardWidth }]} backgroundColor={Colors.surface}>
+                <Image source={{ uri: artworkUrl(song.artworkUrl, 100) }} style={StyleSheet.absoluteFill} blurRadius={50} />
+                <View style={[StyleSheet.absoluteFill, styles.scrim]} />
                 <ScrollView contentContainerStyle={styles.cardBody}>
                   <ThemedText style={styles.rank}>{rankLabel(rank)}</ThemedText>
                   <Image source={{ uri: artworkUrl(song.artworkUrl, 600) }} style={styles.art} />
@@ -116,9 +118,9 @@ export default function DropResultsScreen() {
                   </View>
                   <View style={styles.tags}>
                     {song.slot === 'famous' && <ThemedText style={styles.tag}>The secret famous one</ThemedText>}
-                    {guess === position && <ThemedText style={styles.tag}>🎯 Your guess</ThemedText>}
+                    {guess === position && <ThemedText style={styles.tag}>Your guess</ThemedText>}
                   </View>
-                  <ThemedText>{liked ? '♥ You liked it' : '✕ You skipped it'}</ThemedText>
+                  <ThemedText>{liked ? 'You liked it' : 'You skipped it'}</ThemedText>
                   <ThemedView style={styles.bar} backgroundColor={Colors.surfaceElevated}>
                     <ThemedView style={[styles.barFill, { width: `${Math.round(share * 100)}%` }]} backgroundColor={Colors.accent} />
                   </ThemedView>
@@ -166,6 +168,7 @@ const styles = StyleSheet.create({
   pager: { flexGrow: 1, marginVertical: Spacing.md },
   page: { alignItems: 'center' },
   pressFill: { flex: 1 },
+  scrim: { backgroundColor: 'rgba(0, 0, 0, 0.5)' },
   card: { flex: 1, borderRadius: Radius.lg, overflow: 'hidden' },
   cardBody: { padding: Spacing.lg, gap: Spacing.xs },
   rank: { fontSize: 22, lineHeight: 28, fontWeight: '800', color: Colors.accent },
@@ -179,7 +182,7 @@ const styles = StyleSheet.create({
   barFill: { height: 6 },
   ladder: { alignItems: 'center', gap: Spacing.xs },
   dots: { flexDirection: 'row', gap: Spacing.sm },
-  dot: { width: 10, height: 10, borderRadius: Radius.pill },
+  dot: { width: 10, height: 10, borderRadius: Radius.round },
   actions: { flexDirection: 'row', gap: Spacing.md, paddingHorizontal: Spacing.lg, marginTop: Spacing.md },
   action: { flex: 1 },
   button: { paddingVertical: Spacing.md, borderRadius: Radius.pill, alignItems: 'center' },

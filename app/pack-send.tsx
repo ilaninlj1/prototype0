@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -47,7 +48,7 @@ export default function PackSendScreen() {
   return (
     <ScrollView contentContainerStyle={[styles.pad, { paddingTop: insets.top + Spacing.lg }]}>
       <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-        <ThemedText style={styles.close}>✕</ThemedText>
+        <Ionicons name="close" size={26} color={Colors.textSecondary} style={styles.close} />
       </TouchableOpacity>
       <ThemedText type="subtitle">Send a Blind Pack</ThemedText>
       <ThemedText style={styles.dim}>

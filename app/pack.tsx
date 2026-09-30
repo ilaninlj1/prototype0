@@ -139,7 +139,7 @@ export default function PackScreen() {
               {t.trackName}
             </ThemedText>
             <ThemedText numberOfLines={1} style={styles.dim}>
-              {t.artistName} · {liked[i] ? '♥ you liked it' : '✕ you skipped it'}
+              {t.artistName} · {liked[i] ? 'you liked it' : 'you skipped it'}
             </ThemedText>
             <View style={styles.links}>
               <LikeButton track={t} size={18} />

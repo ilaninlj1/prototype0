@@ -63,7 +63,7 @@ export default function DropGuessScreen() {
           <GuessTile
             key={i}
             label={String(i + 1)}
-            sub={votes.find((v) => v.position === i)?.liked ? '♥ liked' : '✕ skipped'}
+            sub={votes.find((v) => v.position === i)?.liked ? 'liked' : 'skipped'}
             selected={picked === i}
             onPress={() => pick(i)}
           />

@@ -18,21 +18,22 @@ export const Colors = {
   textSecondary: 'rgba(242, 242, 244, 0.62)',
   textTertiary: 'rgba(242, 242, 244, 0.38)',
 
-  // One accent for everything that used to fight over green/blue/teal
-  // (Explore, selected/checkmarked states, the current-genre highlight).
-  accent: '#8b5cf6',
-  accentText: '#ffffff',
+  // Near-colorless on purpose: emphasis comes from off-white and weight, and
+  // the only real color on screen is album art (see RevealCard). Replaces
+  // Tailwind's default violet, the most recognizable "AI-built app" tell.
+  accent: '#f2f0ea',
+  accentText: '#0d0d0f',
 
   // One destructive red, replacing the two slightly different ones that had
   // accumulated (an error banner's red and a delete action's red).
-  destructive: '#ef4444',
+  destructive: '#e0645a',
 
   // Paired with destructive for the swipe-zone tints (skip/like) — same
   // Tailwind-500-ish saturation level as destructive, so the two read as a
   // deliberate pair rather than one themed color and one arbitrary one.
-  positive: '#22c55e',
+  positive: '#6cc38a',
 
-  tint: '#8b5cf6',
+  tint: '#f2f0ea',
   icon: 'rgba(242, 242, 244, 0.62)',
 };
 
@@ -45,11 +46,14 @@ export const Spacing = {
   xxl: 32,
 };
 
+// One small radius family used sparingly; `pill` is now a soft rectangle for
+// buttons and chips, and `round` is for things that really are circles.
 export const Radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  pill: 999,
+  sm: 4,
+  md: 6,
+  lg: 10,
+  pill: 8,
+  round: 999,
 };
 
 export const Fonts = Platform.select({
@@ -110,7 +114,8 @@ export const Typography = {
     fontSize: 15,
     fontWeight: '500' as const,
     lineHeight: 20,
-    color: Colors.accent,
+    color: Colors.text,
+    textDecorationLine: 'underline' as const,
   },
   label: {
     fontFamily: Fonts.rounded,

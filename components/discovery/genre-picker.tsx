@@ -171,7 +171,7 @@ export function GenrePicker({
               <TouchableOpacity onPress={explore} activeOpacity={0.7}>
                 <ThemedView style={styles.exploreRow} backgroundColor={Colors.surface}>
                   <ThemedText type="label" style={styles.exploreText}>
-                    🔀 Explore
+                    Explore
                   </ThemedText>
                 </ThemedView>
               </TouchableOpacity>

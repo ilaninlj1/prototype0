@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type LayoutChangeEvent, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -82,7 +83,7 @@ export default function DropPlayScreen() {
     <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <ThemedText style={styles.close}>✕</ThemedText>
+          <Ionicons name="close" size={26} color={Colors.textSecondary} style={styles.close} />
         </TouchableOpacity>
         <ThemedView style={styles.pill} backgroundColor={Colors.accent}>
           <ThemedText type="label" style={{ color: Colors.accentText }}>
