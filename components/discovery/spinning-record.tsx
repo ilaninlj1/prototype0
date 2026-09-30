@@ -35,8 +35,9 @@ export function SpinningRecord({ size, playing, paused }: { size: number; playin
 
   const recordStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.get()}deg` }] }));
   const ringStyle = useAnimatedStyle(() => ({
-    opacity: pulse.get() === 0 ? 0 : 0.5 * (1 - pulse.get()),
-    transform: [{ scale: 1 + pulse.get() * 0.28 }],
+    // Starts strong right at the record's edge and fades as it spreads, so it reads on any cover.
+    opacity: pulse.get() === 0 ? 0 : 0.9 * (1 - pulse.get()),
+    transform: [{ scale: 1 + pulse.get() * 0.3 }],
   }));
 
   return (
@@ -75,7 +76,7 @@ export function SpinningRecord({ size, playing, paused }: { size: number; playin
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', justifyContent: 'center' },
-  ring: { borderWidth: 2, borderColor: Colors.signal },
+  ring: { borderWidth: 3, borderColor: Colors.signal },
   dim: { opacity: 0.4 },
   pausedOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   playButton: { width: TapTarget + 8, height: TapTarget + 8, borderRadius: (TapTarget + 8) / 2, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },

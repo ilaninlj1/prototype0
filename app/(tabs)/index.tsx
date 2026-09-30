@@ -659,12 +659,18 @@ export default function HomeScreen() {
             accessibilityLabel={`Your piece, ${canvas.marks.length} of ${ART.slots} songs`}>
             {/* Until the first swipe it's a single line and the card takes the room; then the covers appear above it. */}
             {canvas.marks.length > 0 && <ArtPiece canvas={canvas} style={styles.strip} />}
-            <View style={styles.stripCaption}>
-              <ThemedText style={styles.stripLabel}>Your collage</ThemedText>
-              <ThemedText style={styles.stripLabel}>
-                {canvas.marks.length === 0 ? 'starts with your first swipe' : `${canvas.marks.length}/${ART.slots}`}
-              </ThemedText>
-            </View>
+            {canvas.marks.length === 0 ? (
+              <View style={[styles.stripCaption, styles.stripCaptionEmpty]}>
+                <ThemedText style={styles.stripLabel}>Your collage starts with your first swipe</ThemedText>
+              </View>
+            ) : (
+              <View style={styles.stripCaption}>
+                <ThemedText style={styles.stripLabel}>Your collage</ThemedText>
+                <ThemedText style={styles.stripLabel}>
+                  {canvas.marks.length}/{ART.slots}
+                </ThemedText>
+              </View>
+            )}
           </Pressable>
 
           <View style={styles.bottomRow}>
@@ -745,6 +751,9 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.rule,
     marginTop: Spacing.xs,
     paddingTop: Spacing.xs,
+  },
+  stripCaptionEmpty: {
+    justifyContent: 'center',
   },
   stripLabel: {
     ...Ui.label,
