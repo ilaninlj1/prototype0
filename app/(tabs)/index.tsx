@@ -17,7 +17,7 @@ import {
   type CardSize,
   type SwipeDirection,
 } from '@/components/discovery/swipe-physics';
-import { TuneSheet } from '@/components/discovery/tune-sheet';
+import { TuneSheet, type NextMode } from '@/components/discovery/tune-sheet';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { CreditLine } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
@@ -44,9 +44,11 @@ import {
   appendSwipeEntry,
   loadDiscoveredGenres,
   loadRegion,
+  loadShuffleGenres,
   loadSwipeHistory,
   saveDiscoveredGenres,
   saveRegion,
+  saveShuffleGenres,
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
 import { fetchArtistListeners, getTracks, trackToDiscoveryTrack } from '@/lib/pool';
@@ -90,6 +92,7 @@ export default function HomeScreen() {
   const [swipeHistory, setSwipeHistory] = useState<SwipeEntry[]>([]);
   const [discoveredGenres, setDiscoveredGenres] = useState<string[]>([]);
   const [region, setRegion] = useState<Region>('US');
+  const [nextMode, setNextMode] = useState<NextMode>('genre');
 
   // Preset and genre (strategy) are independent axes — see runRefill's
   // fetcher branch below. Not persisted (yet): resets to the default A on
@@ -199,6 +202,7 @@ export default function HomeScreen() {
       setSwipeHistory(history);
       setDiscoveredGenres(genres);
       setRegion(loadedRegion);
+      loadShuffleGenres().then((on) => on && setNextMode('random'));
 
       const initialStrategy: Strategy = { type: 'genre', genre: randomGenre() };
       setStrategy(initialStrategy);
@@ -303,13 +307,31 @@ export default function HomeScreen() {
     return next;
   }
 
+  // Tune → Genres: with Shuffle on, each refill hops to a genre not heard
+  // yet this session (the same pick a swipe-down makes); otherwise stay put.
+  function nextFeedStrategy(history: SwipeEntry[]): Strategy {
+    if (nextMode !== 'random') return strategy;
+    const next: Strategy = { type: 'genre', genre: pickJumpGenre(discoveredGenres, deriveGenresHeard(history), GENRES, history) };
+    setStrategy(next);
+    return next;
+  }
+
+  // Tune → Next songs. 'artist' and 'genre' steer from the playing song;
+  // 'random' lets each refill hop genres. Only genre/random is remembered.
+  function handleSetNextMode(mode: NextMode) {
+    setNextMode(mode);
+    saveShuffleGenres(mode === 'random');
+    if (mode === 'artist') handleMoreFromArtist();
+    else if (mode === 'genre' && strategy.type === 'artist') handleMoreLikeSound();
+  }
+
   async function handleSkip(track: DiscoveryTrack) {
     cardsSeenSincePresetChangeRef.current += 1;
     const nextHistory = await logSwipe(track, 'skip');
     const nextSeen = markArtistSeen(track);
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, strategy, nextHistory, discoveredGenres, region, preset, nextSeen);
+    await runRefill(nextQueue, nextFeedStrategy(nextHistory), nextHistory, discoveredGenres, region, preset, nextSeen);
   }
 
   // Swipe right: "who is this?" — flip to the reveal (and its comments)
@@ -338,7 +360,7 @@ export default function HomeScreen() {
     revealIdRef.current = null;
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, strategy, swipeHistory, discoveredGenres, region, preset, seenArtists);
+    await runRefill(nextQueue, nextFeedStrategy(swipeHistory), swipeHistory, discoveredGenres, region, preset, seenArtists);
   }
 
   async function applySteeringStrategy(kind: 'artist' | 'sound', next: Strategy) {
@@ -371,6 +393,7 @@ export default function HomeScreen() {
   }
 
   async function commitGenreJump(genre: string, nextHistory: SwipeEntry[], excludeArtists: Set<string>) {
+    if (nextMode === 'artist') setNextMode('genre');
     const nextStrategy: Strategy = { type: 'genre', genre };
     setStrategy(nextStrategy);
     setQueue([]);
@@ -526,8 +549,8 @@ export default function HomeScreen() {
               region={region}
               onSelectPreset={handleSelectPreset}
               onToggleRegion={handleToggleRegion}
-              onMoreFromArtist={handleMoreFromArtist}
-              onMoreLikeSound={handleMoreLikeSound}
+              nextMode={nextMode}
+              onSetNextMode={handleSetNextMode}
             />
             <LikedTracksButton onPress={() => router.push('/modal')} />
           </View>

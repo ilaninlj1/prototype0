@@ -30,13 +30,9 @@ export function MiniPlayer({
           <ThemedText style={styles.title} numberOfLines={1}>
             {track.trackName}
           </ThemedText>
-          <View style={styles.sub}>
-            <ThemedText style={styles.artist} numberOfLines={1}>
-              {track.artistName}
-            </ThemedText>
-            <AppleMusicLink trackId={track.id} url={track.trackViewUrl} />
-            <SpotifyLink artist={track.artistName} title={track.trackName} />
-          </View>
+          <ThemedText style={styles.artist} numberOfLines={1}>
+            {track.artistName}
+          </ThemedText>
         </View>
         <Pressable
           hitSlop={8}
@@ -49,6 +45,10 @@ export function MiniPlayer({
         <Pressable onPress={onToggle} hitSlop={8} accessibilityLabel={playing ? 'Pause' : 'Play'}>
           <Ionicons name={playing ? 'pause' : 'play'} size={26} color={Colors.text} />
         </Pressable>
+      </View>
+      <View style={styles.links}>
+        <AppleMusicLink trackId={track.id} url={track.trackViewUrl} height={26} />
+        <SpotifyLink artist={track.artistName} title={track.trackName} />
       </View>
       <View style={styles.track}>
         <View style={[styles.fill, { width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%` }]} />
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   art: { width: 44, height: 44, borderRadius: Radius.sm },
   text: { flex: 1, minWidth: 0 },
   title: { fontFamily: 'Figtree_700Bold', fontSize: 14, lineHeight: 18 },
-  sub: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  links: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingBottom: 2 },
   artist: { fontSize: 12, lineHeight: 16, color: Colors.textSecondary, flexShrink: 1 },
   track: { height: 2, backgroundColor: 'rgba(243,234,216,0.15)' },
   fill: { height: 2, backgroundColor: Colors.signal },

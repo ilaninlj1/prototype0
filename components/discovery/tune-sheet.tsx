@@ -8,7 +8,15 @@ import type { Region } from '@/lib/discovery';
 import type { PresetId } from '@/lib/pool-types';
 import { PRESET_LABELS, PresetChips } from './preset-chips';
 import { RegionToggle } from './region-toggle';
-import { SteeringRow } from './steering-row';
+
+/** Where the feed goes next: the playing song's artist, its genre, or anywhere. */
+export type NextMode = 'artist' | 'genre' | 'random';
+
+const NEXT_MODES: { mode: NextMode; label: string; hint: string }[] = [
+  { mode: 'artist', label: 'This artist', hint: "More songs by whoever you're hearing now." },
+  { mode: 'genre', label: 'This genre', hint: 'Stay in this genre until you swipe down.' },
+  { mode: 'random', label: 'Random', hint: 'A different genre every few songs.' },
+];
 
 type TuneSheetProps = {
   preset: PresetId;
@@ -16,8 +24,8 @@ type TuneSheetProps = {
   region: Region;
   onSelectPreset: (preset: PresetId) => void;
   onToggleRegion: () => void;
-  onMoreFromArtist: () => void;
-  onMoreLikeSound: () => void;
+  nextMode: NextMode;
+  onSetNextMode: (mode: NextMode) => void;
 };
 
 /** One "Tune" button holding every feed control, so the main screen is just the card. */
@@ -27,8 +35,8 @@ export function TuneSheet({
   region,
   onSelectPreset,
   onToggleRegion,
-  onMoreFromArtist,
-  onMoreLikeSound,
+  nextMode,
+  onSetNextMode,
 }: TuneSheetProps) {
   const [visible, setVisible] = useState(false);
 
@@ -36,10 +44,6 @@ export function TuneSheet({
     setVisible(false);
   }
 
-  function steer(action: () => void) {
-    close();
-    action();
-  }
 
   return (
     <>
@@ -58,9 +62,23 @@ export function TuneSheet({
             <PresetChips activePreset={preset} loading={presetLoading} onSelect={onSelectPreset} />
 
             <ThemedText type="label" style={styles.heading}>
-              Steer from this song
+              Next songs
             </ThemedText>
-            <SteeringRow onArtist={() => steer(onMoreFromArtist)} onSound={() => steer(onMoreLikeSound)} />
+            <ThemedView style={styles.segment} backgroundColor={Colors.surfaceElevated}>
+              {NEXT_MODES.map((o) => {
+                const active = nextMode === o.mode;
+                return (
+                  <TouchableOpacity key={o.mode} style={styles.segmentSlot} onPress={() => onSetNextMode(o.mode)} activeOpacity={0.7}>
+                    <ThemedView style={styles.segmentItem} backgroundColor={active ? Colors.accent : 'transparent'}>
+                      <ThemedText type="label" style={{ color: active ? Colors.accentText : Colors.textSecondary }}>
+                        {o.label}
+                      </ThemedText>
+                    </ThemedView>
+                  </TouchableOpacity>
+                );
+              })}
+            </ThemedView>
+            <ThemedText type="caption">{NEXT_MODES.find((o) => o.mode === nextMode)?.hint}</ThemedText>
 
             <ThemedView style={styles.regionRow} backgroundColor="transparent">
               <ThemedText type="label">Store region</ThemedText>
@@ -97,6 +115,20 @@ const styles = StyleSheet.create({
   },
   heading: {
     marginTop: Spacing.lg,
+  },
+  segment: {
+    flexDirection: 'row',
+    borderRadius: Radius.pill,
+    padding: 3,
+  },
+  segmentSlot: {
+    flex: 1,
+  },
+  segmentItem: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.pill - 2,
+    alignItems: 'center',
   },
   regionRow: {
     marginTop: Spacing.lg,

@@ -35,7 +35,7 @@ export function GuessTile({ label, sub, selected, revealed, correct, song, onPre
         {song.artist}
       </ThemedText>
       <ThemedText style={styles.count}>{describeListeners(song.listeners).count}</ThemedText>
-      {song.itunesTrackId != null && <AppleMusicLink trackId={song.itunesTrackId} />}
+      {song.itunesTrackId != null && <AppleMusicLink trackId={song.itunesTrackId} height={24} />}
       <SpotifyLink artist={song.artist} title={song.title} />
       {likeTrack && <LikeButton track={likeTrack} />}
     </ThemedView>

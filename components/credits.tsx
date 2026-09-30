@@ -1,8 +1,10 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { Linking, StyleSheet, TouchableOpacity } from 'react-native';
+import { SvgCss } from 'react-native-svg/css';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
+import { APPLE_MUSIC_BADGE_SVG } from '@/lib/apple-music-badge';
 import { appleMusicUrl, CREDIT_LINE, lastfmArtistUrl } from '@/lib/credits';
 import { buildSpotifySearchUrl } from '@/lib/discovery';
 
@@ -17,24 +19,20 @@ export function CreditLine({ lastfm = true }: { lastfm?: boolean }) {
   );
 }
 
-/** Apple requires a link to the song next to every revealed preview. */
-export function AppleMusicLink({ trackId, url }: { trackId: number; url?: string }) {
+/** Apple requires its official badge, linking to the song, next to every revealed preview. */
+export function AppleMusicLink({ trackId, url, height = 32 }: { trackId: number; url?: string; height?: number }) {
   return (
-    <TouchableOpacity onPress={() => open(appleMusicUrl(trackId, url))} hitSlop={8}>
-      <ThemedText type="link" style={styles.link}>
-        Listen on Apple Music ↗
-      </ThemedText>
+    <TouchableOpacity onPress={() => open(appleMusicUrl(trackId, url))} hitSlop={8} accessibilityLabel="Listen on Apple Music">
+      <SvgCss xml={APPLE_MUSIC_BADGE_SVG} height={height} width={(height * 140.62) / 41} />
     </TouchableOpacity>
   );
 }
 
-/** Last.fm requires links to its artist page wherever its listener counts show. */
+/** Last.fm asks for its branded button, linking to the artist page, wherever its counts show. */
 export function LastfmLink({ artist }: { artist: string }) {
   return (
-    <TouchableOpacity onPress={() => open(lastfmArtistUrl(artist))} hitSlop={8}>
-      <ThemedText type="link" style={styles.link}>
-        Last.fm ↗
-      </ThemedText>
+    <TouchableOpacity onPress={() => open(lastfmArtistUrl(artist))} style={styles.brandIcon} accessibilityLabel="Open on Last.fm">
+      <FontAwesome name="lastfm" size={22} color="#ffffff" />
     </TouchableOpacity>
   );
 }
@@ -57,6 +55,6 @@ export function SpotifyLink({ artist, title }: { artist: string; title: string }
 
 const styles = StyleSheet.create({
   spotify: { padding: 11 },
+  brandIcon: { padding: 11 },
   credit: { color: Colors.textTertiary, textAlign: 'center', fontSize: 11 },
-  link: { fontSize: 13 },
 });

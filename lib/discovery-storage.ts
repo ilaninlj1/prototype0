@@ -296,3 +296,8 @@ export const saveBlindTest = (r: BlindTestResult) => writeJson(BLIND_TEST_KEY, r
 const SENDER_NAME_KEY = `${STORAGE_PREFIX}:senderName`;
 export const loadSenderName = () => readJson<string>(SENDER_NAME_KEY, '');
 export const saveSenderName = (name: string) => writeJson(SENDER_NAME_KEY, name);
+
+// Tune → Genres: shuffle between genres as the feed refills, or stay on one.
+const SHUFFLE_GENRES_KEY = `${STORAGE_PREFIX}:shuffleGenres`;
+export const loadShuffleGenres = () => readJson<boolean>(SHUFFLE_GENRES_KEY, false);
+export const saveShuffleGenres = (on: boolean) => writeJson(SHUFFLE_GENRES_KEY, on);
