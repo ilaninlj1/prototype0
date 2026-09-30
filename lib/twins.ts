@@ -60,7 +60,7 @@ const PROFILE_PREFIX: Record<Platform, RegExp> = {
 
 /** The bare username, from "@maya", "maya" or a profile link; null if it can't be a username. */
 export function cleanHandle(raw: string, platform: Platform): string | null {
-  const h = raw.trim().replace(PROFILE_PREFIX[platform], '').replace(/^@/, '').replace(/\/+$/, '');
+  const h = raw.trim().replace(/[?#].*$/, '').replace(PROFILE_PREFIX[platform], '').replace(/^@/, '').replace(/\/+$/, '');
   return /^[A-Za-z0-9._-]{1,30}$/.test(h) ? h : null;
 }
 
@@ -68,6 +68,17 @@ export function handleUrl(platform: Platform, handle: string): string {
   if (platform === 'snapchat') return `https://snapchat.com/add/${handle}`;
   if (platform === 'tiktok') return `https://tiktok.com/@${handle}`;
   return `https://instagram.com/${handle}`;
+}
+
+/**
+ * Names are shown to every twin, under-18s included, so a name can't carry a
+ * way to reach someone — that's what the mutual wave is for. The database
+ * enforces the same rule.
+ */
+export const CONTACT_PATTERN = /(@|\/|\.(com|net|org|me|gg)\b|\d{4,}|insta|snap|tiktok|whatsapp|discord|telegram|phone|call me|text me)/i;
+
+export function nameLooksLikeContact(name: string): boolean {
+  return CONTACT_PATTERN.test(name);
 }
 
 /** Refresh the anonymous session when it has under 5 minutes left. */

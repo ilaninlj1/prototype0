@@ -7,10 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
-import { ensureSession } from '@/lib/auth';
-import { loadSenderName } from '@/lib/discovery-storage';
-import { cleanHandle, type Platform, type Twin } from '@/lib/twins';
-import { fetchTwins, leaveTwins, myProfile, saveProfile, type MyProfile } from '@/lib/twins-api';
+import { cleanHandle, nameLooksLikeContact, type Platform, type Twin } from '@/lib/twins';
+import { fetchTwins, leaveTwins, myProfile, saveProfile, syncLikesNow, type MyProfile } from '@/lib/twins-api';
 
 const PLATFORMS: { key: Platform | null; label: string }[] = [
   { key: null, label: 'None' },
@@ -28,11 +26,13 @@ export default function TwinsScreen() {
   const [state, setState] = useState<State>({ kind: 'loading' });
 
   const load = useCallback(async () => {
-    if (!(await ensureSession())) return setState({ kind: 'offline' });
     const profile = await myProfile();
+    if (profile === 'error') return setState({ kind: 'offline' });
     if (!profile) return setState({ kind: 'form', profile: null });
     setState({ kind: 'list', twins: null });
-    setState({ kind: 'list', twins: (await fetchTwins()) ?? [] });
+    await syncLikesNow(); // your saves on the server match your Liked list before matching
+    const twins = await fetchTwins();
+    setState(twins ? { kind: 'list', twins } : { kind: 'offline' });
   }, []);
 
   useFocusEffect(
@@ -42,7 +42,8 @@ export default function TwinsScreen() {
   );
 
   async function editProfile() {
-    setState({ kind: 'form', profile: await myProfile() });
+    const profile = await myProfile();
+    setState(profile === 'error' ? { kind: 'offline' } : { kind: 'form', profile });
   }
 
   function leave() {
@@ -130,15 +131,10 @@ function JoinForm({ initial, onSaved }: { initial: MyProfile | null; onSaved: ()
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!initial) loadSenderName().then((n) => n && setName((cur) => cur || n));
-    }, [initial])
-  );
-
   const cleaned = platform && handle.trim() ? cleanHandle(handle, platform) : null;
   const handleBad = !!platform && !!handle.trim() && !cleaned;
-  const canSave = name.trim().length > 0 && !handleBad && !saving;
+  const nameBad = nameLooksLikeContact(name);
+  const canSave = name.trim().length > 0 && !nameBad && !handleBad && !saving;
 
   async function save() {
     setSaving(true);
@@ -158,7 +154,10 @@ function JoinForm({ initial, onSaved }: { initial: MyProfile | null; onSaved: ()
       <ThemedText type="label" style={styles.label}>
         Name
       </ThemedText>
-      <TextInput value={name} onChangeText={setName} maxLength={30} placeholder="What twins see" placeholderTextColor={Colors.textTertiary} style={styles.input} />
+      <TextInput value={name} onChangeText={setName} maxLength={30} placeholder="A nickname" placeholderTextColor={Colors.textTertiary} style={styles.input} />
+      <ThemedText type="caption" style={nameBad ? styles.error : styles.dim}>
+        {nameBad ? 'Keep handles, links and numbers out of your name. That’s what waving is for.' : 'Every twin sees this, so a nickname is best.'}
+      </ThemedText>
 
       <Pressable style={styles.check} onPress={() => setAdult(!adult)} hitSlop={6}>
         <Ionicons name={adult ? 'checkbox' : 'square-outline'} size={22} color={adult ? Colors.accent : Colors.textSecondary} />

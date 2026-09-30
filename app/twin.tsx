@@ -64,8 +64,8 @@ export default function TwinScreen() {
         text: 'Block',
         style: 'destructive',
         onPress: async () => {
-          await block(p.id);
-          router.back();
+          if (await block(p.id)) router.back();
+          else setNote('Couldn’t block just now. Try again.');
         },
       },
     ]);
@@ -73,8 +73,7 @@ export default function TwinScreen() {
 
   function chooseReport() {
     const send = (reason: string) => async () => {
-      await report(p.id, reason);
-      setNote('Thanks. We’ll take a look.');
+      setNote((await report(p.id, reason)) ? 'Reported. Three reports hide a profile.' : 'Couldn’t report just now. Try again.');
     };
     Alert.alert(`Report ${p.name}`, 'What’s wrong?', [
       { text: 'Fake or spam', onPress: send('fake or spam') },

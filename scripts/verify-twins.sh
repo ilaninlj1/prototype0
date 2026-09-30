@@ -29,3 +29,16 @@ call PATCH "twin_profiles?user_id=eq.$IA" "$TA" '{"adult":false}'
 echo "9. Under-18 wave refused:   $(call POST twin_waves "$TA" "{\"to_user\":\"$IB\"}")  (expect an RLS error)"
 rpc leave_twins "$TA" >/dev/null; rpc leave_twins "$TB" >/dev/null
 echo "10. After leaving, A's row: $(call GET "twin_profiles?select=user_id" "$TA")  (expect [])"
+
+# Review fixes (supabase/twins-fixes.sql)
+BODY="{\"device_id\":\"$(uuidgen)\",\"name\":\"snap maya_b\"}"; R=$(call POST twin_profiles "$TA" "$BODY")
+echo "11. Contact info in a name: $R  (expect a check-constraint error)"
+echo "12. Direct profile delete:  $(call DELETE "twin_profiles?user_id=eq.$IA" "$TA")  (expect a permission error)"
+BODY="{\"a\":\"$IA\",\"b\":\"$IB\"}"; R=$(rpc twins_blocked "$TA" "$BODY")
+echo "13. Ask who blocked whom:   ${R:0:90}  (expect a permission error)"
+DEV=$(uuidgen)
+call POST twin_profiles "$TA" "{\"device_id\":\"$DEV\",\"name\":\"Test A\"}"
+C=$(signup); TC=$(echo "$C" | tok)
+echo "14. New account claims A:   $(rpc claim_twin_profile "$TC" "{\"device\":\"$DEV\"}") then $(call GET "twin_profiles?select=name" "$TC")  (expect true then Test A)"
+rpc leave_twins "$TC" >/dev/null
+echo "15. After leaving, C's row: $(call GET "twin_profiles?select=user_id" "$TC")  (expect [])"

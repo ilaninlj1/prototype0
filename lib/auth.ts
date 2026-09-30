@@ -14,6 +14,11 @@ const STORE = 'supabase-session-v1';
 type Stored = { access_token: string; refresh_token: string; expires_at: number; user_id: string };
 let pending: Promise<Stored | null> | null = null;
 
+// The only answers that mean "this session is gone for good". Anything else
+// (rate limits, a school filter, a flaky network) is temporary: keep the
+// session and try again later, never start a new account.
+const GONE = new Set(['refresh_token_not_found', 'refresh_token_already_used', 'session_not_found', 'validation_failed']);
+
 async function authCall(path: string, body: object): Promise<{ ok: boolean; status: number; data: any }> {
   const res = await fetch(`${URL_ROOT}/auth/v1/${path}`, {
     method: 'POST',
@@ -30,21 +35,32 @@ const toStored = (d: any): Stored => ({
   user_id: d.user.id,
 });
 
-async function load(): Promise<Stored | null> {
-  let s: Stored | null = null;
+async function readStored(): Promise<Stored | null> {
   try {
     const raw = await AsyncStorage.getItem(STORE);
-    s = raw ? JSON.parse(raw) : null;
-  } catch {}
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** True once this phone has an account (so visitors who never join don't create one). */
+export async function hasStoredSession(): Promise<boolean> {
+  return (await readStored()) !== null;
+}
+
+async function load(create: boolean): Promise<Stored | null> {
+  let s = await readStored();
   try {
     if (s && !sessionNeedsRefresh(s.expires_at, Date.now())) return s;
     if (s) {
       const r = await authCall('token?grant_type=refresh_token', { refresh_token: s.refresh_token });
       if (r.ok) s = toStored(r.data);
-      else if (r.status >= 400 && r.status < 500) s = null; // revoked: start over
-      else return null; // server trouble: try again later, keep the old one
+      else if (GONE.has(r.data?.error_code ?? r.data?.code)) s = null; // truly gone: start over (the profile is claimed back by device)
+      else return null; // temporary: keep the old one, try again later
     }
     if (!s) {
+      if (!create) return null;
       const r = await authCall('signup', {});
       if (!r.ok) return null;
       s = toStored(r.data);
@@ -56,8 +72,10 @@ async function load(): Promise<Stored | null> {
   }
 }
 
-export async function ensureSession(): Promise<{ token: string; userId: string } | null> {
-  pending ??= load().finally(() => (pending = null));
+/** The session, refreshed if needed. With `create` false, a phone without one gets null instead of a new account. */
+export async function ensureSession(create = true): Promise<{ token: string; userId: string } | null> {
+  if (!create && !(await hasStoredSession())) return null;
+  pending ??= load(create).finally(() => (pending = null));
   const s = await pending;
   return s ? { token: s.access_token, userId: s.user_id } : null;
 }

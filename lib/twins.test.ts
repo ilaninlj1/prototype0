@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cleanHandle, handleUrl, isTwin, matchPercent, rankTwins, sessionNeedsRefresh, twinSummary, type Counts, type TwinRow } from './twins.ts';
+import { cleanHandle, handleUrl, isTwin, matchPercent, nameLooksLikeContact, rankTwins, sessionNeedsRefresh, twinSummary, type Counts, type TwinRow } from './twins.ts';
 
 const c = (over: Partial<Counts> = {}): Counts => ({ bothLiked: 0, bothSkipped: 0, disagreed: 0, sameSongs: 0, sameArtists: 0, ...over });
 const row = (twin: string, over: Partial<TwinRow> = {}): TwinRow => ({
@@ -62,4 +62,15 @@ test('sessionNeedsRefresh: refresh within 5 minutes of expiry', () => {
   assert.equal(sessionNeedsRefresh(now / 1000 + 3600, now), false);
   assert.equal(sessionNeedsRefresh(now / 1000 + 200, now), true);
   assert.equal(sessionNeedsRefresh(now / 1000 - 10, now), true);
+});
+
+test('cleanHandle: real share links with tracking bits still work', () => {
+  assert.equal(cleanHandle('https://www.instagram.com/maya_b?igsh=MWQ1ZGUxMzBkMA==', 'instagram'), 'maya_b');
+  assert.equal(cleanHandle('https://www.tiktok.com/@maya?_t=8pZ&_r=1', 'tiktok'), 'maya');
+  assert.equal(cleanHandle('snapchat.com/add/maya-b#top', 'snapchat'), 'maya-b');
+});
+
+test('nameLooksLikeContact: a nickname is fine, a way to reach someone is not', () => {
+  for (const ok of ['Maya', 'lo-fi lover', 'DJ Kev', 'Sam 22']) assert.equal(nameLooksLikeContact(ok), false, ok);
+  for (const bad of ['snap maya_b', '@maya', 'maya.com', 'insta: maya', 'call 5551234', 'tiktok maya', 'discord maya#1']) assert.equal(nameLooksLikeContact(bad), true, bad);
 });
