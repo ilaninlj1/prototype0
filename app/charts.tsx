@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
-import type { ChartEntry, Move } from '@/lib/charts';
+import { historyLine, type ChartEntry, type Move } from '@/lib/charts';
 import { COUNTRIES, loadChart, peekChart, type Chart } from '@/lib/charts-api';
 import { artworkUrl } from '@/lib/discovery';
 import { pickLesserKnown } from '@/lib/song-facts';
@@ -83,7 +83,7 @@ export default function ChartsScreen() {
             </PressableScale>
 
             <ThemedText type="eyebrow" style={styles.section}>
-              Rising fastest
+              Rising fastest · {chart.risingSpan}
             </ThemedText>
             {!chart.hasHistory || chart.rising.length === 0 ? (
               <ThemedText style={styles.note}>
@@ -120,6 +120,11 @@ export default function ChartsScreen() {
                   <ThemedText style={styles.dim} numberOfLines={1}>
                     {e.artist}
                   </ThemedText>
+                  {historyLine(e.rank, chart.history[e.id]) && (
+                    <ThemedText style={[styles.history, e.rank <= (chart.history[e.id]?.peak ?? 0) && styles.historyPeak]}>
+                      {historyLine(e.rank, chart.history[e.id])}
+                    </ThemedText>
+                  )}
                 </View>
                 <MoveTag move={chart.moves[e.id]} />
               </Pressable>
@@ -173,5 +178,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 15, lineHeight: 19 },
   dim: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
+  history: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, color: Colors.textTertiary, marginTop: 1 },
+  historyPeak: { color: Colors.highlight },
   move: { fontFamily: Fonts.monoMedium, minWidth: 34, textAlign: 'right' },
 });

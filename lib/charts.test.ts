@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { movement, parseChartFeed, pickSimilar, risers, type ChartEntry } from './charts.ts';
+import { historyLine, movement, parseChartFeed, pickSimilar, risers, risingBaseline, type ChartEntry } from './charts.ts';
 
 const e = (rank: number, id: number): ChartEntry => ({ rank, id, title: `t${id}`, artist: `a${id}`, artworkUrl: '' });
 
@@ -36,4 +36,19 @@ test('pickSimilar skips the current artist and ones already played', () => {
   const pick = pickSimilar(['A', 'B', 'C', 'D'], 'A', new Set(['B']), () => 0);
   assert.equal(pick, 'C');
   assert.equal(pickSimilar(['A'], 'A', new Set(), () => 0), null);
+});
+
+test('rising baseline: last week when saved, otherwise yesterday', () => {
+  const week = [e(9, 1)];
+  const yday = [e(3, 1)];
+  assert.deepEqual(risingBaseline(week, yday), { entries: week, span: 'this week' });
+  assert.deepEqual(risingBaseline([], yday), { entries: yday, span: 'today' });
+  assert.deepEqual(risingBaseline([], []), { entries: [], span: 'today' });
+});
+
+test('historyLine: peak, days on chart, and "at its peak"', () => {
+  assert.equal(historyLine(3, { peak: 3, days: 12 }), 'at its peak · 12 days on chart');
+  assert.equal(historyLine(8, { peak: 3, days: 12 }), 'peak #3 · 12 days on chart');
+  assert.equal(historyLine(8, { peak: 8, days: 1 }), 'first day on chart');
+  assert.equal(historyLine(8, undefined), null);
 });

@@ -43,3 +43,18 @@ export function pickSimilar(similar: string[], current: string, played: Set<stri
   if (open.length === 0) return null;
   return open[Math.floor(rng() * Math.min(open.length, 5))];
 }
+
+/** What "rising fastest" compares against: a week ago once saved (less noisy), else yesterday. */
+export function risingBaseline(weekAgo: ChartEntry[], yesterday: ChartEntry[]): { entries: ChartEntry[]; span: 'this week' | 'today' } {
+  return weekAgo.length > 0 ? { entries: weekAgo, span: 'this week' } : { entries: yesterday, span: 'today' };
+}
+
+export type TrackHistory = { peak: number; days: number };
+
+/** The small line under a chart song: "peak #3 · 12 days on chart", or "at its peak". */
+export function historyLine(rank: number, h: TrackHistory | undefined): string | null {
+  if (!h) return null;
+  if (h.days <= 1) return 'first day on chart';
+  const days = `${h.days} days on chart`;
+  return rank <= h.peak ? `at its peak · ${days}` : `peak #${h.peak} · ${days}`;
+}
