@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router/react-navigation';
 import { useCallback, useRef, useState } from 'react';
@@ -267,6 +268,11 @@ export default function LikedTracksScreen() {
             </ThemedView>
           )}
 
+          <Pressable style={styles.lookup} onPress={() => router.push('/search')} accessibilityRole="search">
+            <Ionicons name="search" size={18} color={Colors.textTertiary} />
+            <ThemedText style={styles.lookupText}>Look up any song, artist or album</ThemedText>
+          </Pressable>
+
           {genres.length > 1 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
               {[null, ...genres].map((g) => {
@@ -369,6 +375,18 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.pill,
+  },
+  lookup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  lookupText: {
+    color: Colors.textTertiary,
   },
   grid: {
     flexDirection: 'row',

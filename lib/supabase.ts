@@ -113,3 +113,7 @@ export const fetchVibes = (trackId: number) => get<Vibe[]>(`vibe_counts?track_id
 
 export const addVibe = (trackId: number, deviceId: string, word: string) =>
   post('vibes', { track_id: trackId, device_id: deviceId, word });
+
+/** The newest comments' song ids and times, for "What people are talking about". */
+export const fetchRecentCommentRows = () =>
+  get<{ track_id: number; created_at: string }[]>(`comments?select=track_id,created_at&order=created_at.desc&limit=200`);
