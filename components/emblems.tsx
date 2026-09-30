@@ -103,3 +103,16 @@ export function WorldChartsEmblem({ size = 52 }: Props) {
     </Svg>
   );
 }
+
+/** DJ Picks: a record on the platter, the tone arm down, a red "on air" dot. */
+export function DjPicksEmblem({ size = 52 }: Props) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <Circle {...FILL} cx={28} cy={36} r={22} />
+      <Circle {...LINE} cx={28} cy={36} r={13} opacity={0.5} />
+      <Circle fill={Colors.text} cx={28} cy={36} r={3.5} />
+      <Path {...LINE} d="M54 8 V30 L42 42" />
+      <Circle fill={RED} cx={54} cy={8} r={4.5} />
+    </Svg>
+  );
+}
