@@ -10,11 +10,12 @@ import { PRESET_LABELS, PresetChips } from './preset-chips';
 import { RegionToggle } from './region-toggle';
 
 /** Where the feed goes next: the playing song's artist, its genre, or anywhere. */
-export type NextMode = 'artist' | 'genre' | 'random';
+export type NextMode = 'artist' | 'similar' | 'genre' | 'random';
 
 const NEXT_MODES: { mode: NextMode; label: string; hint: string }[] = [
-  { mode: 'artist', label: 'This artist', hint: "More songs by whoever you're hearing now." },
-  { mode: 'genre', label: 'This genre', hint: 'Stay in this genre until you swipe down.' },
+  { mode: 'artist', label: 'Artist', hint: "More songs by whoever you're hearing now." },
+  { mode: 'similar', label: 'Similar', hint: 'Artists that fans of this one also play. Hops to a new one every 3 songs.' },
+  { mode: 'genre', label: 'Genre', hint: 'Stay in this genre until you swipe down.' },
   { mode: 'random', label: 'Random', hint: 'A different genre every few songs.' },
 ];
 

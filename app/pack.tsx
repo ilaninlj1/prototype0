@@ -23,9 +23,11 @@ import { artworkUrl, parseArtistLookupResponse, type DiscoveryTrack } from '@/li
 export default function PackScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ ids?: string; from?: string; kind?: string }>();
+  const params = useLocalSearchParams<{ ids?: string; from?: string; kind?: string; country?: string }>();
   // 'artist' = "hear 3 of their songs blind first" from search, not a friend's pack.
   const isArtist = params.kind === 'artist';
+  // 'region' = "hear a country's chart blind" from World Charts.
+  const isRegion = params.kind === 'region';
   const pack = useMemo(() => parsePack(params.ids, params.from), [params.ids, params.from]);
   const { player, status } = usePlayback();
 
@@ -37,11 +39,11 @@ export default function PackScreen() {
 
   useEffect(() => {
     if (pack.ids.length === 0) return;
-    fetch(`https://itunes.apple.com/lookup?id=${pack.ids.join(',')}&country=US`)
+    fetch(`https://itunes.apple.com/lookup?id=${pack.ids.join(',')}&country=${params.country ?? 'US'}`)
       .then((r) => r.json())
       .then((json) => setFetched(orderByIds(parseArtistLookupResponse(json), pack.ids)))
       .catch(() => setFetched([]));
-  }, [pack.ids]);
+  }, [pack.ids, params.country]);
 
   const cards = tracks ? tracks.slice(liked.length) : [];
   const done = !!tracks && tracks.length > 0 && liked.length === tracks.length;
@@ -85,7 +87,11 @@ export default function PackScreen() {
     return (
       <ThemedView style={[styles.center, pad]}>
         <ThemedText type="title" style={styles.centerText}>
-          {isArtist ? `${tracks.length} songs by ${pack.from}` : `${pack.from} sent you ${tracks.length} songs`}
+          {isRegion
+            ? `${tracks.length} songs from ${pack.from}'s top 25`
+            : isArtist
+              ? `${tracks.length} songs by ${pack.from}`
+              : `${pack.from} sent you ${tracks.length} songs`}
         </ThemedText>
         <ThemedText style={[styles.dim, styles.centerText]}>
           Listen blind — no names, no covers. Swipe right (or tap the right side) on what you like, left to skip.
@@ -133,9 +139,13 @@ export default function PackScreen() {
     <ScrollView contentContainerStyle={[styles.scroll, pad]}>
       <ThemedText style={styles.big}>{Math.round((likedCount / tracks.length) * 100)}%</ThemedText>
       <ThemedText type="subtitle">
-        {isArtist ? `You liked ${likedCount} of ${tracks.length} by ${pack.from}.` : matchLine(pack.from, likedCount, tracks.length)}
+        {isRegion
+          ? `You liked ${likedCount} of ${tracks.length} from ${pack.from}'s chart.`
+          : isArtist
+            ? `You liked ${likedCount} of ${tracks.length} by ${pack.from}.`
+            : matchLine(pack.from, likedCount, tracks.length)}
       </ThemedText>
-      {!isArtist && <ThemedText style={styles.dim}>These are all songs {pack.from} found and liked.</ThemedText>}
+      {!isArtist && !isRegion && <ThemedText style={styles.dim}>These are all songs {pack.from} found and liked.</ThemedText>}
       {tracks.map((t, i) => (
         <ThemedView key={t.id} style={styles.row} backgroundColor={Colors.surface}>
           <Image source={{ uri: artworkUrl(t.artworkUrl100, 200) }} style={styles.art} />
@@ -154,7 +164,7 @@ export default function PackScreen() {
           </View>
         </ThemedView>
       ))}
-      {isArtist ? (
+      {isArtist || isRegion ? (
         <TouchableOpacity onPress={() => router.back()}>
           <ThemedView style={styles.button} backgroundColor={Colors.accent}>
             <ThemedText type="label" style={{ color: Colors.accentText }}>

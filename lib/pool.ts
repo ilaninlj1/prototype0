@@ -262,6 +262,30 @@ export async function fetchArtistListeners(artistName: string): Promise<number |
   }
 }
 
+interface LastFmSimilarResponse {
+  similarartists?: { artist?: { name: string }[] | { name: string } };
+}
+
+/** Artists Last.fm listeners play alongside this one, most similar first ([] on failure). */
+export async function fetchSimilarArtists(artistName: string, limit = 15): Promise<string[]> {
+  const apiKey = process.env.EXPO_PUBLIC_LASTFM_API_KEY;
+  if (!apiKey) return [];
+  const url = new URL(LASTFM_API_ROOT);
+  url.searchParams.set('method', 'artist.getSimilar');
+  url.searchParams.set('artist', artistName);
+  url.searchParams.set('autocorrect', '1');
+  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('api_key', apiKey);
+  url.searchParams.set('format', 'json');
+  try {
+    const body = (await pacedLastFm(() => fetchWithBackoff(url))) as LastFmSimilarResponse;
+    const raw = body.similarartists?.artist;
+    return (Array.isArray(raw) ? raw : raw ? [raw] : []).map((a) => a.name);
+  } catch {
+    return [];
+  }
+}
+
 interface LastFmTopTagsResponse {
   toptags?: { tag?: { name: string }[] | { name: string } };
 }

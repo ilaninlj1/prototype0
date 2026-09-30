@@ -44,10 +44,10 @@ export async function searchMusic(term: string): Promise<SearchResults> {
   return { songs, artists: [...artists.values()].slice(0, 5), albums: [...albums.values()].slice(0, 6) };
 }
 
-/** Songs by iTunes track id, in the order asked (one call). */
-export async function lookupTracks(ids: number[]): Promise<DiscoveryTrack[]> {
+/** Songs by iTunes track id, in the order asked (one call). Chart songs need their own country's store. */
+export async function lookupTracks(ids: number[], country = 'US'): Promise<DiscoveryTrack[]> {
   if (ids.length === 0) return [];
-  const body = await json<{ results: any[] }>(`https://itunes.apple.com/lookup?id=${ids.join(',')}&country=US`);
+  const body = await json<{ results: any[] }>(`https://itunes.apple.com/lookup?id=${ids.join(',')}&country=${country}`);
   const found = parseArtistLookupResponse(body ?? {});
   return ids.flatMap((id) => found.filter((t) => t.id === id).slice(0, 1));
 }
@@ -129,4 +129,13 @@ export async function fetchStory(artist: string, title: string): Promise<Story |
     }
   }
   return null;
+}
+
+/** An artist's iTunes id by name (first match), or null. */
+export async function findItunesArtist(name: string): Promise<{ id: number; name: string } | null> {
+  const body = await json<{ results?: { artistId?: number; artistName?: string }[] }>(
+    `https://itunes.apple.com/search?term=${encodeURIComponent(name)}&entity=musicArtist&limit=1&country=US`
+  );
+  const r = body?.results?.[0];
+  return r?.artistId ? { id: r.artistId, name: r.artistName ?? name } : null;
 }

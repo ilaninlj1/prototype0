@@ -33,7 +33,7 @@ const LOADING = undefined;
 export default function SongScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, country } = useLocalSearchParams<{ id: string; country?: string }>();
   const { player, status } = usePlayback();
 
   const [track, setTrack] = useState<DiscoveryTrack | null>(null);
@@ -46,7 +46,7 @@ export default function SongScreen() {
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    lookupTracks([Number(id)]).then(([t]) => {
+    lookupTracks([Number(id)], country ?? 'US').then(([t]) => {
       if (!t) return;
       setTrack(t);
       fetchArtistListeners(t.artistName).then(setArtistListeners);
@@ -57,7 +57,7 @@ export default function SongScreen() {
       else setCollectors(null);
       fetchComments(t.id).then((c) => setCommentCount(c?.length ?? 0));
     });
-  }, [id]);
+  }, [id, country]);
 
   useFocusEffect(useCallback(() => () => player.pause(), [player]));
 

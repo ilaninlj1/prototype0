@@ -92,3 +92,14 @@ export function BlindspotMark({ size = 52 }: Props) {
     </Svg>
   );
 }
+
+/** World Charts: a globe with sound coming off it. */
+export function WorldChartsEmblem({ size = 52 }: Props) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <Circle {...FILL} cx={28} cy={34} r={22} />
+      <Path {...LINE} d="M6 34 H50 M28 12 C18 22 18 46 28 56 M28 12 C38 22 38 46 28 56" opacity={0.7} />
+      <Path stroke={RED} strokeWidth={3} strokeLinecap="round" fill="none" d="M52 14 C56 18 56 24 52 28 M57 9 C64 16 64 26 57 33" />
+    </Svg>
+  );
+}

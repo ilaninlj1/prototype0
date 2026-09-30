@@ -66,6 +66,11 @@ export default function SearchScreen() {
 
         {!results && !loading && (
           <>
+            <Pressable style={styles.chartsLink} onPress={() => router.push('/charts')}>
+              <Ionicons name="trending-up" size={20} color={Colors.signal} />
+              <ThemedText style={styles.chartsText}>World charts · what&apos;s rising today</ThemedText>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            </Pressable>
             <ThemedText type="eyebrow" style={styles.section}>
               What people are talking about
             </ThemedText>
@@ -166,6 +171,8 @@ const styles = StyleSheet.create({
   input: { flex: 1, color: Colors.text, fontFamily: Fonts.sans, fontSize: 16, paddingVertical: Spacing.md },
   scroll: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl },
   section: { marginTop: Spacing.xl, marginBottom: Spacing.sm },
+  chartsLink: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, marginTop: Spacing.lg },
+  chartsText: { flex: 1, fontFamily: 'Figtree_600SemiBold' },
   note: { fontFamily: Fonts.note, fontSize: 20, lineHeight: 24, color: Colors.textSecondary, marginTop: Spacing.sm },
   hRow: { gap: Spacing.md },
   artist: { width: 96, alignItems: 'center', gap: 6 },

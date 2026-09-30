@@ -51,7 +51,9 @@ import {
   saveShuffleGenres,
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
-import { fetchArtistListeners, getTracks, trackToDiscoveryTrack } from '@/lib/pool';
+import { pickSimilar } from '@/lib/charts';
+import { fetchArtistListeners, fetchSimilarArtists, getTracks, trackToDiscoveryTrack } from '@/lib/pool';
+import { findItunesArtist } from '@/lib/song-details';
 import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
 
@@ -321,8 +323,34 @@ export default function HomeScreen() {
   function handleSetNextMode(mode: NextMode) {
     setNextMode(mode);
     saveShuffleGenres(mode === 'random');
-    if (mode === 'artist') handleMoreFromArtist();
+    if (mode === 'similar' && currentTrack) hopToSimilar(currentTrack.artistName);
+    else if (mode === 'artist') handleMoreFromArtist();
     else if (mode === 'genre' && strategy.type === 'artist') handleMoreLikeSound();
+  }
+
+  // Next songs → Similar: every 3 songs, move to an artist fans of the
+  // current one also play (Last.fm), never repeating one this session.
+  const similarPlayedRef = useRef(new Set<string>());
+  const similarCountRef = useRef(0);
+  async function similarStrategy(fromArtist: string): Promise<Strategy | null> {
+    const pick = pickSimilar(await fetchSimilarArtists(fromArtist), fromArtist, similarPlayedRef.current);
+    if (!pick) return null;
+    similarPlayedRef.current.add(pick);
+    const artist = await findItunesArtist(pick);
+    return artist ? { type: 'artist', artistId: artist.id, artistName: artist.name } : null;
+  }
+  async function hopToSimilar(fromArtist: string) {
+    const next = await similarStrategy(fromArtist);
+    if (next) applySteeringStrategy('artist', next);
+  }
+  async function strategyAfterSwipe(track: DiscoveryTrack, history: SwipeEntry[]): Promise<Strategy> {
+    if (nextMode !== 'similar') return nextFeedStrategy(history);
+    similarCountRef.current += 1;
+    if (similarCountRef.current % 3 !== 0) return strategy;
+    const next = await similarStrategy(track.artistName);
+    if (!next) return strategy;
+    setStrategy(next);
+    return next;
   }
 
   async function handleSkip(track: DiscoveryTrack) {
@@ -331,7 +359,7 @@ export default function HomeScreen() {
     const nextSeen = markArtistSeen(track);
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, nextFeedStrategy(nextHistory), nextHistory, discoveredGenres, region, preset, nextSeen);
+    await runRefill(nextQueue, await strategyAfterSwipe(track, nextHistory), nextHistory, discoveredGenres, region, preset, nextSeen);
   }
 
   // Swipe right: "who is this?" — flip to the reveal (and its comments)
@@ -356,11 +384,20 @@ export default function HomeScreen() {
   }
 
   async function handleRevealDone() {
+    const revealed = revealTrack;
     setRevealTrack(null);
     revealIdRef.current = null;
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
-    await runRefill(nextQueue, nextFeedStrategy(swipeHistory), swipeHistory, discoveredGenres, region, preset, seenArtists);
+    await runRefill(
+      nextQueue,
+      revealed ? await strategyAfterSwipe(revealed, swipeHistory) : nextFeedStrategy(swipeHistory),
+      swipeHistory,
+      discoveredGenres,
+      region,
+      preset,
+      seenArtists
+    );
   }
 
   async function applySteeringStrategy(kind: 'artist' | 'sound', next: Strategy) {

@@ -104,6 +104,7 @@ export default function RootLayout() {
             <Stack.Screen name="export-history" options={{ presentation: 'modal', title: 'Export History' }} />
             <Stack.Screen name="drop-play" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="search" options={{ headerShown: false }} />
+            <Stack.Screen name="charts" options={{ headerShown: false }} />
             <Stack.Screen name="song" options={{ headerShown: false }} />
             <Stack.Screen name="songs" options={{ headerShown: false }} />
             <Stack.Screen name="comments" options={{ presentation: 'modal', headerShown: false }} />

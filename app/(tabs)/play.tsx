@@ -12,6 +12,7 @@ import {
   DailyDropEmblem,
   HeadToHeadEmblem,
   SpotTheStarEmblem,
+  WorldChartsEmblem,
 } from '@/components/emblems';
 import { PressableScale } from '@/components/pressable-scale';
 import { Sticker } from '@/components/sticker';
@@ -107,6 +108,17 @@ export default function PlayScreen() {
       statLabel: 'best streak',
       cta: 'Play',
       href: '/play-h2h',
+    },
+    {
+      key: 'world',
+      emblem: (s) => <WorldChartsEmblem size={s} />,
+      eyebrow: 'Charts · 18 countries',
+      title: 'World Charts',
+      blurb: "What's number one in Seoul, Lagos or São Paulo right now. See what's climbing, or hear a country's top songs blind.",
+      stat: '18',
+      statLabel: 'countries, updated daily',
+      cta: 'Open the charts',
+      href: '/charts',
     },
     {
       key: 'test',
