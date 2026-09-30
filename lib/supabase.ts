@@ -117,3 +117,9 @@ export const addVibe = (trackId: number, deviceId: string, word: string) =>
 /** The newest comments' song ids and times, for "What people are talking about". */
 export const fetchRecentCommentRows = () =>
   get<{ track_id: number; created_at: string }[]>(`comments?select=track_id,created_at&order=created_at.desc&limit=200`);
+
+/** "Sounds like AI?" — one report per phone per artist. */
+export const reportAiArtist = (artistKey: string, deviceId: string) => post('ai_reports', { artist_key: artistKey, device_id: deviceId });
+
+/** Artists reported as AI by 3+ different phones. */
+export const fetchReportedAiArtists = () => get<{ artist_key: string }[]>('ai_reported?select=artist_key');

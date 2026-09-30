@@ -7,6 +7,7 @@ import path from 'node:path';
 import type { DropSong, Slot } from '../lib/daily-drop.ts';
 import { todayKey } from '../lib/daily-drop.ts';
 import { fetchArtistListeners, fetchItunesCatalog, fetchTopTracks, intersectByTitle } from '../lib/pool.ts';
+import { normalizeArtist } from '../lib/human-check.ts';
 import { addDays, canRedo, daysBetween, distinctGenres, inRankWindow, isRealArtist, seedWindow, slotFor, SLOTS } from './drop-rules.ts';
 
 const LAST_DAY = '2026-12-31';
@@ -17,6 +18,12 @@ const MAX_TRIES_PER_SLOT = 40;
 const KNOWN_REUSE_AFTER_DAYS = 30;
 const FILE = path.resolve(import.meta.dirname, '../drops/drops.json');
 const RAW = path.resolve(import.meta.dirname, '../assets/genres-raw.json');
+// Artists listeners tag as AI (written by `npm run scan-ai-artists`).
+const AI_FILE = path.resolve(import.meta.dirname, '../assets/ai-artists.json');
+const aiArtists = new Set<string>(
+  fs.existsSync(AI_FILE) ? (JSON.parse(fs.readFileSync(AI_FILE, 'utf8')) as { artists: { key: string }[] }).artists.map((a) => a.key) : []
+);
+const isAi = (name: string) => aiArtists.has(normalizeArtist(name));
 
 type DayEntry = { number: number; songs: DropSong[]; candidates?: Partial<Record<Slot, DropSong[]>> };
 type DropsFile = { firstDay: string; days: Record<string, DayEntry> };
@@ -84,7 +91,7 @@ async function pickSong(slot: Slot, artists: Artist[], usedArtists: Set<string>,
     if (!freshListeners.has(a.name)) freshListeners.set(a.name, await fetchArtistListeners(a.name));
     const listeners = freshListeners.get(a.name);
     if (listeners == null || slotFor(listeners) !== slot) continue; // cheap mismatch: not a try
-    if (!isRealArtist(a.mbid, listeners)) continue; // human-only guarantee
+    if (!isRealArtist(a.mbid, listeners, isAi(a.name))) continue; // human-only guarantee
     tries++;
     usedArtists.add(a.name); // right slot: tried once, never retried
     const ranked = (await fetchTopTracks(a.name).catch(() => [])).filter((t) => inRankWindow(slot, t.rank));
@@ -180,7 +187,7 @@ async function main() {
     const byName = new Map(artists.map((a) => [a.name, a]));
     for (const day of Object.keys(file.days).sort()) {
       if (day <= addDays(today, 1) || file.days[day].songs.length !== 5) continue;
-      const bad = file.days[day].songs.filter((s) => !isRealArtist(byName.get(s.artist)?.mbid, s.listeners));
+      const bad = file.days[day].songs.filter((s) => !isRealArtist(byName.get(s.artist)?.mbid, s.listeners, isAi(s.artist)));
       if (bad.length === 0) continue;
       console.log(`${day}: replacing ${bad.map((s) => `${s.slot} (${s.artist})`).join(', ')}`);
       const keep = file.days[day].songs.filter((s) => !bad.includes(s));

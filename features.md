@@ -16,6 +16,21 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-09-30] DJ Picks — a blind mode of what real radio DJs played today
+Research (2026-09-30): the most-liked advice on finding music is human curation — college radio,
+record-store owners, artists' own playlists — not algorithms. KEXP's open feed
+(`https://api.kexp.org/v2/plays/`) lists every song its DJs play, with rotation (Light/Heavy) and
+sometimes a DJ note. Idea: a Play mode with today's DJ plays as blind cards; the reveal shows the
+DJ's note and "played on KEXP". KEXP's terms bar building a "competitive product" — email them for
+an OK before anything public. KCRW and NTS also publish tracklists. Wanted by the user, later.
+
+## [2026-09-30] Taste Twins — meet people who blind-liked the same songs
+Research (2026-09-30): "find someone with your taste and stalk their playlists" was one of the
+most-liked discovery tips. Idea: anonymous matching on blind likes (same songs, liked before the
+reveal), then see what else your twin saved, and optionally say hi. Needs likes uploaded to
+Supabase, a privacy story (opt-in, no names by default), and moderation for any messaging. The user
+wants it to meet people. Later.
+
 ## [2026-09-14] Phase 1 requirement: serialize iTunes lookups with real pacing, pre-fetch ahead of the swipe
 
 Measured directly, not assumed: iTunes's real rate limit is much tighter

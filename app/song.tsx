@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppleMusicLink, SpotifyLink, CreditLine, LastfmLink } from '@/components/credits';
 import { DoubleTapLike } from '@/components/double-tap-like';
+import { HumanBadge } from '@/components/human-badge';
 import { LikeButton } from '@/components/like-button';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
@@ -110,6 +111,7 @@ export default function SongScreen() {
         <ThemedText type="eyebrow">{track.collectionName ?? track.primaryGenreName}</ThemedText>
         <ThemedText type="title">{track.trackName}</ThemedText>
         <ThemedText style={styles.artist}>{track.artistName}</ThemedText>
+        <HumanBadge artist={track.artistName} />
 
         <View style={styles.actions}>
           <Pressable style={styles.play} onPress={togglePlay}>

@@ -53,9 +53,13 @@ export function distinctGenres(songs: { genre: string }[]): boolean {
   return new Set(songs.map((s) => s.genre)).size === songs.length;
 }
 
-/** Human-only guarantee: a MusicBrainz id and a listener floor keep junk and AI uploads out of drops. */
+/**
+ * Human-only guarantee: a MusicBrainz id and a listener floor keep junk out of
+ * drops, and an AI tag (see scripts/scan-ai-artists.ts) keeps AI acts out — they
+ * can have both an id and tens of thousands of listeners.
+ */
 export const MIN_REAL_LISTENERS = 500;
 
-export function isRealArtist(mbid: string | null | undefined, listeners: number): boolean {
-  return !!mbid && listeners >= MIN_REAL_LISTENERS;
+export function isRealArtist(mbid: string | null | undefined, listeners: number, aiTagged = false): boolean {
+  return !!mbid && listeners >= MIN_REAL_LISTENERS && !aiTagged;
 }

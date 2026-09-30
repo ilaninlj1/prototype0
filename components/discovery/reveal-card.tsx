@@ -8,6 +8,7 @@ import Animated, { FadeIn, FlipInEasyY, useAnimatedStyle, useSharedValue, withDe
 
 import { AppleMusicLink, SpotifyLink, CreditLine, LastfmLink } from '@/components/credits';
 import { DoubleTapLike } from '@/components/double-tap-like';
+import { HumanBadge } from '@/components/human-badge';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -70,6 +71,7 @@ export function RevealCard({ track, listeners, size, onDone }: RevealCardProps) 
                 <ThemedText style={styles.secondary}>Last.fm has no count for this artist yet.</ThemedText>
               )}
             </ThemedView>
+            <HumanBadge artist={track.artistName} />
 
             <ThemedView style={styles.links} backgroundColor="transparent">
               <AppleMusicLink trackId={track.id} url={track.trackViewUrl} />

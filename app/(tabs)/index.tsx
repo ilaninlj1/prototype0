@@ -61,6 +61,7 @@ import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
 import { ART, type ArtCanvas, type Mark } from '@/lib/print';
 import { prefetchPrints, printFor } from '@/lib/print-data';
+import { hideFromDiscovery, shouldSkip } from '@/lib/human-check-api';
 
 function randomGenre(): string {
   return GENRES[Math.floor(Math.random() * GENRES.length)];
@@ -293,9 +294,10 @@ export default function HomeScreen() {
         // genre-term search — see bugs.md's 2026-09-14 entry on why that
         // path is retired here, not patched.
         (strategy) =>
-          strategy.type === 'artist'
+          (strategy.type === 'artist'
             ? fetchForStrategy(strategy, activeRegion)
             : getTracks(activePreset, strategy.genre, excludeArtists).then((tracks) => tracks.map(trackToDiscoveryTrack))
+          ).then((tracks) => tracks.filter((t) => !hideFromDiscovery(t.artistName))) // human-only unless AI music is on
       );
       if (refillEpochRef.current !== epoch) return;
 
@@ -385,11 +387,17 @@ export default function HomeScreen() {
   const similarPlayedRef = useRef(new Set<string>());
   const similarCountRef = useRef(0);
   async function similarStrategy(fromArtist: string): Promise<Strategy | null> {
-    const pick = pickSimilar(await fetchSimilarArtists(fromArtist), fromArtist, similarPlayedRef.current);
-    if (!pick) return null;
-    similarPlayedRef.current.add(pick);
-    const artist = await findItunesArtist(pick);
-    return artist ? { type: 'artist', artistId: artist.id, artistName: artist.name } : null;
+    const similar = await fetchSimilarArtists(fromArtist);
+    // A few tries, so an AI-tagged "similar artist" is passed over, not hopped to.
+    for (let i = 0; i < 3; i++) {
+      const pick = pickSimilar(similar, fromArtist, similarPlayedRef.current);
+      if (!pick) return null;
+      similarPlayedRef.current.add(pick);
+      if (await shouldSkip(pick)) continue;
+      const artist = await findItunesArtist(pick);
+      return artist ? { type: 'artist', artistId: artist.id, artistName: artist.name } : null;
+    }
+    return null;
   }
   async function hopToSimilar(fromArtist: string) {
     const epoch = ++refillEpochRef.current;

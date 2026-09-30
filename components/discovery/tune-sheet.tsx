@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import type { Region } from '@/lib/discovery';
+import { setAllowAi, useAllowAi } from '@/lib/human-check-api';
 import type { PresetId } from '@/lib/pool-types';
 import { PRESET_LABELS, PresetChips } from './preset-chips';
 import { RegionToggle } from './region-toggle';
@@ -40,6 +41,7 @@ export function TuneSheet({
   onSetNextMode,
 }: TuneSheetProps) {
   const [visible, setVisible] = useState(false);
+  const allowAi = useAllowAi();
 
   function close() {
     setVisible(false);
@@ -85,6 +87,29 @@ export function TuneSheet({
               <ThemedText type="label">Store region</ThemedText>
               <RegionToggle region={region} onToggle={onToggleRegion} />
             </ThemedView>
+
+            <ThemedText type="label" style={styles.heading}>
+              AI-made music
+            </ThemedText>
+            <ThemedView style={styles.segment} backgroundColor={Colors.surfaceElevated}>
+              {[false, true].map((show) => {
+                const active = allowAi === show;
+                return (
+                  <TouchableOpacity key={String(show)} style={styles.segmentSlot} onPress={() => setAllowAi(show)} activeOpacity={0.7}>
+                    <ThemedView style={styles.segmentItem} backgroundColor={active ? Colors.accent : 'transparent'}>
+                      <ThemedText type="label" style={{ color: active ? Colors.accentText : Colors.textSecondary }}>
+                        {show ? 'Show' : 'Hide'}
+                      </ThemedText>
+                    </ThemedView>
+                  </TouchableOpacity>
+                );
+              })}
+            </ThemedView>
+            <ThemedText type="caption">
+              {allowAi
+                ? 'AI acts can show up. They’re labeled “AI-tagged” when revealed.'
+                : 'Skips artists that listeners have tagged as AI-made. Real people only.'}
+            </ThemedText>
           </Pressable>
         </Pressable>
       </Modal>

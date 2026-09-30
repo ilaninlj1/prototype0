@@ -53,3 +53,8 @@ test('isRealArtist needs a MusicBrainz id and at least 500 listeners', () => {
   assert.equal(isRealArtist(null, 50_000), false);
   assert.equal(isRealArtist(undefined, 50_000), false);
 });
+
+test('isRealArtist: an artist listeners tagged as AI is never real, however well known', () => {
+  assert.equal(isRealArtist('7248a6ff…', 53_058, true), false);
+  assert.equal(isRealArtist('7248a6ff…', 53_058, false), true);
+});

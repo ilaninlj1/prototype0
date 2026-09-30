@@ -11,6 +11,7 @@ import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import { historyLine, type ChartEntry, type Move } from '@/lib/charts';
 import { COUNTRIES, loadChart, peekChart, type Chart } from '@/lib/charts-api';
 import { artworkUrl } from '@/lib/discovery';
+import { shouldSkip } from '@/lib/human-check-api';
 import { pickLesserKnown } from '@/lib/song-facts';
 
 /** World Charts: any country's top 50, what's rising since yesterday, and "hear it blind". */
@@ -34,9 +35,17 @@ export default function ChartsScreen() {
   const name = COUNTRIES.find((c) => c.code === country)?.name ?? country.toUpperCase();
   const openSong = (e: ChartEntry) => router.push({ pathname: '/song', params: { id: String(e.id), country } });
 
-  function hearBlind() {
-    if (!chart) return;
-    const five = pickLesserKnown(chart.entries.slice(0, 25), 5).sort(() => Math.random() - 0.5);
+  const [picking, setPicking] = useState(false);
+  async function hearBlind() {
+    if (!chart || picking) return;
+    setPicking(true);
+    // Five from the top 25, passing over any artist tagged as AI (unless AI music is on).
+    const five: ChartEntry[] = [];
+    for (const e of pickLesserKnown(chart.entries.slice(0, 25), 20)) {
+      if (five.length === 5) break;
+      if (!(await shouldSkip(e.artist))) five.push(e);
+    }
+    setPicking(false);
     router.push({ pathname: '/pack', params: { ids: five.map((e) => e.id).join(','), from: name, kind: 'region', country } });
   }
 
@@ -76,7 +85,7 @@ export default function ChartsScreen() {
           <>
             <PressableScale onPress={hearBlind} style={styles.blind}>
               <View style={styles.blindText}>
-                <ThemedText style={styles.blindTitle}>Hear {name} blind</ThemedText>
+                <ThemedText style={styles.blindTitle}>{picking ? 'Picking 5 songs…' : `Hear ${name} blind`}</ThemedText>
                 <ThemedText style={styles.blindSub}>5 songs from its top 25. No names until the end.</ThemedText>
               </View>
               <Ionicons name="headset" size={26} color={Colors.accentText} />
