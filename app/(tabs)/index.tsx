@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ArtPiece, markPosition } from '@/components/art/art-piece';
-import { FlyingPrint } from '@/components/art/flying-print';
+import { ArtPiece } from '@/components/art/art-piece';
+import { FlyingCover } from '@/components/art/flying-cover';
 import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
@@ -59,8 +59,7 @@ import { fetchArtistListeners, fetchSimilarArtists, getTracks, trackToDiscoveryT
 import { findItunesArtist } from '@/lib/song-details';
 import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
-import { ART, type ArtCanvas, type Mark } from '@/lib/print';
-import { prefetchPrints, printFor } from '@/lib/print-data';
+import { ART, collageRects, type ArtCanvas, type Mark } from '@/lib/collage';
 import { hideFromDiscovery, shouldSkip } from '@/lib/human-check-api';
 
 function randomGenre(): string {
@@ -156,21 +155,13 @@ export default function HomeScreen() {
   // "nothing to play" (see lib/pool.ts), so nothing is loaded.
   usePreviewWhileFocused(currentTrack?.previewUrl || undefined);
 
-  // ---- The piece: every swipe adds the song's print (see lib/print.ts) ----
+  // ---- The collage: every swipe adds the song's cover (see lib/collage.ts) ----
   const { canvas } = useArt();
   const cardAreaRef = useRef<LayoutRectangle | null>(null);
   const stripRef = useRef<LayoutRectangle | null>(null);
   const savedIdsRef = useRef(new Set<number>());
-  const [flying, setFlying] = useState<{ mark: Mark; from: { x: number; y: number }; to: { x: number; y: number }; scale: number } | null>(null);
+  const [flying, setFlying] = useState<{ mark: Mark; from: { x: number; y: number }; to: { x: number; y: number }; endPx: number } | null>(null);
   const flyingIdRef = useRef<number | null>(null);
-
-  // Covers and song facts for the next few cards load ahead, so a swipe never waits on them.
-  const upcomingKey = queue.slice(0, 10).map((t) => t.id).join(',');
-  useEffect(() => {
-    prefetchPrints(queue.slice(0, 10), region);
-    // upcomingKey stands in for the queue's first ten ids
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [upcomingKey, region]);
 
   // A save anywhere (double-tap, heart) gets the song's red dot.
   useEffect(
@@ -188,22 +179,22 @@ export default function HomeScreen() {
     if (finished) router.push({ pathname: '/art', params: { piece: String(finished.number) } });
   }
 
-  async function markSwipe(track: DiscoveryTrack, kind: Mark['kind']) {
-    const print = await printFor(track);
-    const mark: Mark = { trackId: track.id, kind, saved: savedIdsRef.current.has(track.id), print };
+  function markSwipe(track: DiscoveryTrack, kind: Mark['kind']) {
+    const mark: Mark = { trackId: track.id, kind, saved: savedIdsRef.current.has(track.id), artwork: track.artworkUrl100 };
     const area = cardAreaRef.current;
     const strip = stripRef.current;
-    if (kind === 'ghost' || !area || !strip) return commitMark(mark);
-    // A reveal: its print stamps onto the cover, then drops into the piece.
+    if (kind === 'ghost' || !area || !strip || !mark.artwork) return commitMark(mark);
+    // A reveal: once the cover has sharpened, it drops into its new tile.
     if (flying) commitMark(flying.mark); // one still in the air lands now
     const scale = strip.width / ART.width;
-    const at = markPosition(mark, canvas.marks.length + (flying ? 1 : 0));
+    const count = canvas.marks.length + (flying ? 1 : 0);
+    const tile = collageRects(Math.min(count + 1, ART.slots))[Math.min(count, ART.slots - 1)];
     flyingIdRef.current = mark.trackId;
     setFlying({
       mark,
-      from: { x: area.x + area.width / 2, y: area.y + (area.height - cardSize.height) / 2 + cardSize.height * 0.28 },
-      to: { x: strip.x + at.x * scale, y: strip.y + at.y * scale },
-      scale,
+      from: { x: area.x + area.width / 2, y: area.y + (area.height - cardSize.height) / 2 + cardSize.height * 0.3 },
+      to: { x: strip.x + (tile.x + tile.w / 2) * scale, y: strip.y + (tile.y + tile.h / 2) * scale },
+      endPx: Math.min(tile.w, tile.h) * scale,
     });
   }
 
@@ -666,7 +657,7 @@ export default function HomeScreen() {
             <ArtPiece canvas={canvas} style={styles.strip} />
             {canvas.marks.length === 0 ? (
               <ThemedText style={styles.stripEmpty} pointerEvents="none">
-                every swipe prints here
+                every song you swipe adds its cover here
               </ThemedText>
             ) : (
               <ThemedText style={styles.stripCount} pointerEvents="none">
@@ -697,13 +688,13 @@ export default function HomeScreen() {
         <ThemedText style={styles.emptyText}>No more tracks — try again in a bit.</ThemedText>
       )}
       {flying && (
-        <FlyingPrint
+        <FlyingCover
           key={flying.mark.trackId}
-          mark={flying.mark}
+          artwork={flying.mark.artwork}
           from={flying.from}
           to={flying.to}
-          scale={flying.scale}
-          delay={900}
+          endPx={flying.endPx}
+          delay={1500}
           onLanded={() => handleLanded(flying.mark)}
         />
       )}

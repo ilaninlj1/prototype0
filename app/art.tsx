@@ -13,7 +13,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import { useArt } from '@/hooks/use-art';
-import { ART, type ArtCanvas } from '@/lib/print';
+import { ART, type ArtCanvas } from '@/lib/collage';
 
 /** Your piece: the one in progress, or a finished one (?piece=N) to save or share. */
 export default function ArtScreen() {
@@ -60,7 +60,7 @@ export default function ArtScreen() {
       <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
         <Ionicons name="chevron-back" size={26} color={Colors.text} />
       </Pressable>
-      <ThemedText type="eyebrow">Your taste, printed · No. {shown.number}</ThemedText>
+      <ThemedText type="eyebrow">Your collage · No. {shown.number}</ThemedText>
       <ThemedText type="title">{finished ? 'It’s done.' : `${shown.marks.length} of ${ART.slots}`}</ThemedText>
       <ThemedText style={styles.dim}>
         {finished
@@ -96,8 +96,8 @@ export default function ArtScreen() {
         How to read it
       </ThemedText>
       <ThemedText style={styles.dim}>
-        Every mark is one song. Its shape and its line on the staff come from the genre, its two inks from the cover, its size from the song’s
-        length. Older songs print a little out of line. Bold marks are songs you revealed, faint ones you skipped, and a red dot means you saved it.
+        Every tile is one song’s cover. Sharp ones you revealed, blurred ones you skipped, and a red dot means you saved it. Each new song
+        splits the biggest tile, so your first songs stay the biggest.
       </ThemedText>
 
       {pieces.length > 0 && (
