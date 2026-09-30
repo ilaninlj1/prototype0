@@ -39,36 +39,24 @@ test('a group label that is itself a curated genre is selectable; one that is no
   assert.equal(latin.genre, null); // "Latin" was never a curated genre, only an organizing label
 });
 
-test('discovered genres the taxonomy does not cover land in a Discovered group at the end', () => {
+test('there is no Discovered section: genres outside the list are not shown', () => {
   const sections = buildGenreSections(['Country'], ['Punjabi Pop', 'Urbano latino'], taxonomy);
-  const last = sections[sections.length - 1] as any;
-  assert.equal(last.label, 'Discovered');
-  assert.equal(last.genre, null);
-  assert.deepEqual(last.children, ['Punjabi Pop', 'Urbano latino']);
-});
-
-test('a discovered genre that coincidentally matches a curated one is not duplicated into Discovered', () => {
-  const sections = buildGenreSections(['Electronic', 'House', 'Techno'], ['House'], taxonomy);
   assert.equal(
     sections.some((s) => s.type === 'group' && s.label === 'Discovered'),
     false
   );
-});
-
-test('an empty Discovered bucket is omitted entirely, not rendered as an empty group', () => {
-  const sections = buildGenreSections(['Country'], [], taxonomy);
-  assert.equal(
-    sections.some((s) => s.type === 'group' && s.label === 'Discovered'),
-    false
+  assert.deepEqual(
+    sections.map((s) => (s.type === 'leaf' ? s.genre : s.label)),
+    ['Country']
   );
 });
 
-test('sections are sorted alphabetically by label, Discovered always last', () => {
+test('sections are sorted alphabetically by label', () => {
   const sections = buildGenreSections(
     ['Electronic', 'House', 'Techno', 'Country'],
     ['Punjabi Pop'],
     taxonomy
   );
   const labels = sections.map((s) => (s.type === 'leaf' ? s.genre : s.label));
-  assert.deepEqual(labels, ['Country', 'Electronic', 'Discovered']);
+  assert.deepEqual(labels, ['Country', 'Electronic']);
 });

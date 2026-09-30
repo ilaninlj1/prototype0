@@ -17,7 +17,6 @@ import { buildGenreSections, type GenreSection } from './genre-taxonomy';
 type GenrePickerProps = {
   curatedGenres: string[];
   discoveredGenres: string[];
-  heardGenres: Set<string>;
   /** strategy.type === 'genre' ? strategy.genre : null — drives scroll-to/highlight. */
   currentGenre: string | null;
   /** Trigger button text — the current genre, or "More from: X" for an artist strategy. */
@@ -37,7 +36,6 @@ type GroupSection = Extract<GenreSection, { type: 'group' }>;
 export function GenrePicker({
   curatedGenres,
   discoveredGenres,
-  heardGenres,
   currentGenre,
   currentLabel,
   onSelect,
@@ -107,7 +105,6 @@ export function GenrePicker({
   }
 
   function renderRow(genre: string, indented: boolean) {
-    const heard = heardGenres.has(genre);
     const isCurrent = genre === currentGenre;
     return (
       <TouchableOpacity
@@ -119,7 +116,6 @@ export function GenrePicker({
           style={[styles.leafRow, indented && styles.rowIndented, isCurrent && styles.rowCurrent]}
           backgroundColor={isCurrent ? Colors.accent : 'transparent'}>
           <ThemedText style={[styles.rowText, isCurrent && styles.onCream]}>{genre}</ThemedText>
-          {heard && <ThemedText style={[styles.checkmark, isCurrent && styles.onCream]}>✓</ThemedText>}
         </ThemedView>
       </TouchableOpacity>
     );
@@ -128,7 +124,6 @@ export function GenrePicker({
   function renderGroup(section: GroupSection) {
     const isOpen = expanded.has(section.label);
     const isCurrent = section.genre !== null && section.genre === currentGenre;
-    const heard = section.genre !== null && heardGenres.has(section.genre);
     return (
       <ThemedView key={section.label}>
         <ThemedView
@@ -140,8 +135,7 @@ export function GenrePicker({
             activeOpacity={0.7}
             style={styles.groupLabelTap}>
             <ThemedText style={[styles.rowText, isCurrent && styles.onCream]}>{section.label}</ThemedText>
-            {heard && <ThemedText style={[styles.checkmark, isCurrent && styles.onCream]}>✓</ThemedText>}
-          </TouchableOpacity>
+            </TouchableOpacity>
           <TouchableOpacity onPress={() => toggleGroup(section.label)} activeOpacity={0.7} style={styles.chevronTap}>
             <ThemedText style={[styles.chevron, isCurrent && styles.onCream]}>{isOpen ? '▾' : '▸'}</ThemedText>
           </TouchableOpacity>
@@ -256,10 +250,5 @@ const styles = StyleSheet.create({
   rowText: {
     ...Ui.label,
     fontSize: 13,
-  },
-  checkmark: {
-    color: Colors.accent,
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

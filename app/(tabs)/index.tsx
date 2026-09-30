@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,7 +28,6 @@ import { addToCanvas, saveOnCanvas, undoOnCanvas, useArt } from '@/hooks/use-art
 import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import {
   deriveGenresHeard,
-  deriveRatedGenres,
   extractGenres,
   fetchForStrategy,
   keepDropEntries,
@@ -134,7 +133,6 @@ export default function HomeScreen() {
 
   const currentTrack = queue[0];
 
-  const genresHeard = useMemo(() => deriveRatedGenres(swipeHistory), [swipeHistory]);
 
   const currentGenre = strategy.type === 'genre' ? strategy.genre : null;
   const currentLabel = strategy.type === 'genre' ? strategy.genre : `More from: ${strategy.artistName}`;
@@ -617,7 +615,6 @@ export default function HomeScreen() {
         <GenrePicker
           curatedGenres={GENRES}
           discoveredGenres={discoveredGenres}
-          heardGenres={genresHeard}
           currentGenre={currentGenre}
           currentLabel={currentLabel}
           onSelect={handlePickGenre}

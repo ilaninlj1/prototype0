@@ -24,7 +24,6 @@ export const GENRE_TAXONOMY: GenreTaxonomy = {
   Jazz: ['Bossa Nova'],
 };
 
-const DISCOVERED_LABEL = 'Discovered';
 
 export type GenreSection =
   | { type: 'leaf'; genre: string }
@@ -33,22 +32,20 @@ export type GenreSection =
 /**
  * Organizes the flat curated + discovered genre pools into sections for the
  * picker: taxonomy parents become expandable groups, curated genres with no
- * assigned parent (Country, Classical, Gospel, Reggae) stay flat leaves, and
- * any discovered genre the taxonomy doesn't cover (raw iTunes strings like
- * "Urbano latino" or "Punjabi Pop") lands in a synthetic "Discovered" group
- * at the end — never guessed at by substring matching, the same fragile
- * approach GENRE_TERM_OVERRIDES already moved away from elsewhere.
+ * assigned parent (Country, Classical, Gospel, Reggae) stay flat leaves.
+ * Discovered genres only fill in taxonomy groups they belong to; ones the
+ * taxonomy doesn't cover aren't listed (there were too few to be worth a
+ * section).
  *
  * A group's `genre` is its label only when that label is *itself* a literal
  * curated genre (Rock, Pop, Electronic, ... — already directly searchable
  * today). "Latin" and "World" are labels invented purely to organize this
- * taxonomy, not real curated genres, so they (like "Discovered") get
+ * taxonomy, not real curated genres, so they get
  * `genre: null` — chevron-only, not selectable — rather than silently
  * becoming new, unverified search terms.
  *
  * Sections and each group's children are sorted alphabetically for
- * scannability, matching the flat list's previous behavior; "Discovered" is
- * always last regardless, and omitted entirely when it would be empty.
+ * scannability, matching the flat list's previous behavior.
  */
 export function buildGenreSections(
   curatedGenres: string[],
@@ -61,12 +58,6 @@ export function buildGenreSections(
   const childToParent = new Map<string, string>();
   for (const [parent, children] of Object.entries(taxonomy)) {
     for (const child of children) childToParent.set(child, parent);
-  }
-
-  const known = new Set<string>(curatedGenres);
-  for (const parent of Object.keys(taxonomy)) known.add(parent);
-  for (const children of Object.values(taxonomy)) {
-    for (const child of children) known.add(child);
   }
 
   const sections: GenreSection[] = [];
@@ -111,11 +102,6 @@ export function buildGenreSections(
     const labelOf = (s: GenreSection) => (s.type === 'leaf' ? s.genre : s.label);
     return labelOf(a).localeCompare(labelOf(b));
   });
-
-  const discoveredLeftovers = discoveredGenres.filter((g) => !known.has(g)).sort();
-  if (discoveredLeftovers.length > 0) {
-    sections.push({ type: 'group', label: DISCOVERED_LABEL, genre: null, children: discoveredLeftovers });
-  }
 
   return sections;
 }
