@@ -84,7 +84,8 @@ export default function HeadToHeadScreen() {
         <ThemedText type="label">Streak {streak}</ThemedText>
       </ThemedView>
       <HeadToHeadEmblem size={64} />
-      <ThemedText type="subtitle">Which has more listeners?</ThemedText>
+      <ThemedText type="eyebrow">Head to Head · endless</ThemedText>
+      <ThemedText type="title">Which has more listeners?</ThemedText>
       <ThemedText style={styles.dim}>Tap A or B to hear it. Last.fm listeners (Sept 2026).</ThemedText>
       <ThemedView style={styles.grid} backgroundColor="transparent">
         {pair.map((s, i) => (

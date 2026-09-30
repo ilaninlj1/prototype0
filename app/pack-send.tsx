@@ -52,7 +52,8 @@ export default function PackSendScreen() {
         <Ionicons name="close" size={26} color={Colors.textSecondary} style={styles.close} />
       </TouchableOpacity>
       <BlindPackEmblem size={64} />
-      <ThemedText type="subtitle">Send a Blind Pack</ThemedText>
+      <ThemedText type="eyebrow">Blind Pack · 5 songs</ThemedText>
+      <ThemedText type="title">Send a Blind Pack</ThemedText>
       <ThemedText style={styles.dim}>
         Pick {PACK_SIZE} of your finds. Your friend hears them blind in their browser — no app needed — and sees how
         much your taste matches.

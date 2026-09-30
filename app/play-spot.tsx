@@ -72,7 +72,8 @@ export default function SpotTheStarScreen() {
         <ThemedText type="label">Streak {streak}</ThemedText>
       </ThemedView>
       <SpotTheStarEmblem size={64} />
-      <ThemedText type="subtitle">Which one has 1M+ listeners?</ThemedText>
+      <ThemedText type="eyebrow">Spot the Star · endless</ThemedText>
+      <ThemedText type="title">Which one has 1M+ listeners?</ThemedText>
       <ThemedText style={styles.dim}>Tap a tile to hear it. Last.fm listeners (Sept 2026).</ThemedText>
       <ThemedView style={styles.grid} backgroundColor="transparent">
         {round.map((s, i) => (

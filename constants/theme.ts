@@ -77,16 +77,43 @@ export function fontFor(family: string | undefined, weight: string | number | un
   return FIGTREE[String(weight)] ?? (Number(weight) >= 700 ? FIGTREE['700'] : family);
 }
 
+// Type with a point of view: tight, heavy Syne for anything you should read
+// first; small tracked-out mono "eyebrows" above it, like a label's catalog
+// line; Figtree for everything you read after.
 export const Typography = {
+  hero: {
+    fontFamily: Fonts.display,
+    fontSize: 60,
+    lineHeight: 58,
+    letterSpacing: -2,
+  },
   title: {
     fontFamily: Fonts.display,
-    fontSize: 34,
-    lineHeight: 38,
+    fontSize: 38,
+    lineHeight: 40,
+    letterSpacing: -1.2,
   },
   subtitle: {
     fontFamily: Fonts.displayBold,
-    fontSize: 20,
+    fontSize: 22,
     lineHeight: 26,
+    letterSpacing: -0.4,
+  },
+  eyebrow: {
+    fontFamily: Fonts.monoMedium,
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 2,
+    textTransform: 'uppercase' as const,
+    color: Colors.textSecondary,
+  },
+  number: {
+    fontFamily: Fonts.display,
+    fontSize: 44,
+    lineHeight: 46,
+    letterSpacing: -1.5,
+    fontVariant: ['tabular-nums' as const],
+    color: Colors.signal,
   },
   defaultSemiBold: {
     fontFamily: Fonts.sans,

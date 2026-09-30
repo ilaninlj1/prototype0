@@ -54,7 +54,7 @@ export default function DropGuessScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <ThemedText type="caption">Blindspot Daily #{drop.number}</ThemedText>
+      <ThemedText type="eyebrow">Blindspot Daily · No. {drop.number}</ThemedText>
       <ThemedText type="subtitle">Which one has the most listeners?</ThemedText>
       <ThemedText style={styles.dim}>One of these is secretly famous. Tap to hear it again, then lock in your guess.</ThemedText>
 

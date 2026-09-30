@@ -68,7 +68,8 @@ export default function ProfileScreen() {
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <ThemedView style={styles.container}>
-        <ThemedText type="title">Your ears</ThemedText>
+        <ThemedText type="eyebrow">Blindspot · what you hear</ThemedText>
+        <ThemedText type="hero">Your ears</ThemedText>
 
         {finds.length === 0 ? (
           <ThemedText style={styles.dim}>Nothing found yet. Like a song blind and it shows up here.</ThemedText>

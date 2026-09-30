@@ -76,7 +76,7 @@ export default function DropResultsScreen() {
   return (
     <ThemedView style={[styles.fill, { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + Spacing.md }]}>
       <View style={styles.head}>
-        <ThemedText type="caption">Blindspot Daily #{drop.number}</ThemedText>
+        <ThemedText type="eyebrow">Blindspot Daily · No. {drop.number}</ThemedText>
         <ThemedText type="subtitle">{pickHeadline(drop, votes, results ?? [])}</ThemedText>
         {guess != null && <ThemedText style={styles.guess}>{guessLine(drop, guess, guessResults)}</ThemedText>}
       </View>

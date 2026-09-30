@@ -108,7 +108,8 @@ export default function BlindTestScreen() {
       <ScrollView contentContainerStyle={[styles.pad, { paddingTop: insets.top + Spacing.lg }]}>
         {close}
         <BlindTestEmblem size={64} />
-        <ThemedText type="subtitle">Which genres would you never listen to?</ThemedText>
+        <ThemedText type="eyebrow">Blind Spot Test · step 1</ThemedText>
+        <ThemedText type="title">Which genres would you never listen to?</ThemedText>
         <ThemedText style={styles.dim}>Pick up to {MAX_NEVER}. Then you&apos;ll hear 10 songs blind.</ThemedText>
         <View style={styles.chips}>
           {genres.map((g) => {
