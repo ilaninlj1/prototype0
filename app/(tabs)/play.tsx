@@ -13,6 +13,7 @@ import {
   DjPicksEmblem,
   HeadToHeadEmblem,
   SpotTheStarEmblem,
+  TasteTwinsEmblem,
   WorldChartsEmblem,
 } from '@/components/emblems';
 import { PressableScale } from '@/components/pressable-scale';
@@ -131,6 +132,17 @@ export default function PlayScreen() {
       statLabel: 'of real DJ plays',
       cta: 'Listen',
       href: '/dj-picks',
+    },
+    {
+      key: 'twins',
+      emblem: (s) => <TasteTwinsEmblem size={s} />,
+      eyebrow: 'People · opt in',
+      title: 'Taste Twins',
+      blurb: 'Find the people who liked the same songs blind. See what else they saved. If you both wave, swap a handle.',
+      stat: '2',
+      statLabel: 'waves to connect',
+      cta: 'Find my twins',
+      href: '/twins',
     },
     {
       key: 'test',
