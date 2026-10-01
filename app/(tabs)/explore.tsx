@@ -1,12 +1,15 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { MiniPlayer } from '@/components/mini-player';
+import { Tasteform } from '@/components/tasteform/tasteform';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, Fonts, Ui } from '@/constants/theme';
 import { useListenersNow } from '@/hooks/use-listeners-now';
+import { usePlayback } from '@/hooks/use-playback';
 import {
   countSongsHeard,
   describeGrowth,
@@ -29,10 +32,37 @@ function topGenre(tracks: DiscoveryTrack[]): { genre: string; genres: number } |
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  // Zoomed into the Tasteform, one finger moves around the shape instead of the page.
+  const [zoomed, setZoomed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [finds, setFinds] = useState<DiscoveryTrack[]>([]);
   const [history, setHistory] = useState<SwipeEntry[]>([]);
   const [best, setBest] = useState<BestStreaks>({ spot: 0, h2h: 0 });
+
+  // Tap a cover in the Tasteform to hear it. Leaving the tab stops it and
+  // forgets it, since another screen may load a different song meanwhile.
+  const { player, status } = usePlayback();
+  const [nowPlaying, setNowPlaying] = useState<DiscoveryTrack | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        player.pause();
+        setNowPlaying(null);
+      };
+    }, [player])
+  );
+  function togglePlay(track: DiscoveryTrack) {
+    if (nowPlaying?.id === track.id) {
+      if (status.playing) player.pause();
+      else player.play();
+      return;
+    }
+    setNowPlaying(track);
+    if (!track.previewUrl) return;
+    player.replace(track.previewUrl);
+    player.play();
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -69,83 +99,119 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top }]}>
-      <ThemedView style={styles.container}>
-        <ThemedText type="eyebrow">Blindspot · what you hear</ThemedText>
-        <ThemedText type="hero">Your ears</ThemedText>
+    <View style={styles.screen}>
+      <ScrollView
+        scrollEnabled={!zoomed}
+        contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top, paddingBottom: nowPlaying ? 150 : 0 }]}>
+        <ThemedView style={styles.container}>
+          <ThemedText type="eyebrow">Blindspot · what you hear</ThemedText>
+          <ThemedText type="hero">Your ears</ThemedText>
 
-        {finds.length === 0 ? (
-          <ThemedText style={styles.dim}>Nothing found yet. Like a song blind and it shows up here.</ThemedText>
-        ) : (
-          <>
-            <ThemedView style={styles.hero} backgroundColor="transparent">
-              <ThemedText style={styles.heroNumber}>{finds.length}</ThemedText>
-              <ThemedText style={styles.dim}>
-                songs found blind{heard > 0 ? `, out of ${heard} you heard` : ''}.
-              </ThemedText>
-            </ThemedView>
+          {finds.length === 0 ? (
+            <ThemedText style={styles.dim}>
+              Nothing found yet. Double-tap a song on Home to save it, and your shape starts growing here.
+            </ThemedText>
+          ) : (
+            <>
+              <Tasteform
+                liked={finds}
+                history={history}
+                width={width - 2 * Spacing.lg}
+                selectedId={nowPlaying?.id ?? null}
+                playing={status.playing}
+                onPick={togglePlay}
+                onZoomChange={setZoomed}
+              />
 
-            {(best.spot > 0 || best.h2h > 0) && (
-              <ThemedText style={styles.streaks}>
-                Best streaks · Spot the Star {best.spot} · Head to Head {best.h2h}
-              </ThemedText>
-            )}
-
-            {summary.medianFound != null && (
-              <ThemedText style={styles.line}>
-                Half your finds had under <ThemedText style={styles.em}>{fmt(summary.medianFound)}</ThemedText> listeners
-                when you found them. {describeListeners(summary.medianFound).verdict}
-              </ThemedText>
-            )}
-
-            {calledIt.length > 0 ? (
-              <ThemedView style={styles.block} backgroundColor="transparent">
-                <ThemedText style={styles.line}>
-                  You called <ThemedText style={styles.em}>{calledIt.length}</ThemedText> — they&apos;ve at least doubled
-                  since you found them:
+              <ThemedView style={styles.hero} backgroundColor="transparent">
+                <ThemedText style={styles.heroNumber}>{finds.length}</ThemedText>
+                <ThemedText style={styles.dim}>
+                  songs found blind{heard > 0 ? `, out of ${heard} you heard` : ''}.
                 </ThemedText>
-                {calledIt.map((t) => (
-                  <ThemedText key={t.id} style={styles.dim}>
-                    {t.artistName}: {fmt(t.artistListeners!)} → {fmt(now[t.artistName])}
-                  </ThemedText>
-                ))}
               </ThemedView>
-            ) : summary.best ? (
-              <ThemedText style={styles.line}>
-                Best call so far: <ThemedText style={styles.em}>{summary.best.artistName}</ThemedText>, up{' '}
-                {summary.best.pct}% since you found them.
-              </ThemedText>
-            ) : (
-              <ThemedText style={styles.line}>
-                None of your finds have grown yet. When one doubles, you called it.
-              </ThemedText>
-            )}
 
-            {genre && (
-              <ThemedText style={styles.line}>
-                You&apos;ve liked songs blind in <ThemedText style={styles.em}>{genre.genres}</ThemedText>{' '}
-                {genre.genres === 1 ? 'genre' : 'genres'}, most of all {genre.genre}.
-              </ThemedText>
-            )}
+              {(best.spot > 0 || best.h2h > 0) && (
+                <ThemedText style={styles.streaks}>
+                  Best streaks · Spot the Star {best.spot} · Head to Head {best.h2h}
+                </ThemedText>
+              )}
 
-            {firstFind && (
-              <ThemedText style={styles.dim}>
-                First find: {firstFind.trackName} by {firstFind.artistName},{' '}
-                {new Date(firstFind.likedAt!).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}.
-              </ThemedText>
-            )}
-          </>
-        )}
-        <ThemedText type="caption" style={styles.about}>
-          Blindspot is a student project. Song previews provided courtesy of iTunes; listener counts from Last.fm. No
-          accounts — Daily Drop votes are anonymous and tied only to a random device id.
-        </ThemedText>
-      </ThemedView>
-    </ScrollView>
+              {summary.medianFound != null && (
+                <ThemedText style={styles.line}>
+                  Half your finds had under <ThemedText style={styles.em}>{fmt(summary.medianFound)}</ThemedText> listeners
+                  when you found them. {describeListeners(summary.medianFound).verdict}
+                </ThemedText>
+              )}
+
+              {calledIt.length > 0 ? (
+                <ThemedView style={styles.block} backgroundColor="transparent">
+                  <ThemedText style={styles.line}>
+                    You called <ThemedText style={styles.em}>{calledIt.length}</ThemedText> — they&apos;ve at least doubled
+                    since you found them:
+                  </ThemedText>
+                  {calledIt.map((t) => (
+                    <ThemedText key={t.id} style={styles.dim}>
+                      {t.artistName}: {fmt(t.artistListeners!)} → {fmt(now[t.artistName])}
+                    </ThemedText>
+                  ))}
+                </ThemedView>
+              ) : summary.best ? (
+                <ThemedText style={styles.line}>
+                  Best call so far: <ThemedText style={styles.em}>{summary.best.artistName}</ThemedText>, up{' '}
+                  {summary.best.pct}% since you found them.
+                </ThemedText>
+              ) : (
+                <ThemedText style={styles.line}>
+                  None of your finds have grown yet. When one doubles, you called it.
+                </ThemedText>
+              )}
+
+              {genre && (
+                <ThemedText style={styles.line}>
+                  You&apos;ve liked songs blind in <ThemedText style={styles.em}>{genre.genres}</ThemedText>{' '}
+                  {genre.genres === 1 ? 'genre' : 'genres'}, most of all {genre.genre}.
+                </ThemedText>
+              )}
+
+              {firstFind && (
+                <ThemedText style={styles.dim}>
+                  First find: {firstFind.trackName} by {firstFind.artistName},{' '}
+                  {new Date(firstFind.likedAt!).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}.
+                </ThemedText>
+              )}
+            </>
+          )}
+          <ThemedText type="caption" style={styles.about}>
+            Blindspot is a student project. Song previews provided courtesy of iTunes; listener counts from Last.fm. No
+            accounts — Daily Drop votes are anonymous and tied only to a random device id.
+          </ThemedText>
+        </ThemedView>
+      </ScrollView>
+      {nowPlaying && (
+        <View style={styles.mini}>
+          <MiniPlayer
+            track={nowPlaying}
+            playing={status.playing}
+            progress={status.duration ? status.currentTime / status.duration : 0}
+            onToggle={() => togglePlay(nowPlaying)}
+          />
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  // Pinned over the page, like the Liked screen's player.
+  mini: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: Spacing.md,
+  },
   scrollContainer: {
     flexGrow: 1,
   },
