@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
 import { RevealCard } from '@/components/discovery/reveal-card';
 import { DropRing } from '@/components/drop-ring';
 import { onLikeChange, saveLike } from '@/components/like-button';
+import { flySave } from '@/components/save-flight';
 import {
   fitCardToWidth,
   MAX_CARD_HEIGHT,
@@ -160,13 +161,35 @@ export default function HomeScreen() {
   const [flying, setFlying] = useState<{ mark: Mark; from: { x: number; y: number }; to: { x: number; y: number }; endPx: number } | null>(null);
   const flyingIdRef = useRef<number | null>(null);
 
-  // A save anywhere (double-tap, heart) gets the song's red dot.
+  // What a save needs to fly from the card into the You tab, read by the listener below.
+  const cardAreaViewRef = useRef<View>(null);
+  const isFocused = useIsFocused();
+  const flightRef = useRef({ focused: false, revealId: null as number | null, tracks: [] as DiscoveryTrack[], cardHeight: 0 });
+  useEffect(() => {
+    flightRef.current = {
+      focused: isFocused,
+      revealId: revealTrack?.id ?? null,
+      tracks: [revealTrack, currentTrack].filter((t): t is DiscoveryTrack => !!t),
+      cardHeight: cardSize.height,
+    };
+  });
+
+  // A save anywhere (double-tap, heart) gets the song's red dot. A new one
+  // made right here also flies down into the You tab (components/save-flight.tsx):
+  // as blurred colors if it's still blind, as the cover once revealed.
   useEffect(
     () =>
       onLikeChange((id, liked) => {
         if (!liked) return;
+        const first = !savedIdsRef.current.has(id);
         savedIdsRef.current.add(id);
         saveOnCanvas(id);
+        const f = flightRef.current;
+        const track = f.tracks.find((t) => t.id === id);
+        if (!first || !f.focused || !track?.artworkUrl100) return;
+        cardAreaViewRef.current?.measureInWindow((x, y, w) =>
+          flySave({ artwork: track.artworkUrl100, blind: f.revealId !== id, from: { x: x + w / 2, y: y + f.cardHeight / 2 } })
+        );
       }),
     []
   );
@@ -626,7 +649,7 @@ export default function HomeScreen() {
 
       {currentTrack ? (
         <>
-          <View style={styles.cardArea} onLayout={handleCardAreaLayout}>
+          <View ref={cardAreaViewRef} style={styles.cardArea} onLayout={handleCardAreaLayout}>
             {revealTrack ? (
               // The card grows to fit everything; this area scrolls, the card never clips.
               <ScrollView style={styles.revealScroll} showsVerticalScrollIndicator={false}>

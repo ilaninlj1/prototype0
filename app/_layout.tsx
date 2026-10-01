@@ -20,6 +20,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { CreditLine } from '@/components/credits';
+import { SaveFlightLayer } from '@/components/save-flight';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
 import { PlaybackProvider } from '@/hooks/use-playback';
@@ -122,6 +123,7 @@ export default function RootLayout() {
             <Stack.Screen name="drop-guess" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="drop-results" options={{ presentation: 'fullScreenModal', headerShown: false }} />
           </Stack>
+          <SaveFlightLayer />
           <StatusBar style="light" />
         </PlaybackProvider>
       </ThemeProvider>

@@ -17,6 +17,12 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-09-30] Saves fly into your shape
+A save on Home now drops into the You tab: the heart pops, then the song falls into the YOU icon as a
+glowing cell (blurred colors while it's still blind, the real cover once revealed). The icon bumps and
+keeps a red dot until you open You, where the new song flies up from the tab bar into its place in the
+Tasteform with a gold halo that fades (`components/save-flight.tsx`).
+
 ## [2026-09-30] Tasteform breathes with your music
 Each saved song's preview is measured once by ReccoBeats for energy and mood. The shape now breathes
 at the average energy of your saves (calm = slow, intense = quick), each cover pulses at its own song's

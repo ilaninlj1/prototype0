@@ -3,9 +3,10 @@ import * as Haptics from 'expo-haptics';
 import type { Tabs } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { onSaveLanded, setYouTabTarget } from '@/components/save-flight';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
@@ -37,6 +38,31 @@ export function BlindspotTabBar({ state, navigation }: TabBarProps) {
 
   const indicator = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }] }));
 
+  // A save on Home lands here (components/save-flight.tsx): the YOU icon
+  // bumps, and a red dot stays until you open the tab to see it in your shape.
+  const youRef = useRef<View>(null);
+  const bump = useSharedValue(1);
+  const [unseen, setUnseen] = useState(false);
+  const youFocused = state.routes[state.index]?.name === 'explore';
+  if (youFocused && unseen) setUnseen(false);
+  useEffect(
+    () =>
+      onSaveLanded(() => {
+        bump.set(withSequence(withSpring(1.35, { damping: 6, stiffness: 320 }), withSpring(1, { damping: 12, stiffness: 200 })));
+        setUnseen(true);
+      }),
+    [bump]
+  );
+  const bumpStyle = useAnimatedStyle(() => ({ transform: [{ scale: bump.get() }] }));
+  useEffect(() => {
+    setYouTabTarget((done) =>
+      youRef.current?.measureInWindow((x, y, w, h) => {
+        if (w > 0) done({ x: x + w / 2, y: y + h / 2 });
+      })
+    );
+    return () => setYouTabTarget(null);
+  }, []);
+
   function onLayout(e: LayoutChangeEvent) {
     setTabWidth(e.nativeEvent.layout.width / state.routes.length);
   }
@@ -60,7 +86,14 @@ export function BlindspotTabBar({ state, navigation }: TabBarProps) {
                 const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
                 if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
               }}>
-              <Ionicons name={focused ? icon.active : icon.idle} size={24} color={focused ? Colors.text : Colors.textTertiary} />
+              {route.name === 'explore' ? (
+                <Animated.View ref={youRef} style={bumpStyle}>
+                  <Ionicons name={focused ? icon.active : icon.idle} size={24} color={focused ? Colors.text : Colors.textTertiary} />
+                  {unseen && !focused && <View style={styles.dot} />}
+                </Animated.View>
+              ) : (
+                <Ionicons name={focused ? icon.active : icon.idle} size={24} color={focused ? Colors.text : Colors.textTertiary} />
+              )}
               <ThemedText style={[styles.label, { color: focused ? Colors.text : Colors.textTertiary }]}>{icon.label}</ThemedText>
             </Pressable>
           );
@@ -86,5 +119,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.signal,
   },
   tab: { flex: 1, alignItems: 'center', gap: 4 },
+  // New saves waiting in your shape.
+  dot: { position: 'absolute', top: -1, right: -5, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.signal },
   label: { fontFamily: Fonts.monoMedium, fontSize: 11, lineHeight: 14, letterSpacing: 1.2 },
 });

@@ -57,6 +57,8 @@ export function Tasteform({ liked, history, width, selectedId, playing, onPick, 
   const focused = useIsFocused();
   const form = useMemo(() => formLayout(songs, mode, width), [songs, mode, width]);
   const byId = useMemo(() => new Map(liked.map((t) => [t.id, t])), [liked]);
+  // Songs saved after this first showed up fly in from the tab bar instead of forming from the middle.
+  const [mountIds] = useState(() => new Set(liked.map((t) => t.id)));
   const blindIds = useMemo(() => new Set(songs.filter((s) => s.blind).map((s) => s.id)), [songs]);
   const cellColors = useMemo(
     () => form.cells.map((c) => colors[byId.get(c.id)?.artworkUrl100 ?? '']?.main ?? NO_COLOR),
@@ -274,8 +276,9 @@ export function Tasteform({ liked, history, width, selectedId, playing, onPick, 
                   key={c.id}
                   cell={c}
                   index={i}
-                  cx={width / 2}
-                  cy={H / 2}
+                  arrived={!mountIds.has(c.id)}
+                  startX={mountIds.has(c.id) ? width / 2 : width * 0.83}
+                  startY={mountIds.has(c.id) ? H / 2 : H + 80}
                   artwork={byId.get(c.id)?.artworkUrl100 ?? ''}
                   blind={blindIds.has(c.id)}
                   playing={playing && selectedId === c.id}
@@ -302,8 +305,10 @@ export function Tasteform({ liked, history, width, selectedId, playing, onPick, 
 type CoverProps = {
   cell: Cell;
   index: number;
-  cx: number;
-  cy: number;
+  /** Saved since the shape first showed: flies up from the tab bar with a gold halo that fades. */
+  arrived: boolean;
+  startX: number;
+  startY: number;
   artwork: string;
   blind: boolean;
   playing: boolean;
@@ -317,8 +322,9 @@ type CoverProps = {
 const FormCover = memo(function FormCover({
   cell,
   index,
-  cx,
-  cy,
+  arrived,
+  startX,
+  startY,
   artwork,
   blind,
   playing,
@@ -326,17 +332,24 @@ const FormCover = memo(function FormCover({
   breathMs,
   breathDepth,
 }: CoverProps) {
-  const x = useSharedValue(cx);
-  const y = useSharedValue(cy);
+  const x = useSharedValue(startX);
+  const y = useSharedValue(startY);
   const s = useSharedValue(0);
   const pulse = useSharedValue(1);
+  // Only how it first appeared matters; later renders don't replay the arrival.
+  const [fresh] = useState(arrived);
+  const halo = useSharedValue(fresh ? 1 : 0);
 
   useEffect(() => {
-    const delay = Math.min(index * 6, 320);
+    if (fresh) halo.value = withDelay(1600, withTiming(0, { duration: 1800 }));
+  }, [fresh, halo]);
+
+  useEffect(() => {
+    const delay = fresh ? 350 : Math.min(index * 6, 320);
     x.value = withDelay(delay, withSpring(cell.x, SPRING));
     y.value = withDelay(delay, withSpring(cell.y, SPRING));
     s.value = withDelay(delay, withSpring(cell.d / BASE, SPRING));
-  }, [cell.x, cell.y, cell.d, index, x, y, s]);
+  }, [cell.x, cell.y, cell.d, index, fresh, x, y, s]);
 
   useEffect(() => {
     const sine = { easing: Easing.inOut(Easing.sin) };
@@ -351,9 +364,11 @@ const FormCover = memo(function FormCover({
   const style = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value - BASE / 2 }, { translateY: y.value - BASE / 2 }, { scale: s.value * pulse.value }],
   }));
+  const haloStyle = useAnimatedStyle(() => ({ opacity: halo.value }));
 
   return (
     <Animated.View style={[styles.cover, style]} pointerEvents="none">
+      {fresh && <Animated.View style={[styles.halo, haloStyle]} />}
       <Image source={{ uri: artworkUrl(artwork, 150) }} style={styles.coverArt} cachePolicy="memory-disk" transition={150} />
       {blind && <View style={styles.blindRing} />}
       {selected && <View style={styles.selectedRing} />}
@@ -420,6 +435,17 @@ const styles = StyleSheet.create({
     borderRadius: BASE / 2,
     borderWidth: 3,
     borderColor: Colors.text,
+  },
+  // Gold, not cream: cream already means "saved blind". Thick, so it still shows on the tiny shape-mode dots.
+  halo: {
+    position: 'absolute',
+    left: -14,
+    top: -14,
+    right: -14,
+    bottom: -14,
+    borderRadius: BASE / 2 + 14,
+    borderWidth: 8,
+    borderColor: Colors.highlight,
   },
   selectedRing: {
     position: 'absolute',
