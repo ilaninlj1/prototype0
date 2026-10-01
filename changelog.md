@@ -17,6 +17,13 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-01] Reveal card: play controls and a big Next up top
+After a right swipe the song kept playing with no way to stop it, because hold-to-pause only lives
+on the blind card. The reveal now opens with play/pause, play-from-the-start and a big Next button,
+then a small cover with the title, artist and genre, then the listener count. Links, the big cover,
+the human check, save and comments sit below "Swipe up to reveal more", which also scrolls there
+when tapped. DJ Picks uses the same card. The collage flight now takes off from the small cover.
+
 ## [2026-10-01] High-energy songs sprout buds on the Tasteform
 In Shape view, a saved song measured at 0.55 energy or more throws off 1–3 small buds in its cover's
 color, just outside its cell and facing the way the shape grows (more energy, more buds). Near ones
