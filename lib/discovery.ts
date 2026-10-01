@@ -37,6 +37,8 @@ export type DiscoveryTrack = {
   // Liked tracks only: when the like happened. artistListeners on a liked
   // track is the count at that moment, i.e. what you "found them at".
   likedAt?: number;
+  // Liked tracks only: the listener's own line about the song, e.g. "the bass at 0:40".
+  note?: string;
 };
 
 // 'steer-artist'/'steer-sound': logged when the user redirects discovery
