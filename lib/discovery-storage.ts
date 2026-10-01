@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import type { CoverColor } from './cover-color';
 import type { Drop, DropVote } from './daily-drop';
 import type { DiscoveryTrack, Region, SwipeEntry } from './discovery';
 import type { PresetId } from './pool-types';
+import type { SongFeel } from './tasteform';
 
 // All persistence is best-effort: a read/write failure falls back to an empty
 // result rather than throwing, mirroring lib/taste-test.ts's pattern.
@@ -310,3 +312,17 @@ export const saveSenderName = (name: string) => writeJson(SENDER_NAME_KEY, name)
 const SHUFFLE_GENRES_KEY = `${STORAGE_PREFIX}:shuffleGenres`;
 export const loadShuffleGenres = () => readJson<boolean>(SHUFFLE_GENRES_KEY, false);
 export const saveShuffleGenres = (on: boolean) => writeJson(SHUFFLE_GENRES_KEY, on);
+
+// ---------- Tasteform ----------
+
+const COVER_COLORS_KEY = `${STORAGE_PREFIX}:coverColors`;
+
+/** Colors read from each cover, keyed by its artworkUrl100 — they never change, so fetch once. */
+export const loadCoverColors = () => readJson<Record<string, CoverColor>>(COVER_COLORS_KEY, {});
+export const saveCoverColors = (colors: Record<string, CoverColor>) => writeJson(COVER_COLORS_KEY, colors);
+
+const SONG_FEEL_KEY = `${STORAGE_PREFIX}:songFeel`;
+
+/** Energy/mood measured from each song's audio, keyed by track id — measured once, kept for good. */
+export const loadSongFeel = () => readJson<Record<number, SongFeel>>(SONG_FEEL_KEY, {});
+export const saveSongFeel = (feels: Record<number, SongFeel>) => writeJson(SONG_FEEL_KEY, feels);

@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import Animated, {
   interpolate,
   runOnJS,
@@ -24,7 +25,7 @@ import { DEFAULT_SWIPE_THRESHOLDS, resolveSwipeDirection, rotationForDrag, type 
 const FLY_OUT_DISTANCE = 600;
 
 // Skip/like tint: invisible at rest, ramping to this as a drag nears its commit threshold.
-const TINT_ACTIVE_OPACITY = 0.32;
+const TINT_ACTIVE_OPACITY = 0.5;
 
 type CardFaceProps = {
   /** Computed by the screen from the space actually available (see computeCardSize) — never a fixed constant, so the card shrinks to fit on a small screen. */
@@ -55,12 +56,8 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
           <ThemedView style={[StyleSheet.absoluteFill, styles.blurScrim]} backgroundColor="transparent" />
         </>
       )}
-      {leftTintStyle && (
-        <Animated.View pointerEvents="none" style={[styles.tintZone, styles.tintZoneLeft, leftTintStyle]} />
-      )}
-      {rightTintStyle && (
-        <Animated.View pointerEvents="none" style={[styles.tintZone, styles.tintZoneRight, rightTintStyle]} />
-      )}
+      {leftTintStyle && <TintWash side="left" color={Colors.destructive} style={leftTintStyle} />}
+      {rightTintStyle && <TintWash side="right" color={Colors.positive} style={rightTintStyle} />}
 
       <ThemedView style={styles.center} backgroundColor="transparent">
         {/* The song: spinning while it plays, stopped with a play button when paused. */}
@@ -74,6 +71,27 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
         </ThemedText>
       </ThemedView>
     </ThemedView>
+  );
+}
+
+/** A wash of color from one edge that fades out past the middle — no hard line where skip meets like. */
+function TintWash({ side, color, style }: { side: 'left' | 'right'; color: string; style: AnimatedStyle<ViewStyle> }) {
+  const id = `tint-${side}`;
+  const from = side === 'left' ? '0' : '1';
+  const to = side === 'left' ? '1' : '0';
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
+      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient id={id} x1={from} y1="0" x2={to} y2="0">
+            <Stop offset="0" stopColor={color} stopOpacity={1} />
+            <Stop offset="0.4" stopColor={color} stopOpacity={0.45} />
+            <Stop offset="0.85" stopColor={color} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill={`url(#${id})`} />
+      </Svg>
+    </Animated.View>
   );
 }
 
@@ -246,20 +264,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
-  },
-  tintZone: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: '50%',
-  },
-  tintZoneLeft: {
-    left: 0,
-    backgroundColor: Colors.destructive,
-  },
-  tintZoneRight: {
-    right: 0,
-    backgroundColor: Colors.positive,
   },
   blurScrim: {
     backgroundColor: 'rgba(19, 33, 63, 0.3)',
