@@ -4,6 +4,7 @@ import type { CoverColor } from './cover-color';
 import type { Drop, DropVote } from './daily-drop';
 import type { DiscoveryTrack, Region, SwipeEntry } from './discovery';
 import type { PresetId } from './pool-types';
+import { deleteSongs, restoreSongs, saveSong, setNote, type DeletedSong, type Saved } from './saved-songs';
 import type { SongFeel } from './tasteform';
 
 // All persistence is best-effort: a read/write failure falls back to an empty
@@ -13,6 +14,7 @@ const STORAGE_PREFIX = 'blindspotDiscovery';
 const SWIPE_HISTORY_KEY = `${STORAGE_PREFIX}:swipeHistory`;
 const DISCOVERED_GENRES_KEY = `${STORAGE_PREFIX}:discoveredGenres`;
 const LIKED_TRACKS_KEY = `${STORAGE_PREFIX}:likedTracks`;
+const RECENTLY_DELETED_KEY = `${STORAGE_PREFIX}:recentlyDeleted`;
 const EXPORT_BATCHES_KEY = `${STORAGE_PREFIX}:exportBatches`;
 const REGION_KEY = `${STORAGE_PREFIX}:region`;
 const PRESET_CHANGES_KEY = `${STORAGE_PREFIX}:presetChanges`;
@@ -107,15 +109,31 @@ export async function loadLikedTracks(): Promise<DiscoveryTrack[]> {
   }
 }
 
+/** Recently deleted: songs removed from Liked, newest deletion first, until restored or cleared. */
+export async function loadRecentlyDeleted(): Promise<DeletedSong[]> {
+  try {
+    const raw = await AsyncStorage.getItem(RECENTLY_DELETED_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 // Likes are read-modify-write; run them one at a time so two quick taps
-// can't each read the old list and drop the other's change.
+// can't each read the old list and drop the other's change. Liked and
+// Recently deleted change together (delete, restore), so they share it.
 let likedQueue: Promise<void> = Promise.resolve();
-export function updateLikedTracks(change: (tracks: DiscoveryTrack[]) => DiscoveryTrack[]): Promise<void> {
+function updateSaved(change: (saved: Saved) => Saved): Promise<void> {
   likedQueue = likedQueue.then(async () => {
     try {
-      const existing = await loadLikedTracks();
-      const next = change(existing);
-      if (next !== existing) await AsyncStorage.setItem(LIKED_TRACKS_KEY, JSON.stringify(next));
+      const [liked, bin] = await Promise.all([loadLikedTracks(), loadRecentlyDeleted()]);
+      const next = change({ liked, bin });
+      const writes: [string, string][] = [];
+      if (next.liked !== liked) writes.push([LIKED_TRACKS_KEY, JSON.stringify(next.liked)]);
+      if (next.bin !== bin) writes.push([RECENTLY_DELETED_KEY, JSON.stringify(next.bin)]);
+      if (writes.length > 0) await AsyncStorage.multiSet(writes);
     } catch {
       // ignore
     }
@@ -123,8 +141,38 @@ export function updateLikedTracks(change: (tracks: DiscoveryTrack[]) => Discover
   return likedQueue;
 }
 
+export function updateLikedTracks(change: (tracks: DiscoveryTrack[]) => DiscoveryTrack[]): Promise<void> {
+  return updateSaved((s) => {
+    const liked = change(s.liked);
+    return liked === s.liked ? s : { ...s, liked };
+  });
+}
+
 export function appendLikedTrack(track: DiscoveryTrack): Promise<void> {
-  return updateLikedTracks((existing) => (existing.some((t) => t.id === track.id) ? existing : [...existing, track]));
+  return updateSaved((s) => saveSong(s, track));
+}
+
+/** Remove songs from Liked into Recently deleted. */
+export function deleteLikedTracks(ids: Iterable<number>): Promise<void> {
+  const list = [...ids];
+  return updateSaved((s) => deleteSongs(s, list, Date.now()));
+}
+
+/** Put songs from Recently deleted back into Liked, in their old spots. */
+export function restoreDeletedTracks(ids: Iterable<number>): Promise<void> {
+  const list = [...ids];
+  return updateSaved((s) => restoreSongs(s, list));
+}
+
+/** Delete songs from Recently deleted for good. */
+export function clearRecentlyDeleted(ids: Iterable<number>): Promise<void> {
+  const gone = new Set(ids);
+  return updateSaved((s) => ({ ...s, bin: s.bin.filter((d) => !gone.has(d.track.id)) }));
+}
+
+/** Add, change or clear (empty text) the listener's note on a saved song. */
+export function setLikedNote(id: number, text: string): Promise<void> {
+  return updateLikedTracks((liked) => setNote(liked, id, text));
 }
 
 /**

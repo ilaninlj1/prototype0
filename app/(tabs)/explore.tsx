@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { MiniPlayer } from '@/components/mini-player';
+import { NoteSheet } from '@/components/note-sheet';
 import { Tasteform } from '@/components/tasteform/tasteform';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, Fonts, Ui } from '@/constants/theme';
@@ -19,7 +20,8 @@ import {
   type DiscoveryTrack,
   type SwipeEntry,
 } from '@/lib/discovery';
-import { loadBestStreaks, loadLikedTracks, loadSwipeHistory, type BestStreaks } from '@/lib/discovery-storage';
+import { loadBestStreaks, loadLikedTracks, loadSwipeHistory, setLikedNote, type BestStreaks } from '@/lib/discovery-storage';
+import { setNote } from '@/lib/saved-songs';
 
 const fmt = (n: number) => describeListeners(n).count;
 
@@ -44,6 +46,7 @@ export default function ProfileScreen() {
   // forgets it, since another screen may load a different song meanwhile.
   const { player, status } = usePlayback();
   const [nowPlaying, setNowPlaying] = useState<DiscoveryTrack | null>(null);
+  const [noteTrack, setNoteTrack] = useState<DiscoveryTrack | null>(null);
   useFocusEffect(
     useCallback(() => {
       return () => {
@@ -62,6 +65,13 @@ export default function ProfileScreen() {
     if (!track.previewUrl) return;
     player.replace(track.previewUrl);
     player.play();
+  }
+
+  async function saveNote(track: DiscoveryTrack, text: string) {
+    const next = setNote(finds, track.id, text);
+    setFinds(next);
+    setNowPlaying((p) => (p?.id === track.id ? (next.find((t) => t.id === track.id) ?? p) : p));
+    await setLikedNote(track.id, text);
   }
 
   useFocusEffect(
@@ -102,7 +112,7 @@ export default function ProfileScreen() {
     <View style={styles.screen}>
       <ScrollView
         scrollEnabled={!zoomed}
-        contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top, paddingBottom: nowPlaying ? 150 : 0 }]}>
+        contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top, paddingBottom: nowPlaying ? 180 : 0 }]}>
         <ThemedView style={styles.container}>
           <ThemedText type="eyebrow">Blindspot · what you hear</ThemedText>
           <ThemedText type="hero">Your ears</ThemedText>
@@ -194,9 +204,11 @@ export default function ProfileScreen() {
             playing={status.playing}
             progress={status.duration ? status.currentTime / status.duration : 0}
             onToggle={() => togglePlay(nowPlaying)}
+            onEditNote={() => setNoteTrack(nowPlaying)}
           />
         </View>
       )}
+      <NoteSheet track={noteTrack} onSave={saveNote} onClose={() => setNoteTrack(null)} />
     </View>
   );
 }
