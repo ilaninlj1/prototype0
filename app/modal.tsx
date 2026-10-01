@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router/react-navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -17,14 +17,17 @@ import {
 
 import { CreditLine } from '@/components/credits';
 import { CoverCell } from '@/components/discovery/cover-cell';
+import { deleteLikes, onLikeChange } from '@/components/like-button';
 import { MiniPlayer } from '@/components/mini-player';
+import { NoteSheet } from '@/components/note-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
 import { buildSpotifySearchUrl, filterByGenre, likedGenres, summarizeFinds, type DiscoveryTrack } from '@/lib/discovery';
-import { appendExportBatch, loadLikedTracks, saveLikedTracks } from '@/lib/discovery-storage';
+import { appendExportBatch, loadLikedTracks, loadRecentlyDeleted, saveLikedTracks, setLikedNote } from '@/lib/discovery-storage';
+import { setNote } from '@/lib/saved-songs';
 
 // react-native-web's Alert.alert is a no-op (confirmed against the installed
 // react-native-web@0.21 source — `static alert() {}`), so a Cancel/confirm
@@ -62,7 +65,12 @@ export default function LikedTracksScreen() {
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
   const [tracks, setTracks] = useState<DiscoveryTrack[]>([]);
+  const [deletedCount, setDeletedCount] = useState(0);
+  const [noteTrack, setNoteTrack] = useState<DiscoveryTrack | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
+  // Kept so the player stays up if you take the heart off the song that's
+  // playing — tap the heart again to undo.
+  const [playingTrack, setPlayingTrack] = useState<DiscoveryTrack | null>(null);
 
   const [genre, setGenre] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -80,22 +88,22 @@ export default function LikedTracksScreen() {
 
   const listenersNow = useListenersNow(tracks.map((t) => t.artistName));
 
-  // Reload every time this screen gains focus, so a track liked after it was
-  // last opened still shows up on return — mirrors the Profile tab's pattern.
+  const reload = useCallback(async () => {
+    const [liked, deleted] = await Promise.all([loadLikedTracks(), loadRecentlyDeleted()]);
+    setTracks(liked);
+    setDeletedCount(deleted.length);
+    setLoaded(true);
+  }, []);
+
+  // Reload every time this screen gains focus, so a track liked (or restored)
+  // after it was last opened still shows up on return, and whenever a heart on
+  // this screen's player changes.
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        const liked = await loadLikedTracks();
-        if (cancelled) return;
-        setTracks(liked);
-        setLoaded(true);
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, [])
+      reload();
+    }, [reload])
   );
+  useEffect(() => onLikeChange(() => reload()), [reload]);
 
   // Leaving this screen pauses playback rather than leaving it running in the
   // background, and clears the local "which row is playing" state so a row
@@ -121,6 +129,7 @@ export default function LikedTracksScreen() {
     player.replace(track.previewUrl);
     player.play();
     setPlayingId(track.id);
+    setPlayingTrack(track);
   }
 
   function stopIfPlaying(ids: Set<number>) {
@@ -156,15 +165,24 @@ export default function LikedTracksScreen() {
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return;
     const confirmed = await confirmDialog(
-      'Delete tracks?',
-      `Delete ${pluralize(selectedIds.size, 'track')}?`
+      `Delete ${pluralize(selectedIds.size, 'song')}?`,
+      'They go to Recently deleted, so you can put them back.'
     );
     if (!confirmed) return;
     stopIfPlaying(selectedIds);
-    const next = tracks.filter((t) => !selectedIds.has(t.id));
-    setTracks(next);
-    await saveLikedTracks(next);
+    const ids = [...selectedIds];
+    setTracks((prev) => prev.filter((t) => !selectedIds.has(t.id)));
     exitSelectionMode();
+    await deleteLikes(ids);
+  }
+
+  function selectAll(visible: DiscoveryTrack[]) {
+    setSelectedIds(new Set(visible.map((t) => t.id)));
+  }
+
+  async function saveNote(track: DiscoveryTrack, text: string) {
+    setTracks((prev) => setNote(prev, track.id, text));
+    await setLikedNote(track.id, text);
   }
 
   async function archiveAndClear(selected: DiscoveryTrack[]) {
@@ -221,7 +239,8 @@ export default function LikedTracksScreen() {
   }
 
   const genres = likedGenres(tracks);
-  const nowPlaying = tracks.find((t) => t.id === playingId) ?? null;
+  const savedPlaying = tracks.find((t) => t.id === playingId) ?? null;
+  const nowPlaying = savedPlaying ?? (playingTrack?.id === playingId ? playingTrack : null);
   const newestFirst = filterByGenre([...tracks].reverse(), genre && genres.includes(genre) ? genre : null);
   const { best, calledIt } = summarizeFinds(
     tracks.map((t) => ({ artistName: t.artistName, found: t.artistListeners, now: listenersNow[t.artistName] }))
@@ -235,6 +254,9 @@ export default function LikedTracksScreen() {
             <ThemedView style={styles.toolbar} backgroundColor="transparent">
               <ThemedText type="defaultSemiBold">{selectedIds.size} selected</ThemedText>
               <ThemedView style={styles.toolbarActions} backgroundColor="transparent">
+                <TouchableOpacity onPress={() => selectAll(newestFirst)}>
+                  <ThemedText type="link">Select all</ThemedText>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={handleBulkExport} disabled={selectedIds.size === 0}>
                   <ThemedText type="link">Export</ThemedText>
                 </TouchableOpacity>
@@ -251,9 +273,16 @@ export default function LikedTracksScreen() {
               </ThemedView>
             </ThemedView>
           ) : (
-            <TouchableOpacity onPress={() => router.push('/export-history')} style={styles.historyLink}>
-              <ThemedText type="link">Export History</ThemedText>
-            </TouchableOpacity>
+            <ThemedView style={styles.links} backgroundColor="transparent">
+              <TouchableOpacity onPress={() => router.push('/export-history')}>
+                <ThemedText type="link">Export History</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/recently-deleted')}>
+                <ThemedText type="link">
+                  Recently deleted{deletedCount > 0 ? ` · ${deletedCount}` : ''}
+                </ThemedText>
+              </TouchableOpacity>
+            </ThemedView>
           )}
 
           {best && (
@@ -292,7 +321,16 @@ export default function LikedTracksScreen() {
           )}
 
           {newestFirst.length === 0 ? (
-            <ThemedText style={styles.emptyText}>No liked tracks yet — swipe right on something you like.</ThemedText>
+            <ThemedView style={styles.empty} backgroundColor="transparent">
+              <ThemedText style={styles.emptyText}>Nothing saved yet. Double-tap a song on Home to save it.</ThemedText>
+              {deletedCount > 0 && (
+                <TouchableOpacity onPress={() => router.push('/recently-deleted')}>
+                  <ThemedText type="link">
+                    Deleted something by mistake? Get it back from Recently deleted
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
+            </ThemedView>
           ) : (
             <View style={styles.grid}>
               {newestFirst.map((track) => (
@@ -320,9 +358,12 @@ export default function LikedTracksScreen() {
             playing={status.playing}
             progress={status.duration ? status.currentTime / status.duration : 0}
             onToggle={() => togglePlay(nowPlaying)}
+            onEditNote={savedPlaying ? () => setNoteTrack(savedPlaying) : undefined}
           />
         </View>
       )}
+
+      <NoteSheet track={noteTrack} onSave={saveNote} onClose={() => setNoteTrack(null)} />
 
       <Modal visible={fallbackText !== null} transparent animationType="fade" onRequestClose={dismissFallback}>
         <Pressable style={styles.backdrop} onPress={dismissFallback}>
@@ -350,7 +391,7 @@ export default function LikedTracksScreen() {
 const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: 110,
+    paddingBottom: 150,
   },
   container: {
     flex: 1,
@@ -401,8 +442,13 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: Spacing.xl,
   },
-  historyLink: {
-    alignSelf: 'flex-start',
+  links: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.lg,
+  },
+  empty: {
+    gap: Spacing.md,
   },
   toolbar: {
     flexDirection: 'row',

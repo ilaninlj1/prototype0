@@ -5,7 +5,7 @@ import { Platform, TouchableOpacity } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import type { DiscoveryTrack } from '@/lib/discovery';
-import { appendLikedTrack, loadLikedTracks, updateLikedTracks } from '@/lib/discovery-storage';
+import { appendLikedTrack, deleteLikedTracks, loadLikedTracks, restoreDeletedTracks } from '@/lib/discovery-storage';
 import { ensureWeeklyNudge } from '@/lib/nudge';
 import { fetchArtistListeners } from '@/lib/pool';
 
@@ -34,9 +34,22 @@ export async function saveLike(track: DiscoveryTrack): Promise<void> {
   ensureWeeklyNudge();
 }
 
+// Taking the heart off moves the song to Recently deleted, so it can come back.
 async function removeLike(id: number): Promise<void> {
-  await updateLikedTracks((all) => all.filter((t) => t.id !== id));
-  announce(id, false);
+  await deleteLikes([id]);
+}
+
+/** Move songs from Liked to Recently deleted, and tell every heart. */
+export async function deleteLikes(ids: number[]): Promise<void> {
+  await deleteLikedTracks(ids);
+  ids.forEach((id) => announce(id, false));
+}
+
+/** Put songs from Recently deleted back into Liked, and tell every heart. */
+export async function restoreLikes(ids: number[]): Promise<void> {
+  await restoreDeletedTracks(ids);
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  ids.forEach((id) => announce(id, true));
 }
 
 /** Save any revealed song to Liked (and take it back out). Phone app only — the web pack page has no Liked list. */

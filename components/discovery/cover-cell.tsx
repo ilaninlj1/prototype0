@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
+import { noteText } from '@/components/note-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import { artworkUrl, growthLabel, type DiscoveryTrack } from '@/lib/discovery';
@@ -64,6 +65,11 @@ export function CoverCell({ track, listenersNow, playing, selected, selecting, o
       <ThemedText style={styles.artist} numberOfLines={1}>
         {track.artistName}
       </ThemedText>
+      {track.note && (
+        <ThemedText style={[noteText, styles.note]} numberOfLines={2}>
+          “{track.note}”
+        </ThemedText>
+      )}
     </Pressable>
   );
 }
@@ -79,4 +85,5 @@ const styles = StyleSheet.create({
   badge: { position: 'absolute', top: Spacing.sm, right: Spacing.sm, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: Radius.round, padding: 4 },
   title: { fontFamily: 'Figtree_700Bold', fontSize: 15, lineHeight: 19, marginTop: Spacing.xs },
   artist: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
+  note: { marginTop: 2, transform: [{ rotate: '-1deg' }] },
 });

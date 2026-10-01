@@ -17,6 +17,13 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-01] Notes, Recently deleted and restore for saved songs
+Saved songs now go through every state and keep it across relaunches: save (double-tap), add or edit
+your own note (the player bar's "Add a note", shown in handwriting under the cover), delete (Liked's
+Select all / Delete, or the heart) into a new Recently deleted page instead of vanishing, and restore
+from there to the song's old spot, note and all. Empty Liked points to Recently deleted when it has
+songs. Pure logic in `lib/saved-songs.ts` (tested); Liked and Recently deleted share one write queue.
+
 ## [2026-09-30] Saves fly into your shape
 A save on Home now drops into the You tab: the heart pops, then the song falls into the YOU icon as a
 glowing cell (blurred colors while it's still blind, the real cover once revealed). The icon bumps and
