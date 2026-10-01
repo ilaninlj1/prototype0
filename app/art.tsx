@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Asset, requestPermissionsAsync } from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useRef, useState } from 'react';
@@ -45,6 +44,9 @@ export default function ArtScreen() {
   async function save() {
     try {
       const uri = await capture();
+      // Loaded here, not at the top: the module doesn't exist on web, and a top-level import crashed the
+      // local web dev server, where every route loads at startup. (The production export was unaffected.)
+      const { Asset, requestPermissionsAsync } = await import('expo-media-library');
       const { granted } = await requestPermissionsAsync(true);
       if (!granted) return setNote('Photos access is off. Use Share → Save Image instead.');
       await Asset.create(uri);
