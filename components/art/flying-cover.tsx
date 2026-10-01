@@ -15,6 +15,7 @@ export function FlyingCover({
   artwork,
   from,
   to,
+  startPx = START_PX,
   endPx,
   delay,
   onLanded,
@@ -22,6 +23,8 @@ export function FlyingCover({
   artwork: string;
   from: Point;
   to: Point;
+  /** The cover's side on the card when it takes off, in pixels. */
+  startPx?: number;
   /** The tile's shorter side on screen, in pixels. */
   endPx: number;
   delay: number;
@@ -29,7 +32,7 @@ export function FlyingCover({
 }) {
   const x = useSharedValue(from.x);
   const y = useSharedValue(from.y);
-  const scale = useSharedValue(1);
+  const scale = useSharedValue(startPx / START_PX);
   const opacity = useSharedValue(0);
 
   useEffect(() => {

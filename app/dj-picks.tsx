@@ -139,16 +139,14 @@ export default function DjPicksScreen() {
 
       <View style={styles.cardArea} onLayout={(e: LayoutChangeEvent) => setCardSize(fitCardToWidth(e.nativeEvent.layout))}>
         {revealed && current ? (
-          <ScrollView style={styles.revealScroll} showsVerticalScrollIndicator={false}>
-            <RevealCard
-              key={current.track.id}
-              track={{ ...current.track, artistListeners: listeners ?? undefined }}
-              listeners={listeners}
-              width={cardSize.width}
-              onDone={next}
-              extra={<DjNote card={current} />}
-            />
-          </ScrollView>
+          <RevealCard
+            key={current.track.id}
+            track={{ ...current.track, artistListeners: listeners ?? undefined }}
+            listeners={listeners}
+            width={cardSize.width}
+            onDone={next}
+            extra={<DjNote card={current} />}
+          />
         ) : (
           <CardStack
             queue={cards.slice(index).map((c) => c.track)}
@@ -204,7 +202,6 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 26 },
   pill: { ...Ui.outlineButton, minHeight: 32 },
   cardArea: { flex: 1, alignItems: 'center', justifyContent: 'flex-start' },
-  revealScroll: { alignSelf: 'stretch' },
   dim: { color: Colors.textSecondary },
   dj: { gap: 2, marginTop: Spacing.xs },
   line: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, color: Colors.textSecondary },

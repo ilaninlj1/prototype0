@@ -1,6 +1,6 @@
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArtPiece } from '@/components/art/art-piece';
@@ -8,7 +8,7 @@ import { FlyingCover } from '@/components/art/flying-cover';
 import { CardStack } from '@/components/discovery/card-stack';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
-import { RevealCard } from '@/components/discovery/reveal-card';
+import { REVEAL_COVER, REVEAL_COVER_CENTER, RevealCard } from '@/components/discovery/reveal-card';
 import { DropRing } from '@/components/drop-ring';
 import { onLikeChange, saveLike } from '@/components/like-button';
 import { flySave } from '@/components/save-flight';
@@ -212,8 +212,8 @@ export default function HomeScreen() {
     flyingIdRef.current = mark.trackId;
     setFlying({
       mark,
-      // The revealed cover is the full-width square at the top of the card area.
-      from: { x: area.x + area.width / 2, y: area.y + cardSize.width / 2 },
+      // The revealed cover is the small square beside the title.
+      from: { x: area.x + REVEAL_COVER_CENTER.x, y: area.y + REVEAL_COVER_CENTER.y },
       // The first cover lands in a collage that doesn't exist yet: it'll open up just above the label.
       to: { x: strip.x + (tile.x + tile.w / 2) * scale, y: strip.y - (count === 0 ? ART.height * scale : 0) + (tile.y + tile.h / 2) * scale },
       endPx: Math.min(tile.w, tile.h) * scale,
@@ -651,15 +651,13 @@ export default function HomeScreen() {
         <>
           <View ref={cardAreaViewRef} style={styles.cardArea} onLayout={handleCardAreaLayout}>
             {revealTrack ? (
-              // The card grows to fit everything; this area scrolls, the card never clips.
-              <ScrollView style={styles.revealScroll} showsVerticalScrollIndicator={false}>
-                <RevealCard
-                  track={{ ...revealTrack, artistListeners: revealListeners ?? revealTrack.artistListeners }}
-                  listeners={revealListeners}
-                  width={cardSize.width}
-                  onDone={handleRevealDone}
-                />
-              </ScrollView>
+              // The card grows to fit everything and scrolls itself, so it never clips.
+              <RevealCard
+                track={{ ...revealTrack, artistListeners: revealListeners ?? revealTrack.artistListeners }}
+                listeners={revealListeners}
+                width={cardSize.width}
+                onDone={handleRevealDone}
+              />
             ) : (
               <CardStack
                 queue={queue}
@@ -724,6 +722,7 @@ export default function HomeScreen() {
           artwork={flying.mark.artwork}
           from={flying.from}
           to={flying.to}
+          startPx={REVEAL_COVER}
           endPx={flying.endPx}
           delay={1500}
           onLanded={() => handleLanded(flying.mark)}
@@ -745,9 +744,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
-  },
-  revealScroll: {
-    alignSelf: 'stretch',
   },
   headerRow: {
     flexDirection: 'row',
