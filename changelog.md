@@ -17,6 +17,12 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-01] High-energy songs sprout buds on the Tasteform
+In Shape view, a saved song measured at 0.55 energy or more throws off 1–3 small buds in its cover's
+color, just outside its cell and facing the way the shape grows (more energy, more buds). Near ones
+melt into the body as nubs, far ones float as droplets. They never move the cells, and the island
+views don't sprout. This was the last piece of the image prototype still missing.
+
 ## [2026-10-01] Notes, Recently deleted and restore for saved songs
 Saved songs now go through every state and keep it across relaunches: save (double-tap), add or edit
 your own note (the player bar's "Add a note", shown in handwriting under the cover), delete (Liked's

@@ -117,11 +117,14 @@ export const MODES: { id: Mode; label: string; caption: string }[] = [
 /** r: the body's radius around the cell. d: the cover's diameter. */
 export type Cell = { id: number; x: number; y: number; r: number; d: number };
 export type Label = { text: string; x: number; y: number };
+/** A small droplet a high-energy song throws off its cell, in its cover's color. Shape view only. */
+export type Bud = { parent: number; x: number; y: number; r: number };
 export type Form = {
   width: number;
   height: number;
   cells: Cell[];
   labels: Label[];
+  buds: Bud[];
 };
 
 const GOLDEN = Math.PI * (3 - Math.sqrt(5));
@@ -245,7 +248,41 @@ function shapeLayout(songs: FormSong[], width: number, height: number): Form {
     r: p.r * scale,
     d: SHAPE_COVER * scale,
   }));
-  return { width, height, cells, labels: [] };
+  const energy = new Map(songs.map((s) => [s.id, s.energy]));
+  return { width, height, cells, labels: [], buds: sprout(cells, energy, width, height) };
+}
+
+/** Songs at least this energetic sprout. */
+const BUD_MIN = 0.55;
+
+/**
+ * High-energy songs throw off 1–3 small buds just outside their cell, facing
+ * the way the shape grows, so a loud collection looks like it's bursting at
+ * the edges. Near ones melt into the body as nubs, far ones float free. Buds
+ * that would land inside another cell or off the canvas are dropped; they
+ * never move the cells.
+ */
+function sprout(cells: Cell[], energy: Map<number, number | undefined>, width: number, height: number): Bud[] {
+  const buds: Bud[] = [];
+  for (const c of cells) {
+    const e = energy.get(c.id);
+    if (e == null || e < BUD_MIN) continue;
+    const count = e >= 0.85 ? 3 : e >= 0.7 ? 2 : 1;
+    const away = Math.hypot(c.x - width / 2, c.y - height / 2);
+    const out = away > 1 ? Math.atan2(c.y - height / 2, c.x - width / 2) : hash(c.id, 9) * 2 * Math.PI;
+    const grow = lerp(0.85, 1.15, (e - BUD_MIN) / (1 - BUD_MIN));
+    for (let k = 0; k < count; k++) {
+      const angle = out + (k - (count - 1) / 2) * 0.9 + (hash(c.id, 10 + k) - 0.5) * 0.5;
+      const dist = c.r * (1.45 + 0.7 * hash(c.id, 20 + k));
+      const r = c.r * (0.24 + 0.14 * hash(c.id, 30 + k)) * grow;
+      const x = c.x + Math.cos(angle) * dist;
+      const y = c.y + Math.sin(angle) * dist;
+      if (x - r < 0 || x + r > width || y - r < 0 || y + r > height) continue;
+      if (cells.some((o) => o !== c && Math.hypot(o.x - x, o.y - y) < o.r)) continue;
+      buds.push({ parent: c.id, x, y, r });
+    }
+  }
+  return buds;
 }
 
 // ---------- Islands (genre, listeners, color, when) ----------
@@ -400,7 +437,7 @@ function islandLayout(songs: FormSong[], mode: Mode, width: number): Form {
     }
     top += Math.max(...row.map((b) => b.bh)) + gapY;
   }
-  return { width, height: Math.max(top - gapY + pad, 120), cells, labels };
+  return { width, height: Math.max(top - gapY + pad, 120), cells, labels, buds: [] };
 }
 
 /** Where every song sits for this mode. Shape fills a square; islands grow as tall as they need. */
@@ -416,7 +453,7 @@ export function formLayout(songs: FormSong[], mode: Mode, width: number): Form {
  * near cells melt together and far ones stay islands. Returns an SVG path,
  * smoothed, drawn even-odd so any enclosed gap stays open.
  */
-export function bodyPath(cells: Cell[], width: number, height: number, step = 4): string {
+export function bodyPath(cells: Pick<Cell, 'x' | 'y' | 'r'>[], width: number, height: number, step = 4): string {
   if (!cells.length) return '';
   const nx = Math.ceil(width / step) + 1;
   const ny = Math.ceil(height / step) + 1;

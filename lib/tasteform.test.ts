@@ -120,6 +120,50 @@ test('shape: the same saves always make the same shape', () => {
   assert.deepEqual(formLayout(songs(30), 'shape', 340), formLayout(songs(30), 'shape', 340));
 });
 
+const withEnergy = (list: FormSong[], energy: (i: number) => number | undefined) => list.map((s, i) => ({ ...s, energy: energy(i) }));
+
+test('buds: calm or unmeasured songs never sprout', () => {
+  assert.deepEqual(formLayout(songs(30), 'shape', 340).buds, []);
+  assert.deepEqual(formLayout(withEnergy(songs(30), () => 0.4), 'shape', 340).buds, []);
+});
+
+test('buds: the more energy a song has, the more it sprouts, up to 3', () => {
+  const count = (e: number) => {
+    const form = formLayout(withEnergy(songs(1), () => e), 'shape', 340);
+    return form.buds.filter((b) => b.parent === form.cells[0].id).length;
+  };
+  assert.equal(count(0.6), 1);
+  assert.equal(count(0.75), 2);
+  assert.equal(count(0.95), 3);
+});
+
+test('buds: small, outside their own cell, on the canvas, and the same every time', () => {
+  for (const n of [1, 15, 50]) {
+    const list = withEnergy(songs(n), (i) => (i % 3 === 0 ? 0.9 : 0.3));
+    const form = formLayout(list, 'shape', 340);
+    assert.ok(form.buds.length > 0, `n=${n} has buds`);
+    const cellOf = new Map(form.cells.map((c) => [c.id, c]));
+    for (const b of form.buds) {
+      const c = cellOf.get(b.parent)!;
+      assert.ok(b.r < c.r * 0.5, 'a bud is small next to its cell');
+      assert.ok(Math.hypot(b.x - c.x, b.y - c.y) > c.r, 'a bud sits outside its cell');
+      assert.ok(b.x - b.r >= 0 && b.x + b.r <= 340 && b.y - b.r >= 0 && b.y + b.r <= 340, `n=${n} bud off canvas`);
+    }
+    assert.deepEqual(formLayout(list, 'shape', 340).buds, form.buds);
+  }
+});
+
+test('buds: measuring energy never moves the cells', () => {
+  const calm = formLayout(songs(20), 'shape', 340);
+  const loud = formLayout(withEnergy(songs(20), () => 0.9), 'shape', 340);
+  assert.deepEqual(loud.cells, calm.cells);
+});
+
+test('buds: only the Shape view sprouts', () => {
+  const list = withEnergy(songs(20), () => 0.9);
+  for (const mode of ['genre', 'listeners', 'color', 'when'] as Mode[]) assert.deepEqual(formLayout(list, mode, 340).buds, []);
+});
+
 test('islands: every song placed once, no covers overlap, all inside the width', () => {
   const list = songs(80);
   for (const mode of ['genre', 'listeners', 'color', 'when'] as Mode[]) {

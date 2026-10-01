@@ -21,13 +21,15 @@ type Props = {
  * halo outside and a thin light edge make it read as a membrane.
  */
 export const TasteformBody = memo(function TasteformBody({ form, colors, id }: Props) {
-  const d = useMemo(() => bodyPath(form.cells, form.width, form.height), [form]);
+  // High-energy songs' buds are part of the same membrane (see sprout in lib/tasteform.ts).
+  const d = useMemo(() => bodyPath([...form.cells, ...form.buds], form.width, form.height), [form]);
   // One gradient per distinct color, not per cell.
   const palette = useMemo(() => [...new Set(colors.map((c) => rgb(c)))], [colors]);
   const avg = useMemo(() => {
     const sum = colors.reduce((a, c) => [a[0] + c[0], a[1] + c[1], a[2] + c[2]], [0, 0, 0]);
     return rgb(sum.map((v) => Math.round(v / Math.max(1, colors.length))) as Rgb);
   }, [colors]);
+  const colorOf = useMemo(() => new Map(form.cells.map((c, i) => [c.id, rgb(colors[i] ?? NO_COLOR)])), [form, colors]);
   if (!d) return null;
 
   return (
@@ -49,6 +51,9 @@ export const TasteformBody = memo(function TasteformBody({ form, colors, id }: P
         <Rect width={form.width} height={form.height} fill={avg} opacity={0.55} />
         {form.cells.map((c, i) => (
           <Circle key={c.id} cx={c.x} cy={c.y} r={c.r * 2.6} fill={`url(#${id}-g${palette.indexOf(rgb(colors[i]))})`} />
+        ))}
+        {form.buds.map((b, i) => (
+          <Circle key={`b${i}`} cx={b.x} cy={b.y} r={b.r * 2.6} fill={`url(#${id}-g${palette.indexOf(colorOf.get(b.parent) ?? '')})`} />
         ))}
       </G>
       <Path d={d} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth={1} />
