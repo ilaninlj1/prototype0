@@ -4,6 +4,7 @@
 // measuring is lib/song-feel-api.ts; the screens are components/decoded/ and
 // app/decoded.tsx. Spec: docs/superpowers/specs/2026-10-02-taste-decoded-design.md
 
+import { listGenres, type BlindTestSong } from './blind-test.ts';
 import type { DiscoveryTrack, SwipeEntry } from './discovery';
 import type { Baselines, Cuts, GenreSound } from './genre-sound';
 import type { SongFeel } from './tasteform';
@@ -186,4 +187,127 @@ export function acrossFindings(saves: DecodedSong[], b: Baselines): Finding[] {
     evidence: l.evidence,
     strength: l.share * weight(saves.length),
   }));
+}
+
+// ---------- Never, decoded ----------
+
+export type NeverSong = DecodedSong & { liked: boolean };
+
+/** The Blind Spot Test's never-songs that are fully measured. A genre the baselines left out gets null (placed against `all`). */
+export function decodedNevers(songs: BlindTestSong[], feels: Record<number, SongFeel>, b: Baselines): NeverSong[] {
+  return songs.flatMap((s) => {
+    const feel = feels[s.trackId];
+    if (!s.isNever || !isFullyMeasured(feel)) return [];
+    const genre = songGenre([s.genre], b);
+    return [{ id: s.trackId, title: s.title, artist: s.artist, artworkUrl: s.artworkUrl, previewUrl: s.previewUrl, genre, feel, liked: s.liked }];
+  });
+}
+
+const mean = (xs: number[]) => xs.reduce((a, x) => a + x, 0) / xs.length;
+const MIN_GAP = 25;
+
+/**
+ * "You don't hate Country. You hate happy Country." — 2+ measured likes and 1+ measured skip among your
+ * nevers, every like on one side of every skip, averages 25+ points apart. Or, when you liked all of them:
+ * "…then liked all 5. Every one was instrumental." (4+ on one side).
+ */
+export function neverFindings(test: { never: string[]; songs: BlindTestSong[] }, feels: Record<number, SongFeel>, b: Baselines): Finding[] {
+  const nevers = decodedNevers(test.songs, feels, b);
+  const liked = nevers.filter((s) => s.liked);
+  const skipped = nevers.filter((s) => !s.liked);
+  const allNevers = test.songs.filter((s) => s.isNever);
+  const genres = listGenres(test.never);
+  const place = (s: DecodedSong, m: Measure) => position(s.feel[m], baselineFor(s.genre, b).cuts[m]);
+  const evidence = (m: Measure) => nevers.map((song) => ({ song, position: place(song, m) }));
+  const out: Finding[] = [];
+  if (liked.length >= 2 && skipped.length >= 1) {
+    for (const m of MEASURES) {
+      const pl = liked.map((s) => place(s, m));
+      const ps = skipped.map((s) => place(s, m));
+      const split = Math.min(...pl) > Math.max(...ps) || Math.max(...pl) < Math.min(...ps);
+      const gap = mean(pl) - mean(ps);
+      if (!split || Math.abs(gap) < MIN_GAP) continue;
+      const hated: Side = gap > 0 ? 'low' : 'high'; // the skipped songs' side
+      out.push({
+        id: findingId('never', genres, m, hated),
+        kind: 'never',
+        genre: genres,
+        measure: m,
+        side: hated,
+        sentence: `You don't hate ${genres}. You hate ${SIDE_WORDS[m][hated]} ${genres}.`,
+        evidence: evidence(m),
+        strength: Math.abs(gap) / 100,
+      });
+    }
+  } else if (allNevers.length > 0 && allNevers.every((s) => s.liked) && nevers.length >= 4) {
+    for (const m of MEASURES) {
+      const sides = nevers.map((s) => sideOf(place(s, m)));
+      for (const side of ['low', 'high'] as const) {
+        const k = sides.filter((x) => x === side).length;
+        if (k < 4) continue;
+        out.push({
+          id: findingId('never-all', genres, m, side),
+          kind: 'never-all',
+          genre: genres,
+          measure: m,
+          side,
+          sentence: `You said never ${genres}, then liked all ${allNevers.length}. ${k === nevers.length ? 'Every one was' : `${k} of ${nevers.length} were`} ${SIDE_WORDS[m][side]}.`,
+          evidence: evidence(m),
+          strength: k / nevers.length,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+// ---------- Everything together ----------
+
+export type DecodeInput = {
+  liked: DiscoveryTrack[];
+  history: SwipeEntry[];
+  feels: Record<number, SongFeel>;
+  test: { never: string[]; songs?: BlindTestSong[] } | null;
+};
+
+const byStrength = (a: Finding, z: Finding) => z.strength - a.strength || z.evidence.length - a.evidence.length;
+
+/** At most 3 findings, no two on the same measure; the strongest Never, decoded always leads. */
+export function decodeTaste(input: DecodeInput, b: Baselines): Finding[] {
+  const saves = decodedSaves(input.liked, input.history, input.feels, b);
+  const never = input.test?.songs ? neverFindings({ never: input.test.never, songs: input.test.songs }, input.feels, b) : [];
+  const ranked = [...never.sort(byStrength).slice(0, 1), ...[...genreFindings(saves, b), ...acrossFindings(saves, b)].sort(byStrength)];
+  const out: Finding[] = [];
+  for (const f of ranked) if (out.length < 3 && !out.some((o) => o.measure === f.measure)) out.push(f);
+  return out;
+}
+
+/** What the Decoded line says before anything speaks. Counts saves, not measured saves, so it never asks for more while measuring catches up. */
+export function decodedPrompt(saved: number, test: { songs?: BlindTestSong[] } | null): { text: string; takeTest: boolean } {
+  if (!test?.songs) return { text: 'Take the Blind Spot Test to decode your nevers.', takeTest: true };
+  if (saved < 3) {
+    const n = 3 - saved;
+    return { text: `Save ${n} more ${n === 1 ? 'song' : 'songs'} to decode your taste.`, takeTest: false };
+  }
+  return { text: 'Keep saving. Nothing stands out yet.', takeTest: false };
+}
+
+/** The strongest finding not opened on the Decoded page yet. */
+export function unseenFinding(findings: Finding[], seen: string[]): Finding | null {
+  return findings.find((f) => !seen.includes(f.id)) ?? null;
+}
+
+// ---------- Votes ----------
+
+/** "Sounds like me" / "Nope" per finding id, and whether the first one reached the server. */
+export type DecodedVotes = Record<string, { agree: boolean; sent: boolean }>;
+
+/** Records a tap. Only a finding's first vote is sent; later taps change only what this phone shows. */
+export function nextVote(votes: DecodedVotes, id: string, agree: boolean): { votes: DecodedVotes; send: boolean } {
+  const sent = votes[id]?.sent ?? false;
+  return { votes: { ...votes, [id]: { agree, sent } }, send: !sent };
+}
+
+export function markSent(votes: DecodedVotes, id: string): DecodedVotes {
+  return votes[id] ? { ...votes, [id]: { ...votes[id], sent: true } } : votes;
 }
