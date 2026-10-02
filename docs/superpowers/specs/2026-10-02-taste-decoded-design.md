@@ -41,8 +41,10 @@ A song is **low** at or below the genre's 25th percentile, **high** at or above 
 "Across everything" uses the all-genres row of the same file.
 
 - A song's **position** on a measure is its percentile within its own genre, read straight-line between the
-  stored cut points (10/25/50/75/90); below the 10th or above the 90th it's placed at the 10/90 end of that
-  range. This is what lets songs from different genres sit on one bar.
+  stored cut points (10/25/50/75/90); below the 10th it's 5, above the 90th it's 95. A value equal to several
+  cut points (say instrumentalness 0 where most of a genre is 0) takes the middle of those percentiles, so a
+  typical value never reads as extreme. This is what lets songs from different genres sit on one bar, whose
+  normal band is always 25–75.
 - **"On the same side"** means all low or all high; normal songs never count toward a side.
 - A **measured** song has all 8 measurements.
 
@@ -63,8 +65,10 @@ A song is **low** at or below the genre's 25th percentile, **high** at or above 
 - A finding's **id** is `kind:genre:measure:side`. It drives "new" (an id not in the seen list), votes and the
   Sunday ping.
 - **Before anything speaks**, the line says, in this order: "Take the Blind Spot Test to decode your nevers"
-  (if there's no test result with songs), else "Save N more songs to decode your taste" (fewer than 3 measured
-  saves), else "Keep saving. Nothing stands out yet."
+  (if there's no test result with songs; tapping it opens the test), else "Save N more songs to decode your
+  taste" (fewer than 3 saves; counted as saves, not measured saves, so it never asks for more while measuring
+  catches up), else "Keep saving. Nothing stands out yet."
+- **Only the strongest** Never, decoded finding is shown; it's the headline.
 
 ## Data
 Everything stays on the phone. The only thing sent out is each song's public preview clip, as today, plus
@@ -90,8 +94,11 @@ anonymous votes (below).
    `{ trackId, title, artist, genre, previewUrl, artworkUrl, isNever, liked }[]`. The 10 songs are measured
    right after the test ends, through the same measuring code and limits. Old results have no `songs`, so
    Never, decoded stays quiet and the line asks for a retake.
-5. **A saved song's genre** is the `genre` on its swipe-log entry. Songs without one still count toward
-   Across everything.
+5. **A saved song's genre** is the first of its swipe-log entry's `genre` and its own `primaryGenreName` that is
+   one of the baseline genres. Pool songs carry the app's genre names ("Country"); songs from the older fetch
+   path, search or charts carry iTunes labels ("Hip-Hop/Rap") and usually match nothing. Songs without a genre
+   still count toward Across everything. A genre with fewer than 15 measured baseline songs is left out of the
+   file, and its songs are placed against the `all` row.
 
 ## Code
 - **`lib/taste-decoded.ts`** (pure, no network): saved songs, measurements, genres, baselines and the test
@@ -105,7 +112,8 @@ anonymous votes (below).
   `created_at`; no device id, no user id). Phones can insert only, with length checks, the same way `vibes`
   works. A count view readable only by the server key, for the paper. Each finding id is sent at most once per
   phone (remembered locally); tapping the other button changes only the local state.
-- **Sunday ping:** `lib/nudge.ts` gets a way to reschedule the same `NUDGE.id` with new text. With an unseen
+- **Sunday ping:** `lib/nudge.ts` gets a way to reschedule the same `NUDGE.id` with new text (cancel, then
+  schedule: Expo's docs don't promise that reusing an id replaces it). With an unseen
   finding: title "New finding about your taste", body the finding's sentence, opens `/decoded`. Once it's
   seen, it goes back to the Called it text. It never asks for notification permission itself; that stays with
   the first blind like.
@@ -118,8 +126,9 @@ anonymous votes (below).
   spots. On open, the covers slide out from the middle into place, with the same animation tools the Tasteform
   uses. Tap a cover to play it on the shared player. Under the bar: "Based on 4 songs" and two outline buttons,
   **Sounds like me** and **Nope**.
-- **Share my taste:** the page's one filled cream button. It captures an offscreen card (top finding in big
-  type, up to 3 covers, "Decoded by Blindspot" and the date) with `react-native-view-shot` and shares it with
+- **Share my taste:** the page's one filled cream button. The card it shares (top finding in big type, up to 3
+  covers, "Decoded by Blindspot" and the date) sits right above it as a preview, so what you see is what gets
+  sent; it's captured with `react-native-view-shot` and shared with
   `expo-sharing`, like the Song prints poster. **No new native modules**, so it can ship as an update to the
   runtime 1.0.1 APK.
 - Theme rules as everywhere: navy room, cream text, red only for the dot; no emoji.
