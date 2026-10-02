@@ -88,8 +88,10 @@ anonymous votes (below).
    - **Sanity check** at the end; if any fails, the file isn't written: Metal is louder than Ambient,
      Classical is more instrumental than Hip-Hop, Hip-Hop is more spoken than Classical, Ambient is calmer than
      Metal (all compared on the 50th percentile).
-3. **Swipe log keeps the audio link.** `SwipeEntry` gains optional `previewUrl` and `artworkUrl100`, set
-   at swipe time. Nothing reads them yet; they are the data for skip findings later.
+3. **Skips are already kept.** Every `SwipeEntry` has the song's iTunes `trackId`, so skip findings can later
+   get previews and covers back in one batched iTunes lookup. (Changed in review, 2026-10-02: storing the two
+   links on every swipe doubled each entry, 288 → 606 bytes, and swipe history is one stored value that
+   Android can't read past ~2 MB.)
 4. **Blind Spot Test keeps its songs.** `BlindTestResult` gains optional `songs`:
    `{ trackId, title, artist, genre, previewUrl, artworkUrl, isNever, liked }[]`. The 10 songs are measured
    right after the test ends, through the same measuring code and limits. Old results have no `songs`, so

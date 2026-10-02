@@ -51,8 +51,6 @@ export default function DropPlayScreen() {
       artistId: t.artistId,
       artistName: t.artistName,
       genre: t.primaryGenreName,
-      previewUrl: t.previewUrl,
-      artworkUrl100: t.artworkUrl100,
       action: liked ? 'like' : 'skip',
       timestamp: Date.now(),
       artistListeners: t.artistListeners,

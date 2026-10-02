@@ -90,11 +90,6 @@ export type SwipeEntry = {
   artistListeners?: number;
   trackRank?: number;
   dwellMs?: number;
-  // 2026-10-02, for Taste Decoded's skip findings later: what the song
-  // sounded like and looked like, so a skip can be measured long after it
-  // left the queue. Same precedent as every optional field above.
-  previewUrl?: string;
-  artworkUrl100?: string;
 };
 
 export type Strategy =
