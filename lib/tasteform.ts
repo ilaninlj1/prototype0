@@ -22,8 +22,21 @@ export type FormSong = {
   energy?: number;
 };
 
-/** What a song's audio measures as (see hooks/use-song-feel.ts). Tempo is kept but too shaky on 30s clips to drive anything. */
-export type SongFeel = { energy: number; valence: number; tempo: number };
+/**
+ * What a song's audio measures as (see lib/song-feel-api.ts). Tempo is kept but too shaky on 30s clips to
+ * drive anything. The rest are optional: songs measured before 2026-10-02 only kept energy, valence and tempo.
+ */
+export type SongFeel = {
+  energy: number;
+  valence: number;
+  tempo: number;
+  danceability?: number;
+  acousticness?: number;
+  instrumentalness?: number;
+  liveness?: number;
+  speechiness?: number;
+  loudness?: number;
+};
 
 /** Saved within this much listening counts as a quick call — its cell grows a little bigger. */
 const QUICK_MS = 8_000;
