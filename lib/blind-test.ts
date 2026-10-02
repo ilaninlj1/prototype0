@@ -49,7 +49,32 @@ export function scoreTest(items: TestItem[], liked: boolean[]): { neverLiked: nu
   return { neverLiked, otherLiked };
 }
 
-function listGenres(never: string[]): string {
+export type BlindTestSong = {
+  trackId: number;
+  title: string;
+  artist: string;
+  genre: string;
+  previewUrl: string;
+  artworkUrl: string;
+  isNever: boolean;
+  liked: boolean;
+};
+
+/** The test's 10 songs and what you did with each, kept so Taste Decoded can explain your nevers. */
+export function testSongs(items: TestItem[], liked: boolean[]): BlindTestSong[] {
+  return items.map((x, i) => ({
+    trackId: x.song.itunesTrackId,
+    title: x.song.title,
+    artist: x.song.artist,
+    genre: x.song.genre,
+    previewUrl: x.song.previewUrl,
+    artworkUrl: x.song.artworkUrl,
+    isNever: x.isNever,
+    liked: liked[i] === true,
+  }));
+}
+
+export function listGenres(never: string[]): string {
   return never.length <= 1 ? (never[0] ?? '') : `${never.slice(0, -1).join(', ')} & ${never.at(-1)}`;
 }
 

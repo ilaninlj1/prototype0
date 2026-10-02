@@ -340,6 +340,8 @@ export default function HomeScreen() {
       artistName: track.artistName,
       genre: track.primaryGenreName,
       collectionId: track.collectionId,
+      previewUrl: track.previewUrl,
+      artworkUrl100: track.artworkUrl100,
       action,
       timestamp: Date.now(),
       // Phase 3 logging (2026-09-16): preset is always meaningful regardless

@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { pickTestSongs, scoreTest, songToTrack, testComparison, testHeadline, testShareText, testVerdict } from './blind-test.ts';
+import {
+  listGenres,
+  pickTestSongs,
+  scoreTest,
+  songToTrack,
+  testComparison,
+  testHeadline,
+  testShareText,
+  testSongs,
+  testVerdict,
+} from './blind-test.ts';
 import type { PoolSong } from './game-pool.ts';
 
 const genres = ['Country', 'Metal', 'Jazz', 'Pop', 'Rock', 'House', 'Salsa'];
@@ -49,4 +59,21 @@ test('songToTrack uses the real iTunes id and an Apple Music link, and keeps the
   assert.equal(a.id, 555);
   assert.equal(a.trackViewUrl, 'https://music.apple.com/us/song/555');
   assert.equal(a.artistListeners, 1000);
+});
+
+test('testSongs keeps each song with whether it was a never and whether you liked it', () => {
+  const song = (id: number, genre: string): PoolSong => ({ artist: `A${id}`, title: `T${id}`, previewUrl: `p${id}`, artworkUrl: `a${id}`, listeners: 1000, genre, itunesTrackId: id });
+  const items = [
+    { song: song(1, 'Country'), isNever: true },
+    { song: song(2, 'Jazz'), isNever: false },
+  ];
+  assert.deepEqual(testSongs(items, [true, false]), [
+    { trackId: 1, title: 'T1', artist: 'A1', genre: 'Country', previewUrl: 'p1', artworkUrl: 'a1', isNever: true, liked: true },
+    { trackId: 2, title: 'T2', artist: 'A2', genre: 'Jazz', previewUrl: 'p2', artworkUrl: 'a2', isNever: false, liked: false },
+  ]);
+});
+
+test('listGenres joins like the headline', () => {
+  assert.equal(listGenres(['Country']), 'Country');
+  assert.equal(listGenres(['Country', 'Metal', 'Jazz']), 'Country, Metal & Jazz');
 });

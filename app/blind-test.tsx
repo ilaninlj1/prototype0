@@ -22,11 +22,13 @@ import {
   testComparison,
   testHeadline,
   testShareText,
+  testSongs,
   testVerdict,
   type TestItem,
 } from '@/lib/blind-test';
 import { artworkUrl, describeListeners } from '@/lib/discovery';
 import { appendLikedTrack, saveBlindTest } from '@/lib/discovery-storage';
+import { measureMissing } from '@/lib/song-feel-api';
 
 const MAX_NEVER = 3;
 
@@ -75,7 +77,9 @@ export default function BlindTestScreen() {
     if (next.length === items.length) {
       player.pause();
       const score = scoreTest(items, next);
-      await saveBlindTest({ never, ...score, at: Date.now() });
+      await saveBlindTest({ never, ...score, at: Date.now(), songs: testSongs(items, next) });
+      // Measure all 10 now, so Taste Decoded can explain your nevers.
+      measureMissing(items.map((x) => ({ id: x.song.itunesTrackId, previewUrl: x.song.previewUrl })));
     }
   }
 

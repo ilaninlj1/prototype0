@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import type { BlindTestSong } from './blind-test';
 import type { CoverColor } from './cover-color';
 import type { Drop, DropVote } from './daily-drop';
 import type { DiscoveryTrack, Region, SwipeEntry } from './discovery';
@@ -347,7 +348,8 @@ export async function addFinishedDay(day: string): Promise<string[]> {
 
 // Last Blind Spot Test result, shown on the Play card.
 const BLIND_TEST_KEY = `${STORAGE_PREFIX}:blindTest`;
-export type BlindTestResult = { never: string[]; neverLiked: number; otherLiked: number; at: number };
+/** `songs` since 2026-10-02 (Taste Decoded); older results don't have them. */
+export type BlindTestResult = { never: string[]; neverLiked: number; otherLiked: number; at: number; songs?: BlindTestSong[] };
 export const loadBlindTest = () => readJson<BlindTestResult | null>(BLIND_TEST_KEY, null);
 export const saveBlindTest = (r: BlindTestResult) => writeJson(BLIND_TEST_KEY, r);
 
