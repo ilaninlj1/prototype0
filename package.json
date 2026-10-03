@@ -18,7 +18,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "scan-ai-artists": "node --experimental-strip-types --env-file=.env.local scripts/scan-ai-artists.ts"
+    "scan-ai-artists": "node --experimental-strip-types --env-file=.env.local scripts/scan-ai-artists.ts",
+    "measure-genre-sound": "node --experimental-strip-types scripts/measure-genre-sound.ts"
   },
   "dependencies": {
     "@expo-google-fonts/archivo": "^0.4.2",

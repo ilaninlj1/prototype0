@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import type { BlindTestSong } from './blind-test';
 import type { CoverColor } from './cover-color';
 import type { Drop, DropVote } from './daily-drop';
 import type { DiscoveryTrack, Region, SwipeEntry } from './discovery';
 import type { PresetId } from './pool-types';
 import { deleteSongs, restoreSongs, saveSong, setNote, type DeletedSong, type Saved } from './saved-songs';
+import type { DecodedVotes } from './taste-decoded';
 import type { SongFeel } from './tasteform';
 
 // All persistence is best-effort: a read/write failure falls back to an empty
@@ -347,7 +349,8 @@ export async function addFinishedDay(day: string): Promise<string[]> {
 
 // Last Blind Spot Test result, shown on the Play card.
 const BLIND_TEST_KEY = `${STORAGE_PREFIX}:blindTest`;
-export type BlindTestResult = { never: string[]; neverLiked: number; otherLiked: number; at: number };
+/** `songs` since 2026-10-02 (Taste Decoded); older results don't have them. */
+export type BlindTestResult = { never: string[]; neverLiked: number; otherLiked: number; at: number; songs?: BlindTestSong[] };
 export const loadBlindTest = () => readJson<BlindTestResult | null>(BLIND_TEST_KEY, null);
 export const saveBlindTest = (r: BlindTestResult) => writeJson(BLIND_TEST_KEY, r);
 
@@ -374,3 +377,14 @@ const SONG_FEEL_KEY = `${STORAGE_PREFIX}:songFeel`;
 /** Energy/mood measured from each song's audio, keyed by track id — measured once, kept for good. */
 export const loadSongFeel = () => readJson<Record<number, SongFeel>>(SONG_FEEL_KEY, {});
 export const saveSongFeel = (feels: Record<number, SongFeel>) => writeJson(SONG_FEEL_KEY, feels);
+
+// ---------- Taste Decoded ----------
+
+const DECODED_SEEN_KEY = `${STORAGE_PREFIX}:decodedSeen`;
+/** Finding ids already shown on the Decoded page; any other finding is new. */
+export const loadDecodedSeen = () => readJson<string[]>(DECODED_SEEN_KEY, []);
+export const saveDecodedSeen = (ids: string[]) => writeJson(DECODED_SEEN_KEY, ids);
+
+const DECODED_VOTES_KEY = `${STORAGE_PREFIX}:decodedVotes`;
+export const loadDecodedVotes = () => readJson<DecodedVotes>(DECODED_VOTES_KEY, {});
+export const saveDecodedVotes = (votes: DecodedVotes) => writeJson(DECODED_VOTES_KEY, votes);

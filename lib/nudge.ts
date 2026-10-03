@@ -25,3 +25,25 @@ export async function ensureWeeklyNudge(): Promise<void> {
     // ignore
   }
 }
+
+/**
+ * Points the weekly reminder at new text. Only when notifications are already allowed: this never asks
+ * (the ask stays with the first blind like, above). Cancel first, since Expo's docs don't promise that
+ * reusing an id replaces the old one.
+ */
+export async function setWeeklyNudge(content: { title: string; body: string; url: string }): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    if (!(await Notifications.getPermissionsAsync()).granted) return;
+    const current = (await Notifications.getAllScheduledNotificationsAsync()).find((n) => n.identifier === NUDGE.id);
+    if (current?.content.title === content.title && current?.content.body === content.body) return;
+    await Notifications.cancelScheduledNotificationAsync(NUDGE.id);
+    await Notifications.scheduleNotificationAsync({
+      identifier: NUDGE.id,
+      content: { title: content.title, body: content.body, data: { url: content.url } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, ...NUDGE.trigger },
+    });
+  } catch {
+    // ignore
+  }
+}

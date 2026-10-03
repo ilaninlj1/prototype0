@@ -24,6 +24,7 @@ import { SaveFlightLayer } from '@/components/save-flight';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
 import { PlaybackProvider } from '@/hooks/use-playback';
+import { refreshDecodedNews } from '@/hooks/use-taste-decoded';
 import { startTwinSync } from '@/lib/twins-api';
 
 export const unstable_settings = {
@@ -54,12 +55,14 @@ if (Platform.OS !== 'web') {
 }
 
 export default function RootLayout() {
-  // Tapping the weekly "Called it" reminder opens the Liked list.
+  // Tapping the weekly reminder opens the Liked list, or the Decoded page when it announced a finding.
   useEffect(() => {
     if (Platform.OS === 'web') return;
     startTwinSync(); // Taste Twins members: saves and unsaves follow them to the server
+    refreshDecodedNews(); // the YOU dot and Sunday reminder for a finding nobody has opened
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      if (response.notification.request.content.data?.url === '/modal') router.push('/modal');
+      const url = response.notification.request.content.data?.url;
+      if (url === '/modal' || url === '/decoded') router.push(url);
     });
     return () => sub.remove();
   }, []);
@@ -111,6 +114,7 @@ export default function RootLayout() {
             <Stack.Screen name="charts" options={{ headerShown: false }} />
             <Stack.Screen name="song" options={{ headerShown: false }} />
             <Stack.Screen name="art" options={{ headerShown: false }} />
+            <Stack.Screen name="decoded" options={{ headerShown: false }} />
             <Stack.Screen name="dj-picks" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="twins" options={{ headerShown: false }} />
             <Stack.Screen name="twin" options={{ headerShown: false }} />

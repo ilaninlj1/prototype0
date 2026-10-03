@@ -16,6 +16,42 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-10-02] Finds News — what happened to your finds while you were away
+The return loop that goes with Taste Decoded (`docs/superpowers/specs/2026-10-02-taste-decoded-design.md`).
+One "While you were gone" strip, fed by, most frequent first: a found artist's **new release** (one daily
+server lookup per artist, shared by everyone, so it stays inside the iTunes limit); **first finder** ("you
+found it first, 6 people saved it since", needs saves uploaded, opt-in like Twins); **listener milestones**
+(10K/50K/100K or +25%, much more common than today's "doubled"); a **twin** saving your find; and the rare big
+moments, a **KEXP play** or a **chart entry**. The existing Sunday reminder would carry the real news.
+
+Odds check (2026-10-02, `chart_snapshots` 9/30–10/2 × 18 countries, KEXP plays over 3 days, matched by
+artist name against the 15,069 pool artists): on a chart / on KEXP, under 10K listeners 0.21% / 0.09%,
+10K–100K 0.38% / 0.40%, 100K–1M 1.07% / 2.58%, 1M+ 6.37% / 10.52%. So chart and KEXP news is rare for small
+finds, a few-weeks event at best, and can't be the main loop. Surprise: South African artists under 10K
+Last.fm listeners (DJ Jaivane, Young Stunna, Kidd Carder) chart at home. Last.fm undercounts scenes outside
+the US and UK, so "huge at home, unknown everywhere else" is a real thing to show. Rough numbers: 3 days of
+chart history, and name matching lets generic names ("Melody") match the wrong artist.
+
+## [2026-10-02] Called Shots — "Called it" as a deliberate call
+Today's "Called it" means the artist doubled, which takes months, and every save counts the same. Instead:
+mark up to 3 songs a week as calls on the reveal card, dated so it's a real prediction, not hindsight. A call
+hits on a chart entry, a KEXP play or a listener milestone (see Finds News for how rare each is). The
+shareable form is a **before-they-blew-up receipt**: "Found blind at 4,800 listeners, Oct 2."
+
+## [2026-10-02] Twin Bridges — twins as guides into your blind spots
+A twin's saves reach you only when they're in genres you've never saved, blind on Home, credited after the
+reveal ("Your 82% twin loves this. You've never saved Amapiano"). Both ways: "Your twin saved a song you
+found." Before there are enough users, **radio twins**: match you to KEXP shows by what they play
+(`lib/dj-picks-api.ts` already reads host names) and use their new plays as bridges. Needs KEXP's OK first
+(see DJ Picks below).
+
+## [2026-10-02] Mood dial and smooth mode — steer by measured sound
+ReccoBeats already returns 9 measurements per clip (checked 2026-10-02); Taste Decoded keeps 8. A **mood
+dial** (late night / focus / hype) steers the feed by energy and mood instead of genre names. **Smooth mode**
+picks the next song to match key and tempo so swiping feels like a DJ mix, and pairs with "Crossfade between
+tracks while dragging" below. Smooth mode needs key, which ReccoBeats doesn't return; it would come from
+Essentia on a server (the 2026-09-17 spike), and tempo is shaky on 30s clips.
+
 ## [2026-09-30] DJ Picks — a blind mode of what real radio DJs played today
 Research (2026-09-30): the most-liked advice on finding music is human curation — college radio,
 record-store owners, artists' own playlists — not algorithms. KEXP's open feed

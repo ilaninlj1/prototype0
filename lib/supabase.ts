@@ -123,3 +123,18 @@ export const reportAiArtist = (artistKey: string, deviceId: string) => post('ai_
 
 /** Artists reported as AI by 3+ different phones. */
 export const fetchReportedAiArtists = () => get<{ artist_key: string }[]>('ai_reported?select=artist_key');
+
+/** One "Sounds like me" / "Nope" on a Taste Decoded finding (supabase/decoded-votes.sql). Anonymous: no device or user id. */
+export async function sendDecodedVote(v: { kind: string; measure: string; side: string; agree: boolean }): Promise<boolean> {
+  if (!URL_ROOT || !KEY) return false;
+  try {
+    const res = await fetch(`${URL_ROOT}/rest/v1/decoded_votes`, {
+      method: 'POST',
+      headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify(v),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
