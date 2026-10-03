@@ -30,6 +30,15 @@ export type SpotifyLike = {
   addedAt: number;
   /** '' for a liked song, else the playlist you added it to. */
   from: string;
+  /**
+   * 'file' when it came from a file you imported (Exportify); absent when it came from the
+   * Spotify login. Only file songs feed stats and the truly blind feed: Spotify's Developer
+   * Policy forbids deriving metrics or profiles from data read through its API.
+   */
+  source?: 'file';
+  /** File songs only: Spotify's 0-100 popularity when exported, and the album's release year. */
+  popularity?: number;
+  released?: number;
 };
 
 export const spotifyTrackUrl = (id: string) => `https://open.spotify.com/track/${id}`;

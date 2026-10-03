@@ -60,6 +60,8 @@ import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
 import { ART, collageRects, type ArtCanvas, type Mark } from '@/lib/collage';
 import { hideFromDiscovery, shouldSkip } from '@/lib/human-check-api';
+import { alreadyKnown, setKnownArtists } from '@/lib/known-artists';
+import { loadSpotifyLibrary } from '@/lib/spotify-api';
 
 function randomGenre(): string {
   return GENRES[Math.floor(Math.random() * GENRES.length)];
@@ -261,11 +263,14 @@ export default function HomeScreen() {
 
   useEffect(() => {
     (async () => {
-      const [history, genres, loadedRegion] = await Promise.all([
+      const [history, genres, loadedRegion, spotifyFile] = await Promise.all([
         loadSwipeHistory(),
         loadDiscoveredGenres(),
         loadRegion(),
+        loadSpotifyLibrary('file'),
       ]);
+      // Truly blind: artists from an imported Spotify file never come up blind.
+      setKnownArtists(spotifyFile?.likes ?? []);
       setSwipeHistory(history);
       setDiscoveredGenres(genres);
       setRegion(loadedRegion);
@@ -310,7 +315,7 @@ export default function HomeScreen() {
           (strategy.type === 'artist'
             ? fetchForStrategy(strategy, activeRegion)
             : getTracks(activePreset, strategy.genre, excludeArtists).then((tracks) => tracks.map(trackToDiscoveryTrack))
-          ).then((tracks) => tracks.filter((t) => !hideFromDiscovery(t.artistName))) // human-only unless AI music is on
+          ).then((tracks) => tracks.filter((t) => !hideFromDiscovery(t.artistName) && !alreadyKnown(t.artistName))) // human-only unless AI music is on; never an artist already in your Spotify
       );
       if (refillEpochRef.current !== epoch) return;
 
