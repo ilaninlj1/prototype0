@@ -4,6 +4,7 @@ import type { DiscoveryTrack, SwipeEntry } from './discovery.ts';
 import type { SpotifyLike } from './spotify.ts';
 import {
   biggest,
+  calledStories,
   decades,
   decisionSpeed,
   findClock,
@@ -217,4 +218,31 @@ test('newToYou: share of blind finds whose artists are nowhere in your Spotify',
   const finds = [find(1, 'Drake', 1, 1), find(2, 'Tiny Band', 1, 2), find(3, 'Other', 1, 3), find(4, 'Drake', 1, 4)];
   assert.deepEqual(newToYou(finds, [song('Drake')]), { fresh: 2, of: 4, share: 0.5 });
   assert.equal(newToYou(finds, []), null, 'no Spotify file, nothing to compare');
+});
+
+// ---------- The Called It story ----------
+
+test('calledStories: finds that grew since you found them, biggest growth first', () => {
+  const finds = [
+    find(1, 'Grew A Lot', 26_400, at(2026, 9, 30)),
+    find(2, 'Grew A Little', 10_000, at(2026, 9, 1)),
+    find(3, 'Shrank', 50_000, at(2026, 8, 1)),
+    find(4, 'No Count Then', undefined, at(2026, 8, 1)),
+    find(5, 'No Count Now', 1_000, at(2026, 8, 1)),
+    find(6, 'Grew A Lot', 26_400, at(2026, 10, 1)),
+  ];
+  const now = { 'Grew A Lot': 68_500, 'Grew A Little': 10_500, Shrank: 40_000, 'No Count Then': 9_999 };
+  const stories = calledStories(finds, now);
+  assert.deepEqual(
+    stories.map((s) => [s.track.artistName, s.pct]),
+    [
+      ['Grew A Lot', 159],
+      ['Grew A Little', 5],
+    ],
+    'one story per artist, from the first time you found them'
+  );
+  assert.equal(stories[0].track.id, 1);
+  assert.equal(stories[0].found, 26_400);
+  assert.equal(stories[0].now, 68_500);
+  assert.deepEqual(calledStories([], {}), []);
 });

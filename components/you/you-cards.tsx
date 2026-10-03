@@ -13,10 +13,10 @@ import type { Tier } from '@/lib/you-stats';
 // still reads at a glance. The iceberg, receipt and festival poster are drawn exactly as
 // they're shared, like the Decoded share card.
 
-/** Saves a card as a picture and opens the share sheet. */
-export async function shareCard(ref: RefObject<View | null>, title: string) {
+/** Saves a card as a picture and opens the share sheet. `size` sets the picture's pixels (an Instagram story: 1080×1920). */
+export async function shareCard(ref: RefObject<View | null>, title: string, size?: { width: number; height: number }) {
   try {
-    const uri = await captureRef(ref, { format: 'png', quality: 1, result: 'tmpfile' });
+    const uri = await captureRef(ref, { format: 'png', quality: 1, result: 'tmpfile', ...size });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: title });
   } catch {

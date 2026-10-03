@@ -11,6 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { MiniPlayer } from '@/components/mini-player';
 import { NoteSheet } from '@/components/note-sheet';
 import { PressableScale } from '@/components/pressable-scale';
+import { CalledItStory } from '@/components/you/called-it-story';
 import {
   Bars,
   Clock,
@@ -52,6 +53,7 @@ import { setNote } from '@/lib/saved-songs';
 import { FILE_FAIL_TEXT, importAndKeepFile, loadSpotifyLibrary, type SpotifyLibrary } from '@/lib/spotify-api';
 import {
   biggest,
+  calledStories,
   compact,
   decades,
   decisionSpeed,
@@ -91,6 +93,8 @@ export default function ProfileScreen() {
   const icebergRef = useRef<View>(null);
   const receiptRef = useRef<View>(null);
   const posterRef = useRef<View>(null);
+  const storyRef = useRef<View>(null);
+  const [storyAt, setStoryAt] = useState(0);
   const decoded = useTasteDecoded(finds, history);
 
   // Tap a cover in the Tasteform to hear it. Leaving the tab stops it and
@@ -178,6 +182,10 @@ export default function ProfileScreen() {
     called: calledIt.length,
   });
   const bill = receipt(finds, 10);
+  // The Instagram story: the find that's grown most since you saved it, or the next one.
+  const stories = calledStories(finds, now);
+  const story = stories.length ? stories[storyAt % stories.length] : null;
+  const storyWidth = Math.min(360, width - 2 * Spacing.lg);
   const songs = spotifyFile?.likes ?? [];
   const age = listeningAge(songs);
   const popular = mainstream(songs);
@@ -220,6 +228,31 @@ export default function ProfileScreen() {
             </ThemedText>
           ) : (
             <>
+              {story ? (
+                <View style={styles.story}>
+                  <CalledItStory cardRef={storyRef} story={story} width={storyWidth} />
+                  <View style={styles.storyActions}>
+                    <PressableScale
+                      onPress={() => shareCard(storyRef, 'Share your Called It story', { width: 1080, height: 1920 })}
+                      style={styles.storyShare}>
+                      <Ionicons name="logo-instagram" size={18} color={Colors.accentText} />
+                      <ThemedText style={[Ui.label, styles.storyShareText]}>Share to Instagram</ThemedText>
+                    </PressableScale>
+                    {stories.length > 1 && (
+                      <PressableScale onPress={() => setStoryAt((i) => i + 1)} style={Ui.outlineButton}>
+                        <ThemedText style={Ui.label}>
+                          Next find · {(storyAt % stories.length) + 1}/{stories.length}
+                        </ThemedText>
+                      </PressableScale>
+                    )}
+                  </View>
+                </View>
+              ) : (
+                <ThemedText style={styles.dim}>
+                  When an artist you found blind starts growing, your Called It story shows up here, ready for Instagram.
+                </ThemedText>
+              )}
+
               <TypeBadge name={kind.name} why={kind.why} />
               <Tasteform
                 liked={finds}
@@ -540,5 +573,24 @@ const styles = StyleSheet.create({
   },
   importButton: {
     alignSelf: 'flex-start',
+  },
+  story: {
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  storyActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  // The one filled button on the page: cream with navy text, the app's main-action style.
+  storyShare: {
+    ...Ui.outlineButton,
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  storyShareText: {
+    color: Colors.accentText,
   },
 });

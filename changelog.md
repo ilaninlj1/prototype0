@@ -17,6 +17,13 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-03] Called It: an Instagram story of the find that blew up most
+The top of the You tab is now a story card sized for Instagram (shared at 1080×1920). It shows the find whose
+artist has grown most since you saved it blind: the cover, "I found them before I knew who it was", a line from
+their Last.fm listeners on the day you saved it to now (only the two real ends are labeled), and the growth in
+big red. Share to Instagram opens the share sheet, and Next find steps through every find that has grown. Picked
+from mockups of five story ideas; logic in `calledStories` (`lib/you-stats.ts`).
+
 ## [2026-10-03] You page: your listening, worked out; truly blind feed; Spotify file import
 The You tab is now a scroll of cards, each one big number and one plain sentence, built from what people most
 want to know about their listening (Wrapped, stats.fm, Obscurify, Icebergify, Instafest, and the CHI 2026

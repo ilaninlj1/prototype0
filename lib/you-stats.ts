@@ -266,3 +266,27 @@ export function newToYou(finds: DiscoveryTrack[], songs: SpotifyLike[]): { fresh
   const fresh = finds.filter((f) => !artistsIn(f.artistName).some((a) => known.has(a))).length;
   return { fresh, of: finds.length, share: fresh / finds.length };
 }
+
+// ---------- The Called It story ----------
+
+export type CalledStory = { track: DiscoveryTrack; found: number; now: number; pct: number };
+
+/**
+ * The Instagram story's subject: finds whose artist has grown since you found them blind,
+ * biggest growth first, one per artist (the first time you found them). Both numbers are
+ * real Last.fm counts: at the moment you saved it, and the latest.
+ */
+export function calledStories(finds: DiscoveryTrack[], now: Record<string, number>): CalledStory[] {
+  const first = new Map<string, DiscoveryTrack>();
+  for (const f of [...finds].filter((f) => f.likedAt != null).sort((a, b) => a.likedAt! - b.likedAt!)) {
+    if (!first.has(f.artistName)) first.set(f.artistName, f);
+  }
+  return [...first.values()]
+    .flatMap((track) => {
+      const found = track.artistListeners;
+      const latest = now[track.artistName];
+      if (found == null || found <= 0 || latest == null || latest <= found) return [];
+      return [{ track, found, now: latest, pct: Math.round(((latest - found) / found) * 100) }];
+    })
+    .sort((a, b) => b.pct - a.pct);
+}
