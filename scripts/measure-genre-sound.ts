@@ -1,7 +1,7 @@
 // Builds assets/genre-sound.json: what each of the 37 genres normally sounds
 // like, for Taste Decoded (docs/superpowers/specs/2026-10-02-taste-decoded-design.md).
 // 30 songs per genre from the bundled catalogs (15 hits, 15 deep cuts), each
-// 30s preview sent to ReccoBeats one at a time, 3s apart. Answers are saved to
+// 30s preview sent to ReccoBeats one at a time, 1.5s apart. Answers are saved to
 // assets/genre-sound-raw.json as they arrive, so a stopped run (Ctrl-C, a 429)
 // picks up where it left off. ~1,100 clips, about an hour and a half.
 //
@@ -18,7 +18,7 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const RAW = path.join(ROOT, 'assets/genre-sound-raw.json');
 const OUT = path.join(ROOT, 'assets/genre-sound.json');
 const ANALYZE_URL = 'https://api.reccobeats.com/v1/analysis/audio-features';
-const GAP_MS = 3_000;
+const GAP_MS = 1_500;
 const SEED = 20261002;
 
 /** genre → previewUrl → its measurements, or 'failed' (not retried). */
@@ -29,11 +29,11 @@ const readRaw = (): Raw => (fs.existsSync(RAW) ? JSON.parse(fs.readFileSync(RAW,
 const writeRaw = (raw: Raw) => fs.writeFileSync(RAW, JSON.stringify(raw, null, 1) + '\n');
 
 async function measure(previewUrl: string): Promise<Measured | 'failed' | 'limited'> {
-  const clip = await fetch(previewUrl);
+  const clip = await fetch(previewUrl, { signal: AbortSignal.timeout(30_000) });
   if (!clip.ok) return 'failed';
   const body = new FormData();
   body.append('audioFile', new Blob([await clip.arrayBuffer()], { type: 'audio/mp4' }), 'preview.m4a');
-  const res = await fetch(ANALYZE_URL, { method: 'POST', body });
+  const res = await fetch(ANALYZE_URL, { method: 'POST', body, signal: AbortSignal.timeout(30_000) });
   if (res.status === 429) return 'limited';
   if (!res.ok) return 'failed';
   const feel = parseSongFeel(await res.json()) ?? undefined;
