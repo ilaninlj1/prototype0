@@ -3,11 +3,11 @@ import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reani
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
-import { BAND_STARTS, UNITS, type Unit } from '@/lib/rewind';
+import { BAND_STARTS, UNITS, zoneLabel, type Unit } from '@/lib/rewind';
 
-const HEIGHT = 58;
+const HEIGHT = 82;
 const THUMB = 24;
-/** The thumb rides low so it never covers the zone names along the top. */
+/** The thumb rides low so it never covers the zone names and dates along the top. */
 const RAIL = HEIGHT - 8 - THUMB / 2;
 
 type Props = {
@@ -19,16 +19,17 @@ type Props = {
   half: number;
   /** The zone the finger is in: 1 day, 2 month, 3 year; negative is earlier. 0 is none. */
   band: number;
-  canGo: (unit: Unit, dir: -1 | 1) => boolean;
+  /** Where each step would land (any time on that day), or null when there's nowhere to go. */
+  landsOn: (unit: Unit, dir: -1 | 1) => number | null;
   onTap: (unit: Unit, dir: -1 | 1) => void;
 };
 
 /**
- * The visible half of Rewind: DAY · MONTH · YEAR on both sides of a thumb.
- * Drag anywhere on the page and the thumb follows; the further it goes, the
- * bigger the step. Every zone is also a button, so tapping works too.
+ * The visible half of Rewind: DAY · MONTH · YEAR on both sides of a thumb, each
+ * with the date (and year) it lands on. Drag anywhere on the page and the thumb follows; the
+ * further it goes, the bigger the step. Every zone is also a button, so tapping works too.
  */
-export function RewindStrip({ dx, shake, half, band, canGo, onTap }: Props) {
+export function RewindStrip({ dx, shake, half, band, landsOn, onTap }: Props) {
   const reach = half - THUMB / 2 - 2;
   const thumb = useAnimatedStyle(() => ({
     transform: [{ translateX: Math.max(-reach, Math.min(reach, dx.get())) }, { scale: dx.get() === 0 ? 1 : 1.12 }],
@@ -40,19 +41,39 @@ export function RewindStrip({ dx, shake, half, band, canGo, onTap }: Props) {
       const from = BAND_STARTS[unit] * half;
       const to = (i < UNITS.length - 1 ? BAND_STARTS[UNITS[i + 1]] : 1) * half;
       const on = band === dir * (i + 1);
-      const open = canGo(unit, dir);
+      const landed = landsOn(unit, dir);
+      const open = landed != null;
+      const label = zoneLabel(unit, landed);
       return (
         <Pressable
           key={`${dir}${unit}`}
           disabled={!open}
           onPress={() => onTap(unit, dir)}
-          accessibilityLabel={`${dir < 0 ? 'Back' : 'Ahead'} a ${unit}`}
+          accessibilityLabel={`${dir < 0 ? 'Back' : 'Ahead'} a ${unit}${open ? `, to ${label.date}` : ''}`}
           style={[
             styles.zone,
             { left: half + (dir < 0 ? -to : from), width: to - from },
             on && (open ? styles.zoneOn : styles.zoneDead),
           ]}>
-          <ThemedText style={[styles.zoneText, !open && styles.zoneOff, on && open && styles.zoneTextOn]}>{unit}</ThemedText>
+          {/* Name, date, year: six characters at most, so it fits a 360pt phone; shrinks rather than wraps if not. */}
+          <ThemedText
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            style={[styles.zoneName, !open && styles.zoneOff, on && open && styles.zoneTextOn]}>
+            {label.name}
+          </ThemedText>
+          <ThemedText
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            style={[styles.zoneDate, !open && styles.zoneOff, on && open && styles.zoneTextOn]}>
+            {label.date}
+          </ThemedText>
+          <ThemedText
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            style={[styles.zoneName, !open && styles.zoneOff, on && open && styles.zoneTextOn]}>
+            {label.year}
+          </ThemedText>
         </Pressable>
       );
     })
@@ -96,7 +117,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     alignItems: 'center',
-    paddingTop: 8,
+    paddingTop: 7,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: Colors.border,
@@ -108,10 +129,20 @@ const styles = StyleSheet.create({
   zoneDead: {
     backgroundColor: Colors.surfaceElevated,
   },
-  zoneText: {
+  zoneName: {
+    ...Ui.label,
+    fontSize: 10,
+    lineHeight: 13,
+    letterSpacing: 0.5,
+    color: Colors.textSecondary,
+    paddingHorizontal: 2,
+  },
+  zoneDate: {
     ...Ui.label,
     fontSize: 11,
-    letterSpacing: 0.8,
+    lineHeight: 15,
+    letterSpacing: 0.3,
+    paddingHorizontal: 2,
   },
   zoneTextOn: {
     color: Colors.accentText,

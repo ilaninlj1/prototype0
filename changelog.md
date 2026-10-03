@@ -17,6 +17,35 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-03] Rewind: dates on every label, and the scrub only stops on days with songs
+Each DAY / MONTH / YEAR zone on the strip now shows the date that step lands on and its year, in three short
+lines (six characters at most, so it fits a 360pt phone). The zones are now the same width so they look even,
+and a zone with nowhere to go shows "—". The line above the strip always names the real date ("Back a day →
+Fri, Oct 2", never "Yesterday"), with "No songs on Oct 3, so the closest day" underneath when it lands off. When
+the title says Today or Yesterday, the small line above it shows the date. The scrub now steps only through
+days with songs; a month or year scrub steps through the same date each month or year, like a jump. It stops at
+the first and latest songs and turns around the moment you reverse, and the readout shows the real day plus
+"N days before X" when it's off.
+
+## [2026-10-03] Rewind: slide up to scrub, and Spotify playlist songs
+Drag into DAY, MONTH or YEAR, then slide up a little: the step locks, and sliding sideways walks every
+calendar day (about 14pt each), month (24pt) or year (40pt), songs or not. Above the strip, a big red readout
+shows the part you're changing ("24", "Apr", "2023") with the full date and how many songs that day has, and
+the day's songs change live as you go. Days with songs tick harder. Letting go lands there, or on the closest
+day with songs, with the "N days before" tag. In a zone, a line under the preview says "Or slide up to scroll
+through every day". The Spotify import now also brings in songs you added to your own or collaborative
+playlists (`GET /playlists/{id}/items`, the post-February-2026 name; a friend's adds to a shared playlist
+don't count). Each song comes in once (same Spotify id, or same name and artist), dated the first time you
+liked or added it. Each cover says "Liked" or "Added to <playlist>". Re-syncing asks Spotify for the two
+playlist permissions.
+
+## [2026-10-03] Rewind: same day last month, same day last year
+Rewind now always shows one day. A month jump keeps the date (Oct 5 back to Sep 5), and so does a year jump
+(Oct 5, 2025). With no songs on that exact day it lands on the closest day that has some and says so under the
+date ("3 days before Sep 5"). The day you aimed at sticks, so the next jump still aims at the 5th, not wherever
+it landed. A jump only ever moves the way you dragged; when nothing is that way the strip shakes. A short drag
+still steps to the previous day with songs and aims from there. Logic in `jump`/`offsetLabel`, `lib/rewind.ts`.
+
 ## [2026-10-03] Rewind: your Spotify liked songs, behind a switch
 A Spotify switch in Rewind's header logs in once and brings in every song you've liked on Spotify, with the day
 you liked it. Those songs show under "Liked on Spotify" in each day, month or year, and the year zone finally has

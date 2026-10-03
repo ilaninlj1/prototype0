@@ -10,8 +10,11 @@ import type { SpotifyLike } from './spotify.ts';
 export type Unit = 'day' | 'month' | 'year';
 export const UNITS: Unit[] = ['day', 'month', 'year'];
 
-/** Where each step starts, as a share of half the strip's width (the distance from the middle to either end). */
-export const BAND_STARTS: Record<Unit, number> = { day: 0.12, month: 0.45, year: 0.75 };
+/**
+ * Where each step starts, as a share of half the strip's width (the distance from the middle
+ * to either end). Equal widths, so the three zones and their dates look even.
+ */
+export const BAND_STARTS: Record<Unit, number> = { day: 0.1, month: 0.4, year: 0.7 };
 
 /** The step a drag of `distance` points (either direction) has reached, or null for a nudge. */
 export function bandFor(distance: number, half: number): Unit | null {
@@ -90,6 +93,23 @@ export function shortDate(t: number, now: number): string {
   return d.getFullYear() === new Date(now).getFullYear() ? md : `${md}, ${d.getFullYear()}`;
 }
 
+/** A date with its weekday and day of the month, never "Today": "Fri, Oct 2", "Fri, Oct 3, 2025". */
+export function fullDate(t: number, now: number): string {
+  return `${DAYS[new Date(t).getDay()]}, ${shortDate(t, now)}`;
+}
+
+/**
+ * A strip zone's three short lines: its name, the date that step lands on, and that date's
+ * year ("—" and nothing when there's nowhere to go). Six characters at most, so it fits the
+ * narrowest phone, and the same three lines in every zone, so they look even.
+ */
+export function zoneLabel(unit: Unit, landed: number | null): { name: string; date: string; year: string } {
+  const name = unit[0].toUpperCase() + unit.slice(1);
+  if (landed == null) return { name, date: '—', year: '' };
+  const d = new Date(landed);
+  return { name, date: `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`, year: String(d.getFullYear()) };
+}
+
 /** The big title: "Today", "Thu, Sep 24", "September 2026", "2026". */
 export function periodLabel(at: number, unit: Unit, now: number): string {
   const d = new Date(at);
@@ -128,9 +148,11 @@ export function agoLabel(at: number, unit: Unit, now: number): string | null {
  * Spotify likes (only when switched on) get their own short sentence after.
  */
 export function periodLine(found: number, heard: number, spotify = 0): string {
-  const liked = spotify > 0 ? `${spotify} liked on Spotify.` : '';
+  const liked = spotify > 0 ? `${spotify} from your Spotify.` : '';
+  // Scrubbing passes empty days too.
+  if (found === 0 && spotify === 0) return heard > 0 ? `No blind finds among the ${heard} you heard.` : 'No songs this day.';
   if (found === 0 && spotify > 0) {
-    if (heard === 0) return `${spotify} ${spotify === 1 ? 'song' : 'songs'} liked on Spotify.`;
+    if (heard === 0) return `${spotify} ${spotify === 1 ? 'song' : 'songs'} from your Spotify.`;
     return `No blind finds among the ${heard} you heard. ${liked}`;
   }
   const songs = `${found} ${found === 1 ? 'song' : 'songs'} found`;
@@ -143,4 +165,100 @@ export function periodLine(found: number, heard: number, spotify = 0): string {
           : `${songs}, every one you heard.`
         : `${songs}, out of ${heard} you heard.`;
   return liked ? `${first} ${liked}` : first;
+}
+
+// ---------- Same day, other months and years ----------
+// A month or year jump keeps the date: from Oct 5, back a month is Sep 5 and back a
+// year is Oct 5 last year. With no songs on that day it lands on the closest day that
+// has some, and offsetLabel says how far off that is. The wanted day sticks across
+// jumps, so Sep 5 -> (nothing, lands Sep 3) -> back a month still aims at Aug 5.
+
+/** A calendar day. d is the day you want, which can be past the end of a short month (31 in February). */
+export type Day = { y: number; m: number; d: number };
+export type Place = { at: number; want: Day; dir: -1 | 1 };
+
+export function dayOf(t: number): Day {
+  const d = new Date(t);
+  return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
+}
+
+/** The start of that day, or of the month's last day when it's shorter (Feb 31 is Feb 28). */
+export function dayStart(day: Day): number {
+  const last = new Date(day.y, day.m + 1, 0).getDate();
+  return new Date(day.y, day.m, Math.min(day.d, last)).getTime();
+}
+
+function shiftMonths(day: Day, n: number): Day {
+  const m = day.m + n;
+  return { y: day.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12, d: day.d };
+}
+
+export function shiftDay(day: Day, unit: 'month' | 'year', dir: -1 | 1): Day {
+  return unit === 'year' ? { ...day, y: day.y + dir } : shiftMonths(day, dir);
+}
+
+/**
+ * Where one step lands, or null when there's nowhere to go. A day steps to the
+ * previous (or next) day with songs. A month or year aims at the same date and takes
+ * the closest day with songs to it, as long as that's still the way you dragged.
+ */
+export function jump(times: number[], place: Place, unit: Unit, dir: -1 | 1): Place | null {
+  if (unit === 'day') {
+    const t = step(times, place.at, 'day', dir);
+    return t == null ? null : { at: t, want: dayOf(t), dir };
+  }
+  const want = shiftDay(place.want, unit, dir);
+  const aim = dayStart(want);
+  const here = periodStart(place.at, 'day');
+  let best: number | null = null;
+  let bestGap = Infinity;
+  for (const t of times) {
+    const day = periodStart(t, 'day');
+    if (dir < 0 ? day >= here : day <= here) continue;
+    const gap = Math.abs(Math.round((day - aim) / DAY_MS));
+    // A tie goes the way you're dragging.
+    if (gap < bestGap || (gap === bestGap && best != null && (dir < 0 ? t < best : t > best))) {
+      best = t;
+      bestGap = gap;
+    }
+  }
+  return best == null ? null : { at: best, want, dir };
+}
+
+/** "2 days before Sep 5" when the songs aren't on the day you aimed at; null when they are. */
+export function offsetLabel(landed: number, want: Day): string | null {
+  const aim = dayStart(want);
+  const n = daysBetween(aim, landed);
+  if (n === 0) return null;
+  return `${Math.abs(n)} ${Math.abs(n) === 1 ? 'day' : 'days'} ${n > 0 ? 'after' : 'before'} ${shortDate(aim, landed)}`;
+}
+
+// ---------- Scrubbing ----------
+// Drag into a zone, slide up a little, and the step locks: sliding sideways then walks
+// stop by stop, and every stop has songs. A day scrub stops on each day with songs; a
+// month or year scrub stops on the same date each month or year (the closest day with
+// songs, exactly like a jump).
+
+/** Every scrub stop from `place` going `dir`, nearest first, at most `max`. */
+export function scrubStops(times: number[], place: Place, unit: Unit, dir: -1 | 1, max = 500): Place[] {
+  if (unit === 'day') {
+    // Straight from the sorted song days: a big Spotify library would make repeated jumps slow.
+    const here = periodStart(place.at, 'day');
+    const days = [...new Set(times.map((t) => periodStart(t, 'day')))].sort((a, b) => a - b);
+    const way = dir < 0 ? days.filter((d) => d < here).reverse() : days.filter((d) => d > here);
+    return way.slice(0, max).map((d) => ({ at: d, want: dayOf(d), dir }));
+  }
+  const stops: Place[] = [];
+  let at: Place | null = place;
+  while (stops.length < max && (at = jump(times, at, unit, dir))) stops.push(at);
+  return stops;
+}
+
+/** The scrub readout: the part you're changing, big ("14", "Sep", "2023"), then the whole date. */
+export function scrubReadout(day: Day, unit: Unit): { big: string; small: string } {
+  const d = new Date(dayStart(day));
+  const small = `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`;
+  const big =
+    unit === 'day' ? String(d.getDate()) : unit === 'month' ? MONTHS[d.getMonth()].slice(0, 3) : String(d.getFullYear());
+  return { big, small };
 }

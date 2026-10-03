@@ -24,22 +24,29 @@ import { Cassette } from '@/components/rewind/cassette';
 import { RewindStrip } from '@/components/rewind/rewind-strip';
 import { SpotifySheet } from '@/components/rewind/spotify-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import { artworkUrl, withLikedAt, type DiscoveryTrack, type SwipeEntry } from '@/lib/discovery';
 import { loadLikedTracks, loadSwipeHistory } from '@/lib/discovery-storage';
 import {
   agoLabel,
   BAND_STARTS,
+  dayOf,
+  dayStart,
+  fullDate,
   heardIn,
   inPeriod,
+  jump,
   likesInPeriod,
+  offsetLabel,
   periodLabel,
   periodLine,
   periodStart,
+  scrubReadout,
+  scrubStops,
   shortDate,
-  step,
   UNITS,
+  type Place,
   type Unit,
 } from '@/lib/rewind';
 import { describeImport, spotifyTrackUrl, type SpotifyLike } from '@/lib/spotify';
@@ -54,6 +61,10 @@ import {
 } from '@/lib/spotify-api';
 
 const SPRING = { damping: 18, stiffness: 220 };
+/** Slide this far up while in a zone to lock it and scrub through every day, month or year. */
+const LOCK_UP = 32;
+/** Points of sideways slide per scrubbed day, month, year: days fly by, years go slower. */
+const SCRUB_STEP = [14, 24, 40];
 /** Degrees the reels turn per point dragged, and how far they whirr on each kind of jump. */
 const REEL_PER_POINT = 1.5;
 const WHIRR: Record<Unit, { turns: number; ms: number; ticks: number }> = {
@@ -67,12 +78,21 @@ const IMPACT: Record<Unit, Haptics.ImpactFeedbackStyle> = {
   year: Haptics.ImpactFeedbackStyle.Heavy,
 };
 
-type Place = { at: number; unit: Unit; dir: -1 | 1 };
-
-/** A big year of Spotify likes would be hundreds of covers; past this many, the rest is a count. */
+/** A huge playlist-import day could be hundreds of covers; past this many, the rest is a count. */
 const SPOTIFY_SHOWN_MAX = 60;
 
-const latest = (times: number[]): Place | null => (times.length ? { at: Math.max(...times), unit: 'day', dir: -1 } : null);
+/** The scrub stop `steps` away: 0 is where you locked, negative is back. */
+function stopAt(s: { back: Place[]; ahead: Place[] }, steps: number): Place | null {
+  return steps < 0 ? (s.back[-steps - 1] ?? null) : steps > 0 ? (s.ahead[steps - 1] ?? null) : null;
+}
+
+/** Always one day on screen: the latest one with songs, to start. */
+function latest(times: number[]): Place | null {
+  if (!times.length) return null;
+  // reduce, not Math.max(...): a big Spotify library is too many arguments for one call.
+  const at = times.reduce((a, b) => Math.max(a, b), -Infinity);
+  return { at, want: dayOf(at), dir: -1 };
+}
 
 /** The zone a drag of x points is in: 1 day, 2 month, 3 year, signed by direction (negative = earlier). */
 function zoneOf(x: number, half: number): number {
@@ -106,6 +126,8 @@ export default function RewindScreen() {
   const [history, setHistory] = useState<SwipeEntry[]>([]);
   const [view, setView] = useState<Place | null>(null);
   const [band, setBand] = useState(0);
+  // Scrubbing: locked to a step, walking stop by stop (only days with songs), `back` and `ahead` of where you were.
+  const [scrubbing, setScrubbing] = useState<{ unit: Unit; back: Place[]; ahead: Place[]; steps: number } | null>(null);
 
   // Spotify liked songs: kept apart from your finds, shown only while the switch is on.
   const [spotify, setSpotify] = useState<SpotifyLibrary | null>(null);
@@ -137,9 +159,12 @@ export default function RewindScreen() {
   const findTimes = useMemo(() => finds.map((t) => t.likedAt!), [finds]);
   const likes = useMemo(() => (spotifyOn && spotify ? spotify.likes : []), [spotifyOn, spotify]);
   const times = useMemo(() => (likes.length ? [...findTimes, ...likes.map((l) => l.addedAt)] : findTimes), [findTimes, likes]);
-  const shown = useMemo(() => (view ? inPeriod(finds, view.at, view.unit) : []), [finds, view]);
-  const liked = useMemo(() => (view ? likesInPeriod(likes, view.at, view.unit) : []), [likes, view]);
-  const heard = useMemo(() => (view ? heardIn(history, view.at, view.unit) : 0), [history, view]);
+  // The day on screen: the one you landed on, or while scrubbing, the stop under your finger.
+  const stop = scrubbing ? stopAt(scrubbing, scrubbing.steps) : null;
+  const shownAt = stop?.at ?? view?.at;
+  const shown = shownAt != null ? inPeriod(finds, shownAt, 'day') : [];
+  const liked = shownAt != null ? likesInPeriod(likes, shownAt, 'day') : [];
+  const heard = shownAt != null ? heardIn(history, shownAt, 'day') : 0;
   // One or two covers get drawn bigger, so a quiet day doesn't look empty.
   const sizeFor = (count: number) => {
     const columns = count <= 2 ? 2 : 3;
@@ -147,7 +172,10 @@ export default function RewindScreen() {
   };
   const cover = sizeFor(shown.length);
   const spotifyCover = sizeFor(liked.length);
-  const canGo = useCallback((unit: Unit, dir: -1 | 1) => view != null && step(times, view.at, unit, dir) != null, [times, view]);
+  const landsOn = useCallback(
+    (unit: Unit, dir: -1 | 1) => (view ? (jump(times, view, unit, dir)?.at ?? null) : null),
+    [times, view]
+  );
 
   // Playback, the same way as the Profile tab: leaving stops it.
   const { player, status } = usePlayback();
@@ -174,7 +202,7 @@ export default function RewindScreen() {
   /** After the switch or a removal: stay put if there's still something here, else go to the latest thing left. */
   function settle(left: number[], onlyFinds: boolean) {
     if (!view) return setView(latest(left));
-    if (onlyFinds && inPeriod(finds, view.at, view.unit).length === 0) setView(latest(left));
+    if (onlyFinds && inPeriod(finds, view.at, 'day').length === 0) setView(latest(left));
   }
 
   function toggleSpotify() {
@@ -206,7 +234,7 @@ export default function RewindScreen() {
   }
 
   function removeSpotify() {
-    Alert.alert('Remove your Spotify likes?', 'They’re deleted from this phone. Your Blindspot finds stay.', [
+    Alert.alert('Remove your Spotify songs?', 'They’re deleted from this phone. Your Blindspot finds stay.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -228,6 +256,13 @@ export default function RewindScreen() {
   const spinAtStart = useSharedValue(0);
   const zone = useSharedValue(0);
   const shake = useSharedValue(0);
+  // 0 while picking a zone; 1-3 once slid up into a scrub of days, months or years.
+  const mode = useSharedValue(0);
+  const lockX = useSharedValue(0);
+  const scrubStep = useSharedValue(0);
+  // How many stops there are back (negative) and ahead; 0 until locking has counted them.
+  const scrubMin = useSharedValue(0);
+  const scrubMax = useSharedValue(0);
 
   function bump() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -243,9 +278,9 @@ export default function RewindScreen() {
 
   function go(unit: Unit, dir: -1 | 1) {
     if (!view) return;
-    const target = step(times, view.at, unit, dir);
-    if (target == null) return bump();
-    setView({ at: target, unit, dir });
+    const next = jump(times, view, unit, dir);
+    if (!next) return bump();
+    setView(next);
     // A jump whirrs the reels and ticks like a tape winding, then lands with a thump sized to the jump.
     const w = WHIRR[unit];
     spin.set(withTiming(spin.get() + dir * w.turns * 360, { duration: w.ms, easing: Easing.out(Easing.cubic) }));
@@ -264,6 +299,33 @@ export default function RewindScreen() {
     else go(UNITS[Math.abs(z) - 1], z < 0 ? -1 : 1);
   }
 
+  // Locking works out every stop both ways once, and tells the gesture how far it can go,
+  // so it stops at your first and latest songs and turns around right away.
+  function onLock(u: number) {
+    if (!view) return;
+    const unit = UNITS[u - 1];
+    const back = scrubStops(times, view, unit, -1);
+    const ahead = scrubStops(times, view, unit, 1);
+    setScrubbing({ unit, back, ahead, steps: 0 });
+    scrubMin.set(-back.length);
+    scrubMax.set(ahead.length);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }
+
+  function onScrub(steps: number) {
+    setScrubbing((s) => (s ? { ...s, steps } : s));
+    Haptics.selectionAsync();
+  }
+
+  function onScrubEnd(steps: number) {
+    const landed = scrubbing && steps !== 0 ? stopAt(scrubbing, steps) : null;
+    setScrubbing(null);
+    setBand(0);
+    if (!landed) return spin.set(withSpring(spinAtStart.get(), SPRING));
+    setView(landed);
+    Haptics.impactAsync(IMPACT[scrubbing!.unit]);
+  }
+
   const scrub = Gesture.Pan()
     .activeOffsetX([-12, 12])
     .failOffsetY([-16, 16])
@@ -272,29 +334,62 @@ export default function RewindScreen() {
     })
     .onUpdate((e) => {
       const x = rubber(e.translationX, half);
-      dx.set(x);
       spin.set(spinAtStart.get() + x * REEL_PER_POINT);
+      const m = mode.get();
+      // Scrubbing: the thumb stays in the zone you locked; the reels and the readout do the moving.
+      if (m === 0) dx.set(x);
+      if (m > 0) {
+        const per = SCRUB_STEP[m - 1];
+        let steps = Math.round((e.translationX - lockX.get()) / per);
+        if (steps < scrubMin.get() || steps > scrubMax.get()) {
+          // Past the first or latest stop: hold there, and drag the start along so turning back moves at once.
+          steps = Math.max(scrubMin.get(), Math.min(scrubMax.get(), steps));
+          lockX.set(e.translationX - steps * per);
+        }
+        if (steps !== scrubStep.get()) {
+          scrubStep.set(steps);
+          runOnJS(onScrub)(steps);
+        }
+        return;
+      }
       const z = zoneOf(x, half);
       if (z !== zone.get()) {
         zone.set(z);
         runOnJS(onZone)(z);
       }
+      // In a zone and slid up: lock it, and from here sideways walks every day (month, year).
+      if (z !== 0 && e.translationY < -LOCK_UP) {
+        mode.set(Math.abs(z));
+        lockX.set(e.translationX);
+        scrubStep.set(0);
+        scrubMin.set(0);
+        scrubMax.set(0);
+        runOnJS(onLock)(Math.abs(z));
+      }
     })
     .onEnd(() => {
+      const m = mode.get();
       const z = zone.get();
       zone.set(0);
+      mode.set(0);
       dx.set(withSpring(0, SPRING));
-      runOnJS(onRelease)(z);
+      if (m > 0) runOnJS(onScrubEnd)(scrubStep.get());
+      else runOnJS(onRelease)(z);
     });
 
   // What letting go right now would do, in words.
+  // Always the real date with its day of the month (never "Yesterday"); a near miss gets its own line.
   const preview = useMemo(() => {
     if (!view || band === 0) return null;
     const unit = UNITS[Math.abs(band) - 1];
     const dir = band < 0 ? -1 : 1;
-    const target = step(times, view.at, unit, dir);
-    if (target == null) return `Nothing found ${dir < 0 ? 'before' : 'after'} this ${unit}`;
-    return `${dir < 0 ? 'Back' : 'Ahead'} a ${unit}: ${periodLabel(target, unit, now)}`;
+    const next = jump(times, view, unit, dir);
+    if (!next) return { line: `No songs ${dir < 0 ? 'before' : 'after'} this day`, sub: null };
+    const line = `${dir < 0 ? 'Back' : 'Ahead'} a ${unit} → ${fullDate(next.at, now)}`;
+    const sub = offsetLabel(next.at, next.want)
+      ? `No songs on ${shortDate(dayStart(next.want), next.at)}, so the closest day`
+      : null;
+    return { line, sub };
   }, [band, times, view, now]);
 
   if (!loaded) {
@@ -305,7 +400,11 @@ export default function RewindScreen() {
     );
   }
 
-  const ago = view ? agoLabel(view.at, view.unit, now) : null;
+  const ago = shownAt != null ? agoLabel(shownAt, 'day', now) : null;
+  const off = view && !scrubbing ? offsetLabel(view.at, view.want) : null;
+  const readout = stop && scrubbing ? scrubReadout(dayOf(stop.at), scrubbing.unit) : null;
+  const stopOff = stop ? offsetLabel(stop.at, stop.want) : null;
+  const onDay = shown.length + liked.length;
 
   return (
     <GestureDetector gesture={scrub}>
@@ -315,13 +414,13 @@ export default function RewindScreen() {
             <Ionicons name="close" size={26} color={Colors.textSecondary} />
           </Pressable>
           <Cassette spin={spin} size={72} />
-          {/* The Spotify switch: connects the first time, then shows or hides your Spotify likes. */}
+          {/* The Spotify switch: connects the first time, then shows or hides your Spotify songs. */}
           <Pressable
             onPress={toggleSpotify}
             hitSlop={8}
             accessibilityRole="switch"
             accessibilityState={{ checked: spotifyOn }}
-            accessibilityLabel="Spotify likes"
+            accessibilityLabel="Spotify songs"
             style={[styles.chip, spotifyOn && styles.chipOn]}>
             {importing != null ? (
               <ActivityIndicator size="small" color={Colors.text} />
@@ -356,13 +455,22 @@ export default function RewindScreen() {
           <>
             <ScrollView style={styles.flex} contentContainerStyle={styles.scroll}>
               <Animated.View
-                key={`${view.unit}-${periodStart(view.at, view.unit)}`}
-                entering={(view.dir < 0 ? FadeInLeft : FadeInRight).duration(260)}
+                key={periodStart(shownAt!, 'day')}
+                // While scrubbing the day changes many times a second: no fade, it flips like a book.
+                entering={scrubbing ? undefined : (view.dir < 0 ? FadeInLeft : FadeInRight).duration(260)}
                 style={styles.period}>
-                <ThemedText type="eyebrow">{ago ?? 'Rewind'}</ThemedText>
+                {/* "Today" and "Yesterday" get their date up here, so the day of the month is always on screen. */}
+                <ThemedText type="eyebrow">{ago ?? fullDate(shownAt!, now)}</ThemedText>
                 <ThemedText type="hero" numberOfLines={1} adjustsFontSizeToFit>
-                  {periodLabel(view.at, view.unit, now)}
+                  {periodLabel(shownAt!, 'day', now)}
                 </ThemedText>
+                {/* No songs on the day you aimed at: say how far these are from it. */}
+                {off && (
+                  <View style={styles.off}>
+                    <Ionicons name="locate" size={14} color={Colors.text} />
+                    <ThemedText style={styles.offText}>{off}</ThemedText>
+                  </View>
+                )}
                 <ThemedText style={styles.dim}>{periodLine(shown.length, heard, liked.length)}</ThemedText>
                 {shown.length > 0 && liked.length > 0 && (
                   <ThemedText type="eyebrow" style={styles.group}>
@@ -374,7 +482,10 @@ export default function RewindScreen() {
                     {shown.map((t, i) => {
                       const picked = nowPlaying?.id === t.id;
                       return (
-                        <Animated.View key={t.id} entering={FadeIn.delay(Math.min(i, 12) * 30)} style={{ width: cover }}>
+                        <Animated.View
+                          key={t.id}
+                          entering={scrubbing ? undefined : FadeIn.delay(Math.min(i, 12) * 30)}
+                          style={{ width: cover }}>
                           <Pressable onPress={() => togglePlay(t)} accessibilityLabel={`${t.trackName} by ${t.artistName}`}>
                             <Image
                               source={{ uri: artworkUrl(t.artworkUrl100, 300) }}
@@ -391,8 +502,6 @@ export default function RewindScreen() {
                             <ThemedText style={styles.artist} numberOfLines={1}>
                               {t.artistName}
                             </ThemedText>
-                            {/* The title already has the year. */}
-                            {view.unit !== 'day' && <ThemedText style={styles.date}>{shortDate(t.likedAt!, view.at)}</ThemedText>}
                           </Pressable>
                         </Animated.View>
                       );
@@ -404,23 +513,15 @@ export default function RewindScreen() {
                   <>
                     <View style={[styles.group, styles.groupRow]}>
                       <FontAwesome name="spotify" size={14} color={Colors.textSecondary} />
-                      <ThemedText type="eyebrow">Liked on Spotify</ThemedText>
+                      <ThemedText type="eyebrow">From your Spotify</ThemedText>
                     </View>
                     <View style={styles.grid}>
                       {liked.slice(0, SPOTIFY_SHOWN_MAX).map((l, i) => (
-                        <SpotifyCover
-                          key={l.id}
-                          like={l}
-                          size={spotifyCover}
-                          delay={Math.min(i, 12) * 30}
-                          date={view.unit !== 'day' ? shortDate(l.addedAt, view.at) : null}
-                        />
+                        <SpotifyCover key={l.id} like={l} size={spotifyCover} delay={scrubbing ? null : Math.min(i, 12) * 30} />
                       ))}
                     </View>
                     {liked.length > SPOTIFY_SHOWN_MAX && (
-                      <ThemedText style={styles.dim}>
-                        And {liked.length - SPOTIFY_SHOWN_MAX} more. Drag a shorter way to see a month or a day.
-                      </ThemedText>
+                      <ThemedText style={styles.dim}>And {liked.length - SPOTIFY_SHOWN_MAX} more that day.</ThemedText>
                     )}
                   </>
                 )}
@@ -454,10 +555,32 @@ export default function RewindScreen() {
             )}
 
             <View style={[styles.controls, { paddingBottom: insets.bottom + Spacing.md }]}>
-              <ThemedText style={[styles.hint, preview != null && styles.hintOn]} numberOfLines={1}>
-                {preview ?? 'Drag left to go back. Further jumps a month, then a year.'}
-              </ThemedText>
-              <RewindStrip dx={dx} shake={shake} half={half} band={band} canGo={canGo} onTap={go} />
+              {/* Fixed height, so the strip never moves under your finger as this changes. */}
+              <View style={styles.status}>
+                {readout ? (
+                  <View style={styles.readout}>
+                    <ThemedText style={styles.readoutBig}>{readout.big}</ThemedText>
+                    <View>
+                      <ThemedText style={styles.readoutDate}>{readout.small}</ThemedText>
+                      <ThemedText style={styles.readoutCount}>
+                        {onDay} {onDay === 1 ? 'song' : 'songs'} · {stopOff ?? 'let go to land'}
+                      </ThemedText>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <ThemedText style={[styles.hint, preview != null && styles.hintOn]} numberOfLines={1}>
+                      {preview?.line ?? 'Drag left to go back a day, month or year.'}
+                    </ThemedText>
+                    {band !== 0 && (
+                      <ThemedText style={styles.hintSub} numberOfLines={1}>
+                        {preview?.sub ?? `Or slide up to scroll through every ${UNITS[Math.abs(band) - 1]}`}
+                      </ThemedText>
+                    )}
+                  </>
+                )}
+              </View>
+              <RewindStrip dx={dx} shake={shake} half={half} band={band} landsOn={landsOn} onTap={go} />
             </View>
           </>
         )}
@@ -468,9 +591,9 @@ export default function RewindScreen() {
 }
 
 /** A Spotify like: its cover with Spotify's mark, opening the song in Spotify (their rules: Spotify content links back to Spotify). */
-function SpotifyCover({ like, size, delay, date }: { like: SpotifyLike; size: number; delay: number; date: string | null }) {
+function SpotifyCover({ like, size, delay }: { like: SpotifyLike; size: number; delay: number | null }) {
   return (
-    <Animated.View entering={FadeIn.delay(delay)} style={{ width: size }}>
+    <Animated.View entering={delay == null ? undefined : FadeIn.delay(delay)} style={{ width: size }}>
       <Pressable
         onPress={() => Linking.openURL(spotifyTrackUrl(like.id))}
         accessibilityLabel={`${like.name} by ${like.artist}, open in Spotify`}>
@@ -484,7 +607,9 @@ function SpotifyCover({ like, size, delay, date }: { like: SpotifyLike; size: nu
         <ThemedText style={styles.artist} numberOfLines={1}>
           {like.artist}
         </ThemedText>
-        {date && <ThemedText style={styles.date}>{date}</ThemedText>}
+        <ThemedText style={styles.from} numberOfLines={1}>
+          {like.from ? `Added to ${like.from}` : 'Liked'}
+        </ThemedText>
       </Pressable>
     </Animated.View>
   );
@@ -630,10 +755,29 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     color: Colors.textSecondary,
   },
-  date: {
-    ...Ui.label,
-    fontSize: 10,
+  // Where a Spotify song came from: liked, or added to which playlist.
+  from: {
+    fontSize: 11,
+    lineHeight: 15,
     color: Colors.textTertiary,
+  },
+  // How far the songs are from the day you aimed at: a cream outline, read right after the date.
+  off: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: Colors.hairline,
+    borderRadius: Radius.sm,
+    marginBottom: Spacing.xs,
+  },
+  offText: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '600',
   },
   controls: {
     paddingHorizontal: Spacing.lg,
@@ -641,6 +785,40 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.rule,
+  },
+  status: {
+    height: 48,
+    justifyContent: 'center',
+  },
+  readout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.md,
+  },
+  // The part you're scrubbing, in the app's one red: a big number.
+  readoutBig: {
+    fontFamily: Fonts.display,
+    fontSize: 40,
+    lineHeight: 46,
+    color: Colors.signal,
+    fontVariant: ['tabular-nums'],
+  },
+  readoutDate: {
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: '700',
+  },
+  readoutCount: {
+    fontSize: 13,
+    lineHeight: 17,
+    color: Colors.textSecondary,
+  },
+  hintSub: {
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
+    color: Colors.textTertiary,
   },
   hint: {
     fontSize: 14,

@@ -9,14 +9,16 @@ import {
   readQuery,
   safeReturnUrl,
   SPOTIFY_CLIENT_ID,
+  mergeSaves,
   toLike,
+  toPlaylistAdd,
   tokenBody,
   unpackState,
   verifierFrom,
   type SpotifyLike,
 } from './spotify';
 
-// The network and storage half of Spotify liked songs (see lib/spotify.ts for the why).
+// The network and storage half of your Spotify songs, liked and playlist adds (see lib/spotify.ts for the why).
 // Nothing is kept from the login: one pass reads your liked songs and the token is dropped.
 // "Sync again" just logs in again, which Spotify skips through once you've said yes.
 
@@ -104,10 +106,50 @@ export async function importSpotifyLikes(onProgress: (count: number) => void): P
       next = page.next ?? null;
       if (next) await sleep(120);
     }
+    likes.push(...(await readPlaylistAdds(token, (n) => onProgress(likes.length + n))));
   } catch {
     return 'offline';
   }
-  return likes;
+  return mergeSaves(likes);
+}
+
+/**
+ * Songs you added to your own (or shared) playlists. Spotify only shows the contents of
+ * those anyway; a playlist it won't read is skipped rather than failing the whole import.
+ */
+async function readPlaylistAdds(token: string, onProgress: (count: number) => void): Promise<SpotifyLike[]> {
+  const meRes = await get('https://api.spotify.com/v1/me', token);
+  const me: string | null = meRes.ok ? ((await meRes.json()).id ?? null) : null;
+  const playlists: { id: string; name: string }[] = [];
+  let next: string | null = 'https://api.spotify.com/v1/me/playlists?limit=50';
+  while (next) {
+    const res = await get(next, token);
+    if (!res.ok) break;
+    const page = await res.json();
+    for (const p of page.items ?? []) {
+      if (p?.id && (p.owner?.id === me || p.collaborative)) playlists.push({ id: p.id, name: p.name ?? 'a playlist' });
+    }
+    next = page.next ?? null;
+    if (next) await sleep(120);
+  }
+
+  const adds: SpotifyLike[] = [];
+  for (const playlist of playlists) {
+    let page: string | null = `https://api.spotify.com/v1/playlists/${playlist.id}/items?limit=100`;
+    while (page) {
+      const res = await get(page, token);
+      if (!res.ok) break;
+      const body = await res.json();
+      for (const row of body.items ?? []) {
+        const add = toPlaylistAdd(row, playlist.name, me);
+        if (add) adds.push(add);
+      }
+      onProgress(adds.length);
+      page = body.next ?? null;
+      await sleep(120);
+    }
+  }
+  return adds;
 }
 
 // ---------- Storage ----------
