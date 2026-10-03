@@ -17,6 +17,13 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-03] Rewind: same day last month, same day last year
+Rewind now always shows one day. A month jump keeps the date (Oct 5 back to Sep 5), and so does a year jump
+(Oct 5, 2025). With no songs on that exact day it lands on the closest day that has some and says so under the
+date ("3 days before Sep 5"). The day you aimed at sticks, so the next jump still aims at the 5th, not wherever
+it landed. A jump only ever moves the way you dragged; when nothing is that way the strip shakes. A short drag
+still steps to the previous day with songs and aims from there. Logic in `jump`/`offsetLabel`, `lib/rewind.ts`.
+
 ## [2026-10-03] Rewind: your Spotify liked songs, behind a switch
 A Spotify switch in Rewind's header logs in once and brings in every song you've liked on Spotify, with the day
 you liked it. Those songs show under "Liked on Spotify" in each day, month or year, and the year zone finally has

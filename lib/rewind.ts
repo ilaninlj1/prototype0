@@ -144,3 +144,66 @@ export function periodLine(found: number, heard: number, spotify = 0): string {
         : `${songs}, out of ${heard} you heard.`;
   return liked ? `${first} ${liked}` : first;
 }
+
+// ---------- Same day, other months and years ----------
+// A month or year jump keeps the date: from Oct 5, back a month is Sep 5 and back a
+// year is Oct 5 last year. With no songs on that day it lands on the closest day that
+// has some, and offsetLabel says how far off that is. The wanted day sticks across
+// jumps, so Sep 5 -> (nothing, lands Sep 3) -> back a month still aims at Aug 5.
+
+/** A calendar day. d is the day you want, which can be past the end of a short month (31 in February). */
+export type Day = { y: number; m: number; d: number };
+export type Place = { at: number; want: Day; dir: -1 | 1 };
+
+export function dayOf(t: number): Day {
+  const d = new Date(t);
+  return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
+}
+
+/** The start of that day, or of the month's last day when it's shorter (Feb 31 is Feb 28). */
+export function dayStart(day: Day): number {
+  const last = new Date(day.y, day.m + 1, 0).getDate();
+  return new Date(day.y, day.m, Math.min(day.d, last)).getTime();
+}
+
+export function shiftDay(day: Day, unit: 'month' | 'year', dir: -1 | 1): Day {
+  if (unit === 'year') return { ...day, y: day.y + dir };
+  const m = day.m + dir;
+  return { y: day.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12, d: day.d };
+}
+
+/**
+ * Where one step lands, or null when there's nowhere to go. A day steps to the
+ * previous (or next) day with songs. A month or year aims at the same date and takes
+ * the closest day with songs to it, as long as that's still the way you dragged.
+ */
+export function jump(times: number[], place: Place, unit: Unit, dir: -1 | 1): Place | null {
+  if (unit === 'day') {
+    const t = step(times, place.at, 'day', dir);
+    return t == null ? null : { at: t, want: dayOf(t), dir };
+  }
+  const want = shiftDay(place.want, unit, dir);
+  const aim = dayStart(want);
+  const here = periodStart(place.at, 'day');
+  let best: number | null = null;
+  let bestGap = Infinity;
+  for (const t of times) {
+    const day = periodStart(t, 'day');
+    if (dir < 0 ? day >= here : day <= here) continue;
+    const gap = Math.abs(Math.round((day - aim) / DAY_MS));
+    // A tie goes the way you're dragging.
+    if (gap < bestGap || (gap === bestGap && best != null && (dir < 0 ? t < best : t > best))) {
+      best = t;
+      bestGap = gap;
+    }
+  }
+  return best == null ? null : { at: best, want, dir };
+}
+
+/** "2 days before Sep 5" when the songs aren't on the day you aimed at; null when they are. */
+export function offsetLabel(landed: number, want: Day): string | null {
+  const aim = dayStart(want);
+  const n = daysBetween(aim, landed);
+  if (n === 0) return null;
+  return `${Math.abs(n)} ${Math.abs(n) === 1 ? 'day' : 'days'} ${n > 0 ? 'after' : 'before'} ${shortDate(aim, landed)}`;
+}

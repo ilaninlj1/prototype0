@@ -1,7 +1,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { DiscoveryTrack, SwipeEntry } from './discovery.ts';
-import { agoLabel, bandFor, heardIn, inPeriod, likesInPeriod, periodLabel, periodLine, periodStart, step } from './rewind.ts';
+import {
+  agoLabel,
+  bandFor,
+  dayStart,
+  heardIn,
+  inPeriod,
+  jump,
+  likesInPeriod,
+  offsetLabel,
+  periodLabel,
+  periodLine,
+  periodStart,
+  shiftDay,
+  step,
+} from './rewind.ts';
 import type { SpotifyLike } from './spotify.ts';
 
 // Local time, so the tests pass in any timezone.
@@ -150,4 +164,62 @@ test('likesInPeriod keeps Spotify likes from that day, month or year, newest fir
     likesInPeriod(likes, at(2019, 1, 1), 'year').map((l) => l.id),
     ['c', 'b', 'a']
   );
+});
+
+// ---------- Same day, other months and years ----------
+
+const day = (y: number, m: number, d: number) => ({ y, m: m - 1, d });
+const start = (y: number, m: number, d: number) => new Date(y, m - 1, d).getTime();
+
+test('shiftDay keeps the day of the month, even past a short month', () => {
+  assert.deepEqual(shiftDay(day(2026, 10, 5), 'month', -1), day(2026, 9, 5));
+  assert.deepEqual(shiftDay(day(2026, 1, 5), 'month', -1), day(2025, 12, 5), 'back over New Year');
+  assert.deepEqual(shiftDay(day(2026, 12, 5), 'month', 1), day(2027, 1, 5));
+  assert.deepEqual(shiftDay(day(2024, 2, 29), 'year', -1), day(2023, 2, 29), 'the wanted day stays 29');
+  assert.equal(dayStart(day(2023, 2, 29)), start(2023, 2, 28), 'but lands on the last day there is');
+  assert.equal(dayStart(day(2026, 2, 31)), start(2026, 2, 28));
+  assert.deepEqual(
+    shiftDay(shiftDay(day(2026, 1, 31), 'month', 1), 'month', 1),
+    day(2026, 3, 31),
+    'Feb 28 in between does not drag it to the 28th'
+  );
+});
+
+const songs = [at(2024, 9, 5), at(2025, 9, 3), at(2025, 10, 5), at(2026, 9, 5), at(2026, 9, 8), at(2026, 10, 5)];
+const here = (y: number, m: number, d: number) => ({ at: at(y, m, d), want: day(y, m, d), dir: -1 as const });
+
+test('jump by month lands on the same day when there are songs on it', () => {
+  const next = jump(songs, here(2026, 10, 5), 'month', -1);
+  assert.equal(periodStart(next!.at, 'day'), start(2026, 9, 5));
+  assert.deepEqual(next!.want, day(2026, 9, 5));
+});
+
+test('jump by year lands on the same day last year, or the closest day with songs', () => {
+  const exact = jump(songs, here(2026, 10, 5), 'year', -1);
+  assert.equal(periodStart(exact!.at, 'day'), start(2025, 10, 5));
+  const near = jump(songs, here(2026, 9, 5), 'year', -1);
+  assert.equal(periodStart(near!.at, 'day'), start(2025, 9, 3), 'nothing on Sep 5, 2025: Sep 3 is 2 days off');
+  assert.deepEqual(near!.want, day(2025, 9, 5), 'still aiming at the 5th');
+  const again = jump(songs, near!, 'year', -1);
+  assert.equal(periodStart(again!.at, 'day'), start(2024, 9, 5), 'and the next jump aims at Sep 5, 2024, not the 3rd');
+});
+
+test('jump never lands on the day you are on or the wrong way', () => {
+  assert.equal(jump(songs, here(2026, 10, 5), 'month', 1), null, 'nothing after the latest song');
+  assert.equal(jump(songs, here(2024, 9, 5), 'year', -1), null, 'nothing before the first');
+  const back = jump(songs, here(2026, 9, 8), 'month', -1);
+  assert.equal(periodStart(back!.at, 'day'), start(2026, 9, 5), 'Aug 8 has nothing; Sep 5 is closest and still earlier');
+});
+
+test('jump by day steps to the previous day with songs and aims there', () => {
+  const next = jump(songs, here(2026, 9, 8), 'day', -1);
+  assert.equal(periodStart(next!.at, 'day'), start(2026, 9, 5));
+  assert.deepEqual(next!.want, day(2026, 9, 5));
+});
+
+test('offsetLabel says how far the songs are from the day you aimed at', () => {
+  assert.equal(offsetLabel(at(2025, 9, 3), day(2025, 9, 5)), '2 days before Sep 5');
+  assert.equal(offsetLabel(at(2025, 9, 6), day(2025, 9, 5)), '1 day after Sep 5');
+  assert.equal(offsetLabel(at(2025, 9, 5, 22), day(2025, 9, 5)), null, 'right on it');
+  assert.equal(offsetLabel(at(2019, 4, 2), day(2018, 10, 5)), '179 days after Oct 5, 2018');
 });

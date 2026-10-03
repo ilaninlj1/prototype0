@@ -31,15 +31,19 @@ import { loadLikedTracks, loadSwipeHistory } from '@/lib/discovery-storage';
 import {
   agoLabel,
   BAND_STARTS,
+  dayOf,
+  dayStart,
   heardIn,
   inPeriod,
+  jump,
   likesInPeriod,
+  offsetLabel,
   periodLabel,
   periodLine,
   periodStart,
   shortDate,
-  step,
   UNITS,
+  type Place,
   type Unit,
 } from '@/lib/rewind';
 import { describeImport, spotifyTrackUrl, type SpotifyLike } from '@/lib/spotify';
@@ -67,12 +71,15 @@ const IMPACT: Record<Unit, Haptics.ImpactFeedbackStyle> = {
   year: Haptics.ImpactFeedbackStyle.Heavy,
 };
 
-type Place = { at: number; unit: Unit; dir: -1 | 1 };
-
-/** A big year of Spotify likes would be hundreds of covers; past this many, the rest is a count. */
+/** A huge playlist-import day could be hundreds of covers; past this many, the rest is a count. */
 const SPOTIFY_SHOWN_MAX = 60;
 
-const latest = (times: number[]): Place | null => (times.length ? { at: Math.max(...times), unit: 'day', dir: -1 } : null);
+/** Always one day on screen: the latest one with songs, to start. */
+function latest(times: number[]): Place | null {
+  if (!times.length) return null;
+  const at = Math.max(...times);
+  return { at, want: dayOf(at), dir: -1 };
+}
 
 /** The zone a drag of x points is in: 1 day, 2 month, 3 year, signed by direction (negative = earlier). */
 function zoneOf(x: number, half: number): number {
@@ -137,9 +144,9 @@ export default function RewindScreen() {
   const findTimes = useMemo(() => finds.map((t) => t.likedAt!), [finds]);
   const likes = useMemo(() => (spotifyOn && spotify ? spotify.likes : []), [spotifyOn, spotify]);
   const times = useMemo(() => (likes.length ? [...findTimes, ...likes.map((l) => l.addedAt)] : findTimes), [findTimes, likes]);
-  const shown = useMemo(() => (view ? inPeriod(finds, view.at, view.unit) : []), [finds, view]);
-  const liked = useMemo(() => (view ? likesInPeriod(likes, view.at, view.unit) : []), [likes, view]);
-  const heard = useMemo(() => (view ? heardIn(history, view.at, view.unit) : 0), [history, view]);
+  const shown = useMemo(() => (view ? inPeriod(finds, view.at, 'day') : []), [finds, view]);
+  const liked = useMemo(() => (view ? likesInPeriod(likes, view.at, 'day') : []), [likes, view]);
+  const heard = useMemo(() => (view ? heardIn(history, view.at, 'day') : 0), [history, view]);
   // One or two covers get drawn bigger, so a quiet day doesn't look empty.
   const sizeFor = (count: number) => {
     const columns = count <= 2 ? 2 : 3;
@@ -147,7 +154,7 @@ export default function RewindScreen() {
   };
   const cover = sizeFor(shown.length);
   const spotifyCover = sizeFor(liked.length);
-  const canGo = useCallback((unit: Unit, dir: -1 | 1) => view != null && step(times, view.at, unit, dir) != null, [times, view]);
+  const canGo = useCallback((unit: Unit, dir: -1 | 1) => view != null && jump(times, view, unit, dir) != null, [times, view]);
 
   // Playback, the same way as the Profile tab: leaving stops it.
   const { player, status } = usePlayback();
@@ -174,7 +181,7 @@ export default function RewindScreen() {
   /** After the switch or a removal: stay put if there's still something here, else go to the latest thing left. */
   function settle(left: number[], onlyFinds: boolean) {
     if (!view) return setView(latest(left));
-    if (onlyFinds && inPeriod(finds, view.at, view.unit).length === 0) setView(latest(left));
+    if (onlyFinds && inPeriod(finds, view.at, 'day').length === 0) setView(latest(left));
   }
 
   function toggleSpotify() {
@@ -243,9 +250,9 @@ export default function RewindScreen() {
 
   function go(unit: Unit, dir: -1 | 1) {
     if (!view) return;
-    const target = step(times, view.at, unit, dir);
-    if (target == null) return bump();
-    setView({ at: target, unit, dir });
+    const next = jump(times, view, unit, dir);
+    if (!next) return bump();
+    setView(next);
     // A jump whirrs the reels and ticks like a tape winding, then lands with a thump sized to the jump.
     const w = WHIRR[unit];
     spin.set(withTiming(spin.get() + dir * w.turns * 360, { duration: w.ms, easing: Easing.out(Easing.cubic) }));
@@ -292,9 +299,10 @@ export default function RewindScreen() {
     if (!view || band === 0) return null;
     const unit = UNITS[Math.abs(band) - 1];
     const dir = band < 0 ? -1 : 1;
-    const target = step(times, view.at, unit, dir);
-    if (target == null) return `Nothing found ${dir < 0 ? 'before' : 'after'} this ${unit}`;
-    return `${dir < 0 ? 'Back' : 'Ahead'} a ${unit}: ${periodLabel(target, unit, now)}`;
+    const next = jump(times, view, unit, dir);
+    if (!next) return `No songs ${dir < 0 ? 'before' : 'after'} this day`;
+    const off = offsetLabel(next.at, next.want) ? ` · closest to ${shortDate(dayStart(next.want), next.at)}` : '';
+    return `${dir < 0 ? 'Back' : 'Ahead'} a ${unit}: ${periodLabel(next.at, 'day', now)}${off}`;
   }, [band, times, view, now]);
 
   if (!loaded) {
@@ -305,7 +313,8 @@ export default function RewindScreen() {
     );
   }
 
-  const ago = view ? agoLabel(view.at, view.unit, now) : null;
+  const ago = view ? agoLabel(view.at, 'day', now) : null;
+  const off = view ? offsetLabel(view.at, view.want) : null;
 
   return (
     <GestureDetector gesture={scrub}>
@@ -356,13 +365,20 @@ export default function RewindScreen() {
           <>
             <ScrollView style={styles.flex} contentContainerStyle={styles.scroll}>
               <Animated.View
-                key={`${view.unit}-${periodStart(view.at, view.unit)}`}
+                key={periodStart(view.at, 'day')}
                 entering={(view.dir < 0 ? FadeInLeft : FadeInRight).duration(260)}
                 style={styles.period}>
                 <ThemedText type="eyebrow">{ago ?? 'Rewind'}</ThemedText>
                 <ThemedText type="hero" numberOfLines={1} adjustsFontSizeToFit>
-                  {periodLabel(view.at, view.unit, now)}
+                  {periodLabel(view.at, 'day', now)}
                 </ThemedText>
+                {/* No songs on the day you aimed at: say how far these are from it. */}
+                {off && (
+                  <View style={styles.off}>
+                    <Ionicons name="locate" size={14} color={Colors.text} />
+                    <ThemedText style={styles.offText}>{off}</ThemedText>
+                  </View>
+                )}
                 <ThemedText style={styles.dim}>{periodLine(shown.length, heard, liked.length)}</ThemedText>
                 {shown.length > 0 && liked.length > 0 && (
                   <ThemedText type="eyebrow" style={styles.group}>
@@ -391,8 +407,6 @@ export default function RewindScreen() {
                             <ThemedText style={styles.artist} numberOfLines={1}>
                               {t.artistName}
                             </ThemedText>
-                            {/* The title already has the year. */}
-                            {view.unit !== 'day' && <ThemedText style={styles.date}>{shortDate(t.likedAt!, view.at)}</ThemedText>}
                           </Pressable>
                         </Animated.View>
                       );
@@ -408,19 +422,11 @@ export default function RewindScreen() {
                     </View>
                     <View style={styles.grid}>
                       {liked.slice(0, SPOTIFY_SHOWN_MAX).map((l, i) => (
-                        <SpotifyCover
-                          key={l.id}
-                          like={l}
-                          size={spotifyCover}
-                          delay={Math.min(i, 12) * 30}
-                          date={view.unit !== 'day' ? shortDate(l.addedAt, view.at) : null}
-                        />
+                        <SpotifyCover key={l.id} like={l} size={spotifyCover} delay={Math.min(i, 12) * 30} />
                       ))}
                     </View>
                     {liked.length > SPOTIFY_SHOWN_MAX && (
-                      <ThemedText style={styles.dim}>
-                        And {liked.length - SPOTIFY_SHOWN_MAX} more. Drag a shorter way to see a month or a day.
-                      </ThemedText>
+                      <ThemedText style={styles.dim}>And {liked.length - SPOTIFY_SHOWN_MAX} more that day.</ThemedText>
                     )}
                   </>
                 )}
@@ -468,7 +474,7 @@ export default function RewindScreen() {
 }
 
 /** A Spotify like: its cover with Spotify's mark, opening the song in Spotify (their rules: Spotify content links back to Spotify). */
-function SpotifyCover({ like, size, delay, date }: { like: SpotifyLike; size: number; delay: number; date: string | null }) {
+function SpotifyCover({ like, size, delay }: { like: SpotifyLike; size: number; delay: number }) {
   return (
     <Animated.View entering={FadeIn.delay(delay)} style={{ width: size }}>
       <Pressable
@@ -484,7 +490,6 @@ function SpotifyCover({ like, size, delay, date }: { like: SpotifyLike; size: nu
         <ThemedText style={styles.artist} numberOfLines={1}>
           {like.artist}
         </ThemedText>
-        {date && <ThemedText style={styles.date}>{date}</ThemedText>}
       </Pressable>
     </Animated.View>
   );
@@ -630,10 +635,23 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     color: Colors.textSecondary,
   },
-  date: {
-    ...Ui.label,
-    fontSize: 10,
-    color: Colors.textTertiary,
+  // How far the songs are from the day you aimed at: a cream outline, read right after the date.
+  off: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: Colors.hairline,
+    borderRadius: Radius.sm,
+    marginBottom: Spacing.xs,
+  },
+  offText: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '600',
   },
   controls: {
     paddingHorizontal: Spacing.lg,
