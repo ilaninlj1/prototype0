@@ -67,8 +67,9 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
-  // The public website only serves Blind Pack links. Every other screen uses
-  // Last.fm, whose terms need written approval for public web pages.
+  // The public website only serves Blind Pack links (and the page Spotify's login
+  // returns to). Every other screen uses Last.fm, whose terms need written approval
+  // for public web pages.
   const pathname = usePathname();
   const [fontsLoaded] = useFonts({
     Archivo_700Bold,
@@ -84,7 +85,7 @@ export default function RootLayout() {
     Caveat_700Bold,
   });
   if (!fontsLoaded) return <View style={styles.boot} />;
-  if (Platform.OS === 'web' && pathname !== '/pack') {
+  if (Platform.OS === 'web' && pathname !== '/pack' && pathname !== '/spotify-callback') {
     return (
       <View style={styles.webLanding}>
         <ThemedText type="title">Blindspot</ThemedText>
@@ -115,6 +116,9 @@ export default function RootLayout() {
             <Stack.Screen name="song" options={{ headerShown: false }} />
             <Stack.Screen name="art" options={{ headerShown: false }} />
             <Stack.Screen name="decoded" options={{ headerShown: false }} />
+            <Stack.Screen name="rewind" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+            <Stack.Screen name="spotify-auth" options={{ presentation: 'transparentModal', animation: 'none', headerShown: false }} />
+            <Stack.Screen name="spotify-callback" options={{ headerShown: false }} />
             <Stack.Screen name="dj-picks" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="twins" options={{ headerShown: false }} />
             <Stack.Screen name="twin" options={{ headerShown: false }} />
