@@ -17,6 +17,18 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-03] Rewind: slide up to scrub, and Spotify playlist songs
+Drag into DAY, MONTH or YEAR, then slide up a little: the step locks, and sliding sideways walks every
+calendar day (about 14pt each), month (24pt) or year (40pt), songs or not. Above the strip, a big red readout
+shows the part you're changing ("24", "Apr", "2023") with the full date and how many songs that day has, and
+the day's songs change live as you go. Days with songs tick harder. Letting go lands there, or on the closest
+day with songs, with the "N days before" tag. In a zone, a line under the preview says "Or slide up to scroll
+through every day". The Spotify import now also brings in songs you added to your own or collaborative
+playlists (`GET /playlists/{id}/items`, the post-February-2026 name; a friend's adds to a shared playlist
+don't count). Each song comes in once (same Spotify id, or same name and artist), dated the first time you
+liked or added it. Each cover says "Liked" or "Added to <playlist>". Re-syncing asks Spotify for the two
+playlist permissions.
+
 ## [2026-10-03] Rewind: same day last month, same day last year
 Rewind now always shows one day. A month jump keeps the date (Oct 5 back to Sep 5), and so does a year jump
 (Oct 5, 2025). With no songs on that exact day it lands on the closest day that has some and says so under the

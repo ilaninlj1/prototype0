@@ -4,17 +4,18 @@ import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-nati
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
 
-/** Before the first Spotify login: what it brings in, what it doesn't touch, and who can use it. */
+/** Before the first Spotify login: what it brings in (likes and playlist adds), what it doesn't touch, and who can use it. */
 export function SpotifySheet({ visible, onConnect, onClose }: { visible: boolean; onConnect: () => void; onClose: () => void }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <ThemedText style={Ui.label}>Spotify</ThemedText>
-          <ThemedText type="subtitle">Bring in your Spotify likes</ThemedText>
+          <ThemedText type="subtitle">Bring in your Spotify songs</ThemedText>
           <ThemedText style={styles.text}>
-            Rewind adds every song you&apos;ve liked on Spotify, on the day you liked it. They stay apart from what you found
-            blind: they don&apos;t count as finds and don&apos;t join your shape. Nothing leaves your phone.
+            Rewind adds every song you&apos;ve liked on Spotify or added to your playlists, on the day you saved it, each song
+            once. They stay apart from what you found blind: they don&apos;t count as finds and don&apos;t join your shape.
+            Nothing leaves your phone.
           </ThemedText>
           <ThemedText style={styles.small}>For now Spotify only lets accounts on this app&apos;s test list connect.</ThemedText>
           <View style={styles.actions}>

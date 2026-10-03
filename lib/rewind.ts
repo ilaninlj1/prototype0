@@ -128,9 +128,11 @@ export function agoLabel(at: number, unit: Unit, now: number): string | null {
  * Spotify likes (only when switched on) get their own short sentence after.
  */
 export function periodLine(found: number, heard: number, spotify = 0): string {
-  const liked = spotify > 0 ? `${spotify} liked on Spotify.` : '';
+  const liked = spotify > 0 ? `${spotify} from your Spotify.` : '';
+  // Scrubbing passes empty days too.
+  if (found === 0 && spotify === 0) return heard > 0 ? `No blind finds among the ${heard} you heard.` : 'No songs this day.';
   if (found === 0 && spotify > 0) {
-    if (heard === 0) return `${spotify} ${spotify === 1 ? 'song' : 'songs'} liked on Spotify.`;
+    if (heard === 0) return `${spotify} ${spotify === 1 ? 'song' : 'songs'} from your Spotify.`;
     return `No blind finds among the ${heard} you heard. ${liked}`;
   }
   const songs = `${found} ${found === 1 ? 'song' : 'songs'} found`;
@@ -167,9 +169,7 @@ export function dayStart(day: Day): number {
 }
 
 export function shiftDay(day: Day, unit: 'month' | 'year', dir: -1 | 1): Day {
-  if (unit === 'year') return { ...day, y: day.y + dir };
-  const m = day.m + dir;
-  return { y: day.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12, d: day.d };
+  return unit === 'year' ? { ...day, y: day.y + dir } : shiftMonths(day, dir);
 }
 
 /**
@@ -206,4 +206,45 @@ export function offsetLabel(landed: number, want: Day): string | null {
   const n = daysBetween(aim, landed);
   if (n === 0) return null;
   return `${Math.abs(n)} ${Math.abs(n) === 1 ? 'day' : 'days'} ${n > 0 ? 'after' : 'before'} ${shortDate(aim, landed)}`;
+}
+
+// ---------- Scrubbing ----------
+// Drag into a zone, slide up a little, and the step locks: sliding sideways then walks
+// every calendar day (or month, or year) one at a time, songs or not, and letting go
+// lands on that day or the closest one with songs.
+
+/** `steps` days, months or years from `base`. A day scrub starts from a real day (Feb 31 is Feb 28). */
+export function scrubDay(base: Day, unit: Unit, steps: number): Day {
+  if (unit === 'month') return shiftMonths(base, steps);
+  if (unit === 'year') return { ...base, y: base.y + steps };
+  return dayOf(dayStart(base) + steps * DAY_MS + 12 * 60 * 60 * 1000);
+}
+
+function shiftMonths(day: Day, n: number): Day {
+  const m = day.m + n;
+  return { y: day.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12, d: day.d };
+}
+
+/** The closest day with songs to `day`, either way (a tie goes earlier). */
+export function land(times: number[], day: Day, dir: -1 | 1): Place | null {
+  const aim = dayStart(day);
+  let best: number | null = null;
+  let bestGap = Infinity;
+  for (const t of times) {
+    const gap = Math.abs(Math.round((periodStart(t, 'day') - aim) / DAY_MS));
+    if (gap < bestGap || (gap === bestGap && best != null && t < best)) {
+      best = t;
+      bestGap = gap;
+    }
+  }
+  return best == null ? null : { at: best, want: day, dir };
+}
+
+/** The scrub readout: the part you're changing, big ("14", "Sep", "2023"), then the whole date. */
+export function scrubReadout(day: Day, unit: Unit): { big: string; small: string } {
+  const d = new Date(dayStart(day));
+  const small = `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`;
+  const big =
+    unit === 'day' ? String(d.getDate()) : unit === 'month' ? MONTHS[d.getMonth()].slice(0, 3) : String(d.getFullYear());
+  return { big, small };
 }

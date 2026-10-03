@@ -8,11 +8,14 @@ import {
   heardIn,
   inPeriod,
   jump,
+  land,
   likesInPeriod,
   offsetLabel,
   periodLabel,
   periodLine,
   periodStart,
+  scrubDay,
+  scrubReadout,
   shiftDay,
   step,
 } from './rewind.ts';
@@ -147,14 +150,19 @@ test('periodLine is one plain sentence', () => {
 });
 
 test('periodLine adds Spotify likes when they are switched on', () => {
-  assert.equal(periodLine(3, 41, 12), '3 songs found, out of 41 you heard. 12 liked on Spotify.');
-  assert.equal(periodLine(0, 0, 1), '1 song liked on Spotify.', 'a Spotify-only day says just that');
-  assert.equal(periodLine(0, 20, 5), 'No blind finds among the 20 you heard. 5 liked on Spotify.');
+  assert.equal(periodLine(3, 41, 12), '3 songs found, out of 41 you heard. 12 from your Spotify.');
+  assert.equal(periodLine(0, 0, 1), '1 song from your Spotify.', 'a Spotify-only day says just that');
+  assert.equal(periodLine(0, 20, 5), 'No blind finds among the 20 you heard. 5 from your Spotify.');
   assert.equal(periodLine(2, 0, 0), '2 songs found.', 'Spotify on but nothing liked there that day');
 });
 
+test('periodLine on an empty day, which scrubbing passes through', () => {
+  assert.equal(periodLine(0, 0, 0), 'No songs this day.');
+  assert.equal(periodLine(0, 14, 0), 'No blind finds among the 14 you heard.');
+});
+
 test('likesInPeriod keeps Spotify likes from that day, month or year, newest first', () => {
-  const like = (id: string, addedAt: number): SpotifyLike => ({ id, name: id, artist: '', art: '', addedAt });
+  const like = (id: string, addedAt: number): SpotifyLike => ({ id, name: id, artist: '', art: '', addedAt, from: '' });
   const likes = [like('a', at(2019, 4, 2)), like('b', at(2019, 4, 2, 20)), like('c', at(2019, 5, 1)), like('d', at(2020, 1, 1))];
   assert.deepEqual(
     likesInPeriod(likes, at(2019, 4, 2), 'day').map((l) => l.id),
@@ -222,4 +230,35 @@ test('offsetLabel says how far the songs are from the day you aimed at', () => {
   assert.equal(offsetLabel(at(2025, 9, 6), day(2025, 9, 5)), '1 day after Sep 5');
   assert.equal(offsetLabel(at(2025, 9, 5, 22), day(2025, 9, 5)), null, 'right on it');
   assert.equal(offsetLabel(at(2019, 4, 2), day(2018, 10, 5)), '179 days after Oct 5, 2018');
+});
+
+// ---------- Scrubbing: slide up to lock a step, then slide through every day, month or year ----------
+
+test('scrubDay walks every calendar day, month or year from where you locked', () => {
+  assert.deepEqual(scrubDay(day(2026, 9, 29), 'day', 3), day(2026, 10, 2), 'over a month end');
+  assert.deepEqual(scrubDay(day(2026, 3, 1), 'day', -1), day(2026, 2, 28));
+  assert.deepEqual(scrubDay(day(2026, 1, 31), 'month', 1), day(2026, 2, 31), 'months keep the wanted day');
+  assert.equal(dayStart(scrubDay(day(2026, 1, 31), 'month', 1)), start(2026, 2, 28));
+  assert.deepEqual(scrubDay(day(2026, 9, 5), 'year', -3), day(2023, 9, 5));
+  assert.deepEqual(scrubDay(day(2026, 2, 31), 'day', 0), day(2026, 2, 28), 'a day scrub starts from a real day');
+});
+
+test('land goes to the scrubbed day, or the closest day with songs either way', () => {
+  const exact = land(songs, day(2025, 10, 5), -1);
+  assert.equal(periodStart(exact!.at, 'day'), start(2025, 10, 5));
+  const near = land(songs, day(2025, 9, 1), -1);
+  assert.equal(periodStart(near!.at, 'day'), start(2025, 9, 3), 'closest can be after the day you stopped on');
+  assert.deepEqual(near!.want, day(2025, 9, 1));
+  assert.equal(land([], day(2025, 9, 1), -1), null);
+});
+
+test('scrubReadout puts the step you are scrubbing in big type', () => {
+  assert.deepEqual(scrubReadout(day(2026, 9, 14), 'day'), { big: '14', small: 'Mon, Sep 14, 2026' });
+  assert.deepEqual(scrubReadout(day(2026, 9, 14), 'month'), { big: 'Sep', small: 'Mon, Sep 14, 2026' });
+  assert.deepEqual(scrubReadout(day(2023, 9, 14), 'year'), { big: '2023', small: 'Thu, Sep 14, 2023' });
+  assert.deepEqual(
+    scrubReadout(day(2026, 2, 31), 'month'),
+    { big: 'Feb', small: 'Sat, Feb 28, 2026' },
+    'a short month shows its last day'
+  );
 });

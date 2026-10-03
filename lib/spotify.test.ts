@@ -5,11 +5,13 @@ import {
   base64Url,
   callbackTarget,
   describeImport,
+  mergeSaves,
   packState,
   readQuery,
   safeReturnUrl,
   SPOTIFY_REDIRECT,
   toLike,
+  toPlaylistAdd,
   unpackState,
   verifierFrom,
 } from './spotify.ts';
@@ -43,7 +45,7 @@ test('authorizeUrl asks Spotify for liked songs only, with PKCE', () => {
   assert.equal(q.redirect_uri, SPOTIFY_REDIRECT);
   assert.equal(q.code_challenge_method, 'S256');
   assert.equal(q.code_challenge, 'xyz');
-  assert.equal(q.scope, 'user-library-read');
+  assert.equal(q.scope, 'user-library-read playlist-read-private playlist-read-collaborative');
   assert.equal(unpackState(q.state)?.returnUrl, APP);
 });
 
@@ -88,7 +90,14 @@ test('toLike keeps what Rewind shows, with the date you liked it', () => {
       },
     },
   };
-  assert.deepEqual(toLike(item), { id: 'T1', name: 'Song', artist: 'A, B', art: 'mid', addedAt: Date.UTC(2019, 3, 2, 21, 15) });
+  assert.deepEqual(toLike(item), {
+    id: 'T1',
+    name: 'Song',
+    artist: 'A, B',
+    art: 'mid',
+    addedAt: Date.UTC(2019, 3, 2, 21, 15),
+    from: '',
+  });
   assert.equal(toLike({ added_at: '2019-04-02T21:15:00Z', track: null }), null, 'removed songs come back as null');
   assert.equal(toLike({ added_at: 'garbage', track: item.track }), null);
   assert.equal(toLike({ added_at: '2019-04-02T21:15:00Z', track: { ...item.track, album: { images: [] } } })?.art, '');
@@ -96,18 +105,75 @@ test('toLike keeps what Rewind shows, with the date you liked it', () => {
 
 test('describeImport sums up what came in', () => {
   const now = at(2026, 10, 3);
-  const like = (addedAt: number) => ({ id: String(addedAt), name: '', artist: '', art: '', addedAt });
+  const like = (addedAt: number) => ({ id: String(addedAt), name: '', artist: '', art: '', addedAt, from: '' });
+  const many = Array.from({ length: 1234 }, () => like(at(2026, 1, 1)));
   assert.equal(
     describeImport([like(at(2019, 4, 2)), like(at(2026, 9, 1)), like(at(2021, 1, 1))], now),
-    '3 liked songs, back to 2019.'
+    '3 songs from your Spotify, back to 2019.'
   );
-  assert.equal(describeImport([like(at(2026, 9, 1))], now), '1 liked song, from this year.');
-  assert.equal(describeImport([], now), 'No liked songs on that Spotify account yet.');
+  assert.equal(describeImport([like(at(2026, 9, 1))], now), '1 song from your Spotify, from this year.');
+  assert.equal(describeImport([], now), 'No liked or playlist songs on that Spotify account yet.');
+  assert.equal(describeImport(many, now), '1,234 songs from your Spotify, from this year.');
+});
+
+const track = (id: string | null, name = 'Song', artist = 'A') => ({
+  id,
+  type: 'track',
+  name,
+  artists: [{ name: artist }],
+  album: { images: [{ url: 'mid', width: 300 }] },
+});
+
+test('toPlaylistAdd keeps songs you added, with the playlist they went in', () => {
+  const row = { added_at: '2021-06-01T10:00:00Z', added_by: { id: 'me' }, item: track('T1') };
+  assert.deepEqual(toPlaylistAdd(row, 'Road trip', 'me'), {
+    id: 'T1',
+    name: 'Song',
+    artist: 'A',
+    art: 'mid',
+    addedAt: Date.UTC(2021, 5, 1, 10),
+    from: 'Road trip',
+  });
   assert.equal(
-    describeImport(
-      Array.from({ length: 1234 }, () => like(at(2026, 1, 1))),
-      now
-    ),
-    '1,234 liked songs, from this year.'
+    toPlaylistAdd({ ...row, added_by: { id: 'friend' } }, 'Shared', 'me'),
+    null,
+    'a friend added it to a shared playlist'
+  );
+  assert.equal(toPlaylistAdd({ ...row, added_at: null }, 'Old', 'me'), null, 'very old playlists have no dates');
+  assert.equal(
+    toPlaylistAdd({ ...row, item: { ...track('E1'), type: 'episode' } }, 'Pods', 'me'),
+    null,
+    'podcasts are not songs'
+  );
+  assert.equal(toPlaylistAdd({ ...row, item: track(null) }, 'Local', 'me'), null, 'local files have no Spotify id');
+  const oldShape = { added_at: '2021-06-01T10:00:00Z', added_by: { id: 'me' }, track: track('T2') };
+  assert.equal(toPlaylistAdd(oldShape, 'X', 'me')?.id, 'T2', 'the old field name still works');
+});
+
+test('mergeSaves keeps one of each song, from the first time you saved it', () => {
+  const s = (id: string, addedAt: number, from = '', name = 'Song ' + id, artist = 'A') => ({
+    id,
+    name,
+    artist,
+    art: '',
+    addedAt,
+    from,
+  });
+  const merged = mergeSaves([
+    s('T1', at(2024, 5, 1)),
+    s('T1', at(2021, 2, 2), 'Road trip'),
+    s('T2', at(2023, 1, 1), 'Gym'),
+    s('T2', at(2023, 3, 3), 'Sleep'),
+    s('T3', at(2022, 1, 1), '', 'Hello', 'Adele'),
+    s('T4', at(2020, 1, 1), 'Mix', 'hello ', 'ADELE'),
+  ]);
+  assert.deepEqual(
+    merged.map((m) => [m.id, m.from]),
+    [
+      ['T2', 'Gym'],
+      ['T1', 'Road trip'],
+      ['T4', 'Mix'],
+    ],
+    'newest first; liked and in a playlist counts once, and so does the same name and artist on another id'
   );
 });
