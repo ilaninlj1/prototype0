@@ -17,6 +17,16 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-03] Rewind: dates on every label, and the scrub only stops on days with songs
+Each DAY / MONTH / YEAR zone on the strip now shows the date that step lands on and its year, in three short
+lines (six characters at most, so it fits a 360pt phone). The zones are now the same width so they look even,
+and a zone with nowhere to go shows "—". The line above the strip always names the real date ("Back a day →
+Fri, Oct 2", never "Yesterday"), with "No songs on Oct 3, so the closest day" underneath when it lands off. When
+the title says Today or Yesterday, the small line above it shows the date. The scrub now steps only through
+days with songs; a month or year scrub steps through the same date each month or year, like a jump. It stops at
+the first and latest songs and turns around the moment you reverse, and the readout shows the real day plus
+"N days before X" when it's off.
+
 ## [2026-10-03] Rewind: slide up to scrub, and Spotify playlist songs
 Drag into DAY, MONTH or YEAR, then slide up a little: the step locks, and sliding sideways walks every
 calendar day (about 14pt each), month (24pt) or year (40pt), songs or not. Above the strip, a big red readout

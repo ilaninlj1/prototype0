@@ -3,21 +3,23 @@ import { test } from 'node:test';
 import type { DiscoveryTrack, SwipeEntry } from './discovery.ts';
 import {
   agoLabel,
+  BAND_STARTS,
   bandFor,
   dayStart,
+  fullDate,
   heardIn,
   inPeriod,
   jump,
-  land,
   likesInPeriod,
   offsetLabel,
   periodLabel,
   periodLine,
   periodStart,
-  scrubDay,
   scrubReadout,
+  scrubStops,
   shiftDay,
   step,
+  zoneLabel,
 } from './rewind.ts';
 import type { SpotifyLike } from './spotify.ts';
 
@@ -234,22 +236,26 @@ test('offsetLabel says how far the songs are from the day you aimed at', () => {
 
 // ---------- Scrubbing: slide up to lock a step, then slide through every day, month or year ----------
 
-test('scrubDay walks every calendar day, month or year from where you locked', () => {
-  assert.deepEqual(scrubDay(day(2026, 9, 29), 'day', 3), day(2026, 10, 2), 'over a month end');
-  assert.deepEqual(scrubDay(day(2026, 3, 1), 'day', -1), day(2026, 2, 28));
-  assert.deepEqual(scrubDay(day(2026, 1, 31), 'month', 1), day(2026, 2, 31), 'months keep the wanted day');
-  assert.equal(dayStart(scrubDay(day(2026, 1, 31), 'month', 1)), start(2026, 2, 28));
-  assert.deepEqual(scrubDay(day(2026, 9, 5), 'year', -3), day(2023, 9, 5));
-  assert.deepEqual(scrubDay(day(2026, 2, 31), 'day', 0), day(2026, 2, 28), 'a day scrub starts from a real day');
+test('scrubStops for days stop only on days with songs, nearest first', () => {
+  const back = scrubStops(songs, here(2026, 10, 5), 'day', -1);
+  assert.deepEqual(
+    back.map((p) => p.at),
+    [start(2026, 9, 8), start(2026, 9, 5), start(2025, 10, 5), start(2025, 9, 3), start(2024, 9, 5)]
+  );
+  assert.deepEqual(back[0].want, day(2026, 9, 8), 'each stop aims at itself');
+  assert.deepEqual(scrubStops(songs, here(2026, 10, 5), 'day', 1), [], 'nothing after the latest');
+  assert.equal(scrubStops(songs, here(2026, 10, 5), 'day', -1, 2).length, 2, 'capped');
 });
 
-test('land goes to the scrubbed day, or the closest day with songs either way', () => {
-  const exact = land(songs, day(2025, 10, 5), -1);
-  assert.equal(periodStart(exact!.at, 'day'), start(2025, 10, 5));
-  const near = land(songs, day(2025, 9, 1), -1);
-  assert.equal(periodStart(near!.at, 'day'), start(2025, 9, 3), 'closest can be after the day you stopped on');
-  assert.deepEqual(near!.want, day(2025, 9, 1));
-  assert.equal(land([], day(2025, 9, 1), -1), null);
+test('scrubStops for months and years are jumps in a row, keeping the date', () => {
+  const years = scrubStops(songs, here(2026, 9, 5), 'year', -1);
+  assert.deepEqual(
+    years.map((p) => periodStart(p.at, 'day')),
+    [start(2025, 9, 3), start(2024, 9, 5)]
+  );
+  assert.deepEqual(years[1].want, day(2024, 9, 5), 'still aiming at the 5th');
+  const months = scrubStops(songs, here(2026, 10, 5), 'month', -1);
+  assert.equal(periodStart(months[0].at, 'day'), start(2026, 9, 5));
 });
 
 test('scrubReadout puts the step you are scrubbing in big type', () => {
@@ -261,4 +267,30 @@ test('scrubReadout puts the step you are scrubbing in big type', () => {
     { big: 'Feb', small: 'Sat, Feb 28, 2026' },
     'a short month shows its last day'
   );
+});
+
+// ---------- Dates on every label ----------
+
+test('zoneLabel: every zone shows the date it lands on and its year', () => {
+  assert.deepEqual(zoneLabel('day', at(2026, 10, 2)), { name: 'Day', date: 'Oct 2', year: '2026' });
+  assert.deepEqual(zoneLabel('month', at(2026, 9, 3)), { name: 'Month', date: 'Sep 3', year: '2026' });
+  assert.deepEqual(zoneLabel('year', at(2025, 10, 3)), { name: 'Year', date: 'Oct 3', year: '2025' });
+  assert.deepEqual(zoneLabel('year', null), { name: 'Year', date: '—', year: '' }, 'nowhere to go');
+  for (const unit of ['day', 'month', 'year'] as const) {
+    const l = zoneLabel(unit, at(2025, 12, 31));
+    assert.ok(Math.max(l.name.length, l.date.length, l.year.length) <= 6, 'six characters at most, to fit a 360pt phone');
+  }
+});
+
+test('fullDate never says Today or Yesterday, so the day of the month is always there', () => {
+  const now = at(2026, 10, 3, 9);
+  assert.equal(fullDate(at(2026, 10, 2), now), 'Fri, Oct 2');
+  assert.equal(fullDate(at(2026, 10, 3), now), 'Sat, Oct 3');
+  assert.equal(fullDate(at(2025, 10, 3), now), 'Fri, Oct 3, 2025');
+});
+
+test('equal zones: each step gets the same width of the strip', () => {
+  const width = 1 - BAND_STARTS.year;
+  assert.ok(Math.abs(BAND_STARTS.month - BAND_STARTS.day - width) < 1e-9);
+  assert.ok(Math.abs(BAND_STARTS.year - BAND_STARTS.month - width) < 1e-9);
 });

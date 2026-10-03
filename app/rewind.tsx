@@ -33,20 +33,19 @@ import {
   BAND_STARTS,
   dayOf,
   dayStart,
+  fullDate,
   heardIn,
   inPeriod,
   jump,
-  land,
   likesInPeriod,
   offsetLabel,
   periodLabel,
   periodLine,
   periodStart,
-  scrubDay,
   scrubReadout,
+  scrubStops,
   shortDate,
   UNITS,
-  type Day,
   type Place,
   type Unit,
 } from '@/lib/rewind';
@@ -81,6 +80,11 @@ const IMPACT: Record<Unit, Haptics.ImpactFeedbackStyle> = {
 
 /** A huge playlist-import day could be hundreds of covers; past this many, the rest is a count. */
 const SPOTIFY_SHOWN_MAX = 60;
+
+/** The scrub stop `steps` away: 0 is where you locked, negative is back. */
+function stopAt(s: { back: Place[]; ahead: Place[] }, steps: number): Place | null {
+  return steps < 0 ? (s.back[-steps - 1] ?? null) : steps > 0 ? (s.ahead[steps - 1] ?? null) : null;
+}
 
 /** Always one day on screen: the latest one with songs, to start. */
 function latest(times: number[]): Place | null {
@@ -122,8 +126,8 @@ export default function RewindScreen() {
   const [history, setHistory] = useState<SwipeEntry[]>([]);
   const [view, setView] = useState<Place | null>(null);
   const [band, setBand] = useState(0);
-  // Scrubbing: locked to a step, walking every day (month, year) from `base`, the day you were on.
-  const [scrubbing, setScrubbing] = useState<{ unit: Unit; base: Day; steps: number } | null>(null);
+  // Scrubbing: locked to a step, walking stop by stop (only days with songs), `back` and `ahead` of where you were.
+  const [scrubbing, setScrubbing] = useState<{ unit: Unit; back: Place[]; ahead: Place[]; steps: number } | null>(null);
 
   // Spotify liked songs: kept apart from your finds, shown only while the switch is on.
   const [spotify, setSpotify] = useState<SpotifyLibrary | null>(null);
@@ -155,13 +159,12 @@ export default function RewindScreen() {
   const findTimes = useMemo(() => finds.map((t) => t.likedAt!), [finds]);
   const likes = useMemo(() => (spotifyOn && spotify ? spotify.likes : []), [spotifyOn, spotify]);
   const times = useMemo(() => (likes.length ? [...findTimes, ...likes.map((l) => l.addedAt)] : findTimes), [findTimes, likes]);
-  // The day on screen: the one you landed on, or while scrubbing, the one under your finger.
-  const scrubDayNow = scrubbing ? scrubDay(scrubbing.base, scrubbing.unit, scrubbing.steps) : null;
-  const shownAt = scrubDayNow ? dayStart(scrubDayNow) : view?.at;
+  // The day on screen: the one you landed on, or while scrubbing, the stop under your finger.
+  const stop = scrubbing ? stopAt(scrubbing, scrubbing.steps) : null;
+  const shownAt = stop?.at ?? view?.at;
   const shown = shownAt != null ? inPeriod(finds, shownAt, 'day') : [];
   const liked = shownAt != null ? likesInPeriod(likes, shownAt, 'day') : [];
   const heard = shownAt != null ? heardIn(history, shownAt, 'day') : 0;
-  const songDays = useMemo(() => new Set(times.map((t) => periodStart(t, 'day'))), [times]);
   // One or two covers get drawn bigger, so a quiet day doesn't look empty.
   const sizeFor = (count: number) => {
     const columns = count <= 2 ? 2 : 3;
@@ -169,7 +172,10 @@ export default function RewindScreen() {
   };
   const cover = sizeFor(shown.length);
   const spotifyCover = sizeFor(liked.length);
-  const canGo = useCallback((unit: Unit, dir: -1 | 1) => view != null && jump(times, view, unit, dir) != null, [times, view]);
+  const landsOn = useCallback(
+    (unit: Unit, dir: -1 | 1) => (view ? (jump(times, view, unit, dir)?.at ?? null) : null),
+    [times, view]
+  );
 
   // Playback, the same way as the Profile tab: leaving stops it.
   const { player, status } = usePlayback();
@@ -254,6 +260,9 @@ export default function RewindScreen() {
   const mode = useSharedValue(0);
   const lockX = useSharedValue(0);
   const scrubStep = useSharedValue(0);
+  // How many stops there are back (negative) and ahead; 0 until locking has counted them.
+  const scrubMin = useSharedValue(0);
+  const scrubMax = useSharedValue(0);
 
   function bump() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -290,27 +299,31 @@ export default function RewindScreen() {
     else go(UNITS[Math.abs(z) - 1], z < 0 ? -1 : 1);
   }
 
-  // The scrub always starts from the day you're on, which can't change mid-drag,
-  // so each callback rebuilds it from `view` plus what the gesture passes.
-  function onScrub(u: number, steps: number) {
+  // Locking works out every stop both ways once, and tells the gesture how far it can go,
+  // so it stops at your first and latest songs and turns around right away.
+  function onLock(u: number) {
     if (!view) return;
     const unit = UNITS[u - 1];
-    setScrubbing({ unit, base: view.want, steps });
-    if (steps === 0) return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Days with songs tick harder, so you can feel them go by.
-    if (songDays.has(dayStart(scrubDay(view.want, unit, steps)))) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    else Haptics.selectionAsync();
+    const back = scrubStops(times, view, unit, -1);
+    const ahead = scrubStops(times, view, unit, 1);
+    setScrubbing({ unit, back, ahead, steps: 0 });
+    scrubMin.set(-back.length);
+    scrubMax.set(ahead.length);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
-  function onScrubEnd(u: number, steps: number) {
+  function onScrub(steps: number) {
+    setScrubbing((s) => (s ? { ...s, steps } : s));
+    Haptics.selectionAsync();
+  }
+
+  function onScrubEnd(steps: number) {
+    const landed = scrubbing && steps !== 0 ? stopAt(scrubbing, steps) : null;
     setScrubbing(null);
     setBand(0);
-    if (!view || steps === 0) return spin.set(withSpring(spinAtStart.get(), SPRING));
-    const unit = UNITS[u - 1];
-    const next = land(times, scrubDay(view.want, unit, steps), steps < 0 ? -1 : 1);
-    if (!next) return bump();
-    setView(next);
-    Haptics.impactAsync(IMPACT[unit]);
+    if (!landed) return spin.set(withSpring(spinAtStart.get(), SPRING));
+    setView(landed);
+    Haptics.impactAsync(IMPACT[scrubbing!.unit]);
   }
 
   const scrub = Gesture.Pan()
@@ -326,10 +339,16 @@ export default function RewindScreen() {
       // Scrubbing: the thumb stays in the zone you locked; the reels and the readout do the moving.
       if (m === 0) dx.set(x);
       if (m > 0) {
-        const steps = Math.round((e.translationX - lockX.get()) / SCRUB_STEP[m - 1]);
+        const per = SCRUB_STEP[m - 1];
+        let steps = Math.round((e.translationX - lockX.get()) / per);
+        if (steps < scrubMin.get() || steps > scrubMax.get()) {
+          // Past the first or latest stop: hold there, and drag the start along so turning back moves at once.
+          steps = Math.max(scrubMin.get(), Math.min(scrubMax.get(), steps));
+          lockX.set(e.translationX - steps * per);
+        }
         if (steps !== scrubStep.get()) {
           scrubStep.set(steps);
-          runOnJS(onScrub)(m, steps);
+          runOnJS(onScrub)(steps);
         }
         return;
       }
@@ -343,7 +362,9 @@ export default function RewindScreen() {
         mode.set(Math.abs(z));
         lockX.set(e.translationX);
         scrubStep.set(0);
-        runOnJS(onScrub)(Math.abs(z), 0);
+        scrubMin.set(0);
+        scrubMax.set(0);
+        runOnJS(onLock)(Math.abs(z));
       }
     })
     .onEnd(() => {
@@ -352,19 +373,23 @@ export default function RewindScreen() {
       zone.set(0);
       mode.set(0);
       dx.set(withSpring(0, SPRING));
-      if (m > 0) runOnJS(onScrubEnd)(m, scrubStep.get());
+      if (m > 0) runOnJS(onScrubEnd)(scrubStep.get());
       else runOnJS(onRelease)(z);
     });
 
   // What letting go right now would do, in words.
+  // Always the real date with its day of the month (never "Yesterday"); a near miss gets its own line.
   const preview = useMemo(() => {
     if (!view || band === 0) return null;
     const unit = UNITS[Math.abs(band) - 1];
     const dir = band < 0 ? -1 : 1;
     const next = jump(times, view, unit, dir);
-    if (!next) return `No songs ${dir < 0 ? 'before' : 'after'} this day`;
-    const off = offsetLabel(next.at, next.want) ? ` · closest to ${shortDate(dayStart(next.want), next.at)}` : '';
-    return `${dir < 0 ? 'Back' : 'Ahead'} a ${unit}: ${periodLabel(next.at, 'day', now)}${off}`;
+    if (!next) return { line: `No songs ${dir < 0 ? 'before' : 'after'} this day`, sub: null };
+    const line = `${dir < 0 ? 'Back' : 'Ahead'} a ${unit} → ${fullDate(next.at, now)}`;
+    const sub = offsetLabel(next.at, next.want)
+      ? `No songs on ${shortDate(dayStart(next.want), next.at)}, so the closest day`
+      : null;
+    return { line, sub };
   }, [band, times, view, now]);
 
   if (!loaded) {
@@ -377,7 +402,8 @@ export default function RewindScreen() {
 
   const ago = shownAt != null ? agoLabel(shownAt, 'day', now) : null;
   const off = view && !scrubbing ? offsetLabel(view.at, view.want) : null;
-  const readout = scrubDayNow && scrubbing ? scrubReadout(scrubDayNow, scrubbing.unit) : null;
+  const readout = stop && scrubbing ? scrubReadout(dayOf(stop.at), scrubbing.unit) : null;
+  const stopOff = stop ? offsetLabel(stop.at, stop.want) : null;
   const onDay = shown.length + liked.length;
 
   return (
@@ -433,7 +459,8 @@ export default function RewindScreen() {
                 // While scrubbing the day changes many times a second: no fade, it flips like a book.
                 entering={scrubbing ? undefined : (view.dir < 0 ? FadeInLeft : FadeInRight).duration(260)}
                 style={styles.period}>
-                <ThemedText type="eyebrow">{ago ?? 'Rewind'}</ThemedText>
+                {/* "Today" and "Yesterday" get their date up here, so the day of the month is always on screen. */}
+                <ThemedText type="eyebrow">{ago ?? fullDate(shownAt!, now)}</ThemedText>
                 <ThemedText type="hero" numberOfLines={1} adjustsFontSizeToFit>
                   {periodLabel(shownAt!, 'day', now)}
                 </ThemedText>
@@ -536,24 +563,24 @@ export default function RewindScreen() {
                     <View>
                       <ThemedText style={styles.readoutDate}>{readout.small}</ThemedText>
                       <ThemedText style={styles.readoutCount}>
-                        {onDay ? `${onDay} ${onDay === 1 ? 'song' : 'songs'}` : 'No songs'} · let go to land
+                        {onDay} {onDay === 1 ? 'song' : 'songs'} · {stopOff ?? 'let go to land'}
                       </ThemedText>
                     </View>
                   </View>
                 ) : (
                   <>
                     <ThemedText style={[styles.hint, preview != null && styles.hintOn]} numberOfLines={1}>
-                      {preview ?? 'Drag left to go back. Further jumps a month, then a year.'}
+                      {preview?.line ?? 'Drag left to go back a day, month or year.'}
                     </ThemedText>
                     {band !== 0 && (
                       <ThemedText style={styles.hintSub} numberOfLines={1}>
-                        Or slide up to scroll through every {UNITS[Math.abs(band) - 1]}
+                        {preview?.sub ?? `Or slide up to scroll through every ${UNITS[Math.abs(band) - 1]}`}
                       </ThemedText>
                     )}
                   </>
                 )}
               </View>
-              <RewindStrip dx={dx} shake={shake} half={half} band={band} canGo={canGo} onTap={go} />
+              <RewindStrip dx={dx} shake={shake} half={half} band={band} landsOn={landsOn} onTap={go} />
             </View>
           </>
         )}
