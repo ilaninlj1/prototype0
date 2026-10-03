@@ -15,6 +15,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Fonts, Ui } from '@/constants/theme';
 import { useGamePool } from '@/hooks/use-game-pool';
 import { usePlayback } from '@/hooks/use-playback';
+import { refreshDecodedNews } from '@/hooks/use-taste-decoded';
 import {
   pickTestSongs,
   scoreTest,
@@ -79,7 +80,7 @@ export default function BlindTestScreen() {
       const score = scoreTest(items, next);
       await saveBlindTest({ never, ...score, at: Date.now(), songs: testSongs(items, next) });
       // Measure all 10 now, so Taste Decoded can explain your nevers.
-      measureMissing(items.map((x) => ({ id: x.song.itunesTrackId, previewUrl: x.song.previewUrl })));
+      measureMissing(items.map((x) => ({ id: x.song.itunesTrackId, previewUrl: x.song.previewUrl }))).then(refreshDecodedNews);
     }
   }
 

@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { onSaveLanded, setYouTabTarget } from '@/components/save-flight';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
+import { onDecodedNews } from '@/hooks/use-taste-decoded';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -53,6 +54,8 @@ export function BlindspotTabBar({ state, navigation }: TabBarProps) {
       }),
     [bump]
   );
+  // A Taste Decoded finding nobody has opened lights the same dot (hooks/use-taste-decoded.ts).
+  useEffect(() => onDecodedNews(() => setUnseen(true)), []);
   const bumpStyle = useAnimatedStyle(() => ({ transform: [{ scale: bump.get() }] }));
   useEffect(() => {
     setYouTabTarget((done) =>

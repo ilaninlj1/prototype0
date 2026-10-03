@@ -6,6 +6,7 @@ import type { Drop, DropVote } from './daily-drop';
 import type { DiscoveryTrack, Region, SwipeEntry } from './discovery';
 import type { PresetId } from './pool-types';
 import { deleteSongs, restoreSongs, saveSong, setNote, type DeletedSong, type Saved } from './saved-songs';
+import type { DecodedVotes } from './taste-decoded';
 import type { SongFeel } from './tasteform';
 
 // All persistence is best-effort: a read/write failure falls back to an empty
@@ -376,3 +377,14 @@ const SONG_FEEL_KEY = `${STORAGE_PREFIX}:songFeel`;
 /** Energy/mood measured from each song's audio, keyed by track id — measured once, kept for good. */
 export const loadSongFeel = () => readJson<Record<number, SongFeel>>(SONG_FEEL_KEY, {});
 export const saveSongFeel = (feels: Record<number, SongFeel>) => writeJson(SONG_FEEL_KEY, feels);
+
+// ---------- Taste Decoded ----------
+
+const DECODED_SEEN_KEY = `${STORAGE_PREFIX}:decodedSeen`;
+/** Finding ids already shown on the Decoded page; any other finding is new. */
+export const loadDecodedSeen = () => readJson<string[]>(DECODED_SEEN_KEY, []);
+export const saveDecodedSeen = (ids: string[]) => writeJson(DECODED_SEEN_KEY, ids);
+
+const DECODED_VOTES_KEY = `${STORAGE_PREFIX}:decodedVotes`;
+export const loadDecodedVotes = () => readJson<DecodedVotes>(DECODED_VOTES_KEY, {});
+export const saveDecodedVotes = (votes: DecodedVotes) => writeJson(DECODED_VOTES_KEY, votes);
