@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DecodedLine } from '@/components/decoded/decoded-line';
 import { ThemedText } from '@/components/themed-text';
 import { MiniPlayer } from '@/components/mini-player';
 import { NoteSheet } from '@/components/note-sheet';
@@ -11,6 +12,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, Fonts, Ui } from '@/constants/theme';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
+import { useTasteDecoded } from '@/hooks/use-taste-decoded';
 import {
   countSongsHeard,
   describeGrowth,
@@ -41,6 +43,7 @@ export default function ProfileScreen() {
   const [finds, setFinds] = useState<DiscoveryTrack[]>([]);
   const [history, setHistory] = useState<SwipeEntry[]>([]);
   const [best, setBest] = useState<BestStreaks>({ spot: 0, h2h: 0 });
+  const decoded = useTasteDecoded(finds, history);
 
   // Tap a cover in the Tasteform to hear it. Leaving the tab stops it and
   // forgets it, since another screen may load a different song meanwhile.
@@ -132,6 +135,7 @@ export default function ProfileScreen() {
                 onPick={togglePlay}
                 onZoomChange={setZoomed}
               />
+              {decoded.ready && <DecodedLine finding={decoded.findings[0] ?? null} prompt={decoded.prompt} isNew={decoded.isNew} />}
 
               <ThemedView style={styles.hero} backgroundColor="transparent">
                 <ThemedText style={styles.heroNumber}>{finds.length}</ThemedText>
