@@ -7,6 +7,7 @@ import {
   base64Url,
   packState,
   readQuery,
+  safeReturnUrl,
   SPOTIFY_CLIENT_ID,
   toLike,
   tokenBody,
@@ -19,7 +20,7 @@ import {
 // Nothing is kept from the login: one pass reads your liked songs and the token is dropped.
 // "Sync again" just logs in again, which Spotify skips through once you've said yes.
 
-export type SpotifyFail = 'cancelled' | 'denied' | 'not-allowed' | 'offline' | 'not-set-up' | 'failed';
+export type SpotifyFail = 'cancelled' | 'denied' | 'not-allowed' | 'offline' | 'not-set-up' | 'wrong-link' | 'failed';
 
 export const FAIL_TEXT: Record<SpotifyFail, string> = {
   cancelled: 'Spotify login closed. Nothing changed.',
@@ -27,10 +28,17 @@ export const FAIL_TEXT: Record<SpotifyFail, string> = {
   'not-allowed': 'Spotify only lets accounts on this app’s test list connect. Ask to be added, then try again.',
   offline: 'Couldn’t reach Spotify. Check your connection.',
   'not-set-up': 'Spotify isn’t set up in this version of the app yet.',
+  'wrong-link': 'Spotify can’t find its way back to this version of the app. Send this link to whoever runs the app:',
   failed: 'Something went wrong with Spotify. Try again in a minute.',
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * The app link Spotify's web page sends the code back to. Expo's docs call this unpredictable in
+ * Expo Go for published updates, so it's checked before login rather than after a stuck web page.
+ */
+export const spotifyReturnUrl = () => Linking.createURL('spotify-auth');
 
 /** GET with Spotify's rate limit respected: on a 429, wait as long as it asks, a few times at most. */
 async function get(url: string, token: string): Promise<Response> {
@@ -57,7 +65,8 @@ export async function importSpotifyLikes(onProgress: (count: number) => void): P
     const challenge = base64Url(
       await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier, { encoding: Crypto.CryptoEncoding.BASE64 })
     );
-    const returnUrl = Linking.createURL('spotify-auth');
+    const returnUrl = spotifyReturnUrl();
+    if (!safeReturnUrl(returnUrl)) return 'wrong-link';
     const result = await WebBrowser.openAuthSessionAsync(
       authorizeUrl({ clientId: SPOTIFY_CLIENT_ID, challenge, state: packState(nonce, returnUrl) }),
       returnUrl

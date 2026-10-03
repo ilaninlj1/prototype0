@@ -14,7 +14,7 @@
  */
 
 /** Public by design: a PKCE client has no secret. From the Spotify developer dashboard's "Blindspot" app. */
-export const SPOTIFY_CLIENT_ID = '';
+export const SPOTIFY_CLIENT_ID = 'f35f9da7a9484344ad6d6bc04aeaa384';
 export const SPOTIFY_REDIRECT = 'https://blindspot.expo.app/spotify-callback';
 const SCOPE = 'user-library-read';
 const PROJECT_ID = '93a021d9-29e0-41bb-876f-2d5ffba00638';

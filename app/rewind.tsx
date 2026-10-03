@@ -49,6 +49,7 @@ import {
   importSpotifyLikes,
   loadSpotifyLibrary,
   saveSpotifyLibrary,
+  spotifyReturnUrl,
   type SpotifyLibrary,
 } from '@/lib/spotify-api';
 
@@ -193,7 +194,7 @@ export default function RewindScreen() {
     setImporting(null);
     if (typeof result === 'string') {
       if (result !== 'cancelled') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return setNotice(FAIL_TEXT[result]);
+      return setNotice(result === 'wrong-link' ? `${FAIL_TEXT[result]} ${spotifyReturnUrl()}` : FAIL_TEXT[result]);
     }
     const library = { syncedAt: Date.now(), likes: result };
     await saveSpotifyLibrary(library);
