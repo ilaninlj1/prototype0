@@ -17,6 +17,14 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-02] Taste Decoded: one honest sentence about your taste
+The You tab now says what your saves have in common, judged against what each genre normally sounds like:
+"You don't hate Country. You hate happy Country." Tap it for the Decoded page: up to 3 findings, each with
+your songs on a bar against the genre's normal, a vote ("Sounds like me" / "Nope", counted anonymously for
+the paper) and a share card. A finding you haven't opened lights the YOU dot and becomes the Sunday
+reminder. Baselines: 30 measured songs per genre (`npm run measure-genre-sound`). The Blind Spot Test now
+keeps its songs. Spec: `docs/superpowers/specs/2026-10-02-taste-decoded-design.md`.
+
 ## [2026-10-01] Reveal card: play controls and a big Next up top
 After a right swipe the song kept playing with no way to stop it, because hold-to-pause only lives
 on the blind card. The reveal now opens with play/pause, play-from-the-start and a big Next button,
