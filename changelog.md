@@ -17,6 +17,17 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-03] Rewind: your Spotify liked songs, behind a switch
+A Spotify switch in Rewind's header logs in once and brings in every song you've liked on Spotify, with the day
+you liked it. Those songs show under "Liked on Spotify" in each day, month or year, and the year zone finally has
+years in it. They stay apart from blind finds: separate storage (`lib/spotify-api.ts`, chunked because Android
+can't read back one value over about 2 MB). They never count as finds, never join the Tasteform and never leave the
+phone. Tapping one opens it in Spotify, since Spotify has no previews now and its rules want content to link back.
+The footer has Sync again and Remove. Login is PKCE with no secret (`lib/spotify.ts`, `expo-crypto` added). Spotify
+always redirects to one fixed page, `blindspot.expo.app/spotify-callback`, which hands the code back to this app's
+link only (Expo Go links change with every update, and Spotify wants exact redirect URIs). Development mode limits
+it to 5 Spotify accounts, added by hand in the Spotify dashboard, and the app owner needs Premium.
+
 ## [2026-10-03] Rewind: drag back through your finds by day, month or year
 A Rewind row under the Tasteform opens `app/rewind.tsx`, which starts on the day of your latest find. Drag
 left anywhere to go back and right to go ahead. How far you drag sets the step: a short drag moves a day,

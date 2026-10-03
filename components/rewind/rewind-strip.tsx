@@ -47,7 +47,11 @@ export function RewindStrip({ dx, shake, half, band, canGo, onTap }: Props) {
           disabled={!open}
           onPress={() => onTap(unit, dir)}
           accessibilityLabel={`${dir < 0 ? 'Back' : 'Ahead'} a ${unit}`}
-          style={[styles.zone, { left: half + (dir < 0 ? -to : from), width: to - from }, on && (open ? styles.zoneOn : styles.zoneDead)]}>
+          style={[
+            styles.zone,
+            { left: half + (dir < 0 ? -to : from), width: to - from },
+            on && (open ? styles.zoneOn : styles.zoneDead),
+          ]}>
           <ThemedText style={[styles.zoneText, !open && styles.zoneOff, on && open && styles.zoneTextOn]}>{unit}</ThemedText>
         </Pressable>
       );

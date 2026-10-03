@@ -26,7 +26,7 @@ the timeline gets longer the more someone uses the app. The gesture is the user'
 step. A short swipe moves by days, carrying on into the next distance band moves by months, then years. Catch:
 new users have only days of history, so the year band is empty until the timeline grows. Optional later:
 import Spotify liked songs for a few testers, and pair with Taste Decoded ("your taste then vs now").
-**Status: built 2026-10-03 on branch `rewind`** (see changelog).
+**Status: built 2026-10-03 on branch `rewind`**, then Spotify liked songs behind a switch the same day (see changelog).
 
 ## [2026-09-30] DJ Picks — a blind mode of what real radio DJs played today
 Research (2026-09-30): the most-liked advice on finding music is human curation — college radio,

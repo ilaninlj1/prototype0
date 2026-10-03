@@ -5,6 +5,7 @@
  * never wasted on an empty day. All dates are local time.
  */
 import { countSongsHeard, type DiscoveryTrack, type SwipeEntry } from './discovery.ts';
+import type { SpotifyLike } from './spotify.ts';
 
 export type Unit = 'day' | 'month' | 'year';
 export const UNITS: Unit[] = ['day', 'month', 'year'];
@@ -46,9 +47,13 @@ export function step(times: number[], at: number, unit: Unit, dir: -1 | 1): numb
 /** Saves from the same day, month or year as `at`, newest first. Saves with no date are left out. */
 export function inPeriod(tracks: DiscoveryTrack[], at: number, unit: Unit): DiscoveryTrack[] {
   const here = periodStart(at, unit);
-  return tracks
-    .filter((t) => t.likedAt != null && periodStart(t.likedAt, unit) === here)
-    .sort((a, b) => b.likedAt! - a.likedAt!);
+  return tracks.filter((t) => t.likedAt != null && periodStart(t.likedAt, unit) === here).sort((a, b) => b.likedAt! - a.likedAt!);
+}
+
+/** Spotify likes from the same day, month or year as `at`, newest first. */
+export function likesInPeriod(likes: SpotifyLike[], at: number, unit: Unit): SpotifyLike[] {
+  const here = periodStart(at, unit);
+  return likes.filter((l) => periodStart(l.addedAt, unit) === here).sort((a, b) => b.addedAt - a.addedAt);
 }
 
 /** Songs heard in that period, counted the same way as the Profile tab's total. */
@@ -58,7 +63,20 @@ export function heardIn(history: SwipeEntry[], at: number, unit: Unit): number {
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Whole calendar days from `at` to `now` (rounded, so a daylight-saving hour doesn't matter). */
@@ -105,10 +123,24 @@ export function agoLabel(at: number, unit: Unit, now: number): string | null {
   return plural(Math.floor(days / 365), 'year');
 }
 
-/** One plain sentence under the title. Hearing is left out when the swipe log can't back it up. */
-export function periodLine(found: number, heard: number): string {
+/**
+ * One plain sentence under the title. Hearing is left out when the swipe log can't back it up;
+ * Spotify likes (only when switched on) get their own short sentence after.
+ */
+export function periodLine(found: number, heard: number, spotify = 0): string {
+  const liked = spotify > 0 ? `${spotify} liked on Spotify.` : '';
+  if (found === 0 && spotify > 0) {
+    if (heard === 0) return `${spotify} ${spotify === 1 ? 'song' : 'songs'} liked on Spotify.`;
+    return `No blind finds among the ${heard} you heard. ${liked}`;
+  }
   const songs = `${found} ${found === 1 ? 'song' : 'songs'} found`;
-  if (heard < found || heard === 0) return `${songs}.`;
-  if (heard === found) return found === 1 ? `${songs}, the only one you heard.` : `${songs}, every one you heard.`;
-  return `${songs}, out of ${heard} you heard.`;
+  const first =
+    heard < found || heard === 0
+      ? `${songs}.`
+      : heard === found
+        ? found === 1
+          ? `${songs}, the only one you heard.`
+          : `${songs}, every one you heard.`
+        : `${songs}, out of ${heard} you heard.`;
+  return liked ? `${first} ${liked}` : first;
 }

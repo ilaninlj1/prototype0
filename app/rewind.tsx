@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MiniPlayer } from '@/components/mini-player';
 import { Cassette } from '@/components/rewind/cassette';
 import { RewindStrip } from '@/components/rewind/rewind-strip';
+import { SpotifySheet } from '@/components/rewind/spotify-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
@@ -32,6 +33,7 @@ import {
   BAND_STARTS,
   heardIn,
   inPeriod,
+  likesInPeriod,
   periodLabel,
   periodLine,
   periodStart,
@@ -40,6 +42,15 @@ import {
   UNITS,
   type Unit,
 } from '@/lib/rewind';
+import { describeImport, spotifyTrackUrl, type SpotifyLike } from '@/lib/spotify';
+import {
+  clearSpotifyLibrary,
+  FAIL_TEXT,
+  importSpotifyLikes,
+  loadSpotifyLibrary,
+  saveSpotifyLibrary,
+  type SpotifyLibrary,
+} from '@/lib/spotify-api';
 
 const SPRING = { damping: 18, stiffness: 220 };
 /** Degrees the reels turn per point dragged, and how far they whirr on each kind of jump. */
@@ -56,6 +67,11 @@ const IMPACT: Record<Unit, Haptics.ImpactFeedbackStyle> = {
 };
 
 type Place = { at: number; unit: Unit; dir: -1 | 1 };
+
+/** A big year of Spotify likes would be hundreds of covers; past this many, the rest is a count. */
+const SPOTIFY_SHOWN_MAX = 60;
+
+const latest = (times: number[]): Place | null => (times.length ? { at: Math.max(...times), unit: 'day', dir: -1 } : null);
 
 /** The zone a drag of x points is in: 1 day, 2 month, 3 year, signed by direction (negative = earlier). */
 function zoneOf(x: number, half: number): number {
@@ -90,16 +106,26 @@ export default function RewindScreen() {
   const [view, setView] = useState<Place | null>(null);
   const [band, setBand] = useState(0);
 
+  // Spotify liked songs: kept apart from your finds, shown only while the switch is on.
+  const [spotify, setSpotify] = useState<SpotifyLibrary | null>(null);
+  const [spotifyOn, setSpotifyOn] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const [importing, setImporting] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [liked, h] = await Promise.all([loadLikedTracks(), loadSwipeHistory()]);
+      const [liked, h, library] = await Promise.all([loadLikedTracks(), loadSwipeHistory(), loadSpotifyLibrary()]);
       if (cancelled) return;
       const dated = withLikedAt(liked, h).filter((t) => t.likedAt != null);
       setFinds(dated);
       setHistory(h);
-      // Open on your latest find.
-      if (dated.length) setView({ at: Math.max(...dated.map((t) => t.likedAt!)), unit: 'day', dir: -1 });
+      const withSpotify = !!library?.likes.length;
+      setSpotify(library);
+      setSpotifyOn(withSpotify);
+      // Open on your latest find (or latest Spotify like, if that's all there is).
+      setView(latest(dated.length || !withSpotify ? dated.map((t) => t.likedAt!) : library!.likes.map((l) => l.addedAt)));
       setLoaded(true);
     })();
     return () => {
@@ -107,12 +133,19 @@ export default function RewindScreen() {
     };
   }, []);
 
-  const times = useMemo(() => finds.map((t) => t.likedAt!), [finds]);
+  const findTimes = useMemo(() => finds.map((t) => t.likedAt!), [finds]);
+  const likes = useMemo(() => (spotifyOn && spotify ? spotify.likes : []), [spotifyOn, spotify]);
+  const times = useMemo(() => (likes.length ? [...findTimes, ...likes.map((l) => l.addedAt)] : findTimes), [findTimes, likes]);
   const shown = useMemo(() => (view ? inPeriod(finds, view.at, view.unit) : []), [finds, view]);
+  const liked = useMemo(() => (view ? likesInPeriod(likes, view.at, view.unit) : []), [likes, view]);
   const heard = useMemo(() => (view ? heardIn(history, view.at, view.unit) : 0), [history, view]);
-  // One or two finds get bigger covers, so a quiet day doesn't look empty.
-  const columns = shown.length <= 2 ? 2 : 3;
-  const cover = Math.floor((width - 2 * Spacing.lg - (columns - 1) * Spacing.md) / columns);
+  // One or two covers get drawn bigger, so a quiet day doesn't look empty.
+  const sizeFor = (count: number) => {
+    const columns = count <= 2 ? 2 : 3;
+    return Math.floor((width - 2 * Spacing.lg - (columns - 1) * Spacing.md) / columns);
+  };
+  const cover = sizeFor(shown.length);
+  const spotifyCover = sizeFor(liked.length);
   const canGo = useCallback((unit: Unit, dir: -1 | 1) => view != null && step(times, view.at, unit, dir) != null, [times, view]);
 
   // Playback, the same way as the Profile tab: leaving stops it.
@@ -135,6 +168,59 @@ export default function RewindScreen() {
     player.play();
   }
 
+  // ---------- Spotify ----------
+
+  /** After the switch or a removal: stay put if there's still something here, else go to the latest thing left. */
+  function settle(left: number[], onlyFinds: boolean) {
+    if (!view) return setView(latest(left));
+    if (onlyFinds && inPeriod(finds, view.at, view.unit).length === 0) setView(latest(left));
+  }
+
+  function toggleSpotify() {
+    if (importing != null) return;
+    if (!spotify?.likes.length) return setSheet(true);
+    Haptics.selectionAsync();
+    const on = !spotifyOn;
+    setSpotifyOn(on);
+    settle(on ? [...findTimes, ...spotify.likes.map((l) => l.addedAt)] : findTimes, !on);
+  }
+
+  async function connect() {
+    setSheet(false);
+    setNotice(null);
+    setImporting(0);
+    const result = await importSpotifyLikes(setImporting);
+    setImporting(null);
+    if (typeof result === 'string') {
+      if (result !== 'cancelled') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return setNotice(FAIL_TEXT[result]);
+    }
+    const library = { syncedAt: Date.now(), likes: result };
+    await saveSpotifyLibrary(library);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setSpotify(library);
+    setSpotifyOn(result.length > 0);
+    setNotice(result.length ? `Brought in ${describeImport(result, now)}` : describeImport(result, now));
+    if (!view) setView(latest(result.map((l) => l.addedAt)));
+  }
+
+  function removeSpotify() {
+    Alert.alert('Remove your Spotify likes?', 'They’re deleted from this phone. Your Blindspot finds stay.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          await clearSpotifyLibrary();
+          setSpotify(null);
+          setSpotifyOn(false);
+          setNotice(null);
+          settle(findTimes, true);
+        },
+      },
+    ]);
+  }
+
   // ---------- The scrub ----------
   const dx = useSharedValue(0);
   const spin = useSharedValue(0);
@@ -144,7 +230,13 @@ export default function RewindScreen() {
 
   function bump() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    shake.set(withSequence(withTiming(-8, { duration: 50 }), withRepeat(withTiming(8, { duration: 80 }), 3, true), withTiming(0, { duration: 50 })));
+    shake.set(
+      withSequence(
+        withTiming(-8, { duration: 50 }),
+        withRepeat(withTiming(8, { duration: 80 }), 3, true),
+        withTiming(0, { duration: 50 })
+      )
+    );
     spin.set(withSpring(spinAtStart.get(), SPRING));
   }
 
@@ -222,13 +314,42 @@ export default function RewindScreen() {
             <Ionicons name="close" size={26} color={Colors.textSecondary} />
           </Pressable>
           <Cassette spin={spin} size={72} />
-          <View style={Ui.textButton} />
+          {/* The Spotify switch: connects the first time, then shows or hides your Spotify likes. */}
+          <Pressable
+            onPress={toggleSpotify}
+            hitSlop={8}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: spotifyOn }}
+            accessibilityLabel="Spotify likes"
+            style={[styles.chip, spotifyOn && styles.chipOn]}>
+            {importing != null ? (
+              <ActivityIndicator size="small" color={Colors.text} />
+            ) : (
+              <FontAwesome name="spotify" size={16} color={spotifyOn ? Colors.accentText : Colors.text} />
+            )}
+            <ThemedText style={[styles.chipText, spotifyOn && styles.chipTextOn]}>
+              {importing != null ? `${importing}` : spotify?.likes.length ? 'Spotify' : '+ Spotify'}
+            </ThemedText>
+          </Pressable>
         </View>
+
+        {notice && (
+          <Pressable onPress={() => setNotice(null)} style={styles.notice} accessibilityHint="Tap to dismiss">
+            <ThemedText style={styles.noticeText}>{notice}</ThemedText>
+          </Pressable>
+        )}
 
         {!view ? (
           <View style={styles.empty}>
             <ThemedText type="title">Nothing to rewind yet</ThemedText>
-            <ThemedText style={styles.dim}>Save songs on Home and they line up here by the day you found them.</ThemedText>
+            <ThemedText style={styles.dim}>
+              Save songs on Home and they line up here by the day you found them. Or bring in the songs you&apos;ve liked on
+              Spotify.
+            </ThemedText>
+            <Pressable onPress={() => setSheet(true)} style={[Ui.outlineButton, styles.connect]}>
+              <FontAwesome name="spotify" size={16} color={Colors.text} />
+              <ThemedText style={Ui.label}>Connect Spotify</ThemedText>
+            </Pressable>
           </View>
         ) : (
           <>
@@ -241,33 +362,85 @@ export default function RewindScreen() {
                 <ThemedText type="hero" numberOfLines={1} adjustsFontSizeToFit>
                   {periodLabel(view.at, view.unit, now)}
                 </ThemedText>
-                <ThemedText style={styles.dim}>{periodLine(shown.length, heard)}</ThemedText>
-                <View style={styles.grid}>
-                  {shown.map((t, i) => {
-                    const picked = nowPlaying?.id === t.id;
-                    return (
-                      <Animated.View key={t.id} entering={FadeIn.delay(Math.min(i, 12) * 30)} style={{ width: cover }}>
-                        <Pressable onPress={() => togglePlay(t)} accessibilityLabel={`${t.trackName} by ${t.artistName}`}>
-                          <Image source={{ uri: artworkUrl(t.artworkUrl100, 300) }} style={[styles.art, { width: cover, height: cover }]} />
-                          {picked && (
-                            <View style={styles.playing}>
-                              <Ionicons name={status.playing ? 'pause' : 'play'} size={16} color={Colors.accentText} />
-                            </View>
-                          )}
-                          <ThemedText style={styles.song} numberOfLines={1}>
-                            {t.trackName}
-                          </ThemedText>
-                          <ThemedText style={styles.artist} numberOfLines={1}>
-                            {t.artistName}
-                          </ThemedText>
-                          {/* The title already has the year. */}
-                          {view.unit !== 'day' && <ThemedText style={styles.date}>{shortDate(t.likedAt!, view.at)}</ThemedText>}
-                        </Pressable>
-                      </Animated.View>
-                    );
-                  })}
-                </View>
+                <ThemedText style={styles.dim}>{periodLine(shown.length, heard, liked.length)}</ThemedText>
+                {shown.length > 0 && liked.length > 0 && (
+                  <ThemedText type="eyebrow" style={styles.group}>
+                    Found blind
+                  </ThemedText>
+                )}
+                {shown.length > 0 && (
+                  <View style={styles.grid}>
+                    {shown.map((t, i) => {
+                      const picked = nowPlaying?.id === t.id;
+                      return (
+                        <Animated.View key={t.id} entering={FadeIn.delay(Math.min(i, 12) * 30)} style={{ width: cover }}>
+                          <Pressable onPress={() => togglePlay(t)} accessibilityLabel={`${t.trackName} by ${t.artistName}`}>
+                            <Image
+                              source={{ uri: artworkUrl(t.artworkUrl100, 300) }}
+                              style={[styles.art, { width: cover, height: cover }]}
+                            />
+                            {picked && (
+                              <View style={styles.playing}>
+                                <Ionicons name={status.playing ? 'pause' : 'play'} size={16} color={Colors.accentText} />
+                              </View>
+                            )}
+                            <ThemedText style={styles.song} numberOfLines={1}>
+                              {t.trackName}
+                            </ThemedText>
+                            <ThemedText style={styles.artist} numberOfLines={1}>
+                              {t.artistName}
+                            </ThemedText>
+                            {/* The title already has the year. */}
+                            {view.unit !== 'day' && <ThemedText style={styles.date}>{shortDate(t.likedAt!, view.at)}</ThemedText>}
+                          </Pressable>
+                        </Animated.View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {liked.length > 0 && (
+                  <>
+                    <View style={[styles.group, styles.groupRow]}>
+                      <FontAwesome name="spotify" size={14} color={Colors.textSecondary} />
+                      <ThemedText type="eyebrow">Liked on Spotify</ThemedText>
+                    </View>
+                    <View style={styles.grid}>
+                      {liked.slice(0, SPOTIFY_SHOWN_MAX).map((l, i) => (
+                        <SpotifyCover
+                          key={l.id}
+                          like={l}
+                          size={spotifyCover}
+                          delay={Math.min(i, 12) * 30}
+                          date={view.unit !== 'day' ? shortDate(l.addedAt, view.at) : null}
+                        />
+                      ))}
+                    </View>
+                    {liked.length > SPOTIFY_SHOWN_MAX && (
+                      <ThemedText style={styles.dim}>
+                        And {liked.length - SPOTIFY_SHOWN_MAX} more. Drag a shorter way to see a month or a day.
+                      </ThemedText>
+                    )}
+                  </>
+                )}
               </Animated.View>
+
+              {spotifyOn && spotify && (
+                <View style={styles.footer}>
+                  <ThemedText style={styles.footerText}>
+                    {describeImport(spotify.likes, now)} Synced {shortDate(spotify.syncedAt, now)}. Tap a Spotify cover to open it
+                    there.
+                  </ThemedText>
+                  <View style={styles.footerActions}>
+                    <Pressable onPress={connect} hitSlop={8} style={Ui.textButton}>
+                      <ThemedText style={styles.link}>Sync again</ThemedText>
+                    </Pressable>
+                    <Pressable onPress={removeSpotify} hitSlop={8} style={Ui.textButton}>
+                      <ThemedText style={styles.link}>Remove</ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
             </ScrollView>
 
             {nowPlaying && (
@@ -287,8 +460,32 @@ export default function RewindScreen() {
             </View>
           </>
         )}
+        <SpotifySheet visible={sheet} onConnect={connect} onClose={() => setSheet(false)} />
       </View>
     </GestureDetector>
+  );
+}
+
+/** A Spotify like: its cover with Spotify's mark, opening the song in Spotify (their rules: Spotify content links back to Spotify). */
+function SpotifyCover({ like, size, delay, date }: { like: SpotifyLike; size: number; delay: number; date: string | null }) {
+  return (
+    <Animated.View entering={FadeIn.delay(delay)} style={{ width: size }}>
+      <Pressable
+        onPress={() => Linking.openURL(spotifyTrackUrl(like.id))}
+        accessibilityLabel={`${like.name} by ${like.artist}, open in Spotify`}>
+        <Image source={like.art ? { uri: like.art } : null} style={[styles.art, { width: size, height: size }]} />
+        <View style={styles.spotifyMark}>
+          <FontAwesome name="spotify" size={14} color="#ffffff" />
+        </View>
+        <ThemedText style={styles.song} numberOfLines={1}>
+          {like.name}
+        </ThemedText>
+        <ThemedText style={styles.artist} numberOfLines={1}>
+          {like.artist}
+        </ThemedText>
+        {date && <ThemedText style={styles.date}>{date}</ThemedText>}
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -313,6 +510,81 @@ const styles = StyleSheet.create({
   empty: {
     padding: Spacing.lg,
     gap: Spacing.md,
+  },
+  connect: {
+    alignSelf: 'flex-start',
+  },
+  // Outlined off, cream on, like the app's other switches.
+  chip: {
+    ...Ui.outlineButton,
+    minHeight: 36,
+    paddingHorizontal: Spacing.sm,
+    gap: 6,
+  },
+  chipOn: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  chipText: {
+    ...Ui.label,
+    fontSize: 11,
+  },
+  chipTextOn: {
+    color: Colors.accentText,
+  },
+  notice: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.hairline,
+    borderRadius: Radius.sm,
+  },
+  noticeText: {
+    fontSize: 14,
+    lineHeight: 19,
+  },
+  group: {
+    marginTop: Spacing.xl,
+    marginBottom: -Spacing.sm,
+  },
+  groupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  // Spotify's mark on its covers, in its own black and white.
+  spotifyMark: {
+    position: 'absolute',
+    left: Spacing.xs,
+    top: Spacing.xs,
+    width: 22,
+    height: 22,
+    borderRadius: Radius.round,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footer: {
+    marginTop: Spacing.xl,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.rule,
+    gap: Spacing.xs,
+  },
+  footerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: Colors.textTertiary,
+  },
+  footerActions: {
+    flexDirection: 'row',
+    gap: Spacing.lg,
+  },
+  link: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textDecorationLine: 'underline',
   },
   scroll: {
     padding: Spacing.lg,

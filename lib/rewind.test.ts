@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { DiscoveryTrack, SwipeEntry } from './discovery.ts';
-import { agoLabel, bandFor, heardIn, inPeriod, periodLabel, periodLine, periodStart, step } from './rewind.ts';
+import { agoLabel, bandFor, heardIn, inPeriod, likesInPeriod, periodLabel, periodLine, periodStart, step } from './rewind.ts';
+import type { SpotifyLike } from './spotify.ts';
 
 // Local time, so the tests pass in any timezone.
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
@@ -67,7 +68,13 @@ test('step returns null at either end', () => {
 });
 
 test('inPeriod keeps that day, month or year, newest first, and skips undated saves', () => {
-  const tracks = [track(1, at(2026, 9, 3)), track(2, at(2026, 9, 3, 20)), track(3, at(2026, 9, 28)), track(4), track(5, at(2025, 6, 2))];
+  const tracks = [
+    track(1, at(2026, 9, 3)),
+    track(2, at(2026, 9, 3, 20)),
+    track(3, at(2026, 9, 28)),
+    track(4),
+    track(5, at(2025, 6, 2)),
+  ];
   const ids = (ts: DiscoveryTrack[]) => ts.map((t) => t.id);
   assert.deepEqual(ids(inPeriod(tracks, at(2026, 9, 3), 'day')), [2, 1]);
   assert.deepEqual(ids(inPeriod(tracks, at(2026, 9, 3), 'month')), [3, 2, 1]);
@@ -107,7 +114,13 @@ test('heardIn counts songs heard in that period, not steering', () => {
     action,
     timestamp,
   });
-  const history = [e(1, at(2026, 9, 3)), e(2, at(2026, 9, 3, 15), 'like'), e(2, at(2026, 9, 3, 16)), e(3, at(2026, 9, 3), 'steer-artist'), e(4, at(2026, 9, 4))];
+  const history = [
+    e(1, at(2026, 9, 3)),
+    e(2, at(2026, 9, 3, 15), 'like'),
+    e(2, at(2026, 9, 3, 16)),
+    e(3, at(2026, 9, 3), 'steer-artist'),
+    e(4, at(2026, 9, 4)),
+  ];
   assert.equal(heardIn(history, at(2026, 9, 3), 'day'), 2);
   assert.equal(heardIn(history, at(2026, 9, 3), 'month'), 3);
 });
@@ -117,4 +130,24 @@ test('periodLine is one plain sentence', () => {
   assert.equal(periodLine(1, 1), '1 song found, the only one you heard.');
   assert.equal(periodLine(2, 0), '2 songs found.', 'saves from before the swipe log say nothing about hearing');
   assert.equal(periodLine(3, 2), '3 songs found.');
+});
+
+test('periodLine adds Spotify likes when they are switched on', () => {
+  assert.equal(periodLine(3, 41, 12), '3 songs found, out of 41 you heard. 12 liked on Spotify.');
+  assert.equal(periodLine(0, 0, 1), '1 song liked on Spotify.', 'a Spotify-only day says just that');
+  assert.equal(periodLine(0, 20, 5), 'No blind finds among the 20 you heard. 5 liked on Spotify.');
+  assert.equal(periodLine(2, 0, 0), '2 songs found.', 'Spotify on but nothing liked there that day');
+});
+
+test('likesInPeriod keeps Spotify likes from that day, month or year, newest first', () => {
+  const like = (id: string, addedAt: number): SpotifyLike => ({ id, name: id, artist: '', art: '', addedAt });
+  const likes = [like('a', at(2019, 4, 2)), like('b', at(2019, 4, 2, 20)), like('c', at(2019, 5, 1)), like('d', at(2020, 1, 1))];
+  assert.deepEqual(
+    likesInPeriod(likes, at(2019, 4, 2), 'day').map((l) => l.id),
+    ['b', 'a']
+  );
+  assert.deepEqual(
+    likesInPeriod(likes, at(2019, 1, 1), 'year').map((l) => l.id),
+    ['c', 'b', 'a']
+  );
 });
