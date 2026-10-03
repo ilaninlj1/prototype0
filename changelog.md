@@ -17,6 +17,17 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-03] Rewind: drag back through your finds by day, month or year
+A Rewind row under the Tasteform opens `app/rewind.tsx`, which starts on the day of your latest find. Drag
+left anywhere to go back and right to go ahead. How far you drag sets the step: a short drag moves a day,
+further a month, furthest a year. Each step lands on the nearest day, month or year you actually saved
+something, so a swipe never lands on an empty day. The DAY · MONTH · YEAR strip at the bottom shows which zone
+your finger is in. Each zone is also a button, and a zone with nowhere to go is dimmed. Crossing into a zone
+ticks the phone. A jump spins the cassette's reels and ticks like tape winding, with a bigger thump for bigger
+jumps. Past your first or latest find, the strip shakes. Each day, month or year shows "3 songs found, out of
+41 you heard" and its covers; tap one to hear it. It uses only the app's own saves and swipe log, no Spotify
+or Apple login (see the features.md entry for why). Logic and tests are in `lib/rewind.ts`.
+
 ## [2026-10-01] Reveal card: play controls and a big Next up top
 After a right swipe the song kept playing with no way to stop it, because hold-to-pause only lives
 on the blind card. The reveal now opens with play/pause, play-from-the-start and a big Next button,

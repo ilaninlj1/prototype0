@@ -1,3 +1,4 @@
+import { View } from 'react-native';
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
 
 import { Colors } from '@/constants/theme';
@@ -126,5 +127,44 @@ export function TasteTwinsEmblem({ size = 52 }: Props) {
       <Path fill={RED} d="M32 19.2 A17 17 0 0 1 32 48.8 A17 17 0 0 1 32 19.2 Z" />
       <Path {...LINE} d="M24 17 A17 17 0 1 0 24 51 M40 17 A17 17 0 1 1 40 51" opacity={0.5} />
     </Svg>
+  );
+}
+
+/** Rewind: a cassette, its label in red. The reels are drawn apart so the Rewind page can spin them. */
+export function CassetteBody({ size = 52 }: Props) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <Rect {...FILL} x={4} y={14} width={56} height={38} rx={4} />
+      <Rect fill={RED} x={10} y={19} width={44} height={7} rx={1.5} />
+      <Rect {...LINE} x={15} y={30} width={34} height={12} rx={6} opacity={0.5} />
+      <Path {...LINE} d="M16 52 L20 46 H44 L48 52" />
+    </Svg>
+  );
+}
+
+/** One cassette reel, centered in its box: a ring, three spokes, a red hub. */
+export function CassetteReel({ size = 16 }: Props) {
+  return (
+    <Svg width={size} height={size} viewBox="-8 -8 16 16">
+      <Circle {...LINE} r={5.5} strokeWidth={2.5} />
+      <Path {...LINE} strokeWidth={2} d="M0 -1.5 V-4.5 M1.3 0.75 L3.9 2.25 M-1.3 0.75 L-3.9 2.25" />
+      <Circle fill={RED} r={1.4} />
+    </Svg>
+  );
+}
+
+/** Rewind, still: the cassette with its reels in place. */
+export function RewindEmblem({ size = 52 }: Props) {
+  const reel = (16 / 64) * size;
+  return (
+    <View style={{ width: size, height: size }}>
+      <CassetteBody size={size} />
+      <View style={{ position: 'absolute', left: (14 / 64) * size, top: (28 / 64) * size }}>
+        <CassetteReel size={reel} />
+      </View>
+      <View style={{ position: 'absolute', left: (34 / 64) * size, top: (28 / 64) * size }}>
+        <CassetteReel size={reel} />
+      </View>
+    </View>
   );
 }

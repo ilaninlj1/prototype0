@@ -1,11 +1,14 @@
-import { useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RewindEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
 import { MiniPlayer } from '@/components/mini-player';
 import { NoteSheet } from '@/components/note-sheet';
+import { PressableScale } from '@/components/pressable-scale';
 import { Tasteform } from '@/components/tasteform/tasteform';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, Fonts, Ui } from '@/constants/theme';
@@ -33,6 +36,7 @@ function topGenre(tracks: DiscoveryTrack[]): { genre: string; genres: number } |
 }
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   // Zoomed into the Tasteform, one finger moves around the shape instead of the page.
@@ -132,6 +136,15 @@ export default function ProfileScreen() {
                 onPick={togglePlay}
                 onZoomChange={setZoomed}
               />
+
+              <PressableScale onPress={() => router.push('/rewind')} style={styles.rewind}>
+                <RewindEmblem size={44} />
+                <View style={styles.rewindText}>
+                  <ThemedText style={styles.rewindTitle}>Rewind</ThemedText>
+                  <ThemedText style={styles.dim}>Drag back through your finds.</ThemedText>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              </PressableScale>
 
               <ThemedView style={styles.hero} backgroundColor="transparent">
                 <ThemedText style={styles.heroNumber}>{finds.length}</ThemedText>
@@ -243,6 +256,24 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.rule,
     paddingBottom: Spacing.lg,
     gap: 2,
+  },
+  // A row, not a button: the emblem says what it is, the chevron says it opens.
+  rewind: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.rule,
+  },
+  rewindText: {
+    flex: 1,
+  },
+  rewindTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 18,
+    lineHeight: 22,
   },
   streaks: {
     ...Ui.label,

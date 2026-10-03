@@ -16,6 +16,18 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-10-02] Rewind — scrub back through your finds by day, month, year
+A timeline of every song you liked in Blindspot, by the date you found it, built from the saved likes and
+`swipeHistory` timestamps. The user picked this source over Spotify/Apple liked songs (checked 2026-10-02):
+Spotify caps new development-mode apps at 5 users and the owner needs Premium; extended quota needs a
+registered business with 250K monthly users. Apple Music's `libraryAddedDate` is only readable from native
+MusicKit, which needs a paid developer account and a custom build. Own finds also fit the discovery pitch, and
+the timeline gets longer the more someone uses the app. The gesture is the user's: how far you swipe sets the
+step. A short swipe moves by days, carrying on into the next distance band moves by months, then years. Catch:
+new users have only days of history, so the year band is empty until the timeline grows. Optional later:
+import Spotify liked songs for a few testers, and pair with Taste Decoded ("your taste then vs now").
+**Status: built 2026-10-03 on branch `rewind`** (see changelog).
+
 ## [2026-09-30] DJ Picks — a blind mode of what real radio DJs played today
 Research (2026-09-30): the most-liked advice on finding music is human curation — college radio,
 record-store owners, artists' own playlists — not algorithms. KEXP's open feed
