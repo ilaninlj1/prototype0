@@ -17,6 +17,7 @@ import {
   verifierFrom,
   type SpotifyLike,
 } from './spotify';
+import { setKnownArtists } from './known-artists';
 import { filesFromZip, readExport, type NamedText } from './spotify-file';
 
 // The network and storage half of your Spotify songs, liked and playlist adds (see lib/spotify.ts for the why).
@@ -244,4 +245,14 @@ export async function importSpotifyFile(): Promise<SpotifyLike[] | FileFail> {
   } catch {
     return 'unreadable';
   }
+}
+
+/** Import a file and keep it: saved in the file slot, and Home starts skipping its artists right away. */
+export async function importAndKeepFile(): Promise<SpotifyLibrary | FileFail> {
+  const result = await importSpotifyFile();
+  if (typeof result === 'string') return result;
+  const library = { syncedAt: Date.now(), likes: result };
+  await saveSpotifyLibrary(library, 'file');
+  setKnownArtists(result);
+  return library;
 }

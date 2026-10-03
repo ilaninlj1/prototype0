@@ -55,7 +55,7 @@ import {
   clearSpotifyLibrary,
   FAIL_TEXT,
   FILE_FAIL_TEXT,
-  importSpotifyFile,
+  importAndKeepFile,
   importSpotifyLikes,
   loadSpotifyLibrary,
   saveSpotifyLibrary,
@@ -259,20 +259,17 @@ export default function RewindScreen() {
     setSheet(false);
     setNotice(null);
     setImporting(0);
-    const result = await importSpotifyFile();
+    const library = await importAndKeepFile();
     setImporting(null);
-    if (typeof result === 'string') {
-      if (result !== 'cancelled') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return setNotice(FILE_FAIL_TEXT[result]);
+    if (typeof library === 'string') {
+      if (library !== 'cancelled') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return setNotice(FILE_FAIL_TEXT[library]);
     }
-    const library = { syncedAt: Date.now(), likes: result };
-    await saveSpotifyLibrary(library, 'file');
-    setKnownArtists(result);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setFileLib(library);
     setSpotifyOn(true);
-    setNotice(`Imported ${describeImport(result, now)} Home now skips the ${knownCount()} artists already in it.`);
-    if (!view) setView(latest(result.map((l) => l.addedAt)));
+    setNotice(`Imported ${describeImport(library.likes, now)} Home now skips the ${knownCount()} artists already in it.`);
+    if (!view) setView(latest(library.likes.map((l) => l.addedAt)));
   }
 
   function removeSpotify() {

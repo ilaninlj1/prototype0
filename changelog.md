@@ -17,6 +17,22 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-03] You page: your listening, worked out; truly blind feed; Spotify file import
+The You tab is now a scroll of cards, each one big number and one plain sentence, built from what people most
+want to know about their listening (Wrapped, stats.fm, Obscurify, Icebergify, Instafest, and the CHI 2026
+"Spotify Warped" survey). It opens with a listener type (The Digger, The Prophet, The Night Owl...) and the
+reason for it. Then come three tiles (1 in N songs saved, median listeners when found, artists called) and your
+**iceberg** of blind finds, from Famous down to Buried. How you listen covers how many seconds you take to
+decide, a 24-hour clock of when you find music, and streaks. Then your range, called it, and a **receipt** of
+your latest finds. With a Spotify file imported, **Your Spotify** shows your listening age (median release year),
+popularity, the share of blind finds that are new to you, decades, your biggest year and day, and a **festival
+lineup**. The iceberg, receipt and lineup share as pictures. Logic in `lib/you-stats.ts`.
+
+Anyone can now import their Spotify songs from exportify.app, a CSV or a ZIP of every playlist, from Rewind or
+You (`lib/spotify-file.ts`; no 5-user cap). Home's feed then skips every artist in that file, so each blind card
+is someone new (`lib/known-artists.ts`). Only file songs feed stats and the filter. Songs from the login stay
+display-only, because Spotify's Developer Policy forbids deriving metrics or functionality from API data.
+
 ## [2026-10-03] Rewind: dates on every label, and the scrub only stops on days with songs
 Each DAY / MONTH / YEAR zone on the strip now shows the date that step lands on and its year, in three short
 lines (six characters at most, so it fits a 360pt phone). The zones are now the same width so they look even,
