@@ -22,12 +22,13 @@ import { MiniPlayer } from '@/components/mini-player';
 import { NoteSheet } from '@/components/note-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, TapTarget } from '@/constants/theme';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
 import { buildSpotifySearchUrl, filterByGenre, likedGenres, summarizeFinds, type DiscoveryTrack } from '@/lib/discovery';
 import { appendExportBatch, loadLikedTracks, loadRecentlyDeleted, saveLikedTracks, setLikedNote } from '@/lib/discovery-storage';
 import { setNote } from '@/lib/saved-songs';
+import { requestSteer, type SteerRequest } from '@/lib/steer-request';
 
 // react-native-web's Alert.alert is a no-op (confirmed against the installed
 // react-native-web@0.21 source — `static alert() {}`), so a Cancel/confirm
@@ -71,6 +72,7 @@ export default function LikedTracksScreen() {
   // Kept so the player stays up if you take the heart off the song that's
   // playing — tap the heart again to undo.
   const [playingTrack, setPlayingTrack] = useState<DiscoveryTrack | null>(null);
+  const [playerHeight, setPlayerHeight] = useState(0);
 
   const [genre, setGenre] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -240,6 +242,11 @@ export default function LikedTracksScreen() {
 
   const genres = likedGenres(tracks);
   const savedPlaying = tracks.find((t) => t.id === playingId) ?? null;
+  function steerHome(request: SteerRequest) {
+    requestSteer(request);
+    router.back();
+    router.navigate('/');
+  }
   const nowPlaying = savedPlaying ?? (playingTrack?.id === playingId ? playingTrack : null);
   const newestFirst = filterByGenre([...tracks].reverse(), genre && genres.includes(genre) ? genre : null);
   const { best, calledIt } = summarizeFinds(
@@ -248,7 +255,7 @@ export default function LikedTracksScreen() {
 
   return (
     <>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingBottom: playerHeight + Spacing.xl + Spacing.lg }]}>
         <ThemedView style={styles.container}>
           {selectionMode ? (
             <ThemedView style={styles.toolbar} backgroundColor="transparent">
@@ -352,7 +359,29 @@ export default function LikedTracksScreen() {
       </ScrollView>
 
       {nowPlaying && (
-        <View style={styles.mini}>
+        <View style={styles.mini} onLayout={(e) => setPlayerHeight(e.nativeEvent.layout.height)}>
+          {savedPlaying && (
+            <View style={styles.exploreActions}>
+              {!!savedPlaying.artistId && (
+                <TouchableOpacity
+                  style={styles.exploreButton}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  onPress={() =>
+                    steerHome({ kind: 'artist', strategy: { type: 'artist', artistId: savedPlaying.artistId, artistName: savedPlaying.artistName } })
+                  }>
+                  <ThemedText type="label" style={styles.exploreLabel}>More from this artist</ThemedText>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.exploreButton}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                onPress={() => steerHome({ kind: 'sound', strategy: { type: 'genre', genre: savedPlaying.primaryGenreName } })}>
+                <ThemedText type="label" style={styles.exploreLabel}>More like this sound</ThemedText>
+              </TouchableOpacity>
+            </View>
+          )}
           <MiniPlayer
             track={nowPlaying}
             playing={status.playing}
@@ -391,7 +420,6 @@ export default function LikedTracksScreen() {
 const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: 150,
   },
   container: {
     flex: 1,
@@ -441,6 +469,26 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: Spacing.xl,
+  },
+  exploreActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  exploreButton: {
+    flex: 1,
+    minHeight: TapTarget,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.accent,
+  },
+  exploreLabel: {
+    color: Colors.accentText,
+    textAlign: 'center',
   },
   links: {
     flexDirection: 'row',

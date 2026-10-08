@@ -45,12 +45,16 @@ found." Before there are enough users, **radio twins**: match you to KEXP shows 
 (`lib/dj-picks-api.ts` already reads host names) and use their new plays as bridges. Needs KEXP's OK first
 (see DJ Picks below).
 
+**Status (2026-10-08): Parked.** Needs real Taste Twins traffic first.
+
 ## [2026-10-02] Mood dial and smooth mode — steer by measured sound
 ReccoBeats already returns 9 measurements per clip (checked 2026-10-02); Taste Decoded keeps 8. A **mood
 dial** (late night / focus / hype) steers the feed by energy and mood instead of genre names. **Smooth mode**
 picks the next song to match key and tempo so swiping feels like a DJ mix, and pairs with "Crossfade between
 tracks while dragging" below. Smooth mode needs key, which ReccoBeats doesn't return; it would come from
 Essentia on a server (the 2026-09-17 spike), and tempo is shaky on 30s clips.
+
+**Status (2026-10-08): Parked.** Every served song would need a ReccoBeats measure first, which runs into rate limits.
 
 ## [2026-10-02] Rewind — scrub back through your finds by day, month, year
 A timeline of every song you liked in Blindspot, by the date you found it, built from the saved likes and
@@ -62,6 +66,7 @@ the timeline gets longer the more someone uses the app. The gesture is the user'
 step. A short swipe moves by days, carrying on into the next distance band moves by months, then years. Catch:
 new users have only days of history, so the year band is empty until the timeline grows. Optional later:
 import Spotify liked songs for a few testers, and pair with Taste Decoded ("your taste then vs now").
+**Status (2026-10-08): Done.** Shipped in `app/rewind.tsx`, `lib/rewind.ts`, and `components/rewind/rewind-strip.tsx` (commits 4e689c3, 6119247).
 **Status: built 2026-10-03 on branch `rewind`**, then Spotify liked songs behind a switch the same day (see changelog).
 
 ## [2026-09-30] DJ Picks — a blind mode of what real radio DJs played today
@@ -71,6 +76,7 @@ record-store owners, artists' own playlists — not algorithms. KEXP's open feed
 sometimes a DJ note. Idea: a Play mode with today's DJ plays as blind cards; the reveal shows the
 DJ's note and "played on KEXP". KEXP's terms bar building a "competitive product" — email them for
 an OK before anything public. KCRW and NTS also publish tracklists. Wanted by the user, later.
+**Status (2026-10-08): Done.** Shipped in `app/dj-picks.tsx`, `lib/dj-picks-api.ts`, and `lib/dj-picks.ts` (commit 0f0897a).
 
 ## [2026-09-30] Taste Twins — meet people who blind-liked the same songs
 Research (2026-09-30): "find someone with your taste and stalk their playlists" was one of the
@@ -78,6 +84,7 @@ most-liked discovery tips. Idea: anonymous matching on blind likes (same songs, 
 reveal), then see what else your twin saved, and optionally say hi. Needs likes uploaded to
 Supabase, a privacy story (opt-in, no names by default), and moderation for any messaging. The user
 wants it to meet people. Later.
+**Status (2026-10-08): Done.** Shipped in `app/twins.tsx`, `lib/twins.ts`, and `lib/twins-api.ts` (commits e3ae066, b9f4b70).
 
 ## [2026-09-14] Phase 1 requirement: serialize iTunes lookups with real pacing, pre-fetch ahead of the swipe
 
@@ -109,6 +116,8 @@ which reads to them as tracks silently failing to load with no visible cause.
   (`lookup?id=`) instead of two — the name-search step, which is both the
   fragile one and half the original budget, moves entirely to seed time.
 
+**Status (2026-10-08): Done.** Shipped in `lib/pool.ts` via serial `pacedItunes`, background filling, and leftover cache (lines 30–38, 154).
+
 ## [2026-09-14] scripts/check-obscure-floor.ts retired, replaced by an exhaustive offline resolver
 
 Two sampled runs of the floor-check script (n=30 then n=80 per bucket) came
@@ -127,6 +136,7 @@ including mid-resolve) and produces the exact data Phase 1 needs to skip
 its own name-search step — one script serving both purposes rather than a
 throwaway measurement tool. `artistObscureMinListeners` stays at 20,000
 until this reports.
+**Status (2026-10-08): Done.** Shipped in `scripts/resolve-itunes-ids.ts` and `scripts/report-itunes-resolution.ts`.
 
 ## [2026-09-14] Phase 1 task: retry collaborative-credit artist names on iTunes resolution failure
 
@@ -150,6 +160,7 @@ resolution step itself, not a Reggae issue or a data-availability gap.
 a), on an exact-match failure, retry with the substring before the first
 `&`, `feat.`/`ft.`, or `x` separator before falling through to the
 term-search fallback. Not implemented yet — `lib/pool.ts` doesn't exist.
+**Status (2026-10-08): Done.** Shipped in `scripts/resolve-itunes-ids.ts` via `splitOnSeparator` (`SEPARATOR_REGEX`) and `resolveArtistId` fallback.
 
 ## [2026-09-14] Correction to the entry below: the 24/25 finding was a call-shape bug
 
@@ -168,6 +179,7 @@ Also noted in passing while checking this: `fetchTracksByGenre` is live in
 production today — it's the default path and the swipe-down refill path for
 the whole discovery feed, not a stale/unused function. That's a separate,
 independent bug from anything Taste Space or the entry below is about.
+**Status (2026-10-08): Obsolete.** Superseded; Taste Space pad replaced by pool steering, correction recorded in `docs/superpowers/specs/2026-09-07-taste-space-design.md`.
 
 ## [2026-09-08] Taste Space is blocked on the candidate source, not on Last.fm
 Live probe from the app runtime (Expo Go, not node): Last.fm answered every call
@@ -188,11 +200,13 @@ That's the reverse of the current "iTunes finds candidates, Last.fm scores them"
 direction. Open question for whenever Taste Space's data layer is actually
 designed further — see the status note at the top of
 `docs/superpowers/specs/2026-09-07-taste-space-design.md`.
+**Status (2026-10-08): Obsolete.** Superseded; continuous 2D Taste Space pad was replaced by discrete 4-preset pool steering in `lib/pool.ts`.
 
 ## [2026-09-02] Replay the current clip before rating
 Each 30s preview plays once and then you rate it. If you get distracted, or the audio
 starts before headphones are on, there's no way to hear it again without restarting the
 whole session. A replay button on the playing screen would fix it.
+**Status (2026-10-08): Done.** Shipped via card tap-to-replay (commit 7fb5dc7) and restart button in `components/discovery/reveal-card.tsx` (commit e2486d4).
 
 **Status: Done (superseded).** The rating-quiz flow this described no longer exists —
 the app is swipe-based now — but the underlying need (replay a clip) is met by
@@ -201,6 +215,7 @@ tap-to-pause/resume/replay on the swipe card (commit 7fb5dc7).
 ## [2026-09-02] Adjustable session length
 TRACKS_PER_SESSION is hardcoded to 10. Some people will want a quick 5-track round,
 others will want to keep going past 10. Make it a choice on the setup screen.
+**Status (2026-10-08): Obsolete.** Superseded; rating quiz setup screen retired in favor of continuous swipe feed without session length limits.
 
 **Status: Obsolete.** `TRACKS_PER_SESSION` and the setup screen it belonged to no longer
 exist — the swipe-discovery feed is continuous, with no fixed session length to make
@@ -209,6 +224,7 @@ adjustable.
 ## [2026-09-02] Share your results
 The summary screen lists your mismatches, which is the interesting part and the reason
 someone would tell a friend about the app. Right now there's no way to share it.
+**Status (2026-10-08): Obsolete.** Superseded; rating quiz results retired. Listening analytics share cards exist in Taste Decoded and unpushed `you-page` (commit 4a12929).
 
 **Status: Obsolete.** The summary/mismatch screen belonged to the retired rating quiz
 and no longer exists. The closest thing today, the Profile tab's listening-data
@@ -219,6 +235,7 @@ against.
 On second launch the app skips setup and resumes from saved genre picks. Convenient, but
 invisible — a returning user may think the genre screen is broken. Consider a "Resume or
 start over?" prompt instead of jumping straight in.
+**Status (2026-10-08): Obsolete.** Superseded; setup screen and onboarding genre picks removed; app opens directly into discovery feed.
 
 **Status: Obsolete.** Genre picks and the setup screen no longer exist — the app starts
 directly into the swipe feed, with no setup step to resume past or clarify.
@@ -228,6 +245,7 @@ directly into the swipe feed, with no setup step to resume past or clarify.
 A mis-swipe is currently permanent — the track is logged as seen and never
 resurfaces. In a thumb-driven interface that's going to happen constantly.
 An undo button should pop the last swipe entry and put the track back on top.
+**Status (2026-10-08): Done.** Shipped in `components/discovery/undo-button.tsx` and `app/(tabs)/index.tsx` (commit 5397ad1).
 
 **Status: Done.** Commit 5397ad1, "Add one-level, full-rollback undo for the last swipe."
 
@@ -236,6 +254,7 @@ Right-swipes steer what plays next but aren't kept anywhere, so there's no way
 to go back to something you liked. Saving them would give the app a reason to
 return to, and would give the Profile tab real data again now that the quiz no
 longer feeds it.
+**Status (2026-10-08): Done.** Shipped in `app/modal.tsx` and `components/discovery/liked-tracks-button.tsx` (commit 36315ad).
 
 **Status: Done.** Commit 36315ad, "Add liked tracks list, reachable from the swipe
 screen." (The Profile tab was later rebuilt around swipeHistory/session data instead —
@@ -255,6 +274,7 @@ the intent — one direction for "more from this artist," another for "more like
 sound" — so there's no deferred choice and no timer. Removes action-overlay.tsx
 entirely. Needs a visual hint that appears while dragging so the user can see where
 each direction leads.
+**Status (2026-10-08): Done.** Shipped via persistent steering row replacing deferred overlay in `components/discovery/tune-sheet.tsx` (commit b1567f5).
 
 **Status: Done, different mechanism.** `action-overlay.tsx` was removed and steering is
 no longer deferred, per commit b1567f5, "Make steering always-available, replacing the
@@ -280,6 +300,7 @@ not act on it. Tapping a liked track should offer "more from this artist" and
 Same machinery as the post-like overlay, but reachable when you're browsing what
 you saved rather than only in the moment after a swipe. May be a better home for
 those two options than the overlay is.
+**Status (2026-10-08): Done.** Liked list → "More from this artist" / "More like this sound" steer Home (app/modal.tsx).
 
 **Status: Open.** The overlay this refers to is gone now (steering is a persistent row,
 not a post-like overlay — see "Move the artist/sound choice into the swipe itself"
@@ -298,6 +319,7 @@ elapsed playback time from the player into each swipe) and the SwipeEntry
 schema in lib/discovery.ts — existing persisted entries won't have listenMs,
 so the new logic needs a sensible fallback for old data (probably: no
 listenMs recorded means don't count it as heard, same as it not existing).
+**Status (2026-10-08): Done.** Shipped in `lib/discovery.ts` (`RATED_LISTEN_THRESHOLD_MS`, `deriveRatedGenres`) via commit ca044e1.
 
 **Status: Done.** Commit ca044e1, "Base 'heard' on listen time instead of swipe
 action" — `listenMs` landed on `SwipeEntry` exactly as described, and has since become
@@ -334,6 +356,8 @@ were tried live and found not to work. Recorded here so they don't get re-invest
   future region needs this same live check before being added or assumed to behave like
   a neighboring one.
 
+**Status (2026-10-08): Done.** Shipped; investigated and respected; storefront scoping in `components/discovery/region-toggle.tsx` and title filter in commit dc1a9f1.
+
 ## [2026-09-05] Background taste weighting
 Genre-jump/fallback selection (`pickJumpGenre`) currently has no notion of which genres
 you actually enjoy — it picks by "unexplored" and "least-recently-heard," not by
@@ -346,6 +370,8 @@ actually changes (jump selection? fallback order? both?), and how it interacts w
 deliberate steering, which is supposed to represent a stronger, more immediate signal
 than ambient listening time.
 
+**Status (2026-10-08): Won't build.** Weighting jumps toward genres you already spend time in pulls against the blind-spot idea; jumps keep favoring genres you haven't heard.
+
 ## [2026-09-05] Genre adjacency from path data
 The Profile tab's genre path (`deriveGenrePath`/`deriveGenrePathSegments`) already
 records the literal sequence of genres each session moves through. That's raw material
@@ -354,6 +380,8 @@ usually end up at Techno) that doesn't exist yet — path data is currently only
 as a per-session chain, never aggregated across sessions into a transition/adjacency
 view. Purely additive on top of existing data; no new persisted fields needed, same
 "derive it from what's already on disk" approach the sessions/path features already use.
+
+**Status (2026-10-08): Parked.** "Genres that follow each other" needs many people's paths; one person's history is too thin to say anything yet.
 
 ## [2026-09-05] Search + song page
 A search bar that queries the iTunes search endpoint with a user-typed term (rather
@@ -374,3 +402,4 @@ response is metadata only — no description, no context, nothing to display bey
 fields listed above. Producing one would mean a per-track LLM call, which means an API
 key living in a client-side app. Not part of this entry; a real design question for
 whenever/if that's actually wanted.
+**Status (2026-10-08): Done.** Shipped in `app/search.tsx`, `app/song.tsx`, and `lib/song-details.ts` (commit a556dd6).

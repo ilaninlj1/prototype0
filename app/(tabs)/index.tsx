@@ -1,5 +1,5 @@
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -60,6 +60,7 @@ import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
 import { ART, collageRects, type ArtCanvas, type Mark } from '@/lib/collage';
 import { hideFromDiscovery, shouldSkip } from '@/lib/human-check-api';
+import { takeSteerRequest } from '@/lib/steer-request';
 
 function randomGenre(): string {
   return GENRES[Math.floor(Math.random() * GENRES.length)];
@@ -514,6 +515,18 @@ export default function HomeScreen() {
     captureUndoSnapshot();
     applySteeringStrategy('sound', { type: 'genre', genre: currentTrack.primaryGenreName });
   }
+
+  const applyRouteSteering = useEffectEvent((kind: 'artist' | 'sound', next: Strategy) => {
+    captureUndoSnapshot();
+    void applySteeringStrategy(kind, next);
+  });
+
+  // Liked list → "More from this artist" / "More like this sound".
+  useEffect(() => {
+    if (!hydrated || !isFocused) return;
+    const request = takeSteerRequest();
+    if (request) applyRouteSteering(request.kind, request.strategy);
+  }, [hydrated, isFocused]);
 
   async function commitGenreJump(genre: string, nextHistory: SwipeEntry[], excludeArtists: Set<string>) {
     if (nextMode === 'artist') setNextMode('genre');
