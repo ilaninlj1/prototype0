@@ -7,9 +7,21 @@ export const NUDGE = {
   trigger: { weekday: 1, hour: 18, minute: 0 }, // expo weekly trigger: 1 = Sunday
 } as const;
 
-/** What the weekly reminder says: a Taste Decoded finding they haven't opened beats the Called it text. */
-export function nudgeContent(unseen: { sentence: string } | null): { title: string; body: string; url: string } {
-  return unseen
-    ? { title: 'New finding about your taste', body: unseen.sentence, url: '/decoded' }
-    : { title: NUDGE.title, body: NUDGE.body, url: NUDGE.url };
+export type NudgeItem = { sentence: string };
+
+/**
+ * What the weekly reminder says: the top unseen news item beats a Taste Decoded finding,
+ * which beats the Called it fallback text.
+ */
+export function nudgeContent(
+  news?: NudgeItem | null,
+  finding?: NudgeItem | null
+): { title: string; body: string; url: string } {
+  if (news) {
+    return { title: NUDGE.title, body: news.sentence, url: NUDGE.url };
+  }
+  if (finding) {
+    return { title: 'New finding about your taste', body: finding.sentence, url: '/decoded' };
+  }
+  return { title: NUDGE.title, body: NUDGE.body, url: NUDGE.url };
 }

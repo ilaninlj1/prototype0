@@ -151,7 +151,8 @@ function makePacer(delayMs: number): <T>(fn: () => Promise<T>) => Promise<T> {
 }
 
 const pacedLastFm = makePacer(lastfmDelayMs);
-const pacedItunes = makePacer(itunesDelayMs);
+export const pacedItunes = makePacer(itunesDelayMs);
+
 
 // ---------- Networking: bounded retries, not indefinite — this is live/user-facing, unlike the seed scripts ----------
 

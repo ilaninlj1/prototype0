@@ -39,3 +39,10 @@ test('milestone descriptions prefer the highest milestone, then substantial grow
   assert.equal(describeMilestone('Mabe Fratti', 4_800, 5_000), null);
   assert.equal(describeMilestone('Mabe Fratti', undefined, 50_000), null);
 });
+
+test('describeMilestone: names the count you found them at, not a later checkpoint', () => {
+  assert.equal(
+    describeMilestone('Mabe Fratti', 30_000, 52_000, 4_800),
+    'Mabe Fratti passed 50K listeners. You found them at 4.8K.'
+  );
+});
