@@ -425,3 +425,29 @@ export const saveDecodedSeen = (ids: string[]) => writeJson(DECODED_SEEN_KEY, id
 const DECODED_VOTES_KEY = `${STORAGE_PREFIX}:decodedVotes`;
 export const loadDecodedVotes = () => readJson<DecodedVotes>(DECODED_VOTES_KEY, {});
 export const saveDecodedVotes = (votes: DecodedVotes) => writeJson(DECODED_VOTES_KEY, votes);
+
+// ---------- Finds News ----------
+
+export type NewsSeenEntry = { listeners: number; seenAt: number };
+export type NewsSeenState = Record<string, NewsSeenEntry>;
+
+const NEWS_SEEN_KEY = `${STORAGE_PREFIX}:newsSeen`;
+export const loadNewsSeen = () => readJson<NewsSeenState>(NEWS_SEEN_KEY, {});
+export const saveNewsSeen = (seen: NewsSeenState) => writeJson(NEWS_SEEN_KEY, seen);
+
+export type ArtistRelease = {
+  collectionId: number;
+  collectionName: string;
+  releaseDate: string;
+  artworkUrl100?: string;
+};
+export type ReleaseCheck = {
+  checkedAt: number;
+  releases: ArtistRelease[];
+};
+export type ReleaseChecks = Record<number, ReleaseCheck>;
+
+const RELEASE_CHECKS_KEY = `${STORAGE_PREFIX}:releaseChecks`;
+export const loadReleaseChecks = () => readJson<ReleaseChecks>(RELEASE_CHECKS_KEY, {});
+export const saveReleaseChecks = (checks: ReleaseChecks) => writeJson(RELEASE_CHECKS_KEY, checks);
+

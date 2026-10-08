@@ -1,11 +1,12 @@
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArtPiece } from '@/components/art/art-piece';
 import { FlyingCover } from '@/components/art/flying-cover';
 import { CardStack } from '@/components/discovery/card-stack';
+import { FindsNewsSheet } from '@/components/finds-news-sheet';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
 import { REVEAL_COVER, REVEAL_COVER_CENTER, RevealCard } from '@/components/discovery/reveal-card';
@@ -24,8 +25,9 @@ import { UndoButton } from '@/components/discovery/undo-button';
 import { CreditLine } from '@/components/credits';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
 import { addToCanvas, saveOnCanvas, undoOnCanvas, useArt } from '@/hooks/use-art';
+import { useFindsNews } from '@/hooks/use-finds-news';
 import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import {
   deriveGenresHeard,
@@ -112,6 +114,14 @@ export default function HomeScreen() {
   // set and exclude those artists when refilling"). Deliberately plain
   // state, not persisted — resets each launch, unlike swipeHistory.
   const [seenArtists, setSeenArtists] = useState<Set<string>>(new Set());
+
+  const { news, dismissNews, syncReleases } = useFindsNews();
+  const [newsSheetVisible, setNewsSheetVisible] = useState(false);
+  // New-release checks wait until the feed has its first cards.
+  const hasCards = queue.length > 0;
+  useEffect(() => {
+    if (hydrated && hasCards) syncReleases();
+  }, [hydrated, hasCards, syncReleases]);
 
   // The track just liked, shown face-up until tapped away. It stays at
   // queue[0] meanwhile, so its preview keeps playing through the reveal.
@@ -643,6 +653,19 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
+      {news.length > 0 && (
+        <TouchableOpacity
+          onPress={() => setNewsSheetVisible(true)}
+          activeOpacity={0.8}
+          style={styles.newsStrip}
+          accessibilityRole="button"
+          accessibilityLabel={`While you were gone, ${news.length} updates`}>
+          <ThemedText style={styles.newsStripText}>
+            While you were gone · {news.length}
+          </ThemedText>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           <DropRing />
@@ -742,11 +765,39 @@ export default function HomeScreen() {
           onLanded={() => handleLanded(flying.mark)}
         />
       )}
+      <FindsNewsSheet
+        visible={newsSheetVisible}
+        items={news}
+        onClose={(played) => {
+          setNewsSheetVisible(false);
+          dismissNews();
+          // A news song took the player; put the card's song back.
+          if (played && currentTrack?.previewUrl) {
+            player.replace(currentTrack.previewUrl);
+            player.play();
+          }
+        }}
+      />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  newsStrip: {
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.xs + 2,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newsStripText: {
+    fontFamily: Fonts.monoMedium,
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: Colors.accentText,
+  },
   container: {
     flex: 1,
     paddingHorizontal: Spacing.lg,

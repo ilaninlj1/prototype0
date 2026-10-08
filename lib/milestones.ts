@@ -16,11 +16,13 @@ export function grewALot(before: Count, now: Count): boolean {
   return known(before) && known(now) && now >= before * 1.25 && now - before >= 1_000;
 }
 
-export function describeMilestone(artistName: string, before: Count, now: Count): string | null {
+/** foundAt is the count when the song was saved; before can be a later checkpoint. */
+export function describeMilestone(artistName: string, before: Count, now: Count, foundAt: Count = before): string | null {
   const milestone = crossedMilestone(before, now);
   if (milestone == null && !grewALot(before, now)) return null;
   const change = milestone != null
     ? `passed ${describeListeners(milestone).count}`
     : `grew to ${describeListeners(now!).count}`;
-  return `${artistName} ${change} listeners. You found them at ${describeListeners(before!).count}.`;
+  const found = known(foundAt) ? foundAt : before!;
+  return `${artistName} ${change} listeners. You found them at ${describeListeners(found).count}.`;
 }

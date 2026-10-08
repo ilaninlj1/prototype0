@@ -6,14 +6,19 @@ import { useSongFeel } from '@/hooks/use-song-feel';
 import type { DiscoveryTrack, SwipeEntry } from '@/lib/discovery';
 import {
   loadBlindTest,
+  loadCalls,
   loadDecodedSeen,
   loadDecodedVotes,
   loadLikedTracks,
+  loadListenersNow,
+  loadNewsSeen,
+  loadReleaseChecks,
   loadSwipeHistory,
   saveDecodedSeen,
   saveDecodedVotes,
   type BlindTestResult,
 } from '@/lib/discovery-storage';
+import { buildFindsNews } from '@/lib/finds-news';
 import type { Baselines } from '@/lib/genre-sound';
 import { setWeeklyNudge } from '@/lib/nudge';
 import { nudgeContent } from '@/lib/nudge-config';
@@ -39,12 +44,31 @@ export function onDecodedNews(fn: () => void): () => void {
 
 /** Recompute from storage; light the YOU dot for a finding nobody has opened; point the Sunday reminder at it. App start and after the Blind Spot Test. */
 export async function refreshDecodedNews(): Promise<void> {
-  const [liked, history, feels, test, seen] = await Promise.all([loadLikedTracks(), loadSwipeHistory(), loadFeels(), loadBlindTest(), loadDecodedSeen()]);
+  const [liked, history, feels, test, seen, newsSeen, releaseChecks, calls, listenersNow] = await Promise.all([
+    loadLikedTracks(),
+    loadSwipeHistory(),
+    loadFeels(),
+    loadBlindTest(),
+    loadDecodedSeen(),
+    loadNewsSeen(),
+    loadReleaseChecks(),
+    loadCalls(),
+    loadListenersNow(),
+  ]);
   const unseen = unseenFinding(decodeTaste({ liked, history, feels, test }, BASELINES), seen);
   hasNews = unseen != null;
   if (hasNews) newsListeners.forEach((fn) => fn());
-  await setWeeklyNudge(nudgeContent(unseen));
+  const news = buildFindsNews({
+    likedTracks: liked,
+    newsSeen,
+    releaseChecks,
+    calls,
+    listenersNow: Object.fromEntries(Object.entries(listenersNow).map(([k, v]) => [k, v.listeners])),
+  });
+  const topNews = news[0] ?? null;
+  await setWeeklyNudge(nudgeContent(topNews, unseen));
 }
+
 
 /** Findings for the You tab and the Decoded page. Measures saves that still need it, sharing the Tasteform's cache. */
 export function useTasteDecoded(liked: DiscoveryTrack[], history: SwipeEntry[]) {
@@ -74,9 +98,10 @@ export function useTasteDecoded(liked: DiscoveryTrack[], history: SwipeEntry[]) 
   // Keep the Sunday reminder in step with what's on screen.
   const unseenId = unseen?.id ?? null;
   useEffect(() => {
-    if (seen) setWeeklyNudge(nudgeContent(unseen));
+    if (seen) setWeeklyNudge(nudgeContent(null, unseen));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run when the unseen finding changes, not its object
   }, [unseenId, seen != null]);
+
 
   async function markSeen() {
     const ids = [...new Set([...(seen ?? []), ...findings.map((f) => f.id)])];
