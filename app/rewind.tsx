@@ -49,10 +49,13 @@ import {
   type Place,
   type Unit,
 } from '@/lib/rewind';
-import { describeImport, spotifyTrackUrl, type SpotifyLike } from '@/lib/spotify';
+import { knownCount, setKnownArtists } from '@/lib/known-artists';
+import { describeImport, mergeSaves, spotifyTrackUrl, type SpotifyLike } from '@/lib/spotify';
 import {
   clearSpotifyLibrary,
   FAIL_TEXT,
+  FILE_FAIL_TEXT,
+  importAndKeepFile,
   importSpotifyLikes,
   loadSpotifyLibrary,
   saveSpotifyLibrary,
@@ -129,8 +132,20 @@ export default function RewindScreen() {
   // Scrubbing: locked to a step, walking stop by stop (only days with songs), `back` and `ahead` of where you were.
   const [scrubbing, setScrubbing] = useState<{ unit: Unit; back: Place[]; ahead: Place[]; steps: number } | null>(null);
 
-  // Spotify liked songs: kept apart from your finds, shown only while the switch is on.
-  const [spotify, setSpotify] = useState<SpotifyLibrary | null>(null);
+  // Spotify songs: kept apart from your finds, shown only while the switch is on. Two slots, the
+  // login's and an imported file's, shown together with each song once.
+  const [loginLib, setLoginLib] = useState<SpotifyLibrary | null>(null);
+  const [fileLib, setFileLib] = useState<SpotifyLibrary | null>(null);
+  const spotify = useMemo<SpotifyLibrary | null>(
+    () =>
+      loginLib || fileLib
+        ? {
+            syncedAt: Math.max(loginLib?.syncedAt ?? 0, fileLib?.syncedAt ?? 0),
+            likes: mergeSaves([...(loginLib?.likes ?? []), ...(fileLib?.likes ?? [])]),
+          }
+        : null,
+    [loginLib, fileLib]
+  );
   const [spotifyOn, setSpotifyOn] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [importing, setImporting] = useState<number | null>(null);
@@ -139,16 +154,22 @@ export default function RewindScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [liked, h, library] = await Promise.all([loadLikedTracks(), loadSwipeHistory(), loadSpotifyLibrary()]);
+      const [liked, h, login, file] = await Promise.all([
+        loadLikedTracks(),
+        loadSwipeHistory(),
+        loadSpotifyLibrary('login'),
+        loadSpotifyLibrary('file'),
+      ]);
       if (cancelled) return;
       const dated = withLikedAt(liked, h).filter((t) => t.likedAt != null);
       setFinds(dated);
       setHistory(h);
-      const withSpotify = !!library?.likes.length;
-      setSpotify(library);
-      setSpotifyOn(withSpotify);
-      // Open on your latest find (or latest Spotify like, if that's all there is).
-      setView(latest(dated.length || !withSpotify ? dated.map((t) => t.likedAt!) : library!.likes.map((l) => l.addedAt)));
+      const spotifyTimes = [...(login?.likes ?? []), ...(file?.likes ?? [])].map((l) => l.addedAt);
+      setLoginLib(login);
+      setFileLib(file);
+      setSpotifyOn(spotifyTimes.length > 0);
+      // Open on your latest find (or latest Spotify song, if that's all there is).
+      setView(latest(dated.length || !spotifyTimes.length ? dated.map((t) => t.likedAt!) : spotifyTimes));
       setLoaded(true);
     })();
     return () => {
@@ -225,12 +246,30 @@ export default function RewindScreen() {
       return setNotice(result === 'wrong-link' ? `${FAIL_TEXT[result]} ${spotifyReturnUrl()}` : FAIL_TEXT[result]);
     }
     const library = { syncedAt: Date.now(), likes: result };
-    await saveSpotifyLibrary(library);
+    await saveSpotifyLibrary(library, 'login');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSpotify(library);
-    setSpotifyOn(result.length > 0);
+    setLoginLib(library);
+    setSpotifyOn(result.length > 0 || !!fileLib?.likes.length);
     setNotice(result.length ? `Brought in ${describeImport(result, now)}` : describeImport(result, now));
     if (!view) setView(latest(result.map((l) => l.addedAt)));
+  }
+
+  /** Anyone, no Spotify test list needed: the CSV or ZIP from exportify.app. Replaces an earlier import. */
+  async function importFile() {
+    setSheet(false);
+    setNotice(null);
+    setImporting(0);
+    const library = await importAndKeepFile();
+    setImporting(null);
+    if (typeof library === 'string') {
+      if (library !== 'cancelled') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return setNotice(FILE_FAIL_TEXT[library]);
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setFileLib(library);
+    setSpotifyOn(true);
+    setNotice(`Imported ${describeImport(library.likes, now)} Home now skips the ${knownCount()} artists already in it.`);
+    if (!view) setView(latest(library.likes.map((l) => l.addedAt)));
   }
 
   function removeSpotify() {
@@ -240,8 +279,10 @@ export default function RewindScreen() {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          await clearSpotifyLibrary();
-          setSpotify(null);
+          await Promise.all([clearSpotifyLibrary('login'), clearSpotifyLibrary('file')]);
+          setKnownArtists([]);
+          setLoginLib(null);
+          setFileLib(null);
           setSpotifyOn(false);
           setNotice(null);
           settle(findTimes, true);
@@ -428,7 +469,7 @@ export default function RewindScreen() {
               <FontAwesome name="spotify" size={16} color={spotifyOn ? Colors.accentText : Colors.text} />
             )}
             <ThemedText style={[styles.chipText, spotifyOn && styles.chipTextOn]}>
-              {importing != null ? `${importing}` : spotify?.likes.length ? 'Spotify' : '+ Spotify'}
+              {importing != null ? (importing > 0 ? `${importing}` : '…') : spotify?.likes.length ? 'Spotify' : '+ Spotify'}
             </ThemedText>
           </Pressable>
         </View>
@@ -530,12 +571,17 @@ export default function RewindScreen() {
               {spotifyOn && spotify && (
                 <View style={styles.footer}>
                   <ThemedText style={styles.footerText}>
-                    {describeImport(spotify.likes, now)} Synced {shortDate(spotify.syncedAt, now)}. Tap a Spotify cover to open it
-                    there.
+                    {describeImport(spotify.likes, now)} Updated {shortDate(spotify.syncedAt, now)}. Tap a Spotify cover to open
+                    it there.
                   </ThemedText>
                   <View style={styles.footerActions}>
-                    <Pressable onPress={connect} hitSlop={8} style={Ui.textButton}>
-                      <ThemedText style={styles.link}>Sync again</ThemedText>
+                    {loginLib && (
+                      <Pressable onPress={connect} hitSlop={8} style={Ui.textButton}>
+                        <ThemedText style={styles.link}>Sync again</ThemedText>
+                      </Pressable>
+                    )}
+                    <Pressable onPress={importFile} hitSlop={8} style={Ui.textButton}>
+                      <ThemedText style={styles.link}>{fileLib ? 'Import again' : 'Import a file'}</ThemedText>
                     </Pressable>
                     <Pressable onPress={removeSpotify} hitSlop={8} style={Ui.textButton}>
                       <ThemedText style={styles.link}>Remove</ThemedText>
@@ -584,7 +630,7 @@ export default function RewindScreen() {
             </View>
           </>
         )}
-        <SpotifySheet visible={sheet} onConnect={connect} onClose={() => setSheet(false)} />
+        <SpotifySheet visible={sheet} onConnect={connect} onImport={importFile} onClose={() => setSheet(false)} />
       </View>
     </GestureDetector>
   );

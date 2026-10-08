@@ -17,6 +17,8 @@ import {
   verifierFrom,
   type SpotifyLike,
 } from './spotify';
+import { setKnownArtists } from './known-artists';
+import { filesFromZip, readExport, type NamedText } from './spotify-file';
 
 // The network and storage half of your Spotify songs, liked and playlist adds (see lib/spotify.ts for the why).
 // Nothing is kept from the login: one pass reads your liked songs and the token is dropped.
@@ -155,19 +157,26 @@ async function readPlaylistAdds(token: string, onProgress: (count: number) => vo
 // ---------- Storage ----------
 // Kept apart from your Blindspot saves on purpose: these never count as blind finds,
 // never join the Tasteform, and never leave the phone.
+// Two slots: songs read through the login, and songs from a file you imported. They're kept
+// apart so a login "Sync again" never wipes an import, and because only file songs may feed
+// stats (see SpotifyLike.source).
 // Saved in chunks, because one big AsyncStorage value can fail to read back on Android (about 2 MB).
 
-const PREFIX = 'blindspotDiscovery:spotify';
-const META_KEY = `${PREFIX}Meta`;
+export type SpotifySlot = 'login' | 'file';
+const prefixOf = (slot: SpotifySlot) => (slot === 'login' ? 'blindspotDiscovery:spotify' : 'blindspotDiscovery:spotifyFile');
 const CHUNK = 1000;
 
 export type SpotifyLibrary = { syncedAt: number; likes: SpotifyLike[] };
 
-export async function loadSpotifyLibrary(): Promise<SpotifyLibrary | null> {
+export async function loadSpotifyLibrary(slot: SpotifySlot = 'login'): Promise<SpotifyLibrary | null> {
+  const prefix = prefixOf(slot);
   try {
-    const meta = JSON.parse((await AsyncStorage.getItem(META_KEY)) ?? 'null') as { syncedAt: number; chunks: number } | null;
+    const meta = JSON.parse((await AsyncStorage.getItem(`${prefix}Meta`)) ?? 'null') as {
+      syncedAt: number;
+      chunks: number;
+    } | null;
     if (!meta) return null;
-    const keys = Array.from({ length: meta.chunks }, (_, i) => `${PREFIX}:${i}`);
+    const keys = Array.from({ length: meta.chunks }, (_, i) => `${prefix}:${i}`);
     const rows = await AsyncStorage.multiGet(keys);
     const likes = rows.flatMap(([, raw]) => (raw ? (JSON.parse(raw) as SpotifyLike[]) : []));
     return { syncedAt: meta.syncedAt, likes };
@@ -176,25 +185,74 @@ export async function loadSpotifyLibrary(): Promise<SpotifyLibrary | null> {
   }
 }
 
-export async function saveSpotifyLibrary(library: SpotifyLibrary): Promise<void> {
+export async function saveSpotifyLibrary(library: SpotifyLibrary, slot: SpotifySlot = 'login'): Promise<void> {
+  const prefix = prefixOf(slot);
   try {
-    await clearSpotifyLibrary();
+    await clearSpotifyLibrary(slot);
     const chunks: [string, string][] = [];
     for (let i = 0; i * CHUNK < library.likes.length; i++) {
-      chunks.push([`${PREFIX}:${i}`, JSON.stringify(library.likes.slice(i * CHUNK, (i + 1) * CHUNK))]);
+      chunks.push([`${prefix}:${i}`, JSON.stringify(library.likes.slice(i * CHUNK, (i + 1) * CHUNK))]);
     }
     if (chunks.length) await AsyncStorage.multiSet(chunks);
-    await AsyncStorage.setItem(META_KEY, JSON.stringify({ syncedAt: library.syncedAt, chunks: chunks.length }));
+    await AsyncStorage.setItem(`${prefix}Meta`, JSON.stringify({ syncedAt: library.syncedAt, chunks: chunks.length }));
   } catch {
     // ignore
   }
 }
 
-export async function clearSpotifyLibrary(): Promise<void> {
+export async function clearSpotifyLibrary(slot: SpotifySlot = 'login'): Promise<void> {
+  const prefix = prefixOf(slot);
   try {
-    const keys = (await AsyncStorage.getAllKeys()).filter((k) => k === META_KEY || k.startsWith(`${PREFIX}:`));
+    // 'blindspotDiscovery:spotify:' never matches the file slot's 'blindspotDiscovery:spotifyFile:' keys.
+    const keys = (await AsyncStorage.getAllKeys()).filter((k) => k === `${prefix}Meta` || k.startsWith(`${prefix}:`));
     if (keys.length) await AsyncStorage.multiRemove(keys);
   } catch {
     // ignore
   }
+}
+
+// ---------- Importing a file ----------
+
+export type FileFail = 'cancelled' | 'not-exportify' | 'empty' | 'unreadable';
+
+export const FILE_FAIL_TEXT: Record<FileFail, string> = {
+  cancelled: 'No file picked. Nothing changed.',
+  'not-exportify': 'That file isn’t an Exportify export. Export from exportify.app, then pick the .csv or .zip it saves.',
+  empty: 'That file has no songs in it.',
+  unreadable: 'Couldn’t open that file. Try exporting it again.',
+};
+
+/**
+ * Pick Exportify's CSV (Liked Songs, a playlist) or its ZIP of everything, and read the songs.
+ * Several files can be picked at once. Nothing is uploaded.
+ */
+export async function importSpotifyFile(): Promise<SpotifyLike[] | FileFail> {
+  try {
+    // Loaded here, not at the top: an APK built before these modules were added fails on this tap, not at launch.
+    const DocumentPicker = await import('expo-document-picker');
+    const { File } = await import('expo-file-system');
+    const picked = await DocumentPicker.getDocumentAsync({ type: '*/*', multiple: true, copyToCacheDirectory: true });
+    if (picked.canceled || !picked.assets?.length) return 'cancelled';
+    const files: NamedText[] = [];
+    for (const asset of picked.assets) {
+      const file = new File(asset.uri);
+      if (/\.zip$/i.test(asset.name) || asset.mimeType?.includes('zip')) files.push(...filesFromZip(await file.bytes()));
+      else files.push({ name: asset.name, text: await file.text() });
+    }
+    const read = readExport(files);
+    if (read.problem) return read.problem;
+    return read.songs.length ? read.songs : 'empty';
+  } catch {
+    return 'unreadable';
+  }
+}
+
+/** Import a file and keep it: saved in the file slot, and Home starts skipping its artists right away. */
+export async function importAndKeepFile(): Promise<SpotifyLibrary | FileFail> {
+  const result = await importSpotifyFile();
+  if (typeof result === 'string') return result;
+  const library = { syncedAt: Date.now(), likes: result };
+  await saveSpotifyLibrary(library, 'file');
+  setKnownArtists(result);
+  return library;
 }
