@@ -30,15 +30,14 @@ const fmt = (n: number) => describeListeners(n).count;
 
 function ListenersLine({ found, now }: { found?: number; now?: number }) {
   if (found != null && now != null) {
-    const { pct, calledIt } = describeGrowth(found, now);
+    const { pct } = describeGrowth(found, now);
     return (
       <ThemedView style={styles.listenersRow} backgroundColor="transparent">
         <ThemedText type="caption">
           Found at {fmt(found)} → {fmt(now)} now
         </ThemedText>
         {pct !== 0 && (
-          <ThemedText type="caption" style={calledIt ? styles.calledIt : pct > 0 ? styles.up : styles.down}>
-            {calledIt ? 'Called it ' : ''}
+          <ThemedText type="caption" style={pct > 0 ? styles.up : styles.down}>
             {pct > 0 ? '↑' : '↓'} {Math.abs(pct)}%
           </ThemedText>
         )}
@@ -142,10 +141,6 @@ const styles = StyleSheet.create({
   },
   down: {
     color: Colors.textSecondary,
-  },
-  calledIt: {
-    color: Colors.accent,
-    fontWeight: '700',
   },
   linkText: {
     fontSize: 13,
