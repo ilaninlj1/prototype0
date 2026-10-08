@@ -7,12 +7,13 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import Animated, { FadeIn, FlipInEasyY, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { AppleMusicLink, SpotifyLink, LastfmLink } from '@/components/credits';
+import { CallButton } from '@/components/discovery/call-button';
 import { DoubleTapLike } from '@/components/double-tap-like';
 import { HumanBadge } from '@/components/human-badge';
 import { LikeButton } from '@/components/like-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Fonts, Ui } from '@/constants/theme';
+import { Colors, Radius, Spacing, Fonts, TapTarget, Ui } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 import { COVER_BLUR } from './swipe-card';
@@ -33,6 +34,7 @@ type RevealCardProps = {
   /** The card is this wide and as tall as its content; it scrolls, it never clips. */
   width: number;
   onDone: () => void;
+  onSave?: (track: DiscoveryTrack) => Promise<void>;
   /** Extra lines under the listener count — DJ Picks puts the DJ's note here. */
   extra?: ReactNode;
 };
@@ -42,7 +44,7 @@ type RevealCardProps = {
  * controls, Next, who it is and how few people know them. Links, the big
  * cover and comments wait below "Swipe up to reveal more".
  */
-export function RevealCard({ track, listeners, width, onDone, extra }: RevealCardProps) {
+export function RevealCard({ track, listeners, width, onDone, onSave, extra }: RevealCardProps) {
   const router = useRouter();
   const { player, status } = usePlayback();
   const scrollRef = useRef<ScrollView>(null);
@@ -86,9 +88,10 @@ export function RevealCard({ track, listeners, width, onDone, extra }: RevealCar
                 <Pressable style={styles.control} onPress={restart} accessibilityLabel="Play from the start">
                   <Ionicons name="refresh" size={24} color={Colors.text} />
                 </Pressable>
-                <Pressable style={styles.next} onPress={onDone}>
+                <CallButton track={track} listeners={listeners} onSave={onSave} />
+                <Pressable style={styles.next} onPress={onDone} accessibilityLabel="Next song">
                   <ThemedText style={styles.nextLabel}>Next</ThemedText>
-                  <Ionicons name="arrow-forward" size={22} color={Colors.accentText} />
+                  <Ionicons name="arrow-forward" size={18} color={Colors.accentText} />
                 </Pressable>
               </View>
 
@@ -182,9 +185,9 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   controls: { flexDirection: 'row', gap: Spacing.sm, height: CONTROL },
-  control: { ...Ui.outlineButton, width: CONTROL, height: CONTROL, paddingHorizontal: 0 },
+  control: { ...Ui.outlineButton, width: TapTarget, height: CONTROL, paddingHorizontal: 0 },
   next: { ...Ui.outlineButton, flex: 1, height: CONTROL, backgroundColor: Colors.accent, borderColor: Colors.accent, gap: Spacing.sm },
-  nextLabel: { ...Ui.label, fontSize: 18, lineHeight: 22, color: Colors.accentText },
+  nextLabel: { ...Ui.label, color: Colors.accentText },
   head: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg, alignItems: 'center' },
   cover: { width: REVEAL_COVER, height: REVEAL_COVER, borderRadius: Radius.sm, overflow: 'hidden' },
   names: { flex: 1, gap: 2 },

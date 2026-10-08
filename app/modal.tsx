@@ -23,8 +23,10 @@ import { NoteSheet } from '@/components/note-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, TapTarget } from '@/constants/theme';
+import { useCalledShots } from '@/hooks/use-called-shots';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
+import { summarizeCalls } from '@/lib/called-shots';
 import { buildSpotifySearchUrl, filterByGenre, likedGenres, summarizeFinds, type DiscoveryTrack } from '@/lib/discovery';
 import { appendExportBatch, loadLikedTracks, loadRecentlyDeleted, saveLikedTracks, setLikedNote } from '@/lib/discovery-storage';
 import { setNote } from '@/lib/saved-songs';
@@ -88,7 +90,8 @@ export default function LikedTracksScreen() {
   // screen or export history, and vice versa, since it's the same player.
   const { player, status } = usePlayback();
 
-  const listenersNow = useListenersNow(tracks.map((t) => t.artistName));
+  const { calls, loaded: callsLoaded } = useCalledShots();
+  const listenersNow = useListenersNow([...tracks.map((t) => t.artistName), ...calls.map((c) => c.artistName)]);
 
   const reload = useCallback(async () => {
     const [liked, deleted] = await Promise.all([loadLikedTracks(), loadRecentlyDeleted()]);
@@ -232,7 +235,16 @@ export default function LikedTracksScreen() {
     }
   }
 
-  if (!loaded) {
+  async function shareCall(message: string) {
+    try {
+      await Share.share({ message });
+    } catch {
+      pendingArchiveRef.current = null;
+      setFallbackText(message);
+    }
+  }
+
+  if (!loaded || !callsLoaded) {
     return (
       <ThemedView style={styles.centered}>
         <ActivityIndicator color={Colors.accent} />
@@ -249,9 +261,11 @@ export default function LikedTracksScreen() {
   }
   const nowPlaying = savedPlaying ?? (playingTrack?.id === playingId ? playingTrack : null);
   const newestFirst = filterByGenre([...tracks].reverse(), genre && genres.includes(genre) ? genre : null);
-  const { best, calledIt } = summarizeFinds(
+  const { best } = summarizeFinds(
     tracks.map((t) => ({ artistName: t.artistName, found: t.artistListeners, now: listenersNow[t.artistName] }))
   );
+  const callSummary = summarizeCalls(calls, listenersNow);
+  const callsByTrack = new Map(calls.map((c) => [c.trackId, c]));
 
   return (
     <>
@@ -292,15 +306,15 @@ export default function LikedTracksScreen() {
             </ThemedView>
           )}
 
-          {best && (
+          {(tracks.length > 0 || calls.length > 0) && (
             <ThemedView style={styles.summary} backgroundColor={Colors.surface}>
-              <ThemedText type="defaultSemiBold">
-                Best call: {best.artistName} ↑ {best.pct}%
-              </ThemedText>
+              {best && (
+                <ThemedText type="defaultSemiBold">
+                  Best find: {best.artistName} ↑ {best.pct}%
+                </ThemedText>
+              )}
               <ThemedText type="caption">
-                {calledIt > 0
-                  ? `You called ${calledIt} — they've at least doubled since you found them.`
-                  : 'Nothing has doubled yet. Keep digging.'}
+                Your calls: {callSummary.hit} hit, {callSummary.waiting} waiting
               </ThemedText>
             </ThemedView>
           )}
@@ -345,6 +359,8 @@ export default function LikedTracksScreen() {
                   key={track.id}
                   track={track}
                   listenersNow={listenersNow[track.artistName]}
+                  call={callsByTrack.get(track.id)}
+                  onShare={shareCall}
                   playing={playingId === track.id && status.playing}
                   selecting={selectionMode}
                   selected={selectedIds.has(track.id)}

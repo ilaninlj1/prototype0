@@ -100,7 +100,7 @@ export default function ProfileScreen() {
 
   const now = useListenersNow(finds.map((t) => t.artistName));
   const summary = summarizeFinds(finds.map((t) => ({ artistName: t.artistName, found: t.artistListeners, now: now[t.artistName] })));
-  const calledIt = finds.filter(
+  const doubled = finds.filter(
     (t) => t.artistListeners != null && now[t.artistName] != null && describeGrowth(t.artistListeners, now[t.artistName]).calledIt
   );
   const genre = useMemo(() => topGenre(finds), [finds]);
@@ -170,13 +170,13 @@ export default function ProfileScreen() {
                 </ThemedText>
               )}
 
-              {calledIt.length > 0 ? (
+              {doubled.length > 0 ? (
                 <ThemedView style={styles.block} backgroundColor="transparent">
                   <ThemedText style={styles.line}>
-                    You called <ThemedText style={styles.em}>{calledIt.length}</ThemedText> — they&apos;ve at least doubled
+                    <ThemedText style={styles.em}>{doubled.length}</ThemedText> of your finds have at least doubled
                     since you found them:
                   </ThemedText>
-                  {calledIt.map((t) => (
+                  {doubled.map((t) => (
                     <ThemedText key={t.id} style={styles.dim}>
                       {t.artistName}: {fmt(t.artistListeners!)} → {fmt(now[t.artistName])}
                     </ThemedText>
@@ -184,12 +184,12 @@ export default function ProfileScreen() {
                 </ThemedView>
               ) : summary.best ? (
                 <ThemedText style={styles.line}>
-                  Best call so far: <ThemedText style={styles.em}>{summary.best.artistName}</ThemedText>, up{' '}
+                  Best find so far: <ThemedText style={styles.em}>{summary.best.artistName}</ThemedText>, up{' '}
                   {summary.best.pct}% since you found them.
                 </ThemedText>
               ) : (
                 <ThemedText style={styles.line}>
-                  None of your finds have grown yet. When one doubles, you called it.
+                  None of your finds have grown yet. Make a prediction with Call it on a revealed song.
                 </ThemedText>
               )}
 

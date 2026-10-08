@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { BlindTestSong } from './blind-test';
+import { callAction, toggleCall, type CalledShot } from './called-shots';
 import type { CoverColor } from './cover-color';
 import type { Drop, DropVote } from './daily-drop';
 import type { DiscoveryTrack, Region, SwipeEntry } from './discovery';
@@ -16,6 +17,7 @@ const STORAGE_PREFIX = 'blindspotDiscovery';
 const SWIPE_HISTORY_KEY = `${STORAGE_PREFIX}:swipeHistory`;
 const DISCOVERED_GENRES_KEY = `${STORAGE_PREFIX}:discoveredGenres`;
 const LIKED_TRACKS_KEY = `${STORAGE_PREFIX}:likedTracks`;
+const CALLS_KEY = `${STORAGE_PREFIX}:calls`;
 const RECENTLY_DELETED_KEY = `${STORAGE_PREFIX}:recentlyDeleted`;
 const EXPORT_BATCHES_KEY = `${STORAGE_PREFIX}:exportBatches`;
 const REGION_KEY = `${STORAGE_PREFIX}:region`;
@@ -152,6 +154,41 @@ export function updateLikedTracks(change: (tracks: DiscoveryTrack[]) => Discover
 
 export function appendLikedTrack(track: DiscoveryTrack): Promise<void> {
   return updateSaved((s) => saveSong(s, track));
+}
+
+export async function loadCalls(): Promise<CalledShot[]> {
+  try {
+    const raw = await AsyncStorage.getItem(CALLS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+const callListeners = new Set<(calls: CalledShot[]) => void>();
+export function onCallsChange(fn: (calls: CalledShot[]) => void): () => void {
+  callListeners.add(fn);
+  return () => { callListeners.delete(fn); };
+}
+
+let callsQueue: Promise<void> = Promise.resolve();
+
+/** Recheck the limit inside the queue; only accepted new calls save a song. */
+export function toggleStoredCall(call: CalledShot, saveTrack: () => Promise<void>): Promise<void> {
+  callsQueue = callsQueue.then(async () => {
+    try {
+      const calls = await loadCalls();
+      const next = toggleCall(calls, call);
+      if (next === calls) return;
+      if (callAction(calls, call.trackId, call.calledAt) === 'call') await saveTrack();
+      await AsyncStorage.setItem(CALLS_KEY, JSON.stringify(next));
+      callListeners.forEach((fn) => fn(next));
+    } catch {
+      // ignore
+    }
+  });
+  return callsQueue;
 }
 
 /** Remove songs from Liked into Recently deleted. */

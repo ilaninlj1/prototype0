@@ -670,6 +670,7 @@ export default function HomeScreen() {
                 listeners={revealListeners}
                 width={cardSize.width}
                 onDone={handleRevealDone}
+                onSave={handleSave}
               />
             ) : (
               <CardStack
