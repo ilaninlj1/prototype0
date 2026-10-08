@@ -16,6 +16,25 @@ Description of the bug, repro steps, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-10-08] Audit: three small feed bugs fixed, two pool caveats still live
+
+Fixed:
+- **Late Similar lookup overrode Undo.** `strategyAfterSwipe` set the strategy after
+  its await but before the caller's epoch check, so in Similar mode a skip followed by
+  a quick Undo could land the old hop on top of the restored strategy. It now takes the
+  caller's epoch and only sets the strategy if no swipe or Undo came first.
+- **Fallback retried an exhausted genre.** Once every genre was heard, `pickJumpGenre`'s
+  least-recent branch ignored the exclusions, so `refillQueueWithFallback` kept picking
+  the same empty genre. Tried genres are now removed from the lists it's given, and it
+  stops when none are left.
+- **`describeGrowth(0, n)`** returned NaN or Infinity, and (0, 0) counted as "called it".
+  No baseline now means no growth.
+
+Still live from the 2026-09-14 entry (the pool replaced `fetchTracksByGenre` on Home):
+- The region toggle doesn't affect genre browsing, since the pool has no region.
+- A raw iTunes genre name with no seed entry gives an empty pool and falls back to
+  another genre.
+
 ## [2026-09-14] fetchTracksByGenre serves chart-relevance results, not genre-representative ones — live, not a stale path
 
 `fetchTracksByGenre` (`lib/discovery.ts:324-333`) issues a bare

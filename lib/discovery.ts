@@ -160,6 +160,7 @@ export function describeListeners(listeners: number): { count: string; verdict: 
 
 /** How an artist's listener count moved since you found them. "Called it" means it at least doubled. */
 export function describeGrowth(found: number, now: number): { pct: number; calledIt: boolean } {
+  if (found <= 0) return { pct: 0, calledIt: false };
   return { pct: Math.round(((now - found) / found) * 100), calledIt: now >= found * 2 };
 }
 
@@ -619,8 +620,10 @@ export async function refillQueueWithFallback(
 
     fallbacks += 1;
     if (currentStrategy.type === 'genre') triedGenres.add(currentStrategy.genre);
-    const excluded = new Set([...genresHeard, ...triedGenres]);
-    const fallbackGenre = pickJumpGenre(knownGenres, excluded, allGenres, history);
+    const untriedDiscovered = knownGenres.filter((g) => !triedGenres.has(g));
+    const untriedAll = allGenres.filter((g) => !triedGenres.has(g));
+    if (untriedDiscovered.length === 0 && untriedAll.length === 0) break;
+    const fallbackGenre = pickJumpGenre(untriedDiscovered, genresHeard, untriedAll, history);
     currentStrategy = { type: 'genre', genre: fallbackGenre };
   }
 

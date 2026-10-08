@@ -418,13 +418,13 @@ export default function HomeScreen() {
     // A swipe during the lookup moved the feed on; this hop is stale.
     if (next && refillEpochRef.current === epoch) applySteeringStrategy('artist', next);
   }
-  async function strategyAfterSwipe(track: DiscoveryTrack, history: SwipeEntry[]): Promise<Strategy> {
+  async function strategyAfterSwipe(track: DiscoveryTrack, history: SwipeEntry[], epoch: number): Promise<Strategy> {
     if (nextMode !== 'similar') return nextFeedStrategy(history);
     similarCountRef.current += 1;
     if (similarCountRef.current % 3 !== 0) return strategy;
     const next = await similarStrategy(track.artistName);
     if (!next) return strategy;
-    setStrategy(next);
+    if (refillEpochRef.current === epoch) setStrategy(next);
     return next;
   }
 
@@ -438,7 +438,7 @@ export default function HomeScreen() {
     // A similar-artist hop can take seconds; if another swipe lands first,
     // its refill wins and this one (with its older queue) is dropped.
     const epoch = ++refillEpochRef.current;
-    const nextStrategy = await strategyAfterSwipe(track, nextHistory);
+    const nextStrategy = await strategyAfterSwipe(track, nextHistory, epoch);
     if (refillEpochRef.current !== epoch) return;
     await runRefill(nextQueue, nextStrategy, nextHistory, discoveredGenres, region, preset, nextSeen);
   }
@@ -473,7 +473,7 @@ export default function HomeScreen() {
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
     const epoch = ++refillEpochRef.current;
-    const nextStrategy = revealed ? await strategyAfterSwipe(revealed, swipeHistory) : nextFeedStrategy(swipeHistory);
+    const nextStrategy = revealed ? await strategyAfterSwipe(revealed, swipeHistory, epoch) : nextFeedStrategy(swipeHistory);
     if (refillEpochRef.current !== epoch) return;
     await runRefill(
       nextQueue,

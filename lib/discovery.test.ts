@@ -355,6 +355,54 @@ test('refillQueueWithFallback falls back to another genre once the current strat
   assert.equal(calls.length, MAX_REFILL_ATTEMPTS + 1);
 });
 
+test('refillQueueWithFallback moves past an exhausted least-recent genre when all genres are heard', async () => {
+  const calls: string[] = [];
+  const history = [
+    swipe({ trackId: 1, genre: 'Rock', timestamp: 1 }),
+    swipe({ trackId: 2, genre: 'Jazz', timestamp: 2 }),
+  ];
+  const fetcher = async (strategy: Strategy) => {
+    if (strategy.type !== 'genre') throw new Error('unexpected artist strategy');
+    calls.push(strategy.genre);
+    if (strategy.genre === 'Rock') return [];
+    if (strategy.genre === 'Jazz') return [3, 4, 5].map((id) => track({ id, primaryGenreName: 'Jazz' }));
+    throw new Error(`unexpected genre ${strategy.genre}`);
+  };
+
+  const result = await refillQueueWithFallback(
+    [],
+    { type: 'genre', genre: 'Rock' },
+    history,
+    ['Rock', 'Jazz'],
+    ['Rock', 'Jazz'],
+    fetcher
+  );
+
+  assert.deepEqual(result.queue.map((t) => t.id), [3, 4, 5]);
+  assert.deepEqual(result.strategy, { type: 'genre', genre: 'Jazz' });
+  assert.deepEqual(calls, [...Array(MAX_REFILL_ATTEMPTS).fill('Rock'), 'Jazz']);
+});
+
+test('refillQueueWithFallback stops when no untried genres remain', async () => {
+  let calls = 0;
+  const fetcher = async () => {
+    calls += 1;
+    return [];
+  };
+
+  const result = await refillQueueWithFallback(
+    [],
+    { type: 'genre', genre: 'Rock' },
+    [swipe({ genre: 'Rock' })],
+    ['Rock'],
+    ['Rock'],
+    fetcher
+  );
+
+  assert.deepEqual(result.queue, []);
+  assert.equal(calls, MAX_REFILL_ATTEMPTS);
+});
+
 test('refillQueueWithFallback tries distinct genres and terminates instead of looping forever when nothing has anything left', async () => {
   const allGenres = ['G0', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6'];
   const history: SwipeEntry[] = [{ trackId: 1, artistId: 1, genre: 'G0', action: 'skip', timestamp: 1 }];
@@ -463,6 +511,14 @@ test('describeGrowth: percent change since the find, and whether it at least dou
   assert.deepEqual(describeGrowth(10_000, 38_700), { pct: 287, calledIt: true });
   assert.deepEqual(describeGrowth(10_000, 10_400), { pct: 4, calledIt: false });
   assert.deepEqual(describeGrowth(10_000, 9_000), { pct: -10, calledIt: false });
+});
+
+test('describeGrowth: zero listeners without a baseline is not growth', () => {
+  assert.deepEqual(describeGrowth(0, 0), { pct: 0, calledIt: false });
+});
+
+test('describeGrowth: new listeners without a baseline is not growth', () => {
+  assert.deepEqual(describeGrowth(0, 10), { pct: 0, calledIt: false });
 });
 
 test('summarizeFinds: count, median found-at, called-it count and best call', () => {
