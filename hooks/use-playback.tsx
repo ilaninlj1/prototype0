@@ -6,35 +6,44 @@ import {
   type AudioStatus,
 } from 'expo-audio';
 import { useFocusEffect } from 'expo-router';
-import { createContext, useCallback, useContext, useEffect, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 
-type PlaybackContextValue = {
+import { createPlaybackCrossfade } from '@/lib/playback-crossfade';
+
+type PlaybackContextValue = ReturnType<typeof createPlaybackCrossfade<AudioPlayer>> & {
   player: AudioPlayer;
   status: AudioStatus;
 };
 
 const PlaybackContext = createContext<PlaybackContextValue | null>(null);
 
-/**
- * One AudioPlayer for the whole app, created once here at the root (see
- * app/_layout.tsx) rather than once per screen. Every screen previously
- * called useAudioPlayer(null) itself, which creates an independent native
- * player scoped to that component — three call sites meant three players
- * that didn't know about each other, so starting a preview on one screen
- * never stopped one already playing on another. Sharing a single instance
- * fixes that by construction: every screen's replace()/play() acts on the
- * same player, so starting a new preview always replaces whatever the old
- * one was.
- */
+// Screens share the current player; a silent second player peeks at the next card.
 export function PlaybackProvider({ children }: { children: ReactNode }) {
-  const player = useAudioPlayer(null);
-  const status = useAudioPlayerStatus(player);
+  const first = useAudioPlayer(null);
+  const second = useAudioPlayer(null);
+  const [player, setPlayer] = useState(first);
+  // Keep each status subscription attached to its native player across swaps.
+  const firstStatus = useAudioPlayerStatus(first);
+  const secondStatus = useAudioPlayerStatus(second);
+  const status = player === first ? firstStatus : secondStatus;
+  const crossfade = useMemo(() => createPlaybackCrossfade(first, second, setPlayer, {
+    now: Date.now,
+    requestFrame: requestAnimationFrame,
+    cancelFrame: cancelAnimationFrame,
+  }), [first, second]);
 
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
   }, []);
 
-  return <PlaybackContext.Provider value={{ player, status }}>{children}</PlaybackContext.Provider>;
+  useEffect(() => {
+    crossfade.refresh();
+  }, [firstStatus.isLoaded, firstStatus.playing, secondStatus.isLoaded, secondStatus.playing, crossfade]);
+
+  // Stop fades before useAudioPlayer releases its native objects.
+  useLayoutEffect(() => () => crossfade.stopPreview(), [crossfade]);
+
+  return <PlaybackContext.Provider value={{ player, status, ...crossfade }}>{children}</PlaybackContext.Provider>;
 }
 
 export function usePlayback(): PlaybackContextValue {
@@ -50,15 +59,16 @@ export function usePlayback(): PlaybackContextValue {
  * when you return to it (another screen may have loaded a different song in
  * the meantime). Pauses when the screen loses focus.
  */
-export function usePreviewWhileFocused(url: string | undefined) {
-  const { player } = usePlayback();
+export function usePreviewWhileFocused(url: string | undefined, nextUrl?: string) {
+  const { playPreview, stopPreview, peekLoad } = usePlayback();
+  // Blur stops both players; a card change must not pause a promoted preview.
   useFocusEffect(
-    useCallback(() => {
-      if (url) {
-        player.replace(url);
-        player.play();
-      }
-      return () => player.pause();
-    }, [url, player])
+    useCallback(() => () => stopPreview(), [stopPreview])
+  );
+  useFocusEffect(
+    useCallback(() => { playPreview(url); }, [url, playPreview])
+  );
+  useFocusEffect(
+    useCallback(() => { peekLoad(url ? nextUrl : undefined); }, [url, nextUrl, peekLoad])
   );
 }

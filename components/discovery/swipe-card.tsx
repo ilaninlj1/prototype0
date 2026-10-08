@@ -19,6 +19,7 @@ import { HeartBurst } from '@/components/heart-burst';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { mixForDrag, shouldReportMix } from '@/lib/crossfade';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { DEFAULT_SWIPE_THRESHOLDS, resolveSwipeDirection, rotationForDrag, type CardSize, type SwipeDirection } from './swipe-physics';
 
@@ -107,9 +108,11 @@ type SwipeCardProps = {
   allowDown?: boolean;
   /** Home only: double-tap saves the song to Liked (still blind). Single taps then wait a beat for a second tap. */
   onDoubleTap?: (track: DiscoveryTrack) => void;
+  onMix?: (mix: number) => void;
+  onCancelPeek?: () => void;
 };
 
-export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon, allowDown = true, onDoubleTap }: SwipeCardProps) {
+export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon, allowDown = true, onDoubleTap, onMix, onCancelPeek }: SwipeCardProps) {
   const [burst, setBurst] = useState(0);
   function doubleTapped() {
     setBurst((n) => n + 1);
@@ -117,6 +120,12 @@ export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon,
   }
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const lastMix = useSharedValue(0);
+  const exiting = useSharedValue(false);
+
+  function cancelPeek() {
+    onCancelPeek?.();
+  }
   // Which half is currently pressed, before/independent of any drag —
   // -1 left, 1 right, 0 neither. Combined with translateX below so a press
   // shows immediate feedback and a drag's direction can override it (see
@@ -147,32 +156,56 @@ export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon,
   // no red screen — uncatchable by RN's normal JS-thread error handler)
   // caused by pan.onEnd calling this directly instead.
   function flyOutHorizontally(direction: 'left' | 'right') {
-    translateX.value = withTiming(direction === 'right' ? FLY_OUT_DISTANCE : -FLY_OUT_DISTANCE, { duration: 250 }, () =>
-      runOnJS(commit)(direction)
-    );
+    if (exiting.value) return;
+    exiting.value = true;
+    if (direction === 'right') cancelPeek();
+    translateX.value = withTiming(direction === 'right' ? FLY_OUT_DISTANCE : -FLY_OUT_DISTANCE, { duration: 250 }, (finished) => {
+      if (finished) runOnJS(commit)(direction);
+    });
   }
 
   const pan = Gesture.Pan()
     .onBegin((e) => {
+      lastMix.value = 0;
       pressedSide.value = e.x < size.width / 2 ? -1 : 1;
     })
     .onUpdate((e) => {
+      if (exiting.value) return;
       translateX.value = e.translationX;
       translateY.value = e.translationY;
+      if (!onMix) return;
+      const mix = mixForDrag(e.translationX, e.translationY, DEFAULT_SWIPE_THRESHOLDS.horizontal);
+      if (mix === 0 && lastMix.value > 0) {
+        lastMix.value = 0;
+        runOnJS(cancelPeek)();
+      } else if (shouldReportMix(mix, lastMix.value)) {
+        lastMix.value = mix;
+        runOnJS(onMix)(mix);
+      }
     })
     .onEnd((e) => {
+      if (exiting.value) return;
       const direction = resolveSwipeDirection(e.translationX, e.translationY);
+      if (direction !== 'left') runOnJS(cancelPeek)();
       if (direction === 'right' || direction === 'left') {
         runOnJS(flyOutHorizontally)(direction);
       } else if (direction === 'down' && allowDown) {
-        translateY.value = withTiming(FLY_OUT_DISTANCE, { duration: 250 }, () => runOnJS(commit)('down'));
+        exiting.value = true;
+        translateY.value = withTiming(FLY_OUT_DISTANCE, { duration: 250 }, (finished) => {
+          if (finished) runOnJS(commit)('down');
+        });
       } else {
         translateX.value = withSpring(0);
         translateY.value = withSpring(0);
       }
     })
-    .onFinalize(() => {
+    .onFinalize((_e, success) => {
       pressedSide.value = 0;
+      if (!success && !exiting.value) {
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+        runOnJS(cancelPeek)();
+      }
     });
 
   // Left half skips, right half likes — same commit path (and the same
