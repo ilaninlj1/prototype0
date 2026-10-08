@@ -141,7 +141,7 @@ export default function HomeScreen() {
   const currentGenre = strategy.type === 'genre' ? strategy.genre : null;
   const currentLabel = strategy.type === 'genre' ? strategy.genre : `More from: ${strategy.artistName}`;
 
-  const { player, status } = usePlayback();
+  const { player, status, setMix, cancelPeek, promotePeek } = usePlayback();
   const [hasEnded, setHasEnded] = useState(false);
 
   useEffect(() => {
@@ -154,7 +154,7 @@ export default function HomeScreen() {
 
   // The top card plays while Home is in view. A falsy previewUrl means
   // "nothing to play" (see lib/pool.ts), so nothing is loaded.
-  usePreviewWhileFocused(currentTrack?.previewUrl || undefined);
+  usePreviewWhileFocused(currentTrack?.previewUrl || undefined, queue[1]?.previewUrl);
 
   // ---- The collage: every swipe adds the song's cover (see lib/collage.ts) ----
   const { canvas } = useArt();
@@ -440,6 +440,7 @@ export default function HomeScreen() {
     const nextHistory = await logSwipe(track, 'skip');
     const nextSeen = markArtistSeen(track);
     const nextQueue = queue.slice(1);
+    promotePeek(nextQueue[0]?.previewUrl);
     setQueue(nextQueue);
     // A similar-artist hop can take seconds; if another swipe lands first,
     // its refill wins and this one (with its older queue) is dropped.
@@ -683,6 +684,8 @@ export default function HomeScreen() {
                 onSwipe={handleCardSwipe}
                 onDoubleTap={handleSave}
                 onHold={handleCardHold}
+                onMix={setMix}
+                onCancelPeek={cancelPeek}
                 playing={status.playing}
                 showPlayIcon={showPlayIcon}
               />
