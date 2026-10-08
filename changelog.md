@@ -17,6 +17,32 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-08] Finds News: "While you were gone"
+When something happened to your saved artists since you last looked, a slim strip sits at the top of Home:
+"While you were gone · 3". It opens a sheet with one sentence per item: an artist passed a listener milestone
+(10K, 25K, 50K, 100K, 250K, 500K, 1M) or grew by a quarter, or put out a new release after you saved them. Called
+artists come first, tapping an item plays that saved song, and closing the sheet marks it seen. Release checks use
+iTunes, through the same pacing as the pool, at most 8 artists per app open, after Home has its first cards. The
+Sunday reminder now says the top news item first. Spec `docs/superpowers/specs/2026-10-08-called-shots-finds-news-design.md`.
+
+## [2026-10-08] Called Shots: Call it on the reveal
+"Called it" used to mean an artist doubled, which takes months, and every save counted the same. Now the reveal
+card has a Call it button: a dated prediction, 3 a week, take it back the same day. A call hits when the artist
+passes a listener milestone above where you called it, or grows by a quarter (`lib/milestones.ts`,
+`lib/called-shots.ts`). The Liked list shows "Called Oct 2 at 4.8K → 50K" on called songs and shares a hit as a
+text receipt.
+
+## [2026-10-08] Crossfade while dragging
+Dragging a card left fades the next song in under the one you're leaving, equal-power so the middle doesn't dip.
+Let go without skipping and it eases back; skip and the next song keeps playing from where the fade got to, with
+no restart. A second player in `PlaybackProvider` peeks at the next card (`lib/playback-crossfade.ts`,
+`lib/crossfade.ts`). Right and down drags don't touch the audio.
+
+## [2026-10-08] Explore from a liked track; three feed bugs
+The Liked list has More from this artist and More like this sound under the player, which close the list and steer
+Home the same way Tune does (`lib/steer-request.ts`). Fixed a late Similar lookup overriding Undo, the fallback
+retrying an empty genre once every genre was heard, and growth math with no starting count (see `bugs.md`).
+
 ## [2026-10-03] Called It: an Instagram story of the find that blew up most
 The top of the You tab is now a story card sized for Instagram (shared at 1080×1920). It shows the find whose
 artist has grown most since you saved it blind: the cover, "I found them before I knew who it was", a line from

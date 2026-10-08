@@ -32,11 +32,15 @@ Last.fm listeners (DJ Jaivane, Young Stunna, Kidd Carder) chart at home. Last.fm
 the US and UK, so "huge at home, unknown everywhere else" is a real thing to show. Rough numbers: 3 days of
 chart history, and name matching lets generic names ("Melody") match the wrong artist.
 
+**Status (2026-10-08): Done, v1.** Milestones and new releases, local only. First finder, twin saves, KEXP and charts are not built yet.
+
 ## [2026-10-02] Called Shots — "Called it" as a deliberate call
 Today's "Called it" means the artist doubled, which takes months, and every save counts the same. Instead:
 mark up to 3 songs a week as calls on the reveal card, dated so it's a real prediction, not hindsight. A call
 hits on a chart entry, a KEXP play or a listener milestone (see Finds News for how rare each is). The
 shareable form is a **before-they-blew-up receipt**: "Found blind at 4,800 listeners, Oct 2."
+
+**Status (2026-10-08): Done, v1.** Hits on listener milestones; chart and KEXP hits left out as rare.
 
 ## [2026-10-02] Twin Bridges — twins as guides into your blind spots
 A twin's saves reach you only when they're in genres you've never saved, blind on Home, credited after the
@@ -266,6 +270,8 @@ resolving fully when the swipe commits. Would need two audio players with
 volume driven by drag distance, instead of the single player swapping sources.
 
 **Status: Open.**
+
+**Status (2026-10-08): Done.** Left drags only, since right now reveals and keeps the song; see the changelog.
 
 ## [2026-09-04] Move the artist/sound choice into the swipe itself
 The post-like overlay asks a second question the swipe already answered, and the
