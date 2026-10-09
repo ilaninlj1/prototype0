@@ -17,6 +17,17 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-09] Prototype 6: the feed's loading says what's happening
+Loading new songs used to fail quietly (one line of red text) or show a bare spinner, and an empty genre quietly
+switched to another. Now the card's place holds a panel with explicit states (`lib/feed-load.ts`,
+`components/home/feed-status.tsx`): waiting ("FINDING SONGS · AMBIENT", a turning ring, Cancel), slow after 6 seconds
+("Taking longer than usual"), failed ("Couldn't load songs. Check your connection" with Try again and Another genre,
+and after repeated failures "Still not working after 2 tries"), nothing left ("No songs left in X"), and stopped.
+Cancel abandons the load and puts you back on the song and genre you came from. A refill that fails behind a playing
+card says "Couldn't load more songs · tap to try again" above it. Tune and Liked stay reachable under the panel.
+Tune → Test network (Off / Slow / Offline, not saved) makes loading slow or fail on purpose so the states can be
+shown and tested; songs already playing aren't affected.
+
 ## [2026-10-09] You: Piece, Discoveries, Insights
 The You tab was one long scroll of about ten cards competing for attention. Now a switch at the top splits it
 into three views: Piece (your piece from Home, your Editions, the Called It story) opens first, Discoveries

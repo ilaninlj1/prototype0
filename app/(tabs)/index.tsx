@@ -21,6 +21,7 @@ import { UndoButton } from '@/components/discovery/undo-button';
 import { CreditLine } from '@/components/credits';
 import { ActionRow } from '@/components/home/action-row';
 import { DetailsSheet } from '@/components/home/details-sheet';
+import { FeedStatus } from '@/components/home/feed-status';
 import { FlyingPrint } from '@/components/home/flying-print';
 import { GenreStamp } from '@/components/home/genre-stamp';
 import { ListenCard, StackFace, type ListenCardHandle } from '@/components/home/listen-card';
@@ -71,6 +72,17 @@ import { findItunesArtist } from '@/lib/song-details';
 import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
 import { createActionLock } from '@/lib/action-lock';
+import {
+  fail as failLoad,
+  IDLE,
+  simulate,
+  start as startLoad,
+  stop as stopLoad,
+  succeed as succeedLoad,
+  type FeedAction,
+  type FeedLoad,
+  type NetworkTest,
+} from '@/lib/feed-load';
 import { PIECE, type PieceMark } from '@/lib/piece';
 import { recipeFor, type PrintRecipe } from '@/lib/print-recipe';
 import { moreLikeLabel } from '@/lib/sound';
@@ -103,7 +115,12 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [hydrated, setHydrated] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The feed's loading, as explicit states (lib/feed-load.ts): waiting, failed, stopped. Retry re-runs the last load.
+  const [load, setLoad] = useState<FeedLoad>(IDLE);
+  const lastRefillRef = useRef<Parameters<typeof runRefill> | null>(null);
+  // Tune → Test network (not saved): the feed's loading can be made slow or offline on purpose, to see these states.
+  const [networkTest, setNetworkTest] = useState<NetworkTest>('off');
+  const networkTestRef = useRef<NetworkTest>('off');
 
   // Starts at the card's max size (a reasonable default before the first
   // layout pass) then shrinks to whatever cardArea actually measures — see
@@ -406,9 +423,9 @@ export default function HomeScreen() {
       // them, so reading the state itself would just be an unnecessary
       // (and lint-flagged) dependency on values that are always still 'A' /
       // empty here.
-      await runRefill([], initialStrategy, history, genres, loadedRegion, 'A', new Set());
-
+      // Show the screen right away; the feed panel says it's finding songs.
       setHydrated(true);
+      await runRefill([], initialStrategy, history, genres, loadedRegion, 'A', new Set());
     })();
     // Once, at mount: it reads everything it needs from storage, not from state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -424,6 +441,9 @@ export default function HomeScreen() {
     excludeArtists: Set<string>
   ) {
     const epoch = ++refillEpochRef.current;
+    lastRefillRef.current = [baseQueue, activeStrategy, history, knownGenres, activeRegion, activePreset, excludeArtists];
+    // Only an empty feed shows the waiting panel; a refill behind a playing card stays quiet unless it fails.
+    if (baseQueue.length === 0) setLoad((prev) => startLoad(prev, activeStrategy.type === 'genre' ? activeStrategy.genre : activeStrategy.artistName, Date.now()));
     try {
       const { queue: nextQueue, fetched, strategy: landedStrategy } = await refillQueueWithFallback(
         baseQueue,
@@ -437,16 +457,19 @@ export default function HomeScreen() {
         // genre-term search — see bugs.md's 2026-09-14 entry on why that
         // path is retired here, not patched.
         (strategy) =>
+          simulate(networkTestRef.current, () =>
           (strategy.type === 'artist'
             ? fetchForStrategy(strategy, activeRegion)
             : isActive(soundFilterRef.current)
               ? Promise.resolve(sortedTracks(activePreset, strategy.genre, excludeArtists))
               : getTracks(activePreset, strategy.genre, excludeArtists).then((tracks) => tracks.map(trackToDiscoveryTrack))
-          ).then((tracks) => tracks.filter((t) => !hideFromDiscovery(t.artistName) && !alreadyKnown(t.artistName))) // human-only unless AI music is on; never an artist already in your Spotify
+          ).then((tracks) => tracks.filter((t) => !hideFromDiscovery(t.artistName) && !alreadyKnown(t.artistName))), // human-only unless AI music is on; never an artist already in your Spotify
+          (ms) => new Promise((r) => setTimeout(r, ms)))
       );
       if (refillEpochRef.current !== epoch) return;
 
       setQueue(nextQueue);
+      setLoad((prev) => (nextQueue.length === 0 ? failLoad(prev, 'empty') : succeedLoad()));
       if (landedStrategy !== activeStrategy) {
         setStrategy(landedStrategy);
       }
@@ -456,10 +479,27 @@ export default function HomeScreen() {
         setDiscoveredGenres(merged);
         await saveDiscoveredGenres(merged);
       }
-      setError(null);
     } catch {
       if (refillEpochRef.current !== epoch) return;
-      setError('Something went wrong fetching tracks. Check your connection and try again.');
+      setLoad((prev) => failLoad(prev, 'offline'));
+    }
+  }
+
+  // The panel's buttons. Cancel abandons the load: back to where you were if there's an undo, otherwise just stop.
+  function handleFeedAction(action: FeedAction) {
+    if (action === 'retry') {
+      const args = lastRefillRef.current;
+      if (args) void runRefill(...args);
+    } else if (action === 'another') {
+      lock.release();
+      void handleExplore();
+    } else {
+      ++refillEpochRef.current;
+      if (undoSnapshot) {
+        setLoad(IDLE);
+        lock.release();
+        void handleUndo();
+      } else setLoad((prev) => stopLoad(prev));
     }
   }
 
@@ -888,6 +928,36 @@ export default function HomeScreen() {
     );
   }
 
+  // Tune and Liked, under the card or under the loading panel: you can always change course.
+  const controls = (
+    <>
+        <View style={styles.bottomRow}>
+          <View style={styles.half}>
+            <TuneSheet
+            preset={preset}
+            presetLoading={presetLoading}
+            region={region}
+            onSelectPreset={handleSelectPreset}
+            onToggleRegion={handleToggleRegion}
+            nextMode={nextMode}
+            onSetNextMode={handleSetNextMode}
+            soundFilter={soundFilter}
+            onChangeSoundFilter={handleChangeSoundFilter}
+            networkTest={networkTest}
+            onChangeNetworkTest={(mode) => {
+              networkTestRef.current = mode;
+              setNetworkTest(mode);
+            }}
+            />
+          </View>
+          <View style={styles.half}>
+            <LikedTracksButton onPress={() => router.push('/modal')} />
+          </View>
+        </View>
+        <CreditLine />
+    </>
+  );
+
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
       {news.length > 0 && (
@@ -918,12 +988,17 @@ export default function HomeScreen() {
         />
       </View>
 
-      {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
       {currentTrack && topRecipe ? (
         <>
           <View style={styles.noteLine}>
-            {editionReady != null ? (
+            {load.phase === 'failed' && load.reason === 'offline' ? (
+              <Pressable onPress={() => handleFeedAction('retry')} hitSlop={{ top: 14, bottom: 14 }} accessibilityRole="button" accessibilityLabel="Couldn't load more songs. Try again">
+                <ThemedText style={[styles.note, styles.editionNote]} numberOfLines={1}>
+                  COULDN’T LOAD MORE SONGS · TAP TO TRY AGAIN
+                </ThemedText>
+              </Pressable>
+            ) : editionReady != null ? (
               <Pressable
                 onPress={() => router.push({ pathname: '/edition', params: { n: String(editionReady) } })}
                 hitSlop={{ top: 14, bottom: 14 }}
@@ -995,32 +1070,15 @@ export default function HomeScreen() {
 
           <PieceStrip piece={piece} onPress={() => router.push('/art')} onLayoutStrip={(rect) => (stripRef.current = rect)} />
 
-          <View style={styles.bottomRow}>
-            <View style={styles.half}>
-              <TuneSheet
-              preset={preset}
-              presetLoading={presetLoading}
-              region={region}
-              onSelectPreset={handleSelectPreset}
-              onToggleRegion={handleToggleRegion}
-              nextMode={nextMode}
-              onSetNextMode={handleSetNextMode}
-              soundFilter={soundFilter}
-              onChangeSoundFilter={handleChangeSoundFilter}
-              />
-            </View>
-            <View style={styles.half}>
-              <LikedTracksButton onPress={() => router.push('/modal')} />
-            </View>
-          </View>
-          <CreditLine />
+          {controls}
         </>
-      ) : presetLoading ? (
-        <ThemedView style={styles.centered}>
-          <ActivityIndicator color={Colors.accent} />
-        </ThemedView>
       ) : (
-        <ThemedText style={styles.emptyText}>No more tracks — try again in a bit.</ThemedText>
+        <>
+          <View style={styles.statusArea}>
+            <FeedStatus load={load} onAction={handleFeedAction} />
+          </View>
+          {controls}
+        </>
       )}
       {/* Outside the card branch: the queue empties for a moment during a jump, and the stamp must not remount. */}
       {stamp && (
@@ -1108,6 +1166,7 @@ const styles = StyleSheet.create({
   },
   // Reserved height, so the card never jumps when the More like this note comes and goes.
   noteLine: { height: 16, justifyContent: 'center' },
+  statusArea: { flex: 1, marginBottom: Spacing.lg },
   note: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1, color: Colors.textSecondary },
   editionNote: { color: Colors.text },
   under: { position: 'absolute', top: 0, left: 0, opacity: 0.55 },

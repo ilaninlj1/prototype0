@@ -6,6 +6,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, TapTarget, Ui } from '@/constants/theme';
 import type { Region } from '@/lib/discovery';
 import { setAllowAi, useAllowAi } from '@/lib/human-check-api';
+import type { NetworkTest } from '@/lib/feed-load';
 import type { PresetId } from '@/lib/pool-types';
 import { DIMENSIONS, describeFilter, isActive, type Level, type SoundFilter } from '@/lib/sound-filter';
 import { PRESET_LABELS, PresetChips } from './preset-chips';
@@ -32,6 +33,9 @@ type TuneSheetProps = {
   /** Sort by sound: five Low / Any / High switches over each song's measured sound. */
   soundFilter: SoundFilter;
   onChangeSoundFilter: (filter: SoundFilter) => void;
+  /** Make the feed's loading slow or fail on purpose, to see the loading screens. Not saved. */
+  networkTest: NetworkTest;
+  onChangeNetworkTest: (mode: NetworkTest) => void;
 };
 
 /** One "Tune" button holding every feed control, so the main screen is just the card. */
@@ -45,6 +49,8 @@ export function TuneSheet({
   onSetNextMode,
   soundFilter,
   onChangeSoundFilter,
+  networkTest,
+  onChangeNetworkTest,
 }: TuneSheetProps) {
   const [visible, setVisible] = useState(false);
   const allowAi = useAllowAi();
@@ -152,6 +158,23 @@ export function TuneSheet({
               {isActive(soundFilter)
                 ? `Only ${describeFilter(soundFilter)} songs, measured from how they sound. Stays on through genre jumps.`
                 : 'Pick how you want the next songs to sound. Measured by ReccoBeats, not by genre.'}
+            </ThemedText>
+
+            <ThemedText style={[Ui.label, styles.heading]}>Test network</ThemedText>
+            <ThemedView style={styles.segment} backgroundColor="transparent">
+              {(['off', 'slow', 'offline'] as NetworkTest[]).map((mode) => {
+                const active = networkTest === mode;
+                return (
+                  <TouchableOpacity key={mode} style={styles.segmentSlot} onPress={() => onChangeNetworkTest(mode)} activeOpacity={0.7} accessibilityRole="button" accessibilityState={{ selected: active }}>
+                    <ThemedView style={styles.segmentItem} backgroundColor={active ? Colors.accent : 'transparent'}>
+                      <ThemedText style={[Ui.label, { color: active ? Colors.accentText : Colors.textSecondary }]}>{mode === 'off' ? 'Off' : mode === 'slow' ? 'Slow' : 'Offline'}</ThemedText>
+                    </ThemedView>
+                  </TouchableOpacity>
+                );
+              })}
+            </ThemedView>
+            <ThemedText type="caption">
+              For trying the loading screens: makes loading new songs slow or fail on purpose. Songs already playing aren’t affected. Turns off when you close the app.
             </ThemedText>
             </ScrollView>
           </Pressable>
