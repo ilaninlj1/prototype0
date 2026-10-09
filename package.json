@@ -19,6 +19,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "scan-ai-artists": "node --experimental-strip-types --env-file=.env.local scripts/scan-ai-artists.ts",
+    "build-sound-index": "node --experimental-strip-types scripts/build-sound-index.ts",
     "measure-genre-sound": "node --experimental-strip-types scripts/measure-genre-sound.ts"
   },
   "dependencies": {

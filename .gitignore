@@ -50,3 +50,7 @@ app/lastfm-probe.tsx
 
 # Daily Drop review page (regenerated)
 drops/review.html
+
+# Skia web (dev preview only): npx setup-skia-web public
+public/canvaskit.wasm
+scripts/.sound-index-raw.json
