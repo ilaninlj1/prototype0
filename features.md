@@ -16,6 +16,17 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-10-08] The Edition: a motion reel of your last 5 finds
+After every 5 reveals, a ~30-second full-screen reel plays those 5 songs as scenes in the style of the user's
+`claude-motion-reel.html` (particle fields gathering into rings, terrain, a glass orb holding the cover, a final
+lockup), each scene streaming its own preview and shaped by its sound data. Replayable from the art screen.
+Rendered on the phone's GPU; shares as a still poster or a silent clip, never video with preview audio (Apple's
+terms). Needs the reel HTML on this Mac before its spec. Decided 2026-10-08 as the project after New Home.
+
+## [2026-10-08] Sort by sound in Tune
+Pace, Intensity, Texture, Harmony and Rhythm controls built on `assets/sound-index.json`, so you can steer the
+feed by how songs sound, not just genre. Technical values stay in Details. Next after the Edition or alongside.
+
 ## [2026-10-02] Finds News — what happened to your finds while you were away
 The return loop that goes with Taste Decoded (`docs/superpowers/specs/2026-10-02-taste-decoded-design.md`).
 One "While you were gone" strip, fed by, most frequent first: a found artist's **new release** (one daily
@@ -281,6 +292,7 @@ sound" — so there's no deferred choice and no timer. Removes action-overlay.ts
 entirely. Needs a visual hint that appears while dragging so the user can see where
 each direction leads.
 **Status (2026-10-08): Done.** Shipped via persistent steering row replacing deferred overlay in `components/discovery/tune-sheet.tsx` (commit b1567f5).
+**Update (2026-10-08, New Home):** the swipe now carries the intent after all: right = reveal + More like this (the 3 nearest songs in sound go next), with drag labels and three labeled buttons showing where each direction leads.
 
 **Status: Done, different mechanism.** `action-overlay.tsx` was removed and steering is
 no longer deferred, per commit b1567f5, "Make steering always-available, replacing the

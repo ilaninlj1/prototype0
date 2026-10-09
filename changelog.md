@@ -17,6 +17,30 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-08] New Home: the sound you hear, drawn; reveal in place; prints instead of covers
+Three design reviews of the Oct 8 screen recording agreed: only one gesture was ever taught, the reveal flipped into
+a different card where the listener count was the hero, and the art under the card was album covers with no link
+to the music. Home now:
+- The blind card draws the song's sound as moving particles (Skia): rings sit where its key falls on a
+  circle-of-fifths dial (a triad for major or minor), warm colors for major and blue for minor, density from
+  energy, breathing at the tempo, driven by the real playback clock. Mono labels show the print slot, the clock
+  and `148 BPM · C♯ MAJOR` when measured. Tap pauses (hold-to-play is gone); double-tap still saves.
+- Three buttons under the card spell out the swipes: Skip, New genre, More like this. Drag labels say what
+  letting go will do.
+- Right swipe reveals in place: the particles settle into the song's print, the cover sharpens in the same frame,
+  the name and listeners come in, and the print flies into your piece. The next 3 songs are the closest in sound
+  from the bundled catalog (More like this). Save, Details and Next replace the buttons; Details holds the links,
+  Call it, comments and "The sound" in plain words.
+- Down stamps the new genre's name and forks the line in your piece. Skips stay blind and leave a grey ring.
+- The piece under the card is generated prints on one line, not covers. The art screen shows the song behind
+  any print you tap, and the share picture is drawn by Skia.
+Sound data is free and no audio leaves the phone: `npm run build-sound-index` matches each catalog song on Deezer
+for its ISRC, then reads ReccoBeats' catalog values (BPM, key, mode and 8 more) into `assets/sound-index.json`;
+other songs get the same lookup live, cached. The Tasteform, Taste Decoded and the Blind Spot Test use the same
+source, so previews are no longer uploaded to ReccoBeats (Apple's terms: previews are "streamed only").
+Also fixed: the art store's hook went stale under the React Compiler (the old "Your collage starts with your first
+swipe" that never went away). Spec `docs/superpowers/specs/2026-10-08-new-home-design.md`.
+
 ## [2026-10-08] Finds News: "While you were gone"
 When something happened to your saved artists since you last looked, a slim strip sits at the top of Home:
 "While you were gone · 3". It opens a sheet with one sentence per item: an artist passed a listener milestone
