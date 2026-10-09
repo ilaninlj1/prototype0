@@ -30,13 +30,13 @@ export default function PrintLab() {
   const gather = useSharedValue(0);
   const [gathered, setGathered] = useState(false);
   useFrameCallback((f) => {
-    if (f.timeSincePreviousFrame) clock.value += f.timeSincePreviousFrame / 1000;
+    if (f.timeSincePreviousFrame) clock.set(clock.get() + f.timeSincePreviousFrame / 1000);
   });
   const samples = useMemo(() => SAMPLES, []);
   if (!__DEV__) return null;
 
   function toggle() {
-    gather.value = withTiming(gathered ? 0 : 1, { duration: 300 });
+    gather.set(withTiming(gathered ? 0 : 1, { duration: 300 }));
     setGathered(!gathered);
   }
 
