@@ -52,6 +52,9 @@ import type { DiscoveryTrack } from './discovery.ts';
 import { deckSize, deepCutMinTrackCount, deepCutRelativeFloor, hitRankMax, itunesDelayMs, lastfmDelayMs, poolQuickFillSize } from './pool-config.ts';
 import type { ArtistBand, ArtistCatalog, CatalogEntry, GenreCatalogFile, PresetId, SeedArtistEntry, SongBand, Track } from './pool-types.ts';
 import { shuffle } from './taste-test.ts';
+import { soundFor } from './sound-index.ts';
+import { pickNeighbors, type Candidate } from './sound-neighbors.ts';
+import type { SoundFeatures } from './sound.ts';
 
 const genresSeed = genresSeedRaw as unknown as Record<string, SeedArtistEntry[]>;
 
@@ -536,24 +539,16 @@ function loadCatalog(genreTag: string): GenreCatalogFile | null {
  * the async signature below exists only so resolveOneTrack's single
  * `await` call site doesn't need to branch on sync-vs-async.
  */
-function resolveOneTrackFromCatalog(artist: SeedArtistEntry, catalog: ArtistCatalog, preset: PresetId, genreTag: string): Track | null {
-  let eligible: CatalogEntry[];
-  if (preset === 'M') {
-    eligible = catalog.mixed;
-  } else if (PRESET_SONG_BAND[preset] === 'hit') {
-    eligible = catalog.hits;
-  } else {
-    if (catalog.rankedTrackCount < deepCutMinTrackCount) {
-      diagnostics.skippedForMinTrackCount++;
-      return null;
-    }
-    eligible = catalog.deepCuts;
-  }
-  if (eligible.length === 0) return null;
+/** The catalog songs a preset may serve for one artist (mixed, hits, or deep cuts with enough ranked tracks). */
+export function eligibleEntries(catalog: ArtistCatalog, preset: PresetId): CatalogEntry[] {
+  if (preset === 'M') return catalog.mixed;
+  if (PRESET_SONG_BAND[preset] === 'hit') return catalog.hits;
+  return catalog.rankedTrackCount < deepCutMinTrackCount ? [] : catalog.deepCuts;
+}
 
-  const chosen = eligible[Math.floor(Math.random() * eligible.length)];
+/** One precomputed catalog song as a Track, the same shape the live path builds. */
+export function catalogTrack(artist: SeedArtistEntry, catalog: ArtistCatalog, chosen: CatalogEntry, preset: PresetId, genreTag: string): Track {
   const songBand: SongBand = chosen.rank <= hitRankMax ? 'hit' : 'deepcut';
-
   return {
     id: `${normalizeArtist(artist.name)}::${normalizeTitle(chosen.title)}`,
     artist: artist.name,
@@ -575,6 +570,16 @@ function resolveOneTrackFromCatalog(artist: SeedArtistEntry, catalog: ArtistCata
       itunesArtistId: artist.itunesArtistId!,
     },
   };
+}
+
+function resolveOneTrackFromCatalog(artist: SeedArtistEntry, catalog: ArtistCatalog, preset: PresetId, genreTag: string): Track | null {
+  if (preset !== 'M' && PRESET_SONG_BAND[preset] === 'deepcut' && catalog.rankedTrackCount < deepCutMinTrackCount) {
+    diagnostics.skippedForMinTrackCount++;
+    return null;
+  }
+  const eligible = eligibleEntries(catalog, preset);
+  if (eligible.length === 0) return null;
+  return catalogTrack(artist, catalog, eligible[Math.floor(Math.random() * eligible.length)], preset, genreTag);
 }
 
 // ---------- Per-artist session cache ----------
@@ -710,6 +715,34 @@ function eligibleArtists(genreTag: string, band: ArtistBand | null, excludeNorma
 export interface CollectResult {
   tracks: Track[];
   starved: boolean; // true if even the widened pool couldn't satisfy `count`
+}
+
+
+/**
+ * More like this: the n catalog songs in this genre closest in sound to the
+ * target, under the preset's usual rules. No network: the catalogs and
+ * assets/sound-index.json are bundled. Different artists, never the target's.
+ */
+export function nearestBySound(
+  preset: PresetId,
+  genreTag: string,
+  target: { sound: SoundFeatures; artist: string },
+  n: number,
+  excludeArtists: Set<string>,
+  keep: (artist: string) => boolean
+): DiscoveryTrack[] {
+  const catalog = loadCatalog(genreTag);
+  if (!catalog) return [];
+  const band = preset === 'M' ? null : PRESET_ARTIST_BAND[preset];
+  const excluded = new Set([...excludeArtists].map(normalizeArtist));
+  const candidates: Candidate<Track>[] = [];
+  for (const artist of eligibleArtists(genreTag, band, excluded, new Set())) {
+    const ac = catalog[artist.name];
+    if (!ac || !keep(artist.name)) continue;
+    for (const entry of eligibleEntries(ac, preset))
+      candidates.push({ item: catalogTrack(artist, ac, entry, preset, genreTag), artist: artist.name, sound: soundFor(entry.itunesTrackId) });
+  }
+  return pickNeighbors(target.sound, target.artist, candidates, n).map(trackToDiscoveryTrack);
 }
 
 /**
