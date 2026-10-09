@@ -197,12 +197,13 @@ Storage moves to `art-canvas-v3` / `art-pieces-v3` in `hooks/use-art.ts`. On fir
 
 ### Layout (`piecePositions(marks) → points`, pure)
 
-A 1000×240 strip. One flowing line runs left to right through the marks in order, evenly spaced across the 50 slots. Each new branch shifts the line to another lane (up or down, alternating, staying inside the strip) with a smooth fork from the previous mark. The same marks always give the same layout.
+A 1000×240 strip. One flowing line runs left to right through the marks in order. Spacing adapts to the count (the marks always fill the width, as if there were at least 4), so the piece looks finished from the first swipe. Marks shrink as it fills: about 48pt for the first few, about 14pt at 50. Each new branch shifts the line to another lane (up or down, alternating, staying inside the strip) with a smooth fork from the previous mark. The same marks always give the same layout.
 
-- reveal = the song's still print (about 36pt on the phone)
+- reveal = the song's still print
 - skip = a small grey ring on the line
 - saved = a red (`signal`) outline ring around the mark
 - the line itself is a fine cream stroke at low opacity, with grain
+- a genre jump leaves a skip mark for the song you jumped from, then the next mark starts the new branch
 
 ### On Home (`components/home/piece-strip.tsx`)
 
@@ -250,3 +251,7 @@ The UI gets checked in the web preview (headless Chrome, touch events, per the C
 - **Deezer's non-commercial limit** (see above).
 - **Bundle size** from the index (estimated under 1 MB).
 - **Home's `index.tsx` is 872 lines.** The new card, action row, strip and sheet go in `components/home/`, so the screen file gets smaller, not bigger.
+
+## Next project: the Edition
+
+Decided 2026-10-08: after every 5 reveals, a ~30-second full-screen reel plays those 5 finds as scenes in the style of `claude-motion-reel.html` (each scene streams its song's preview, shaped by its sound data, ending on a lockup), replayable from the art screen. It gets its own spec once the reel file is on this Mac, and it's built on this branch after New Home. Rendering is on the phone's GPU; exports are a still poster or a silent clip, never video with the preview audio.
