@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 import { loadLikedTracks, loadSwipeHistory } from '@/lib/discovery-storage';
 import { addMark, forkBranch, markSaved, migrateV2, newPiece, removeLastMark, type Piece, type PieceMark, type PieceSong, type PieceState, type V2Canvas } from '@/lib/piece';
@@ -82,15 +82,20 @@ export async function undoOnPiece(trackId: number) {
   commit(removeLastMark(state, trackId));
 }
 
+function subscribe(fn: () => void) {
+  listeners.add(fn);
+  load();
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+/**
+ * The piece in progress and the finished ones. Read through
+ * useSyncExternalStore: the state lives outside React, and the React Compiler
+ * would otherwise memoize a plain read of it and never show a new mark.
+ */
 export function useArt(): { piece: Piece; finished: Piece[] } {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const fn = () => setTick((n) => n + 1);
-    listeners.add(fn);
-    load();
-    return () => {
-      listeners.delete(fn);
-    };
-  }, []);
-  return { piece: state.piece, finished: state.finished };
+  const snapshot = useSyncExternalStore(subscribe, () => state);
+  return { piece: snapshot.piece, finished: snapshot.finished };
 }

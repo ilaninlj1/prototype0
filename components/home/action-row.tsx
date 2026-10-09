@@ -32,15 +32,15 @@ export function ActionRow({ mode, saved, disabled = false, onSkip, onJump, onMor
           <Ionicons name={saved ? 'heart' : 'heart-outline'} size={16} color={saved ? Colors.signal : Colors.text} />
         </Button>
         <Button onPress={onDetails} disabled={disabled} label="Details" a11y="Song details" />
-        <Button onPress={onNext} disabled={disabled} label="Next →" a11y="Next song" primary />
+        <Button onPress={onNext} disabled={disabled} label="Next" a11y="Next song" primary icon="arrow-forward" iconAfter />
       </View>
     );
   }
   return (
     <View style={styles.row}>
-      <Button onPress={onSkip} disabled={disabled} label="← Skip" a11y="Skip this song" />
-      <Button onPress={onJump} disabled={disabled} label="↓ New genre" a11y="Jump to a new genre" />
-      <Button onPress={onMore} disabled={disabled} label="More like this →" a11y="More like this, and show who it is" primary />
+      <Button onPress={onSkip} disabled={disabled} label="Skip" a11y="Skip this song" icon="arrow-back" />
+      <Button onPress={onJump} disabled={disabled} label="New genre" a11y="Jump to a new genre" icon="arrow-down" />
+      <Button onPress={onMore} disabled={disabled} label="More like this" a11y="More like this, and show who it is" primary icon="arrow-forward" iconAfter />
     </View>
   );
 }
@@ -51,6 +51,8 @@ function Button({
   label,
   a11y,
   primary = false,
+  icon,
+  iconAfter = false,
   children,
 }: {
   onPress: () => void;
@@ -58,8 +60,11 @@ function Button({
   label: string;
   a11y: string;
   primary?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconAfter?: boolean;
   children?: ReactNode;
 }) {
+  const glyph = icon ? <Ionicons name={icon} size={14} color={primary ? Colors.accentText : Colors.text} /> : null;
   return (
     <Pressable
       onPress={onPress}
@@ -68,9 +73,11 @@ function Button({
       accessibilityLabel={a11y}
       style={({ pressed }) => [styles.button, primary && styles.primary, (pressed || disabled) && { opacity: disabled ? 0.4 : 0.7 }]}>
       {children}
+      {!iconAfter && glyph}
       <ThemedText style={[styles.label, primary && styles.primaryLabel]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
         {label}
       </ThemedText>
+      {iconAfter && glyph}
     </Pressable>
   );
 }
@@ -85,9 +92,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     paddingHorizontal: Spacing.xs,
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
   },
-  primary: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  label: { ...Ui.label, textAlign: 'center' },
+  // The main action gets the most room: "More like this" is the longest label.
+  primary: { flex: 1.35, backgroundColor: Colors.accent, borderColor: Colors.accent },
+  label: { ...Ui.label, fontSize: 11, letterSpacing: 0.6, textAlign: 'center', flexShrink: 1 },
   primaryLabel: { color: Colors.accentText },
 });

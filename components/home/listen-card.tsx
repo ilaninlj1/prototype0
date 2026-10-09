@@ -175,7 +175,11 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
     return new Promise((resolve) => {
       const node = badgeRef.current;
       if (!node) return resolve(null);
-      node.measureInWindow((x, y, w, h) => resolve({ x: x + w / 2, y: y + h / 2 }));
+      try {
+        node.measureInWindow((x, y, w, h) => resolve(w > 0 ? { x: x + w / 2, y: y + h / 2 } : null));
+      } catch {
+        resolve(null);
+      }
     });
   }
 
@@ -264,16 +268,15 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
           </Animated.View>
 
           {/* The formation crossfades when sound data lands after the card appeared. */}
-          <Animated.View
-            key={`${recipe.source}:${recipe.label ?? ''}`}
-            entering={FadeIn.duration(400)}
-            pointerEvents="none"
-            style={[styles.print, printBox, printStyle]}>
-            {reduceMotion ? (
-              <PrintStill recipe={recipe} size={side} ground={false} />
-            ) : (
-              <LivePrint recipe={recipe} size={side} clock={clock} gather={gather} />
-            )}
+          <Animated.View pointerEvents="none" style={[styles.print, printBox, printStyle]}>
+            {/* Keyed apart from the opacity above: the entering fade and the reveal fade can't share one view. */}
+            <Animated.View key={`${recipe.source}:${recipe.label ?? ''}`} entering={FadeIn.duration(400)}>
+              {reduceMotion ? (
+                <PrintStill recipe={recipe} size={side} ground={false} />
+              ) : (
+                <LivePrint recipe={recipe} size={side} clock={clock} gather={gather} />
+              )}
+            </Animated.View>
           </Animated.View>
 
           {!revealed && <TintWash side="left" color={Colors.destructive} style={leftTint} />}
@@ -304,8 +307,11 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
                   {track.artistName}
                 </ThemedText>
               </Animated.View>
-              <Animated.View ref={badgeRef} entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={styles.badge} pointerEvents="none">
-                <PrintStill recipe={recipe} size={BADGE} detail="mini" />
+              <Animated.View entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={styles.badge} pointerEvents="none">
+                {/* Measured for the flight: a plain view, since an animated one doesn't measure on every platform. */}
+                <View ref={badgeRef} collapsable={false}>
+                  <PrintStill recipe={recipe} size={BADGE} detail="mini" />
+                </View>
               </Animated.View>
             </>
           ) : (

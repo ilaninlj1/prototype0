@@ -289,9 +289,11 @@ export default function HomeScreen() {
     // The print badge appears ~700ms into the reveal; it takes off from there into its slot.
     setTimeout(async () => {
       if (flyingIdRef.current !== track.id) return; // undone meanwhile
-      const from = await cardRef.current?.badgeCenter();
+      const from = await cardRef.current?.badgeCenter().catch(() => null);
       const strip = stripRef.current;
+      if (flyingIdRef.current !== track.id) return;
       if (!from || !strip) {
+        // No flight possible: the print still joins the piece.
         flyingIdRef.current = null;
         commitMark(mark);
         return;
@@ -878,17 +880,6 @@ export default function HomeScreen() {
                 onCancelPeek={cancelPeek}
               />
             </View>
-            {stamp && (
-              <GenreStamp
-                key={stamp.id}
-                genre={stamp.genre}
-                fresh={stamp.fresh}
-                onDone={() => {
-                  setStamp(null);
-                  lock.release();
-                }}
-              />
-            )}
           </View>
 
           <ActionRow
@@ -928,6 +919,18 @@ export default function HomeScreen() {
         </ThemedView>
       ) : (
         <ThemedText style={styles.emptyText}>No more tracks — try again in a bit.</ThemedText>
+      )}
+      {/* Outside the card branch: the queue empties for a moment during a jump, and the stamp must not remount. */}
+      {stamp && (
+        <GenreStamp
+          key={stamp.id}
+          genre={stamp.genre}
+          fresh={stamp.fresh}
+          onDone={() => {
+            setStamp((s) => (s?.id === stamp.id ? null : s));
+            lock.release();
+          }}
+        />
       )}
       {flying && (
         <FlyingPrint
@@ -1004,7 +1007,7 @@ const styles = StyleSheet.create({
   // Reserved height, so the card never jumps when the More like this note comes and goes.
   noteLine: { height: 16, justifyContent: 'center' },
   note: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1, color: Colors.textSecondary },
-  under: { position: 'absolute', top: 0, left: 0 },
+  under: { position: 'absolute', top: 0, left: 0, opacity: 0.55 },
   // Tune and Liked: equal halves of one row.
   bottomRow: {
     flexDirection: 'row',

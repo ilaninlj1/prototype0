@@ -63,8 +63,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.hairline,
   },
-  left: { left: 16, top: '45%' },
-  right: { right: 16, top: '45%' },
+  // Each label sits on the edge that stays on screen as the card moves away from it.
+  left: { right: 16, top: '42%' },
+  right: { left: 16, top: '42%' },
   bottom: { alignSelf: 'center', bottom: 72 },
   label: { fontFamily: Fonts.monoMedium, fontSize: 14, lineHeight: 18, letterSpacing: 2, color: Colors.text },
 });
