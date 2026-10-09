@@ -2,32 +2,47 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { FadeIn, runOnJS, useAnimatedReaction, useFrameCallback, useSharedValue } from 'react-native-reanimated';
+import Animated, { FadeIn, runOnJS, useAnimatedReaction, useAnimatedStyle, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ReelCard } from '@/components/edition/reel-card';
 import { EditionView } from '@/components/edition/edition-view';
 import { loadSkia } from '@/components/print/load-skia';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Spacing, Ui } from '@/constants/theme';
 import { markEditionSeen, useEditions } from '@/hooks/use-editions';
 import { usePlayback } from '@/hooks/use-playback';
-import { frameLabel, timeline, TOTAL, type SceneKind } from '@/lib/edition';
+import { beatIndex, frameLabel, timecode, timeline, TOTAL, type SceneKind } from '@/lib/edition';
+import { expoOut, prog } from '@/lib/reel-ease';
 
-const KIND: Record<SceneKind, string> = { intro: 'INTRO', flow: 'FLOW', terrain: 'TERRAIN', orbit: 'ORBIT', orb: 'ORB', lockup: 'EDITION' };
+const KIND: Record<SceneKind, string> = {
+  intro: 'INTRO',
+  voxel: 'VOXEL FIELD',
+  wall: 'TYPE WALL',
+  data: 'DATA',
+  particles: 'PARTICLES',
+  interface: 'INTERFACE',
+  outro: 'OUTRO',
+};
+const OR = '#E8461E';
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /**
- * An Edition: your last five finds as a ~32-second reel. Each song's scene
- * plays its preview (streamed, as everywhere in the app); the reel's frame
- * counter is its own clock. Tap to pause, swipe down or ✕ to leave.
+ * An Edition: your last five finds as a 34-second reel in the style of
+ * claude-motion-reel.html. Each song's scene plays its preview (streamed, as
+ * everywhere in the app). The HUD is the reel's: scene, frame counter,
+ * timecode, and beat squares that tick at the song's measured tempo (never a
+ * made-up bar count). Tap to pause, swipe down or ✕ to leave.
  */
 export default function EditionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const params = useLocalSearchParams<{ n?: string }>();
+  // ?at=12.5 opens the reel frozen at that second (for stills and checking a moment).
+  const params = useLocalSearchParams<{ n?: string; at?: string }>();
+  const at = params.at != null && !Number.isNaN(Number(params.at)) ? Number(params.at) : null;
   const { editions } = useEditions();
   const edition = editions.find((e) => e.number === Number(params.n)) ?? null;
   const scenes = useMemo(() => (edition ? timeline(edition) : []), [edition]);
@@ -70,6 +85,11 @@ export default function EditionScreen() {
   useEffect(() => {
     if (edition) markEditionSeen(edition.number);
   }, [edition]);
+  useEffect(() => {
+    if (at == null) return;
+    clock.set(Math.min(TOTAL - 0.01, at));
+    running.set(false);
+  }, [at, clock, running]);
 
   // Each song's scene plays its preview; the lockup lets the last one fade out.
   useEffect(() => {
@@ -79,7 +99,7 @@ export default function EditionScreen() {
     if (scene.song != null) {
       const url = edition.songs[scene.song].previewUrl;
       if (url) playPreview(url);
-    } else if (scene.kind === 'lockup') {
+    } else if (scene.kind === 'outro') {
       fadeRef.current = setInterval(() => {
         const v = Math.max(0, player.volume - 0.05);
         player.volume = v;
@@ -156,71 +176,64 @@ export default function EditionScreen() {
 
   const scene = scenes[Math.max(0, sceneIndex)];
   const song = scene?.song != null ? edition.songs[scene.song] : null;
-  const date = new Date(edition.createdAt).toDateString().toUpperCase();
+  const local = scene ? frame - scene.start : 0;
+  // Over the orange moments the HUD turns dark, as in the reel.
+  const dark = (scene?.kind === 'intro' && local >= 2.02) || (scene?.kind === 'outro' && local < 3);
+  const hud = { color: dark ? 'rgba(10,10,10,0.78)' : 'rgba(244,241,236,0.72)' };
+  const bpm = song ? (song.sound?.tempo ?? 60 / song.recipe.beat) : null;
+  const lit = bpm ? beatIndex(local, bpm) : -1;
 
   return (
     <GestureDetector gesture={Gesture.Exclusive(swipeDown, tap)}>
       <View style={styles.screen}>
         <EditionView edition={edition} width={width} height={height} clock={clock} />
+        {scene?.kind === 'interface' && song && <ReelCard song={song} scene={scene} clock={clock} width={width} height={height} local={local} />}
+        {scene?.kind === 'voxel' && song && <VoxelCaption key={sceneIndex} title={song.title} artist={song.artist} label={song.recipe.label} start={scene.start} clock={clock} width={width} bottom={insets.bottom} />}
 
-        <View style={[styles.top, { top: insets.top + Spacing.sm }]} pointerEvents="box-none">
-          <ThemedText style={styles.mono}>
-            SC {pad2(Math.max(0, sceneIndex) + 1)}/{pad2(scenes.length)} — {scene ? KIND[scene.kind] : ''}
-          </ThemedText>
-          <ThemedText style={styles.mono}>{frameLabel(frame)}</ThemedText>
+        <View style={[styles.corner, { top: insets.top + 16, left: 18 }]} pointerEvents="none">
+          <View style={styles.rec} />
+          <Text style={[styles.hud, hud]}>BLINDSPOT — No. {edition.number}</Text>
         </View>
-        <Pressable onPress={close} hitSlop={12} style={[styles.x, { top: insets.top + Spacing.xl + Spacing.sm }]} accessibilityLabel="Close the edition">
-          <Ionicons name="close" size={26} color={Colors.text} />
+        <View style={[styles.corner, { top: insets.top + 16, right: 18 }]} pointerEvents="none">
+          <Text style={[styles.hud, hud]}>
+            SC {pad2(Math.max(0, sceneIndex) + 1)}/{pad2(scenes.length)} · {scene ? KIND[scene.kind] : ''}
+          </Text>
+        </View>
+        <View style={[styles.corner, { bottom: insets.bottom + 16, left: 18 }]} pointerEvents="none">
+          <Text style={[styles.hud, hud]}>{frameLabel(frame)}</Text>
+        </View>
+        <View style={[styles.corner, { bottom: insets.bottom + 16, right: 18 }]} pointerEvents="none">
+          <Text style={[styles.hud, hud]}>{timecode(frame)}</Text>
+          {bpm != null && (
+            <>
+              <View style={styles.beats}>
+                {[0, 1, 2, 3].map((k) => (
+                  <View key={k} style={[styles.beat, { borderColor: hud.color }, k === lit && { backgroundColor: hud.color, opacity: 1 }]} />
+                ))}
+              </View>
+              <Text style={[styles.hud, hud]}>{Math.round(bpm)} BPM</Text>
+            </>
+          )}
+        </View>
+        <Pressable onPress={close} hitSlop={12} style={[styles.x, { top: insets.top + 40 }]} accessibilityLabel="Close the edition">
+          <Ionicons name="close" size={24} color={hud.color} />
         </Pressable>
 
-        {scene?.kind === 'intro' && (
-          <Animated.View key="intro" entering={FadeIn.duration(500)} style={styles.middle} pointerEvents="none">
-            <ThemedText style={styles.brand}>BLINDSPOT</ThemedText>
-            <ThemedText style={styles.mono}>
-              EDITION No. {edition.number} · {date}
-            </ThemedText>
-          </Animated.View>
-        )}
-
-        {song && (
-          <Animated.View key={`song-${sceneIndex}`} entering={FadeIn.delay(600).duration(500)} style={[styles.bottom, { bottom: insets.bottom + Spacing.xxl }]} pointerEvents="none">
-            <ThemedText style={styles.mono}>
-              {pad2(scene!.song! + 1)} / {pad2(edition.songs.length)} · FOUND BLIND
-            </ThemedText>
-            <ThemedText style={styles.title} numberOfLines={2}>
-              {song.title}
-            </ThemedText>
-            <ThemedText style={styles.dim} numberOfLines={1}>
-              {song.artist}
-            </ThemedText>
-            {!!song.recipe.label && <ThemedText style={styles.mono}>{song.recipe.label}</ThemedText>}
-          </Animated.View>
-        )}
-
-        {scene?.kind === 'lockup' && (
-          <Animated.View key="lockup" entering={FadeIn.duration(500)} style={[styles.lockupText, { top: height / 2 - 140 }]} pointerEvents="none">
-            <ThemedText style={styles.brand}>EDITION No. {edition.number}</ThemedText>
-            <ThemedText style={styles.mono}>
-              {edition.songs.length} FOUND BLIND · {date}
-            </ThemedText>
-          </Animated.View>
-        )}
-
-        {paused && !done && (
+        {paused && !done && at == null && (
           <View style={styles.pausedBadge} pointerEvents="none">
-            <ThemedText style={styles.mono}>PAUSED · TAP TO PLAY</ThemedText>
+            <Text style={[styles.hud, hud]}>PAUSED · TAP TO PLAY</Text>
           </View>
         )}
 
         {done && (
-          <Animated.View entering={FadeIn.duration(400)} style={[styles.endRow, { bottom: insets.bottom + Spacing.xxl }]}>
+          <Animated.View entering={FadeIn.duration(400)} style={[styles.endRow, { bottom: insets.bottom + 48 }]}>
             <Pressable onPress={replay} style={[Ui.outlineButton, styles.endButton]} accessibilityRole="button">
               <Ionicons name="refresh" size={16} color={Colors.text} />
               <ThemedText style={Ui.label}>Replay</ThemedText>
             </Pressable>
             <Pressable onPress={share} style={[Ui.outlineButton, styles.endButton, styles.primary]} accessibilityRole="button">
-              <Ionicons name="share-outline" size={16} color={Colors.accentText} />
-              <ThemedText style={[Ui.label, { color: Colors.accentText }]}>Share</ThemedText>
+              <Ionicons name="share-outline" size={16} color="#0A0A0A" />
+              <ThemedText style={[Ui.label, { color: '#0A0A0A' }]}>Share</ThemedText>
             </Pressable>
             <Pressable onPress={close} style={[Ui.outlineButton, styles.endButton]} accessibilityRole="button">
               <ThemedText style={Ui.label}>Done</ThemedText>
@@ -233,22 +246,48 @@ export default function EditionScreen() {
   );
 }
 
+/** The voxel field's caption, as in the reel: two big lines rising out of masks, then a mono line. */
+function VoxelCaption(props: { title: string; artist: string; label: string | null; start: number; clock: SharedValue<number>; width: number; bottom: number }) {
+  const { title, artist, label, start, clock, width, bottom } = props;
+  const size = Math.min(width * 0.085, 40);
+  const line1 = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - expoOut(prog(clock.get() - start, 0.7, 1.5))) * size * 1.25 }] }));
+  const line2 = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - expoOut(prog(clock.get() - start, 0.82, 1.62))) * size * 1.25 }] }));
+  const mono = useAnimatedStyle(() => ({ opacity: 0.6 * prog(clock.get() - start, 1.2, 1.6) }));
+  return (
+    <View style={[styles.caption, { bottom: bottom + 64 }]} pointerEvents="none">
+      <View style={[styles.mask, { height: size * 1.15 }]}>
+        <Animated.Text style={[styles.capBig, { fontSize: size, lineHeight: size * 1.1 }, line1]} numberOfLines={1}>
+          {title}
+        </Animated.Text>
+      </View>
+      <View style={[styles.mask, { height: size * 1.15 }]}>
+        <Animated.Text style={[styles.capBig, { fontSize: size, lineHeight: size * 1.1 }, line2]} numberOfLines={1}>
+          by <Text style={{ color: OR }}>{artist}.</Text>
+        </Animated.Text>
+      </View>
+      <Animated.Text style={[styles.hud, styles.capMono, mono]}>VOXEL FIELD · {label ?? 'NO SOUND DATA'} · 144 COLUMNS</Animated.Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0d1426' },
+  screen: { flex: 1, backgroundColor: '#0A0A0A' },
   center: { alignItems: 'center', justifyContent: 'center', gap: Spacing.lg },
-  top: { position: 'absolute', left: Spacing.lg, right: Spacing.lg, flexDirection: 'row', justifyContent: 'space-between' },
-  x: { position: 'absolute', right: Spacing.lg },
-  mono: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1.2, color: Colors.textSecondary },
-  middle: { position: 'absolute', left: 0, right: 0, top: '42%', alignItems: 'center', gap: Spacing.sm },
-  brand: { fontFamily: Fonts.display, fontSize: 34, lineHeight: 38, letterSpacing: 2, color: Colors.text },
-  bottom: { position: 'absolute', left: Spacing.xl, right: Spacing.xl, gap: 4 },
-  title: { fontFamily: Fonts.display, fontSize: 26, lineHeight: 30, color: Colors.text },
+  corner: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 10 },
+  hud: { fontFamily: Fonts.mono, fontSize: 10, lineHeight: 13, letterSpacing: 1.4, textTransform: 'uppercase' },
+  rec: { width: 6, height: 6, borderRadius: 3, backgroundColor: OR, shadowColor: OR, shadowOpacity: 1, shadowRadius: 4, shadowOffset: { width: 0, height: 0 } },
+  beats: { flexDirection: 'row', gap: 3 },
+  beat: { width: 5, height: 5, borderWidth: 1, opacity: 0.5 },
+  x: { position: 'absolute', right: 14 },
+  caption: { position: 'absolute', left: 22, right: 22 },
+  mask: { overflow: 'hidden' },
+  capBig: { fontFamily: Fonts.reelBold, letterSpacing: -1.5, color: '#F4F1EC' },
+  capMono: { marginTop: 14, color: 'rgba(244,241,236,0.9)' },
   dim: { color: Colors.textSecondary },
-  lockupText: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: Spacing.sm },
   pausedBadge: { position: 'absolute', alignSelf: 'center', top: '50%' },
   endRow: { position: 'absolute', left: Spacing.lg, right: Spacing.lg, flexDirection: 'row', gap: Spacing.sm },
-  endButton: { flex: 1, flexDirection: 'row', gap: 6, height: 48 },
-  primary: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  endButton: { flex: 1, flexDirection: 'row', gap: 6, height: 48, backgroundColor: 'rgba(10,10,10,0.6)' },
+  primary: { backgroundColor: OR, borderColor: OR },
   closeWide: { paddingHorizontal: Spacing.xl },
   note: { position: 'absolute', alignSelf: 'center', bottom: 24 },
 });

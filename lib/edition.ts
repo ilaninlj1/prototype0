@@ -1,16 +1,18 @@
-// The Edition: every 5 reveals become a ~32-second full-screen reel of those
-// finds, one scene each in a rotating visual family, between an intro and a
-// lockup of all five prints. The reel's clock is its own (30 frames a
-// second), never presented as the music's beat. Pure.
+// The Edition: every 5 reveals become a 34-second full-screen reel of those
+// finds in the style of claude-motion-reel.html: an intro slam, one scene per
+// song in each of the reel's five families (voxel field, type wall, data,
+// particles, interface), and an outro. The reel's clock is its own (24 frames a
+// second); the only beat it shows is each song's measured tempo. Pure.
 
 import type { PrintRecipe } from './print-recipe.ts';
+import type { SoundFeatures } from './sound.ts';
 
 export const EDITION_SIZE = 5;
-export const INTRO = 2.5;
-export const SCENE = 5.2;
-export const LOCKUP = 4.5;
-export const TOTAL = INTRO + EDITION_SIZE * SCENE + LOCKUP;
-const FPS = 30;
+export const INTRO = 4;
+export const SCENE = 5;
+export const OUTRO = 5;
+export const TOTAL = INTRO + EDITION_SIZE * SCENE + OUTRO;
+const FPS = 24;
 
 export type EditionSong = {
   trackId: number;
@@ -21,15 +23,18 @@ export type EditionSong = {
   recipe: PrintRecipe;
   /** How much of it you'd heard when you revealed it, 0–1. */
   heard: number;
+  /** Its measured sound, for the data scene. Older editions have none. */
+  sound?: SoundFeatures | null;
 };
 export type Edition = { number: number; createdAt: number; songs: EditionSong[] };
 export type EditionsState = { pending: EditionSong[]; editions: Edition[]; unseen: number | null };
 export const EMPTY_EDITIONS: EditionsState = { pending: [], editions: [], unseen: null };
 
-export type SceneKind = 'intro' | 'flow' | 'terrain' | 'orbit' | 'orb' | 'lockup';
+export type SceneKind = 'intro' | 'voxel' | 'wall' | 'data' | 'particles' | 'interface' | 'outro';
 export type Scene = { kind: SceneKind; start: number; end: number; song?: number };
 
-const FAMILIES: SceneKind[] = ['flow', 'terrain', 'orbit', 'orb'];
+/** The reel's five families; each edition shows every one, starting at a different one each time. */
+const FAMILIES: SceneKind[] = ['voxel', 'wall', 'data', 'particles', 'interface'];
 
 /** A reveal joins the next edition; the 5th makes it. */
 export function addReveal(state: EditionsState, song: EditionSong, now: number): { state: EditionsState; made?: Edition } {
@@ -55,8 +60,26 @@ export function timeline(e: Edition): Scene[] {
     const start = INTRO + i * SCENE;
     scenes.push({ kind: FAMILIES[(i + e.number) % FAMILIES.length], start, end: start + SCENE, song: i });
   });
-  scenes.push({ kind: 'lockup', start: TOTAL - LOCKUP, end: TOTAL });
+  scenes.push({ kind: 'outro', start: TOTAL - OUTRO, end: TOTAL });
   return scenes;
+}
+
+export type Wipe = { t: number; dir: 'x' | 'y'; color: 'orange' | 'cream' };
+
+/** A panel sweeps across at every cut, alternating color and direction, as in the reel. */
+export function wipes(scenes: Scene[]): Wipe[] {
+  return scenes.slice(1).map((s, i) => ({ t: s.start, dir: i % 2 ? 'y' : 'x', color: i % 2 ? 'cream' : 'orange' }));
+}
+
+/** Which of the four beat squares is lit, at the song's own tempo. */
+export function beatIndex(t: number, bpm: number): number {
+  return Math.floor((t * bpm) / 60) % 4;
+}
+
+/** The reel's timecode, 00:SS:FF. */
+export function timecode(t: number): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `00:${pad(Math.floor(t))}:${pad(Math.floor(t * FPS) % FPS)}`;
 }
 
 /** The scene playing at t seconds, and how far into it (0–1). Past the end, the lockup holds. */
@@ -67,7 +90,7 @@ export function sceneAt(scenes: Scene[], t: number): { index: number; local: num
   return { index, local: Math.max(0, Math.min(1, (t - s.start) / (s.end - s.start))) };
 }
 
-/** The reel's own frame counter, F 0151 / 0975. */
+/** The reel's own frame counter, F 0120 / 0816. */
 export function frameLabel(t: number): string {
   const pad = (n: number) => String(n).padStart(4, '0');
   return `F ${pad(Math.floor(t * FPS))} / ${pad(Math.round(TOTAL * FPS))}`;

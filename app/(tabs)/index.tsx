@@ -342,7 +342,13 @@ export default function HomeScreen() {
       song: { title: track.trackName, artist: track.artistName, artwork: track.artworkUrl100, previewUrl: track.previewUrl || undefined },
     };
     // Every reveal joins the next Edition; the 5th makes it (lib/edition.ts).
-    addRevealToEditions({ ...mark.song!, trackId: track.id, recipe: mark.recipe, heard });
+    addRevealToEditions({
+      ...mark.song!,
+      trackId: track.id,
+      recipe: mark.recipe,
+      heard,
+      sound: soundFor(track.id) ?? (topSound?.status === 'measured' ? topSound.features : null),
+    });
     if (flying) commitMark(flying.mark); // one still in the air lands now
     flyingIdRef.current = track.id;
     // The print badge appears ~700ms into the reveal; it takes off from there into its slot.

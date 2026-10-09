@@ -73,6 +73,10 @@ export const Fonts = {
   // Handwritten touches, used sparingly: stickers and margin notes.
   marker: 'PermanentMarker_400Regular',
   note: 'Caveat_700Bold',
+  // The Edition reel's type, from claude-motion-reel.html.
+  reel: 'InterTight_900Black',
+  reelBold: 'InterTight_700Bold',
+  reelScript: 'Parisienne_400Regular',
 };
 
 const FIGTREE: Record<string, string> = {

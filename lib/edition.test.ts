@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { addReveal, EDITION_SIZE, EMPTY_EDITIONS, frameLabel, removeReveal, sceneAt, timeline, TOTAL, type EditionSong } from './edition.ts';
+import { addReveal, beatIndex, EDITION_SIZE, EMPTY_EDITIONS, frameLabel, removeReveal, sceneAt, timecode, timeline, TOTAL, wipes, type EditionSong } from './edition.ts';
 import { recipeFor } from './print-recipe.ts';
 
 const song = (id: number): EditionSong => ({ trackId: id, title: `t${id}`, artist: `a${id}`, artwork: '', recipe: recipeFor(id, null, null), heard: 1 });
@@ -40,11 +40,13 @@ test('undoing a reveal takes it back out, even the one that just made an edition
   assert.equal(removeReveal(s, 99), s);
 });
 
-test('the timeline: intro, one scene per song, then the lockup', () => {
+test('the timeline: intro, one scene per song, then the outro', () => {
   const e = addReveal(reveal(EMPTY_EDITIONS, [1, 2, 3, 4]), song(5), 1).made!;
   const scenes = timeline(e);
   assert.equal(scenes[0].kind, 'intro');
-  assert.equal(scenes.at(-1)!.kind, 'lockup');
+  assert.equal(scenes.at(-1)!.kind, 'outro');
+  // Every edition shows all five of the reel's families, in a rotating order.
+  assert.deepEqual(new Set(scenes.slice(1, 6).map((x) => x.kind)), new Set(['voxel', 'wall', 'data', 'particles', 'interface']));
   assert.equal(scenes.length, 7);
   assert.deepEqual(scenes.slice(1, 6).map((x) => x.song), [0, 1, 2, 3, 4]);
   assert.equal(scenes.at(-1)!.end, TOTAL);
@@ -64,7 +66,28 @@ test('sceneAt finds the scene and how far into it', () => {
   assert.equal(sceneAt(scenes, TOTAL + 5).local, 1);
 });
 
-test('the frame counter reads like the reel: 30 frames a second', () => {
-  assert.equal(frameLabel(0), `F 0000 / ${String(Math.round(TOTAL * 30)).padStart(4, '0')}`);
-  assert.equal(frameLabel(5.04).slice(0, 6), 'F 0151');
+test('the frame counter and timecode read like the reel: 24 frames a second', () => {
+  assert.equal(frameLabel(0), `F 0000 / ${String(Math.round(TOTAL * 24)).padStart(4, '0')}`);
+  assert.equal(frameLabel(5.04).slice(0, 6), 'F 0120');
+  assert.equal(timecode(5.5), '00:05:12');
+  assert.equal(timecode(0), '00:00:00');
+});
+
+test('wipes cover each cut between scenes, alternating color and direction', () => {
+  const e = addReveal(reveal(EMPTY_EDITIONS, [1, 2, 3, 4]), song(5), 1).made!;
+  const scenes = timeline(e);
+  const w = wipes(scenes);
+  assert.equal(w.length, scenes.length - 1);
+  assert.deepEqual(w.map((x) => x.t), scenes.slice(1).map((x) => x.start));
+  for (let i = 1; i < w.length; i++) {
+    assert.notEqual(w[i].color, w[i - 1].color);
+    assert.notEqual(w[i].dir, w[i - 1].dir);
+  }
+});
+
+test("beat squares tick at the song's own tempo, four to a cycle", () => {
+  assert.equal(beatIndex(0, 120), 0);
+  assert.equal(beatIndex(0.51, 120), 1);
+  assert.equal(beatIndex(2.01, 120), 0);
+  assert.equal(beatIndex(0.51, 60), 0);
 });
