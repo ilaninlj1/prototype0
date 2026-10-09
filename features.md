@@ -22,6 +22,8 @@ After every 5 reveals, a ~30-second full-screen reel plays those 5 songs as scen
 lockup), each scene streaming its own preview and shaped by its sound data. Replayable from the art screen.
 Rendered on the phone's GPU; shares as a still poster or a silent clip, never video with preview audio (Apple's
 terms). Needs the reel HTML on this Mac before its spec. Decided 2026-10-08 as the project after New Home.
+**Status (2026-10-09): Built** in Blindspot's own print language (Flow, Terrain, Orbit, Orb scenes; `app/edition.tsx`).
+Restyle the scenes to match `claude-motion-reel.html` once that file is on this Mac.
 
 ## [2026-10-08] Sort by sound in Tune
 Pace, Intensity, Texture, Harmony and Rhythm controls built on `assets/sound-index.json`, so you can steer the

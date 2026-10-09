@@ -1,6 +1,6 @@
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FindsNewsSheet } from '@/components/finds-news-sheet';
@@ -30,6 +30,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import { addToPiece, forkPiece, saveOnPiece, undoOnPiece, useArt } from '@/hooks/use-art';
 import { useCoverColors } from '@/hooks/use-cover-colors';
+import { addRevealToEditions, undoRevealInEditions, useEditions } from '@/hooks/use-editions';
 import { useSound } from '@/hooks/use-sound';
 import { useFindsNews } from '@/hooks/use-finds-news';
 import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
@@ -192,6 +193,7 @@ export default function HomeScreen() {
 
   // ---- The piece: every swipe adds the song's print (see lib/piece.ts) ----
   const { piece } = useArt();
+  const { unseen: editionReady } = useEditions();
   const pieceRef = useRef(piece);
   pieceRef.current = piece;
   const cardAreaRef = useRef<LayoutRectangle | null>(null);
@@ -322,6 +324,8 @@ export default function HomeScreen() {
       recipe: recipe ?? recipeFor(track.id, soundFor(track.id), null),
       song: { title: track.trackName, artist: track.artistName, artwork: track.artworkUrl100, previewUrl: track.previewUrl || undefined },
     };
+    // Every reveal joins the next Edition; the 5th makes it (lib/edition.ts).
+    addRevealToEditions({ ...mark.song!, trackId: track.id, recipe: mark.recipe, heard });
     if (flying) commitMark(flying.mark); // one still in the air lands now
     flyingIdRef.current = track.id;
     // The print badge appears ~700ms into the reveal; it takes off from there into its slot.
@@ -840,6 +844,7 @@ export default function HomeScreen() {
     const undone = snapshot.queue[0];
     // Undoing Next (or a jump from a reveal) shows the card revealed again; its print stays in the piece.
     if (undone && !snapshot.revealed) {
+      undoRevealInEditions(undone.id);
       if (flyingIdRef.current === undone.id) {
         flyingIdRef.current = null;
         setFlying(null);
@@ -918,7 +923,17 @@ export default function HomeScreen() {
       {currentTrack && topRecipe ? (
         <>
           <View style={styles.noteLine}>
-            {!!moreLike && moreLike.ids.has(currentTrack.id) ? (
+            {editionReady != null ? (
+              <Pressable
+                onPress={() => router.push({ pathname: '/edition', params: { n: String(editionReady) } })}
+                hitSlop={{ top: 14, bottom: 14 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Edition number ${editionReady} is ready. Play it`}>
+                <ThemedText style={[styles.note, styles.editionNote]} numberOfLines={1}>
+                  EDITION No. {editionReady} IS READY · TAP TO PLAY ▸
+                </ThemedText>
+              </Pressable>
+            ) : !!moreLike && moreLike.ids.has(currentTrack.id) ? (
               <ThemedText style={styles.note} numberOfLines={1}>
                 More like this: {moreLike.label}
               </ThemedText>
@@ -1094,6 +1109,7 @@ const styles = StyleSheet.create({
   // Reserved height, so the card never jumps when the More like this note comes and goes.
   noteLine: { height: 16, justifyContent: 'center' },
   note: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1, color: Colors.textSecondary },
+  editionNote: { color: Colors.text },
   under: { position: 'absolute', top: 0, left: 0, opacity: 0.55 },
   // Tune and Liked: equal halves of one row.
   bottomRow: {

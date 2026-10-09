@@ -20,9 +20,9 @@ export type LivePrintProps = {
 /** The print in motion, on the UI thread. `clock` is the song's position in seconds; `gather` 0 flows, 1 settles onto the rings. Load it through live-print.tsx. */
 export default function LiveCanvas({ recipe, size, clock, gather, scatter, fall }: LivePrintProps) {
   // Always three paths, so the hook count never changes when the recipe does.
-  const ring0 = useDerivedValue(() => draw(recipe, 0, size, clock.get(), gather.get(), scatter?.get() ?? 0, fall?.get() ?? 0));
-  const ring1 = useDerivedValue(() => draw(recipe, 1, size, clock.get(), gather.get(), scatter?.get() ?? 0, fall?.get() ?? 0));
-  const ring2 = useDerivedValue(() => draw(recipe, 2, size, clock.get(), gather.get(), scatter?.get() ?? 0, fall?.get() ?? 0));
+  const ring0 = useDerivedValue(() => drawParticles(recipe, 0, size, clock.get(), gather.get(), scatter?.get() ?? 0, fall?.get() ?? 0));
+  const ring1 = useDerivedValue(() => drawParticles(recipe, 1, size, clock.get(), gather.get(), scatter?.get() ?? 0, fall?.get() ?? 0));
+  const ring2 = useDerivedValue(() => drawParticles(recipe, 2, size, clock.get(), gather.get(), scatter?.get() ?? 0, fall?.get() ?? 0));
   const base = 0.85 * recipe.brightness + 0.15;
   const opacity = useDerivedValue(() => base * (1 - 0.75 * (scatter?.get() ?? 0)));
   const grain = recipe.texture === 'grain';
@@ -55,7 +55,8 @@ function place(r: PrintRecipe, i: number, t: number, gather: number, scatter: nu
   return [0.5 + (x - 0.5) * k, 0.5 + (y - 0.5) * k + fall * fall * (0.5 + 0.9 * h)];
 }
 
-function draw(r: PrintRecipe, ring: number, size: number, t: number, gather: number, scatter: number, fall: number) {
+/** One ring's particles at time t, as a path in a size × size box (also drawn by the Edition's Flow scene). */
+export function drawParticles(r: PrintRecipe, ring: number, size: number, t: number, gather: number, scatter: number, fall: number) {
   'worklet';
   const p = Skia.PathBuilder.Make();
   if (!r.rings[ring]) return p.detach();

@@ -17,6 +17,14 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-09] The Edition: your last five finds as a reel
+Every 5 reveals now make an Edition: a ~32-second full-screen reel. A blueprint grid draws in behind BLINDSPOT,
+then each find gets its own scene with its preview playing (its particles gathering into its rings, a terrain that
+rises with its energy and breathes at its tempo, its rings turning on a circle-of-fifths dial, or its cover held
+in a glass orb), titled in mono with the scene number and the reel's frame counter, and it ends on the five
+prints in a row. Home says when one is ready; tap to play, tap to pause, swipe down to leave. Share gives a still
+picture, never video with the song audio. Past editions replay from the art screen.
+
 ## [2026-10-09] Particles with a reason; Sort by sound
 The particles on the blind card were decoration. Now they do three things: listening develops them (a loose cloud
 that gathers into the song's rings as it plays), your drag moves them (right gathers, left scatters, down drops),

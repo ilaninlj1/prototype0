@@ -14,6 +14,7 @@ import { PrintStill } from '@/components/print/print-still';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
 import { useArt } from '@/hooks/use-art';
+import { useEditions } from '@/hooks/use-editions';
 import { usePlayback } from '@/hooks/use-playback';
 import { artworkUrl } from '@/lib/discovery';
 import { PIECE, type Piece, type PieceMark } from '@/lib/piece';
@@ -25,6 +26,7 @@ export default function ArtScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const params = useLocalSearchParams<{ piece?: string }>();
   const { piece, finished: pieces } = useArt();
+  const { editions } = useEditions();
   const { playPreview } = usePlayback();
   const [pieceNumber, setPieceNumber] = useState(params.piece ? Number(params.piece) : null);
   const [inspect, setInspect] = useState<PieceMark | null>(null);
@@ -125,6 +127,26 @@ export default function ArtScreen() {
             <Pressable key={m.trackId} onPress={() => setInspect(m)} style={styles.row} accessibilityRole="button">
               <ThemedText numberOfLines={1} style={styles.rowText}>
                 {m.song ? `${m.song.title} · ${m.song.artist}` : 'Older print — song details weren’t kept'}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </>
+      )}
+
+      {editions.length > 0 && (
+        <>
+          <ThemedText type="eyebrow" style={styles.section}>
+            Editions
+          </ThemedText>
+          {[...editions].reverse().map((e) => (
+            <Pressable
+              key={e.number}
+              onPress={() => router.push({ pathname: '/edition', params: { n: String(e.number) } })}
+              style={styles.row}
+              accessibilityRole="button"
+              accessibilityLabel={`Play edition ${e.number}`}>
+              <ThemedText numberOfLines={1} style={styles.rowText}>
+                ▸ No. {e.number} · {e.songs.map((s) => s.artist).join(', ')}
               </ThemedText>
             </Pressable>
           ))}
