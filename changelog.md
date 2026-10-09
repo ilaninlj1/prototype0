@@ -17,6 +17,14 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-09] You: Piece, Discoveries, Insights
+The You tab was one long scroll of about ten cards competing for attention. Now a switch at the top splits it
+into three views: Piece (your piece from Home, your Editions, the Called It story) opens first, Discoveries
+holds what you found (the count, the Tasteform, Decoded, Rewind, the Called It log, the iceberg), and Insights
+holds the numbers (listener type, tiles, how you listen, range, the receipt, the Spotify file cards). Loading
+shows placeholder blocks the size of what's coming instead of a lone spinner, and a solid strip sits behind the
+status bar so scrolled cards no longer run under the clock.
+
 ## [2026-10-09] The Edition: your last five finds as a reel
 Every 5 reveals now make an Edition: a ~32-second full-screen reel. A blueprint grid draws in behind BLINDSPOT,
 then each find gets its own scene with its preview playing (its particles gathering into its rings, a terrain that
