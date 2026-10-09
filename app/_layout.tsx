@@ -7,6 +7,8 @@ import {
   Figtree_800ExtraBold,
 } from '@expo-google-fonts/figtree';
 import { Caveat_700Bold } from '@expo-google-fonts/caveat';
+import { InterTight_700Bold, InterTight_900Black } from '@expo-google-fonts/inter-tight';
+import { Parisienne_400Regular } from '@expo-google-fonts/parisienne';
 import { PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker';
 import { Archivo_700Bold, Archivo_800ExtraBold } from '@expo-google-fonts/archivo';
 import { useFonts } from 'expo-font';
@@ -83,6 +85,10 @@ export default function RootLayout() {
     DMMono_500Medium,
     PermanentMarker_400Regular,
     Caveat_700Bold,
+    // The Edition reel's type (app/edition.tsx; Skia loads its own copies).
+    InterTight_700Bold,
+    InterTight_900Black,
+    Parisienne_400Regular,
   });
   if (!fontsLoaded) return <View style={styles.boot} />;
   if (Platform.OS === 'web' && pathname !== '/pack' && pathname !== '/spotify-callback') {
@@ -111,6 +117,7 @@ export default function RootLayout() {
             <Stack.Screen name="export-history" options={{ presentation: 'modal', title: 'Export History' }} />
             <Stack.Screen name="recently-deleted" options={{ presentation: 'modal', title: 'Recently deleted' }} />
             <Stack.Screen name="drop-play" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+            <Stack.Screen name="edition" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="search" options={{ headerShown: false }} />
             <Stack.Screen name="charts" options={{ headerShown: false }} />
             <Stack.Screen name="song" options={{ headerShown: false }} />
