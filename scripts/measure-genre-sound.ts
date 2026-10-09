@@ -7,11 +7,13 @@
 //
 //   npm run measure-genre-sound                  measure what's missing, check, write the file
 //   npm run measure-genre-sound -- --limit 2     first 2 genres only, no file written (a dry run)
+//   npm run measure-genre-sound -- --from-index  rebuild from assets/sound-index.json instead (no uploads; use this one)
 
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { buildBaselines, catalogSlug, pickBaselineSongs, sanityProblems, seededRng, type Measured } from '../lib/genre-sound.ts';
+import { fromIndexRow } from '../lib/sound.ts';
 import { isFullyMeasured, MEASURES, parseSongFeel } from '../lib/taste-decoded.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -41,7 +43,42 @@ async function measure(previewUrl: string): Promise<Measured | 'failed' | 'limit
   return Object.fromEntries(MEASURES.map((m) => [m, feel[m]])) as Measured;
 }
 
+/**
+ * --from-index: every catalog song with data in assets/sound-index.json (ReccoBeats catalog values, matched by
+ * ISRC; nothing uploaded) instead of 30 uploaded previews per genre. Same checks, same file.
+ */
+function fromIndex() {
+  const index = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/sound-index.json'), 'utf8')) as { songs: Record<string, unknown> };
+  const genres = Object.keys(JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/genres-raw.json'), 'utf8')));
+  const byGenre: Record<string, Measured[]> = {};
+  for (const genre of genres) {
+    const file = path.join(ROOT, 'assets/catalogs', `${catalogSlug(genre)}.json`);
+    if (!fs.existsSync(file)) throw new Error(`No catalog for ${genre} at ${file}`);
+    const catalog = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, { hits: { itunesTrackId: number }[]; deepCuts: { itunesTrackId: number }[] }>;
+    const seen = new Set<number>();
+    byGenre[genre] = [];
+    for (const artist of Object.values(catalog))
+      for (const e of [...artist.hits, ...artist.deepCuts]) {
+        if (seen.has(e.itunesTrackId)) continue;
+        seen.add(e.itunesTrackId);
+        const f = fromIndexRow(index.songs[String(e.itunesTrackId)]);
+        if (f) byGenre[genre].push(Object.fromEntries(MEASURES.map((m) => [m, f[m]])) as Measured);
+      }
+  }
+  const baselines = buildBaselines(byGenre, new Date().toISOString().slice(0, 10));
+  const left = genres.filter((g) => !baselines.genres[g]);
+  if (left.length) console.log(`Left out (under 15 measured songs): ${left.join(', ')}`);
+  const problems = sanityProblems(baselines);
+  if (problems.length) {
+    console.log(`Sanity check failed, file not written:\n- ${problems.join('\n- ')}`);
+    process.exit(1);
+  }
+  fs.writeFileSync(OUT, JSON.stringify(baselines, null, 1) + '\n');
+  console.log(`Wrote assets/genre-sound.json from the sound index: ${Object.keys(baselines.genres).length} genres, ${baselines.all.n} songs.`);
+}
+
 async function main() {
+  if (process.argv.includes('--from-index')) return fromIndex();
   const at = process.argv.indexOf('--limit');
   const limit = at > 0 ? Number(process.argv[at + 1]) : null;
   const genres = Object.keys(JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/genres-raw.json'), 'utf8')));
