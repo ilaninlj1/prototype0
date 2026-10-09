@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DecodedLine } from '@/components/decoded/decoded-line';
@@ -11,7 +11,9 @@ import { ThemedText } from '@/components/themed-text';
 import { MiniPlayer } from '@/components/mini-player';
 import { NoteSheet } from '@/components/note-sheet';
 import { PressableScale } from '@/components/pressable-scale';
+import { PieceView } from '@/components/print/piece-view';
 import { CalledItStory } from '@/components/you/called-it-story';
+import { ViewSwitch, type YouView } from '@/components/you/view-switch';
 import {
   Bars,
   Clock,
@@ -28,6 +30,8 @@ import {
 import { Tasteform } from '@/components/tasteform/tasteform';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, Fonts, Ui } from '@/constants/theme';
+import { useArt } from '@/hooks/use-art';
+import { useEditions } from '@/hooks/use-editions';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
 import { useTasteDecoded } from '@/hooks/use-taste-decoded';
@@ -49,6 +53,8 @@ import {
   type BestStreaks,
   type BlindTestResult,
 } from '@/lib/discovery-storage';
+import { EDITION_SIZE } from '@/lib/edition';
+import { PIECE } from '@/lib/piece';
 import { setNote } from '@/lib/saved-songs';
 import { FILE_FAIL_TEXT, importAndKeepFile, loadSpotifyLibrary, type SpotifyLibrary } from '@/lib/spotify-api';
 import {
@@ -95,6 +101,11 @@ export default function ProfileScreen() {
   const posterRef = useRef<View>(null);
   const storyRef = useRef<View>(null);
   const [storyAt, setStoryAt] = useState(0);
+  // Piece first, then what you found, then the numbers.
+  const [view, setView] = useState<YouView>('piece');
+  const { piece } = useArt();
+  const editionState = useEditions();
+  const latestEdition = editionState.editions.at(-1) ?? null;
   const decoded = useTasteDecoded(finds, history);
 
   // Tap a cover in the Tasteform to hear it. Leaving the tab stops it and
@@ -205,14 +216,6 @@ export default function ProfileScreen() {
     setSpotifyFile(library);
   }
 
-  if (!loaded) {
-    return (
-      <ThemedView style={styles.centered}>
-        <ActivityIndicator color={Colors.accent} />
-      </ThemedView>
-    );
-  }
-
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -222,12 +225,51 @@ export default function ProfileScreen() {
           <ThemedText type="eyebrow">Blindspot · what you hear</ThemedText>
           <ThemedText type="hero">Your ears</ThemedText>
 
-          {finds.length === 0 ? (
-            <ThemedText style={styles.dim}>
-              Nothing found yet. Double-tap a song on Home to save it, and your shape starts growing here.
-            </ThemedText>
-          ) : (
+          <ViewSwitch view={view} onChange={setView} />
+          {!loaded ? (
+            <View style={styles.skeletons}>
+              {[96, 220, 140].map((h, i) => (
+                <View key={i} style={[styles.skeleton, { height: h }]} />
+              ))}
+            </View>
+          ) : view === 'piece' ? (
             <>
+              <Section label={`Your piece · No. ${piece.number}`}>
+                <PieceView piece={piece} width={width - 2 * Spacing.lg} onPressMark={() => router.push('/art')} />
+                <ThemedText style={styles.dim}>
+                  {piece.marks.length === 0
+                    ? 'Swipe on Home and every song leaves a mark here: a print for each reveal, a ring for each skip.'
+                    : `${piece.marks.length} of ${PIECE.slots} songs. Every reveal is a print, every skip a ring.`}
+                </ThemedText>
+                <PressableScale onPress={() => router.push('/art')} style={[Ui.outlineButton, styles.importButton]}>
+                  <ThemedText style={Ui.label}>Open your piece</ThemedText>
+                </PressableScale>
+              </Section>
+
+              <Section label="Editions">
+                {latestEdition && (
+                  <PressableScale
+                    onPress={() => router.push({ pathname: '/edition', params: { n: String(latestEdition.number) } })}
+                    style={styles.rewind}>
+                    <Ionicons name="play-circle-outline" size={44} color={Colors.text} />
+                    <View style={styles.rewindText}>
+                      <ThemedText style={styles.rewindTitle}>
+                        Edition No. {latestEdition.number}
+                        {editionState.unseen === latestEdition.number ? ' · new' : ''}
+                      </ThemedText>
+                      <ThemedText style={styles.dim} numberOfLines={1}>
+                        {latestEdition.songs.map((x) => x.artist).join(', ')}
+                      </ThemedText>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+                  </PressableScale>
+                )}
+                <ThemedText style={styles.dim}>
+                  {editionState.pending.length} of {EDITION_SIZE} reveals toward your next Edition
+                  {editionState.editions.length > 1 ? `. ${editionState.editions.length} made so far, all on your piece's page.` : '.'}
+                </ThemedText>
+              </Section>
+
               {story ? (
                 <View style={styles.story}>
                   <CalledItStory cardRef={storyRef} story={story} width={storyWidth} />
@@ -252,8 +294,17 @@ export default function ProfileScreen() {
                   When an artist you found blind starts growing, your Called It story shows up here, ready for Instagram.
                 </ThemedText>
               )}
-
-              <TypeBadge name={kind.name} why={kind.why} />
+            </>
+          ) : finds.length === 0 ? (
+            <ThemedText style={styles.dim}>
+              Nothing found yet. Double-tap a song on Home to save it, and your shape starts growing here.
+            </ThemedText>
+          ) : view === 'discoveries' ? (
+            <>
+              <ThemedView style={styles.hero} backgroundColor="transparent">
+                <ThemedText style={styles.heroNumber}>{finds.length}</ThemedText>
+                <ThemedText style={styles.dim}>songs found blind{heard > 0 ? `, out of ${heard} you heard` : ''}.</ThemedText>
+              </ThemedView>
               <Tasteform
                 liked={finds}
                 history={history}
@@ -266,7 +317,6 @@ export default function ProfileScreen() {
               {decoded.ready && (
                 <DecodedLine finding={decoded.findings[0] ?? null} prompt={decoded.prompt} isNew={decoded.isNew} />
               )}
-
               <PressableScale onPress={() => router.push('/rewind')} style={styles.rewind}>
                 <RewindEmblem size={44} />
                 <View style={styles.rewindText}>
@@ -275,20 +325,34 @@ export default function ProfileScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               </PressableScale>
-
-              <ThemedView style={styles.hero} backgroundColor="transparent">
-                <ThemedText style={styles.heroNumber}>{finds.length}</ThemedText>
-                <ThemedText style={styles.dim}>songs found blind{heard > 0 ? `, out of ${heard} you heard` : ''}.</ThemedText>
-              </ThemedView>
-
-              <Tiles
-                tiles={[
-                  { big: rate.oneIn ? `1 in ${rate.oneIn}` : '—', label: 'songs you hear, you save' },
-                  { big: summary.medianFound != null ? compact(summary.medianFound) : '—', label: 'median listeners when found' },
-                  { big: String(calledIt.length), label: calledIt.length === 1 ? 'find that doubled' : 'finds that doubled' },
-                ]}
-              />
-
+              <Section label="Called it">
+                {calledIt.length > 0 ? (
+                  <ThemedView style={styles.block} backgroundColor="transparent">
+                    <ThemedText style={styles.line}>
+                      <ThemedText style={styles.em}>{calledIt.length}</ThemedText> of your finds have at least doubled
+                      since you found them:
+                    </ThemedText>
+                    {calledIt.map((t) => (
+                      <ThemedText key={t.id} style={styles.dim}>
+                        {t.artistName}: {fmt(t.artistListeners!)} → {fmt(now[t.artistName])}
+                      </ThemedText>
+                    ))}
+                  </ThemedView>
+                ) : summary.best ? (
+                  <ThemedText style={styles.line}>
+                    Best find so far: <ThemedText style={styles.em}>{summary.best.artistName}</ThemedText>, up {summary.best.pct}%
+                    since you found them.
+                  </ThemedText>
+                ) : (
+                  <ThemedText style={styles.line}>None of your finds have grown yet. Make a prediction with Call it on a revealed song.</ThemedText>
+                )}
+                {summary.medianFound != null && (
+                  <ThemedText style={styles.dim}>
+                    Half your finds had under {fmt(summary.medianFound)} listeners when you found them.{' '}
+                    {describeListeners(summary.medianFound).verdict}
+                  </ThemedText>
+                )}
+              </Section>
               <Section label="Your iceberg">
                 <ThemedText style={styles.dim}>
                   Every artist you found blind, by how many listeners they had when you found them.
@@ -296,7 +360,17 @@ export default function ProfileScreen() {
                 <IcebergCard cardRef={icebergRef} tiers={tiers} />
                 <ShareButton label="Share my iceberg" onPress={() => shareCard(icebergRef, 'Share your iceberg')} />
               </Section>
-
+            </>
+          ) : (
+            <>
+              <TypeBadge name={kind.name} why={kind.why} />
+              <Tiles
+                tiles={[
+                  { big: rate.oneIn ? `1 in ${rate.oneIn}` : '—', label: 'songs you hear, you save' },
+                  { big: summary.medianFound != null ? compact(summary.medianFound) : '—', label: 'median listeners when found' },
+                  { big: String(calledIt.length), label: calledIt.length === 1 ? 'find that doubled' : 'finds that doubled' },
+                ]}
+              />
               <Section label="How you listen">
                 {speed && (
                   <Stat
@@ -328,7 +402,6 @@ export default function ProfileScreen() {
                   </ThemedText>
                 )}
               </Section>
-
               <Section label="Your range">
                 <Stat
                   big={String(genres.liked)}
@@ -341,36 +414,6 @@ export default function ProfileScreen() {
                   </ThemedText>
                 )}
               </Section>
-
-              <Section label="Called it">
-                {calledIt.length > 0 ? (
-                  <ThemedView style={styles.block} backgroundColor="transparent">
-                    <ThemedText style={styles.line}>
-                      <ThemedText style={styles.em}>{calledIt.length}</ThemedText> of your finds have at least doubled
-                      since you found them:
-                    </ThemedText>
-                    {calledIt.map((t) => (
-                      <ThemedText key={t.id} style={styles.dim}>
-                        {t.artistName}: {fmt(t.artistListeners!)} → {fmt(now[t.artistName])}
-                      </ThemedText>
-                    ))}
-                  </ThemedView>
-                ) : summary.best ? (
-                  <ThemedText style={styles.line}>
-                    Best find so far: <ThemedText style={styles.em}>{summary.best.artistName}</ThemedText>, up {summary.best.pct}%
-                    since you found them.
-                  </ThemedText>
-                ) : (
-                  <ThemedText style={styles.line}>None of your finds have grown yet. Make a prediction with Call it on a revealed song.</ThemedText>
-                )}
-                {summary.medianFound != null && (
-                  <ThemedText style={styles.dim}>
-                    Half your finds had under {fmt(summary.medianFound)} listeners when you found them.{' '}
-                    {describeListeners(summary.medianFound).verdict}
-                  </ThemedText>
-                )}
-              </Section>
-
               <Section label="Your receipt">
                 <ReceiptCard
                   cardRef={receiptRef}
@@ -381,7 +424,6 @@ export default function ProfileScreen() {
                 />
                 <ShareButton label="Share my receipt" onPress={() => shareCard(receiptRef, 'Share your receipt')} />
               </Section>
-
               <Section label="Your Spotify" spotify>
                 {songs.length > 0 ? (
                   <>
@@ -451,13 +493,11 @@ export default function ProfileScreen() {
                 )}
                 {importNote && <ThemedText style={styles.dim}>{importNote}</ThemedText>}
               </Section>
-
               {(best.spot > 0 || best.h2h > 0) && (
                 <ThemedText style={styles.streaks}>
                   Best streaks · Spot the Star {best.spot} · Head to Head {best.h2h}
                 </ThemedText>
               )}
-
               {firstFind && (
                 <ThemedText style={styles.dim}>
                   First find: {firstFind.trackName} by {firstFind.artistName}, {shortDay(firstFind.likedAt!)}.
@@ -471,6 +511,8 @@ export default function ProfileScreen() {
           </ThemedText>
         </ThemedView>
       </ScrollView>
+      {/* Solid behind the status bar, so scrolled cards never run under the clock and the Dynamic Island. */}
+      <View pointerEvents="none" style={[styles.statusShade, { height: insets.top }]} />
       {nowPlaying && (
         <View style={styles.mini}>
           <MiniPlayer
@@ -488,6 +530,9 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  statusShade: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: Colors.background },
+  skeletons: { gap: Spacing.lg, marginTop: Spacing.lg },
+  skeleton: { borderRadius: 10, backgroundColor: Colors.surface, opacity: 0.6 },
   screen: {
     flex: 1,
   },
