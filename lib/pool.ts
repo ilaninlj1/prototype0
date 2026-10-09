@@ -53,6 +53,7 @@ import { deckSize, deepCutMinTrackCount, deepCutRelativeFloor, hitRankMax, itune
 import type { ArtistBand, ArtistCatalog, CatalogEntry, GenreCatalogFile, PresetId, SeedArtistEntry, SongBand, Track } from './pool-types.ts';
 import { shuffle } from './taste-test.ts';
 import { soundFor } from './sound-index.ts';
+import { pickSorted, type SoundFilter } from './sound-filter.ts';
 import { pickNeighbors, type Candidate } from './sound-neighbors.ts';
 import type { SoundFeatures } from './sound.ts';
 
@@ -743,6 +744,31 @@ export function nearestBySound(
       candidates.push({ item: catalogTrack(artist, ac, entry, preset, genreTag), artist: artist.name, sound: soundFor(entry.itunesTrackId) });
   }
   return pickNeighbors(target.sound, target.artist, candidates, n).map(trackToDiscoveryTrack);
+}
+
+/**
+ * Sort by sound: up to n catalog songs in this genre that match the Tune
+ * switches, one per artist, shuffled. The preset's artist band first; if that
+ * gives fewer than 3, every band (how well-known matters less than how it
+ * sounds). No network, like nearestBySound.
+ */
+export function getTracksBySound(preset: PresetId, genreTag: string, excludeArtists: Set<string>, filter: SoundFilter, n: number): DiscoveryTrack[] {
+  const catalog = loadCatalog(genreTag);
+  if (!catalog) return [];
+  const excluded = new Set([...excludeArtists].map(normalizeArtist));
+  const collect = (band: ArtistBand | null) => {
+    const candidates: Candidate<Track>[] = [];
+    for (const artist of eligibleArtists(genreTag, band, excluded, new Set())) {
+      const ac = catalog[artist.name];
+      if (!ac) continue;
+      for (const entry of eligibleEntries(ac, preset))
+        candidates.push({ item: catalogTrack(artist, ac, entry, preset, genreTag), artist: artist.name, sound: soundFor(entry.itunesTrackId) });
+    }
+    return pickSorted(candidates, filter, n, Math.random);
+  };
+  const band = preset === 'M' ? null : PRESET_ARTIST_BAND[preset];
+  const first = collect(band);
+  return (first.length >= 3 || band === null ? first : collect(null)).map(trackToDiscoveryTrack);
 }
 
 /**

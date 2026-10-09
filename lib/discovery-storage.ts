@@ -9,6 +9,7 @@ import type { PresetId } from './pool-types';
 import { deleteSongs, restoreSongs, saveSong, setNote, type DeletedSong, type Saved } from './saved-songs';
 import type { DecodedVotes } from './taste-decoded';
 import type { SongFeel } from './tasteform';
+import { ANY_FILTER, type SoundFilter } from './sound-filter';
 
 // All persistence is best-effort: a read/write failure falls back to an empty
 // result rather than throwing, mirroring lib/taste-test.ts's pattern.
@@ -416,6 +417,14 @@ const SONG_FEEL_KEY = `${STORAGE_PREFIX}:songFeel:v2`;
 /** Each song's energy, mood and the rest (ReccoBeats catalog values), keyed by track id — looked up once, kept for good. */
 export const loadSongFeel = () => readJson<Record<number, SongFeel>>(SONG_FEEL_KEY, {});
 export const saveSongFeel = (feels: Record<number, SongFeel>) => writeJson(SONG_FEEL_KEY, feels);
+
+// ---------- Sort by sound ----------
+
+const SOUND_FILTER_KEY = `${STORAGE_PREFIX}:soundFilter`;
+
+/** Tune → Sound switches, kept until changed (through genre jumps and app restarts). */
+export const loadSoundFilter = () => readJson<SoundFilter>(SOUND_FILTER_KEY, ANY_FILTER);
+export const saveSoundFilter = (filter: SoundFilter) => writeJson(SOUND_FILTER_KEY, filter);
 
 // ---------- Taste Decoded ----------
 

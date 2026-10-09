@@ -26,6 +26,7 @@ terms). Needs the reel HTML on this Mac before its spec. Decided 2026-10-08 as t
 ## [2026-10-08] Sort by sound in Tune
 Pace, Intensity, Texture, Harmony and Rhythm controls built on `assets/sound-index.json`, so you can steer the
 feed by how songs sound, not just genre. Technical values stay in Details. Next after the Edition or alongside.
+**Status (2026-10-09): Done** as Pace / Energy / Texture / Mood / Groove switches in Tune (`lib/sound-filter.ts`).
 
 ## [2026-10-02] Finds News — what happened to your finds while you were away
 The return loop that goes with Taste Decoded (`docs/superpowers/specs/2026-10-02-taste-decoded-design.md`).

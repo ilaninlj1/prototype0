@@ -54,14 +54,18 @@ import {
   loadLikedTracks,
   loadRegion,
   loadShuffleGenres,
+  loadSoundFilter,
   loadSwipeHistory,
   saveDiscoveredGenres,
   saveRegion,
   saveShuffleGenres,
+  saveSoundFilter,
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
 import { pickSimilar } from '@/lib/charts';
-import { fetchArtistListeners, fetchSimilarArtists, getTracks, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
+import { fetchArtistListeners, fetchSimilarArtists, getTracks, getTracksBySound, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
+import { deckSize } from '@/lib/pool-config';
+import { ANY_FILTER, DIMENSIONS, describeFilter, isActive, relax, type SoundFilter } from '@/lib/sound-filter';
 import { findItunesArtist } from '@/lib/song-details';
 import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
@@ -121,6 +125,10 @@ export default function HomeScreen() {
   const [discoveredGenres, setDiscoveredGenres] = useState<string[]>([]);
   const [region, setRegion] = useState<Region>('US');
   const [nextMode, setNextMode] = useState<NextMode>('genre');
+  // Tune → Sound. The ref is what refills read, so a refill always uses the latest switches.
+  const [soundFilter, setSoundFilter] = useState<SoundFilter>(ANY_FILTER);
+  const soundFilterRef = useRef<SoundFilter>(ANY_FILTER);
+  const [loosened, setLoosened] = useState<string[]>([]);
 
   // Preset and genre (strategy) are independent axes — see runRefill's
   // fetcher branch below. Not persisted (yet): resets to the default A on
@@ -370,12 +378,16 @@ export default function HomeScreen() {
 
   useEffect(() => {
     (async () => {
-      const [history, genres, loadedRegion, spotifyFile] = await Promise.all([
+      const [history, genres, loadedRegion, spotifyFile, savedFilter] = await Promise.all([
         loadSwipeHistory(),
         loadDiscoveredGenres(),
         loadRegion(),
         loadSpotifyLibrary('file'),
+        loadSoundFilter(),
       ]);
+      const filter = { ...ANY_FILTER, ...savedFilter };
+      soundFilterRef.current = filter;
+      setSoundFilter(filter);
       // Truly blind: artists from an imported Spotify file never come up blind.
       setKnownArtists(spotifyFile?.likes ?? []);
       setSwipeHistory(history);
@@ -394,6 +406,8 @@ export default function HomeScreen() {
 
       setHydrated(true);
     })();
+    // Once, at mount: it reads everything it needs from storage, not from state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function runRefill(
@@ -421,7 +435,9 @@ export default function HomeScreen() {
         (strategy) =>
           (strategy.type === 'artist'
             ? fetchForStrategy(strategy, activeRegion)
-            : getTracks(activePreset, strategy.genre, excludeArtists).then((tracks) => tracks.map(trackToDiscoveryTrack))
+            : isActive(soundFilterRef.current)
+              ? Promise.resolve(sortedTracks(activePreset, strategy.genre, excludeArtists))
+              : getTracks(activePreset, strategy.genre, excludeArtists).then((tracks) => tracks.map(trackToDiscoveryTrack))
           ).then((tracks) => tracks.filter((t) => !hideFromDiscovery(t.artistName) && !alreadyKnown(t.artistName))) // human-only unless AI music is on; never an artist already in your Spotify
       );
       if (refillEpochRef.current !== epoch) return;
@@ -441,6 +457,33 @@ export default function HomeScreen() {
       if (refillEpochRef.current !== epoch) return;
       setError('Something went wrong fetching tracks. Check your connection and try again.');
     }
+  }
+
+  // Sort by sound: matching catalog songs only. If fewer than 3 match in this genre, let go of one switch at a
+  // time (finest first, lib/sound-filter.ts relax) and say which, so the feed never runs dry.
+  function sortedTracks(activePreset: PresetId, genre: string, excludeArtists: Set<string>): DiscoveryTrack[] {
+    let filter = soundFilterRef.current;
+    let tracks = getTracksBySound(activePreset, genre, excludeArtists, filter, deckSize);
+    const dropped: string[] = [];
+    while (tracks.length < 3) {
+      const next = relax(filter);
+      if (!next) break;
+      filter = next.filter;
+      dropped.push(DIMENSIONS.find((d) => d.key === next.dropped)!.label.toLowerCase());
+      tracks = getTracksBySound(activePreset, genre, excludeArtists, filter, deckSize);
+    }
+    setLoosened(dropped);
+    return tracks;
+  }
+
+  async function handleChangeSoundFilter(filter: SoundFilter) {
+    soundFilterRef.current = filter;
+    setSoundFilter(filter);
+    setLoosened([]);
+    saveSoundFilter(filter);
+    const preserved = queue.slice(0, 1);
+    setQueue(preserved);
+    await runRefill(preserved, strategy, swipeHistory, discoveredGenres, region, preset, seenArtists);
   }
 
   async function logSwipe(track: DiscoveryTrack, action: SwipeEntry['action']) {
@@ -875,11 +918,16 @@ export default function HomeScreen() {
       {currentTrack && topRecipe ? (
         <>
           <View style={styles.noteLine}>
-            {!!moreLike && moreLike.ids.has(currentTrack.id) && (
+            {!!moreLike && moreLike.ids.has(currentTrack.id) ? (
               <ThemedText style={styles.note} numberOfLines={1}>
                 More like this: {moreLike.label}
               </ThemedText>
-            )}
+            ) : isActive(soundFilter) && strategy.type === 'genre' ? (
+              <ThemedText style={styles.note} numberOfLines={1}>
+                Sorted: {describeFilter(soundFilter)}
+                {loosened.length > 0 ? ` · loosened ${loosened.join(', ')}` : ''}
+              </ThemedText>
+            ) : null}
           </View>
 
           <View ref={cardAreaViewRef} style={styles.cardArea} onLayout={handleCardAreaLayout}>
@@ -942,6 +990,8 @@ export default function HomeScreen() {
               onToggleRegion={handleToggleRegion}
               nextMode={nextMode}
               onSetNextMode={handleSetNextMode}
+              soundFilter={soundFilter}
+              onChangeSoundFilter={handleChangeSoundFilter}
               />
             </View>
             <View style={styles.half}>

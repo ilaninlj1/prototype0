@@ -17,6 +17,16 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-09] Particles with a reason; Sort by sound
+The particles on the blind card were decoration. Now they do three things: listening develops them (a loose cloud
+that gathers into the song's rings as it plays), your drag moves them (right gathers, left scatters, down drops),
+and songs far from what you've saved make them restless with a label: CLOSE TO HOME, NEW GROUND or DEEP IN YOUR
+BLIND SPOT (`lib/taste-distance.ts`, calibrated on 60 simulated listeners). Your piece records how closely you
+listened: a long listen draws a crisp print, a quick skip a small dot.
+Tune → Sound adds five switches (Pace, Energy, Texture, Mood, Groove), each Low / Any / High, so the feed only
+serves songs that sound that way, from the bundled catalog and sound index. When a genre runs short it loosens
+one switch at a time and says so. The choices stay on through genre jumps and app restarts.
+
 ## [2026-10-08] New Home: the sound you hear, drawn; reveal in place; prints instead of covers
 Three design reviews of the Oct 8 screen recording agreed: only one gesture was ever taught, the reveal flipped into
 a different card where the listener count was the hero, and the art under the card was album covers with no link

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, TouchableOpacity } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -7,6 +7,7 @@ import { Colors, Radius, Spacing, TapTarget, Ui } from '@/constants/theme';
 import type { Region } from '@/lib/discovery';
 import { setAllowAi, useAllowAi } from '@/lib/human-check-api';
 import type { PresetId } from '@/lib/pool-types';
+import { DIMENSIONS, describeFilter, isActive, type Level, type SoundFilter } from '@/lib/sound-filter';
 import { PRESET_LABELS, PresetChips } from './preset-chips';
 import { RegionToggle } from './region-toggle';
 
@@ -28,6 +29,9 @@ type TuneSheetProps = {
   onToggleRegion: () => void;
   nextMode: NextMode;
   onSetNextMode: (mode: NextMode) => void;
+  /** Sort by sound: five Low / Any / High switches over each song's measured sound. */
+  soundFilter: SoundFilter;
+  onChangeSoundFilter: (filter: SoundFilter) => void;
 };
 
 /** One "Tune" button holding every feed control, so the main screen is just the card. */
@@ -39,6 +43,8 @@ export function TuneSheet({
   onToggleRegion,
   nextMode,
   onSetNextMode,
+  soundFilter,
+  onChangeSoundFilter,
 }: TuneSheetProps) {
   const [visible, setVisible] = useState(false);
   const allowAi = useAllowAi();
@@ -59,6 +65,7 @@ export function TuneSheet({
       <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
         <Pressable style={styles.backdrop} onPress={close}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
             <ThemedText style={Ui.label}>How well-known</ThemedText>
             <PresetChips activePreset={preset} loading={presetLoading} onSelect={onSelectPreset} />
 
@@ -108,6 +115,45 @@ export function TuneSheet({
                 ? 'AI acts can show up. They’re labeled “AI-tagged” when revealed.'
                 : 'Skips artists that listeners have tagged as AI-made. Real people only.'}
             </ThemedText>
+
+            <ThemedText style={[Ui.label, styles.heading]}>Sound</ThemedText>
+            {DIMENSIONS.map((d) => (
+              <View key={d.key} style={styles.soundRow}>
+                <ThemedText style={styles.soundLabel}>{d.label}</ThemedText>
+                <ThemedView style={[styles.segment, styles.soundSegment]} backgroundColor="transparent">
+                  {(['low', 'any', 'high'] as Level[]).map((level) => {
+                    const active = soundFilter[d.key] === level;
+                    const word = level === 'low' ? d.low : level === 'high' ? d.high : 'Any';
+                    return (
+                      <TouchableOpacity
+                        key={level}
+                        style={styles.segmentSlot}
+                        onPress={() => onChangeSoundFilter({ ...soundFilter, [d.key]: level })}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        accessibilityLabel={`${d.label}: ${word}`}>
+                        <ThemedView style={styles.segmentItem} backgroundColor={active ? Colors.accent : 'transparent'}>
+                          <ThemedText
+                            style={[Ui.label, styles.soundWord, { color: active ? Colors.accentText : Colors.textSecondary }]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.7}>
+                            {word}
+                          </ThemedText>
+                        </ThemedView>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ThemedView>
+              </View>
+            ))}
+            <ThemedText type="caption">
+              {isActive(soundFilter)
+                ? `Only ${describeFilter(soundFilter)} songs, measured from how they sound. Stays on through genre jumps.`
+                : 'Pick how you want the next songs to sound. Measured by ReccoBeats, not by genre.'}
+            </ThemedText>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -128,10 +174,17 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.hairline,
     borderTopLeftRadius: Radius.md,
     borderTopRightRadius: Radius.md,
+    maxHeight: '88%',
+  },
+  body: {
     padding: Spacing.xl,
     paddingBottom: Spacing.xxl,
     gap: Spacing.sm,
   },
+  soundRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  soundLabel: { ...Ui.label, width: 72, color: Colors.textSecondary },
+  soundSegment: { flex: 1 },
+  soundWord: { fontSize: 11, letterSpacing: 0.6 },
   heading: {
     marginTop: Spacing.lg,
   },
