@@ -18,17 +18,31 @@ Description of the bug, repro steps, and any relevant context.
 
 ## [2026-10-08] Audit: three small feed bugs fixed, two pool caveats still live
 
+Found by a read-only Codex audit of the feed code, then checked against the code and
+fixed here (c105c10). Discovery tests 57 passing, `tsc` clean.
+
 Fixed:
-- **Late Similar lookup overrode Undo.** `strategyAfterSwipe` set the strategy after
-  its await but before the caller's epoch check, so in Similar mode a skip followed by
-  a quick Undo could land the old hop on top of the restored strategy. It now takes the
-  caller's epoch and only sets the strategy if no swipe or Undo came first.
-- **Fallback retried an exhausted genre.** Once every genre was heard, `pickJumpGenre`'s
-  least-recent branch ignored the exclusions, so `refillQueueWithFallback` kept picking
-  the same empty genre. Tried genres are now removed from the lists it's given, and it
-  stops when none are left.
-- **`describeGrowth(0, n)`** returned NaN or Infinity, and (0, 0) counted as "called it".
-  No baseline now means no growth.
+- **Late Similar lookup overrode Undo.**
+  Symptom: in Similar mode, skip the third song and tap Undo right away; a second or two
+  later the feed jumps to a similar artist anyway, on top of what Undo put back.
+  Evidence: `strategyAfterSwipe` (`app/(tabs)/index.tsx:427`) called `setStrategy` after
+  its Last.fm await but before the caller's epoch check at :442, so the check that drops
+  a stale refill came too late to stop the strategy change.
+  Fix: it takes the caller's epoch and only sets the strategy if no swipe or Undo came
+  first, in both callers.
+- **Fallback retried an exhausted genre.**
+  Symptom: once every genre had been heard, an empty genre could leave Home with no cards
+  even though another genre still had songs.
+  Evidence: a read-only repro returned an empty queue after 30 calls to the same empty
+  genre. `pickJumpGenre`'s least-recent branch (`lib/discovery.ts:325`) ignores the
+  exclusions `refillQueueWithFallback` passed it. The new test failed before the fix.
+  Fix: tried genres are removed from the lists it's given, and it stops when none are
+  left. Two tests in `lib/discovery.test.ts`.
+- **Growth with no starting count.**
+  Symptom: an artist with no listener count at save time could show as "called it".
+  Evidence: `describeGrowth(0, 0)` returned `{ pct: NaN, calledIt: true }` and `(0, 10)`
+  gave Infinity, from dividing by the zero baseline.
+  Fix: no baseline now means no growth. Two tests.
 
 Still live from the 2026-09-14 entry (the pool replaced `fetchTracksByGenre` on Home):
 - The region toggle doesn't affect genre browsing, since the pool has no region.
