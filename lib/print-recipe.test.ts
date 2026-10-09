@@ -91,3 +91,24 @@ test('mini detail is lighter than full', () => {
   assert.ok(count(settledPrint(r, 'mini')) < count(settledPrint(r, 'full')));
   assert.ok(count(settledPrint(r, 'mini')) <= 40);
 });
+
+test('a print you heard little of is looser; fully heard is the default still', async () => {
+  const { particleHash } = await import('./print-recipe.ts');
+  const r = recipeFor(5, s, null);
+  assert.deepEqual(settledPrint(r, 'full', 1), settledPrint(r));
+  const loose = settledPrint(r, 'full', 0.1);
+  assert.notDeepEqual(loose, settledPrint(r));
+  assert.deepEqual(loose, settledPrint(r, 'full', 0.1));
+  assert.deepEqual(settledPrint(r, 'full', -3), settledPrint(r, 'full', 0));
+  assert.deepEqual(settledPrint(r, 'full', 7), settledPrint(r, 'full', 1));
+  // Spread: a loose print strays further from its rings.
+  const spread = (p: ReturnType<typeof settledPrint>) => {
+    const xs = p.rings.flatMap((g) => g.lines.flatMap((l) => l.filter((_, i) => i % 2 === 0)));
+    const mean = xs.reduce((a, x) => a + x, 0) / xs.length;
+    return xs.reduce((a, x) => a + (x - mean) ** 2, 0) / xs.length;
+  };
+  assert.ok(spread(loose) > spread(settledPrint(r)));
+  const h = particleHash(3, 9);
+  assert.ok(h >= 0 && h < 1);
+  assert.equal(h, particleHash(3, 9));
+});

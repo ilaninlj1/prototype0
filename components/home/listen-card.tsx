@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -9,6 +9,7 @@ import Animated, {
   interpolate,
   runOnJS,
   useAnimatedStyle,
+  useDerivedValue,
   useFrameCallback,
   useReducedMotion,
   useSharedValue,
@@ -52,6 +53,12 @@ type Props = {
   revealed: boolean;
   /** e.g. PRINT 12/50: the piece slot this song will take. */
   slotLabel: string;
+  /** How far this song's sound is from your saves, 0 home to 1 deep (lib/taste-distance.ts), or null when unknown. */
+  restless: number | null;
+  /** CLOSE TO HOME / NEW GROUND / DEEP IN YOUR BLIND SPOT, or null. */
+  tierLabel: string | null;
+  /** How much of the song you'd heard when you revealed it (0–1): the badge's print is as settled as your listen. */
+  heard: number;
   /** The artist's Last.fm listeners: undefined while loading, null if unknown. */
   listeners: number | null | undefined;
   /** Asked before a gesture commits; false means another action is running and the card goes back. */
@@ -75,7 +82,7 @@ const clockText = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}
  * cover sharpens in the same frame, then the name comes in.
  */
 export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCard(props, ref) {
-  const { track, size, recipe, revealed, slotLabel, listeners, takeLock, onSwipe, onSave, onTogglePlay, onRevealSettled, onCallSave, onMix, onCancelPeek } =
+  const { track, size, recipe, revealed, slotLabel, restless, tierLabel, heard, listeners, takeLock, onSwipe, onSave, onTogglePlay, onRevealSettled, onCallSave, onMix, onCancelPeek } =
     props;
   const { status } = usePlayback();
   const reduceMotion = useReducedMotion();
@@ -90,7 +97,25 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   const exiting = useSharedValue(false);
   const crossed = useSharedValue(0);
   const lastMix = useSharedValue(0);
+  const duration = useSharedValue(0);
+  const furthest = useSharedValue(0);
+  const isRevealed = useSharedValue(revealed);
   const badgeRef = useRef<View>(null);
+
+  // Listening develops the print: the particles gather as the song plays, fully formed at 80% of the preview.
+  // It follows the furthest point heard, so a replay never undoes it.
+  const develop = useDerivedValue(() => (duration.get() > 0 ? Math.min(1, furthest.get() / (duration.get() * 0.8)) : 0));
+  // A right drag pulls them together, left blows them apart, down lets them fall; a snap-back puts them back.
+  const living = useDerivedValue(() =>
+    isRevealed.get() ? gather.get() : Math.max(develop.get() * 0.9, interpolate(tx.get(), [0, H], [0, 1], 'clamp'))
+  );
+  const scatter = useDerivedValue(() => (isRevealed.get() ? 0 : interpolate(-tx.get(), [0, H], [0, 1], 'clamp')));
+  const fall = useDerivedValue(() => interpolate(ty.get(), [0, V * 1.5], [0, 1], 'clamp'));
+  // Far from your taste, the particles get restless.
+  const liveRecipe = useMemo(
+    () => (restless ? { ...recipe, turbulence: recipe.turbulence * (1 + 1.5 * restless), speed: recipe.speed * (1 + 0.6 * restless) } : recipe),
+    [recipe, restless]
+  );
   const [burst, setBurst] = useState(0);
 
   // Motion follows the player: frames advance it smoothly, and it re-syncs when it drifts (seek, a restart).
@@ -98,10 +123,14 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
     playing.set(status.playing);
   }, [status.playing, playing]);
   useEffect(() => {
+    duration.set(status.duration);
+  }, [status.duration, duration]);
+  useEffect(() => {
     if (Math.abs(clock.get() - status.currentTime) > 0.3) clock.set(status.currentTime);
   }, [status.currentTime, clock]);
   useFrameCallback((f) => {
     if (playing.get() && f.timeSincePreviousFrame) clock.set(clock.get() + f.timeSincePreviousFrame / 1000);
+    if (clock.get() > furthest.get()) furthest.set(clock.get());
   });
 
   // Both cover sizes are fetched as soon as the card is on top, so the reveal rarely waits.
@@ -111,6 +140,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
 
   // The reveal: settle (300ms), sharpen in place (400ms, one haptic), then the name.
   useEffect(() => {
+    isRevealed.set(revealed);
     if (!revealed) {
       gather.set(0);
       cover.set(0);
@@ -118,6 +148,8 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
       return;
     }
     const sharp = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Settle from wherever listening had brought them.
+    gather.set(develop.get() * 0.9);
     gather.set(withTiming(1, { duration: reduceMotion ? 0 : 300 }));
     cover.set(
       withDelay(
@@ -275,7 +307,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
               {reduceMotion ? (
                 <PrintStill recipe={recipe} size={side} ground={false} />
               ) : (
-                <LivePrint recipe={recipe} size={side} clock={clock} gather={gather} />
+                <LivePrint recipe={liveRecipe} size={side} clock={clock} gather={living} scatter={scatter} fall={fall} />
               )}
             </Animated.View>
           </Animated.View>
@@ -311,7 +343,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
               <Animated.View entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={styles.badge} pointerEvents="none">
                 {/* Measured for the flight: a plain view, since an animated one doesn't measure on every platform. */}
                 <View ref={badgeRef} collapsable={false}>
-                  <PrintStill recipe={recipe} size={BADGE} detail="mini" />
+                  <PrintStill recipe={recipe} size={BADGE} detail="mini" heard={heard} />
                 </View>
               </Animated.View>
             </>
@@ -319,6 +351,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
             <Animated.View style={[styles.blindFoot, blindStyle]} pointerEvents="none">
               <ThemedText type="subtitle">Just listen.</ThemedText>
               {!!recipe.label && <ThemedText style={styles.mono}>{recipe.label}</ThemedText>}
+              {!!tierLabel && <ThemedText style={[styles.mono, styles.tier]}>{tierLabel}</ThemedText>}
             </Animated.View>
           )}
 
@@ -386,6 +419,7 @@ const styles = StyleSheet.create({
   print: { position: 'absolute' },
   topRow: { position: 'absolute', top: Spacing.md, left: Spacing.lg, right: Spacing.lg, flexDirection: 'row', justifyContent: 'space-between' },
   mono: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1, color: Colors.textSecondary },
+  tier: { color: Colors.text },
   paused: {
     position: 'absolute',
     alignSelf: 'center',

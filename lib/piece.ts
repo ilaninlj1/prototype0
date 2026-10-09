@@ -14,6 +14,8 @@ export type PieceMark = {
   branch: number;
   recipe: PrintRecipe;
   song?: PieceSong;
+  /** How much of the song you'd heard when you swiped, 0–1: a close listen draws a crisp print. Older marks have none (fully heard). */
+  heard?: number;
 };
 
 export type Piece = {

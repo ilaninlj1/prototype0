@@ -101,3 +101,8 @@ test('positions stay inside the strip, are stable, and shrink as it fills', () =
   }
   for (let i = 1; i < many.length; i++) assert.ok(many[i].x > many[i - 1].x);
 });
+
+test('a mark keeps how much of the song was heard', () => {
+  const s = addMark(fresh(), { ...m(1), heard: 0.4 }, 1).state;
+  assert.equal(s.piece.marks[0].heard, 0.4);
+});

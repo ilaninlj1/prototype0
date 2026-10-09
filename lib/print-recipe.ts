@@ -40,6 +40,12 @@ function hash(i: number, seed: number, salt: number): number {
   return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
 }
 
+/** A particle's stable random number in [0, 1), for motion layered on top of the print (scatter, fall). */
+export function particleHash(i: number, seed: number): number {
+  'worklet';
+  return hash(i, seed, 9);
+}
+
 export function visualTempo(bpm: number): number {
   if (!Number.isFinite(bpm) || bpm <= 0) return 96;
   while (bpm >= 140) bpm /= 2;
@@ -186,7 +192,12 @@ export function particleAt(r: PrintRecipe, i: number, t: number, gather: number)
   return [x, y];
 }
 
-export function settledPrint(r: PrintRecipe, detail: 'full' | 'mini' = 'full'): PrintStill {
+/**
+ * The still print. `heard` (0–1, how much of the song you listened to) sets
+ * how settled it is: fully heard is crisp rings, a quick reveal stays loose.
+ */
+export function settledPrint(r: PrintRecipe, detail: 'full' | 'mini' = 'full', heard = 1): PrintStill {
+  const gather = 0.3 + 0.7 * Math.max(0, Math.min(1, heard));
   const n = detail === 'full' ? r.particles : Math.min(40, r.particles);
   const steps = detail === 'full' ? 12 : 6;
   const length = r.beat * (r.stroke === 'trail' ? 2 : 0.5);
@@ -194,7 +205,7 @@ export function settledPrint(r: PrintRecipe, detail: 'full' | 'mini' = 'full'): 
   for (let i = 0; i < n; i++) {
     const line: number[] = [];
     for (let k = 0; k <= steps; k++) {
-      const [x, y] = particleAt(r, i, (k / steps) * length, 1);
+      const [x, y] = particleAt(r, i, (k / steps) * length, gather);
       line.push(Math.round(x * 10000) / 10000, Math.round(y * 10000) / 10000);
     }
     rings[ringOf(r, i)].lines.push(line);

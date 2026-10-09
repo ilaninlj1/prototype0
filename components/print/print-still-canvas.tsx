@@ -4,8 +4,8 @@ import { useMemo } from 'react';
 import { settledPrint, type PrintRecipe } from '@/lib/print-recipe';
 
 /** The settled print as one Skia path per ring, in a size × size box. Shared by PrintStill, PieceView and the poster export. */
-export function stillPaths(recipe: PrintRecipe, size: number, detail: 'full' | 'mini') {
-  const still = settledPrint(recipe, detail);
+export function stillPaths(recipe: PrintRecipe, size: number, detail: 'full' | 'mini', heard = 1) {
+  const still = settledPrint(recipe, detail, heard);
   return {
     ground: still.ground,
     rings: still.rings.map((ring) => {
@@ -21,11 +21,12 @@ export function stillPaths(recipe: PrintRecipe, size: number, detail: 'full' | '
 
 export const strokeFor = (size: number, detail: 'full' | 'mini') => Math.max(0.6, size / (detail === 'mini' ? 90 : 220));
 
-export type PrintStillProps = { recipe: PrintRecipe; size: number; detail?: 'full' | 'mini'; ground?: boolean };
+/** `heard` 0–1: how much of the song you listened to; a close listen is a crisp print, a quick one stays loose. */
+export type PrintStillProps = { recipe: PrintRecipe; size: number; detail?: 'full' | 'mini'; ground?: boolean; heard?: number };
 
 /** A song's settled print: the same picture every time for the same recipe. Load it through print-still.tsx. */
-export default function StillCanvas({ recipe, size, detail = 'full', ground = true }: PrintStillProps) {
-  const { ground: groundColor, rings } = useMemo(() => stillPaths(recipe, size, detail), [recipe, size, detail]);
+export default function StillCanvas({ recipe, size, detail = 'full', ground = true, heard = 1 }: PrintStillProps) {
+  const { ground: groundColor, rings } = useMemo(() => stillPaths(recipe, size, detail, heard), [recipe, size, detail, heard]);
   const width = strokeFor(size, detail);
   return (
     <Canvas style={{ width: size, height: size }} pointerEvents="none">

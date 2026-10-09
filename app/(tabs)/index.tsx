@@ -70,6 +70,8 @@ import { PIECE, type PieceMark } from '@/lib/piece';
 import { recipeFor, type PrintRecipe } from '@/lib/print-recipe';
 import { moreLikeLabel } from '@/lib/sound';
 import { soundFor } from '@/lib/sound-index';
+import { soundLookup } from '@/lib/sound-lookup-app';
+import { restlessness, tasteDistance, TIER_LABEL, tierFor } from '@/lib/taste-distance';
 import { hideFromDiscovery, shouldSkip } from '@/lib/human-check-api';
 import { takeSteerRequest } from '@/lib/steer-request';
 import { alreadyKnown, setKnownArtists } from '@/lib/known-artists';
@@ -198,6 +200,18 @@ export default function HomeScreen() {
   const [stamp, setStamp] = useState<Stamp | null>(null);
   const [moreLike, setMoreLike] = useState<{ ids: Set<number>; label: string } | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [revealHeard, setRevealHeard] = useState(1);
+
+  // How much of the top song you've heard: the furthest point the player reached, against 80% of the preview.
+  // It decides how settled a print looks in your piece, and how big a skip's ring is.
+  const furthestRef = useRef(0);
+  useEffect(() => {
+    furthestRef.current = 0;
+  }, [currentTrack?.id]);
+  useEffect(() => {
+    furthestRef.current = Math.max(furthestRef.current, status.currentTime);
+  }, [status.currentTime]);
+  const heardNow = () => (status.duration > 0 ? Math.min(1, furthestRef.current / (status.duration * 0.8)) : 0);
 
   useEffect(() => {
     loadLikedTracks().then((liked) => {
@@ -218,6 +232,20 @@ export default function HomeScreen() {
     [currentTrack, topSound, coverColors]
   );
   const topRecipe = revealTrack && revealRecipeRef.current ? revealRecipeRef.current : liveRecipe;
+
+  // How far the top song is from what you've saved (sound only): close songs stay calm, far ones get restless.
+  const saveSounds = useMemo(
+    () =>
+      [...savedIds].flatMap((id) => {
+        if (id === currentTrack?.id) return [];
+        const indexed = soundFor(id);
+        if (indexed) return [indexed];
+        const cached = soundLookup.peek(id);
+        return cached?.status === 'measured' ? [cached.features] : [];
+      }),
+    [savedIds, currentTrack?.id]
+  );
+  const depth = topSound?.status === 'measured' ? tasteDistance(topSound.features, saveSounds) : null;
   const underIds = queue
     .slice(1, 3)
     .map((t) => t.id)
@@ -276,11 +304,13 @@ export default function HomeScreen() {
   function markSwipe(track: DiscoveryTrack, kind: PieceMark['kind'], recipe?: PrintRecipe) {
     const saved = savedIdsRef.current.has(track.id);
     // A skip stays blind: its mark carries no song.
-    if (kind === 'skip') return commitMark({ trackId: track.id, kind, saved, recipe: recipeFor(track.id, soundFor(track.id), null) });
+    const heard = heardNow();
+    if (kind === 'skip') return commitMark({ trackId: track.id, kind, saved, heard, recipe: recipeFor(track.id, soundFor(track.id), null) });
     const mark: Omit<PieceMark, 'branch'> = {
       trackId: track.id,
       kind,
       saved,
+      heard,
       recipe: recipe ?? recipeFor(track.id, soundFor(track.id), null),
       song: { title: track.trackName, artist: track.artistName, artwork: track.artworkUrl100, previewUrl: track.previewUrl || undefined },
     };
@@ -536,6 +566,7 @@ export default function HomeScreen() {
     cardsSeenSincePresetChangeRef.current += 1;
     const recipe = liveRecipe ?? recipeFor(track.id, null, null);
     revealRecipeRef.current = recipe;
+    setRevealHeard(heardNow());
     markSwipe(track, 'reveal', recipe);
     setRevealTrack(track);
     setRevealListeners(track.artistListeners);
@@ -872,6 +903,9 @@ export default function HomeScreen() {
                 recipe={topRecipe}
                 revealed={revealTrack?.id === currentTrack.id}
                 slotLabel={`PRINT ${Math.min(piece.marks.length + 1, PIECE.slots)}/${PIECE.slots}`}
+                restless={depth == null ? null : restlessness(depth)}
+                tierLabel={depth == null ? null : TIER_LABEL[tierFor(depth)]}
+                heard={revealTrack?.id === currentTrack.id ? revealHeard : 1}
                 listeners={revealTrack?.id === currentTrack.id ? revealListeners : undefined}
                 takeLock={lock.take}
                 onSwipe={(d) => handleCardSwipe(d, currentTrack)}

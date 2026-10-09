@@ -29,7 +29,7 @@ export function PieceDrawing({ piece, width }: PieceCanvasProps) {
   }, [placed, scale]);
   const prints = useMemo(
     () =>
-      piece.marks.map((m, i) => (m.kind === 'reveal' ? stillPaths(m.recipe, placed[i].size * scale, 'mini') : null)),
+      piece.marks.map((m, i) => (m.kind === 'reveal' ? stillPaths(m.recipe, placed[i].size * scale, 'mini', m.heard ?? 1) : null)),
     [piece.marks, placed, scale]
   );
 
@@ -57,7 +57,8 @@ export function PieceDrawing({ piece, width }: PieceCanvasProps) {
                 ))}
               </Group>
             ) : (
-              <Circle cx={x} cy={y} r={Math.max(2, s * 0.18)} color={Colors.textTertiary} style="stroke" strokeWidth={1} />
+              // A quick skip is a dot; a long listen before skipping is a wider ring.
+              <Circle cx={x} cy={y} r={Math.max(2, s * (0.06 + 0.16 * (m.heard ?? 1)))} color={Colors.textTertiary} style="stroke" strokeWidth={1} />
             )}
             {m.saved && <Circle cx={x} cy={y} r={s * 0.55} color={Colors.signal} style="stroke" strokeWidth={1.5} />}
           </Group>
