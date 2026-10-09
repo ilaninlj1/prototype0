@@ -409,9 +409,11 @@ const COVER_COLORS_KEY = `${STORAGE_PREFIX}:coverColors`;
 export const loadCoverColors = () => readJson<Record<string, CoverColor>>(COVER_COLORS_KEY, {});
 export const saveCoverColors = (colors: Record<string, CoverColor>) => writeJson(COVER_COLORS_KEY, colors);
 
-const SONG_FEEL_KEY = `${STORAGE_PREFIX}:songFeel`;
+// v2: catalog values via lib/sound-lookup.ts; v1 held ReccoBeats' analysis of
+// uploaded previews, a different model, so it's left behind rather than mixed in.
+const SONG_FEEL_KEY = `${STORAGE_PREFIX}:songFeel:v2`;
 
-/** Energy/mood measured from each song's audio, keyed by track id — measured once, kept for good. */
+/** Each song's energy, mood and the rest (ReccoBeats catalog values), keyed by track id — looked up once, kept for good. */
 export const loadSongFeel = () => readJson<Record<number, SongFeel>>(SONG_FEEL_KEY, {});
 export const saveSongFeel = (feels: Record<number, SongFeel>) => writeJson(SONG_FEEL_KEY, feels);
 
