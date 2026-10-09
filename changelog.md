@@ -17,6 +17,17 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-09] The Edition looks like the motion reel now
+With `claude-motion-reel.html` on hand, the Edition was rebuilt in its style: the reel's HUD in the corners (scene,
+frame counter, timecode), orange and cream wipes at every cut, film grain, a vignette and an orange progress line;
+an intro where orange slams open and BLINDSPOT. rises letter by letter over "five found blind"; and one scene per
+find in each of the reel's families. A voxel field rises with the song's energy and ripples at its tempo under a
+glass orb holding its cover. The artist's name scrolls as an outlined type wall. The data scene counts up its BPM
+and shows its energy and eight measures. Particles stream and gather into rings turning at its tempo. An app card
+flips its switches and taps Save. The outro merges black blobs on orange and lands on BLINDSPOT●. The reel's beat
+counter was fixed at 120 BPM; here the beat squares tick at each song's measured tempo and there's no bar count.
+Also fixed: the Edition opened as a plain screen with a header bar, because its full-screen setting was never saved.
+
 ## [2026-10-09] Prototype 6: the feed's loading says what's happening
 Loading new songs used to fail quietly (one line of red text) or show a bare spinner, and an empty genre quietly
 switched to another. Now the card's place holds a panel with explicit states (`lib/feed-load.ts`,
