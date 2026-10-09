@@ -130,8 +130,9 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
     names.set(
       withDelay(
         reduceMotion ? 200 : 850,
-        withTiming(1, { duration: 250 }, (f) => {
-          if (f) runOnJS(onRevealSettled)();
+        // Settled or cut short, the reveal is over: Home's action lock is released either way.
+        withTiming(1, { duration: 250 }, () => {
+          runOnJS(onRevealSettled)();
         })
       )
     );

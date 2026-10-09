@@ -701,11 +701,13 @@ export default function HomeScreen() {
 
   // The buttons under the card: the same animation and handler as the swipe.
   function press(direction: SwipeDirection) {
-    if (!lock.take()) return;
+    if (!cardRef.current || !lock.take()) return;
     cardRef.current?.fling(direction, true);
   }
 
+  // The genre picker and Explore jump like a down swipe, so they hold the action lock too (the stamp releases it).
   async function handlePickGenre(genre: string) {
+    if (!lock.take()) return;
     captureUndoSnapshot();
     if (currentTrack) {
       cardsSeenSincePresetChangeRef.current += 1;
@@ -719,6 +721,7 @@ export default function HomeScreen() {
   }
 
   async function handleExplore() {
+    if (!lock.take()) return;
     captureUndoSnapshot();
     if (currentTrack) {
       cardsSeenSincePresetChangeRef.current += 1;

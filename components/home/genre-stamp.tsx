@@ -18,9 +18,10 @@ export function GenreStamp({ genre, fresh, onDone }: { genre: string | null; fre
 
   useEffect(() => {
     if (!genre) return;
-    const done = (finished?: boolean) => {
+    // Finished or interrupted, the stamp is done (Home releases its action lock here).
+    const done = () => {
       'worklet';
-      if (finished) runOnJS(onDone)();
+      runOnJS(onDone)();
     };
     scale.set(reduceMotion ? 1 : 1.15);
     if (!reduceMotion) scale.set(withTiming(1, { duration: 180 }));
