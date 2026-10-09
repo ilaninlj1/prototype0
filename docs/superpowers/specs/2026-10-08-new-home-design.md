@@ -52,11 +52,11 @@ export type SoundFeatures = {
   loudness: number;       // dB, usually -60…0
 };
 export type SoundRecord =
-  | { status: 'measured'; features: SoundFeatures; isrc: string; source: 'reccobeats'; scope: 'whole-track'; at: number }
+  | { status: 'measured'; features: SoundFeatures; source: 'index' | 'live'; isrc?: string; at: number }
   | { status: 'unmatched'; at: number };   // looked up, nothing found; retried after 14 days
 ```
 
-Values are catalog values for the whole recording, not the 30-second preview. Unknown stays `null`; nothing is invented.
+Values are ReccoBeats catalog values for the whole recording, not the 30-second preview. Unknown stays `null`; nothing is invented. Index records carry no ISRC (it isn't bundled); live records keep theirs.
 
 ### The bundled index
 
@@ -74,11 +74,11 @@ Values are catalog values for the whole recording, not the 30-second preview. Un
 
 `lib/sound-lookup.ts` runs the same Deezer → ReccoBeats steps on the phone for artist-steered and searched songs. Records are cached in AsyncStorage under `blindspot:sound:v1` (map of track id → `SoundRecord`). Two requests run at once at most. After a 429 it stops for the rest of the session, or until `Retry-After` passes. On web, Deezer has no CORS headers, so the live lookup is skipped there and only the index answers.
 
-`hooks/use-sound.ts`: `useSound(track): { record: SoundRecord | null; loading: boolean }`, the index first, then the cache, then a live lookup.
+`hooks/use-sound.ts`: `useSound(track): { record: SoundRecord | null; loading: boolean }`, the index first, then the cache, then a live lookup. A live lookup needs the title and artist; with only an id, just the index answers.
 
 ### Moving the existing features over
 
-`lib/song-feel-api.ts` stops posting previews to `/v1/analysis/audio-features`. `measureMissing` keeps its signature but reads `useSound`'s sources (index, cache, live lookup) and maps `SoundFeatures` onto the existing `SongFeel`. Callers (Tasteform, Taste Decoded, Blind Spot Test) don't change. `assets/genre-sound.json` is rebuilt from the index (every catalog song with data instead of 30 per genre) by a new `--from-index` mode of `scripts/measure-genre-sound.ts`. It must pass the existing `sanityProblems` checks before it's written.
+`lib/song-feel-api.ts` stops posting previews to `/v1/analysis/audio-features`. `Measurable` becomes `{ id; trackName?; artistName? }` (no preview URL). `measureMissing`, `loadFeels` and `peekFeels` all read the new sources (index, cache, live lookup) and map `SoundFeatures` onto the existing `SongFeel`. The Tasteform and Taste Decoded already pass saved tracks with names. `app/blind-test.tsx` (line 83) passes the song's title and artist too. The old SongFeel cache (preview-measured, a different model) is dropped: its storage key is bumped, so nothing measured the old way gets compared against the new baselines. `assets/genre-sound.json` is rebuilt from the index (every catalog song with data instead of 30 per genre) by a new `--from-index` mode of `scripts/measure-genre-sound.ts`. It must pass the existing `sanityProblems` checks before it's written.
 
 ## 2. The print
 
@@ -92,12 +92,14 @@ A print is the picture of one song's sound. Same song + same recipe version = th
 |---|---|
 | key + mode | **Formation.** Three attractor rings at the triad's notes, placed on a circle-of-fifths dial: major = tonic, major third, fifth; minor = tonic, minor third, fifth. The tonic ring is the largest. Related keys look related. |
 | key + mode | **Color.** Tonic picks one of 12 hues from a palette that skips violet (the theme bans it): warm reds, oranges and golds for major, teals and blues for minor. Cream and near-black are always present. |
-| tempo | **Motion.** Particle speed, and the rings breathe once per beat (period 60/tempo). Half or double time doesn't change the look. |
+| tempo | **Motion.** Particle speed, and the rings breathe once per beat of the *visual tempo*: the BPM halved or doubled into 70–140 (so 70 and 140 look and move the same, and a half-time reading doesn't change the print). |
 | energy | **Density and turbulence.** 80–240 particles on the card. |
 | acousticness | **Texture.** Soft grain dots (high) vs. sharp fine lines (low). |
 | danceability | **Regularity.** Even breathing (high) vs. uneven (low). |
 | speechiness / instrumentalness | **Stroke.** Short dashes (spoken) vs. long unbroken trails (instrumental). |
 | loudness | **Brightness.** |
+| key known, mode unknown | **Dyad.** Tonic and fifth rings only. |
+| key unknown, other features known | **Neutral formation.** One centered ring with two seeded satellites; colors from the cover; the other features still apply. |
 | no data | **Fallback.** One ring, colors from the cover (`lib/cover-color.ts`), seeded by track id. Details says "Drawn from the cover — no sound data for this song." |
 
 Valence isn't used, so the art never claims a song is happy or sad. Randomness comes only from a seeded PRNG (mulberry32 on the track id).
@@ -143,6 +145,10 @@ The preview keeps playing. On the revealed card, a left or right swipe (or Next)
 
 Logged as today: `logSwipe(track, 'reveal')`. The full-res cover is prefetched (`Image.prefetch`) when a card becomes the top card, and if it hasn't loaded by step 2 the blurred one sharpens as soon as it arrives.
 
+**The recipe freezes at commit.** Whatever sound data is known when the right swipe commits makes the recipe, and that one recipe is used for the settle, the badge, the flight and the stored mark. Data that arrives later doesn't change that mark. Before commit, the live card may still morph.
+
+**On the revealed card**, gestures and buttons dispatch differently: left, right and Next call `handleRevealDone` (nothing new is logged; the reveal was). Down clears the reveal and jumps genre without logging a second action for the same song. Each captures an undo snapshot first.
+
 **Undo** of a reveal puts the card back blind, removes the mark, and cancels more-like-this.
 
 ### Details sheet (`components/home/details-sheet.tsx`)
@@ -151,11 +157,15 @@ A bottom sheet opened by `Details` holding everything `RevealCard` had below the
 
 ### More like this (`lib/sound-neighbors.ts`, pure)
 
-`soundDistance(a, b)`: weighted sum of tempo (relative difference, the smallest of ×0.5, ×1, ×2), energy, danceability, acousticness, instrumentalness, and key closeness (circle-of-fifths steps; a relative major/minor counts as the same key).
+`soundDistance(a, b)`: weighted sum of tempo (relative difference, the smallest of ×0.5, ×1, ×2), energy, danceability, acousticness, instrumentalness, and key closeness (circle-of-fifths steps; a relative major/minor counts as the same key). When either song's key or mode is unknown, the harmony term is dropped and the remaining weights are rescaled to the same total.
 
 `pickNeighbors(target, candidates, n = 3)` returns the closest `n` among candidates that have sound data.
 
-After a right swipe on a song with sound data, the next 3 cards are the closest of the not-yet-shown queue plus at least 12 more candidates from the same genre and preset (the pool's normal path). They come from different artists than the target, with no repeats. Then the feed returns to normal. A one-line note above the card for those 3 cards: "More like this: fast, loud, C♯ major." With no sound data on the target, a right swipe still reveals, and the note says "More like this: same genre".
+After a right swipe on a song with sound data, the next 3 cards are its nearest neighbors, chosen without any network call. A new `lib/pool.ts` export, `nearestBySound(preset, genre, target, n, exclude)`, scans the current genre's precomputed catalog, keeps only entries the preset's existing rules allow (same band, hit-rank and deep-cut filters the pool applies), drops seen artists, known Spotify-file artists, AI-flagged artists and the target's artist, ranks those with index data by `soundDistance`, and converts the top `n` to `DiscoveryTrack`s the same way the catalog path already does. They're inserted after the current card. If fewer than 3 come back, the rest of the queue stays as it was. Then the feed returns to normal. A one-line note above the card for those 3 cards: "More like this: fast, loud, C♯ major." With no sound data on the target, a right swipe still reveals, and the note says "More like this: same genre".
+
+### One action at a time
+
+Buttons bypass `SwipeCard`'s local `exiting` guard, and the handlers await logging before they move the queue. So Home gets one synchronous `actionLockRef`: every committing action (any swipe, any button, Undo) takes it first and is ignored if it's held. It's released when the next card (or the reveal) is in place. `refillEpochRef` becomes the single generation token. Reveal, undo, steering, genre jumps and neighbor inserts all bump it, and every async result (refill, neighbor insert, listener count, sound lookup applied to the queue) checks it before writing state.
 
 ## 6. Swipe left: skip
 
@@ -176,12 +186,14 @@ type PieceMark = {
   saved: boolean;
   branch: number;        // increments on every genre jump
   recipe: PrintRecipe;   // frozen when the mark is made, so the print never changes later
-  artwork: string;       // for inspecting the song on the art screen
+  song?: { title: string; artist: string; artwork: string; previewUrl?: string }; // reveals only: a skip stays blind, even on the art screen
 };
 type Piece = { number: number; startedAt: number; marks: PieceMark[]; finishedAt?: number };
 ```
 
-`addMark`, `markSaved` and `removeLastMark` keep today's rules, including 50 marks per piece, so the 50th finishes it and opens the art screen. Storage moves to `art-canvas-v3` / `art-pieces-v3` in `hooks/use-art.ts`. On first load, v2 data is migrated: every v2 mark becomes a v3 mark (`bold` → `reveal`, `ghost` → `skip`, branch 0, recipe from the index or the cover fallback). Existing pieces redraw as prints.
+`addMark`, `markSaved` and `removeLastMark` keep today's rules, including 50 marks per piece, so the 50th finishes it and opens the art screen. Undo must survive that rollover: when the active piece is empty and the newest finished piece ends with the undone song, `removeLastMark` reopens that piece as the active one, minus the mark. Today's code (`hooks/use-art.ts` line 57) can't do that.
+
+Storage moves to `art-canvas-v3` / `art-pieces-v3` in `hooks/use-art.ts`. On first load, v2 data is migrated: every v2 mark becomes a v3 mark (`bold` → `reveal`, `ghost` → `skip`, branch 0, recipe from the index or the cover fallback). Revealed marks get their `song` filled from swipe history or liked tracks by id where possible. Otherwise the art screen says "Older print — song details weren't kept". Existing pieces redraw as prints.
 
 ### Layout (`piecePositions(marks) → points`, pure)
 
@@ -198,7 +210,7 @@ The strip sits under the action row. Label (mono): `4 PRINTS · TAP TO SEE YOUR 
 
 ### Art screen (`app/art.tsx`)
 
-It shows the piece large with the same renderer. Tapping a print shows that song (cover, title, artist, play), and a list of the songs sits below for accessibility. Export: the piece is drawn offscreen with Skia (`makeImageSnapshot`) to a PNG, then shared, because `react-native-view-shot` can't reliably capture a Skia canvas on Android. The export has no buttons or navigation in it.
+It shows the piece large with the same renderer. Tapping a revealed print shows that song (cover, title, artist, play); tapping a skip says "Skipped — still blind". A list of the revealed songs sits below for accessibility. Export: the piece is drawn offscreen with Skia (`makeImageSnapshot`) to a PNG, then shared, because `react-native-view-shot` can't reliably capture a Skia canvas on Android. The export has no buttons or navigation in it.
 
 ## 9. Layout of Home
 
@@ -218,9 +230,10 @@ Pure modules get Node tests (`node --experimental-strip-types --test`):
 
 - `lib/sound-match.test.ts`: title cleaning, artist matching with accents, version rejection (live/remix), choosing among several recordings.
 - `lib/sound.test.ts`: parsing ReccoBeats rows, `-1` → `null`, the index row format round-trip.
-- `lib/print-recipe.test.ts`: determinism (same input, same recipe and same `settledPrint`), triads for major and minor, no violet hues, fallback with no data, half/double tempo giving the same look.
-- `lib/sound-neighbors.test.ts`: tempo octave tolerance, relative keys counting as close, excluding the target's artist, fewer than n candidates.
-- `lib/piece.test.ts`: the 50-mark rule, saved and undo, branch numbering, v2 → v3 migration, `piecePositions` staying inside the strip and being stable.
+- `lib/print-recipe.test.ts`: determinism (same input, same recipe and same `settledPrint`), triads for major and minor, dyad and neutral formations, no violet hues, fallback with no data, visual tempo (70 and 140 the same).
+- `lib/sound-neighbors.test.ts`: tempo octave tolerance, relative keys counting as close, unknown harmony rescaling, excluding the target's artist, fewer than n candidates.
+- `lib/piece.test.ts`: the 50-mark rule, saved and undo, undo across the 50th-mark rollover, branch numbering, v2 → v3 migration (including song backfill), skip marks carrying no song, `piecePositions` staying inside the strip and being stable.
+- `nearestBySound` (pure part, in `lib/sound-neighbors.ts` or tested through a catalog fixture): preset filtering and every exclusion set.
 
 The UI gets checked in the web preview (headless Chrome, touch events, per the CLAUDE.md recipe; Skia on web needs CanvasKit loaded first via `LoadSkiaWeb`) for layout at 3 widths, the reveal sequence, the drag labels and the button row. Then an `expo-go` update for the phone: haptics, frame rate measured on Android, and audio and motion staying aligned through pause and seek.
 
