@@ -1,35 +1,49 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { captureRef } from 'react-native-view-shot';
 
-import { ArtPiece } from '@/components/art/art-piece';
 import { PressableScale } from '@/components/pressable-scale';
+import { loadSkia } from '@/components/print/load-skia';
+import { PieceView } from '@/components/print/piece-view';
+import { PrintStill } from '@/components/print/print-still';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
 import { useArt } from '@/hooks/use-art';
-import { ART, type ArtCanvas } from '@/lib/collage';
+import { usePlayback } from '@/hooks/use-playback';
+import { artworkUrl } from '@/lib/discovery';
+import { PIECE, type Piece, type PieceMark } from '@/lib/piece';
 
-/** Your piece: the one in progress, or a finished one (?piece=N) to save or share. */
+/** Your piece: the one in progress, or a finished one (?piece=N) to save or share. Tap a print to see its song. */
 export default function ArtScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const params = useLocalSearchParams<{ piece?: string }>();
-  const { canvas, pieces } = useArt();
+  const { piece, finished: pieces } = useArt();
+  const { playPreview } = usePlayback();
   const [pieceNumber, setPieceNumber] = useState(params.piece ? Number(params.piece) : null);
+  const [inspect, setInspect] = useState<PieceMark | null>(null);
   const [note, setNote] = useState('');
-  const posterRef = useRef<View>(null);
 
   const finished = pieces.find((p) => p.number === pieceNumber) ?? null;
-  const shown: ArtCanvas = finished ?? canvas;
-  const revealed = shown.marks.filter((m) => m.kind === 'bold').length;
+  const shown: Piece = finished ?? piece;
+  const revealed = shown.marks.filter((m) => m.kind === 'reveal');
+  const width = Math.min(screenWidth, 640) - Spacing.lg * 2;
 
-  async function capture() {
-    return captureRef(posterRef, { format: 'png', quality: 1, result: 'tmpfile' });
+  async function capture(): Promise<string> {
+    await loadSkia();
+    const { renderPoster } = await import('@/components/print/poster-canvas');
+    const base64 = await renderPoster(shown);
+    if (!base64) throw new Error('nothing drawn');
+    const { File, Paths } = await import('expo-file-system');
+    const file = new File(Paths.cache, `blindspot-piece-${shown.number}.png`);
+    file.write(base64, { encoding: 'base64' });
+    return file.uri;
   }
 
   async function share() {
@@ -59,26 +73,25 @@ export default function ArtScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.scroll, { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + Spacing.xl }]}>
-      <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
+      <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back} accessibilityLabel="Back">
         <Ionicons name="chevron-back" size={26} color={Colors.text} />
       </Pressable>
-      <ThemedText type="eyebrow">Your collage · No. {shown.number}</ThemedText>
-      <ThemedText type="title">{finished ? 'It’s done.' : `${shown.marks.length} of ${ART.slots}`}</ThemedText>
+      <ThemedText type="eyebrow">Your piece · No. {shown.number}</ThemedText>
+      <ThemedText type="title">{finished ? 'It’s done.' : `${shown.marks.length} of ${PIECE.slots}`}</ThemedText>
       <ThemedText style={styles.dim}>
         {finished
-          ? 'Fifty songs, one piece nobody else has. A new canvas has already started on Home.'
-          : `${ART.slots - shown.marks.length} more swipes and this one's finished. Then you can save it or share it.`}
+          ? 'Fifty songs, one piece nobody else has. A new one has already started on Home.'
+          : `${PIECE.slots - shown.marks.length} more swipes and this one's finished. Then you can save it or share it.`}
       </ThemedText>
 
-      <View ref={posterRef} collapsable={false} style={styles.poster}>
-        <ArtPiece canvas={shown} style={styles.piece} />
-        <View style={styles.caption}>
-          <ThemedText style={styles.captionText}>
-            BLINDSPOT · NO. {shown.number} · {shown.marks.length} SONGS · {revealed} REVEALED · {shown.marks.length - revealed} SKIPPED
-          </ThemedText>
-          {finished?.finishedAt && <ThemedText style={styles.captionText}>{new Date(finished.finishedAt).toDateString().toUpperCase()}</ThemedText>}
-        </View>
+      <View style={styles.poster}>
+        <PieceView piece={shown} width={width} onPressMark={setInspect} />
+        <ThemedText style={styles.captionText}>
+          BLINDSPOT · NO. {shown.number} · {revealed.length} FOUND BLIND · {shown.marks.length - revealed.length} SKIPPED
+        </ThemedText>
       </View>
+
+      {inspect && <Inspect mark={inspect} onPlay={(url) => playPreview(url)} onClose={() => setInspect(null)} />}
 
       {finished && (
         <View style={styles.actions}>
@@ -98,9 +111,25 @@ export default function ArtScreen() {
         How to read it
       </ThemedText>
       <ThemedText style={styles.dim}>
-        Every tile is one song’s cover. Sharp ones you revealed, blurred ones you skipped, and a red dot means you saved it. Each new song
-        splits the biggest tile, so your first songs stay the biggest.
+        Every print is one song’s sound: the rings sit where its key falls, the color follows major or minor, the lines get busier the more
+        energy it has. Grey rings are songs you skipped, still blind. A red ring means you saved it. The line forks each time you jumped
+        to a new genre.
       </ThemedText>
+
+      {revealed.length > 0 && (
+        <>
+          <ThemedText type="eyebrow" style={styles.section}>
+            In this piece
+          </ThemedText>
+          {revealed.map((m) => (
+            <Pressable key={m.trackId} onPress={() => setInspect(m)} style={styles.row} accessibilityRole="button">
+              <ThemedText numberOfLines={1} style={styles.rowText}>
+                {m.song ? `${m.song.title} · ${m.song.artist}` : 'Older print — song details weren’t kept'}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </>
+      )}
 
       {pieces.length > 0 && (
         <>
@@ -109,7 +138,7 @@ export default function ArtScreen() {
           </ThemedText>
           {[...pieces].reverse().map((p) => (
             <Pressable key={p.number} onPress={() => setPieceNumber(p.number)} style={styles.past}>
-              <ArtPiece canvas={p} style={styles.pastPiece} />
+              <PieceView piece={p} width={width} />
               <ThemedText style={styles.captionText}>NO. {p.number}</ThemedText>
             </Pressable>
           ))}
@@ -124,15 +153,66 @@ export default function ArtScreen() {
   );
 }
 
+/** One print, opened: the song if you revealed it, "still blind" if you skipped it. */
+function Inspect({ mark, onPlay, onClose }: { mark: PieceMark; onPlay: (url: string) => void; onClose: () => void }) {
+  const song = mark.song;
+  return (
+    <View style={styles.inspect}>
+      <PrintStill recipe={mark.recipe} size={96} />
+      <View style={styles.inspectText}>
+        {mark.kind === 'skip' ? (
+          <ThemedText style={styles.dim}>Skipped — still blind.</ThemedText>
+        ) : song ? (
+          <>
+            <View style={styles.inspectHead}>
+              {!!song.artwork && <Image source={{ uri: artworkUrl(song.artwork, 100) }} style={styles.thumb} />}
+              <View style={styles.inspectNames}>
+                <ThemedText numberOfLines={1}>{song.title}</ThemedText>
+                <ThemedText numberOfLines={1} style={styles.dim}>
+                  {song.artist}
+                </ThemedText>
+              </View>
+            </View>
+            {!!song.previewUrl && (
+              <Pressable style={[Ui.outlineButton, styles.play]} onPress={() => onPlay(song.previewUrl!)} accessibilityLabel={`Play ${song.title}`}>
+                <Ionicons name="play" size={16} color={Colors.text} />
+                <ThemedText style={Ui.label}>Play</ThemedText>
+              </Pressable>
+            )}
+          </>
+        ) : (
+          <ThemedText style={styles.dim}>Older print — song details weren’t kept.</ThemedText>
+        )}
+        {!!mark.recipe.label && <ThemedText style={styles.captionText}>{mark.recipe.label}</ThemedText>}
+      </View>
+      <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">
+        <Ionicons name="close" size={20} color={Colors.textSecondary} />
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
   scroll: { paddingHorizontal: Spacing.lg, gap: Spacing.xs },
   back: { alignSelf: 'flex-start', marginBottom: Spacing.sm },
   dim: { color: Colors.textSecondary },
-  poster: { backgroundColor: Colors.background, paddingVertical: Spacing.md, marginTop: Spacing.lg, gap: Spacing.sm },
-  piece: { borderRadius: Radius.lg, width: '100%' },
-  caption: { gap: 2 },
+  poster: { paddingVertical: Spacing.md, marginTop: Spacing.lg, gap: Spacing.sm },
   captionText: { fontFamily: Fonts.mono, fontSize: 10, letterSpacing: 1, color: Colors.textTertiary },
+  inspect: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    alignItems: 'flex-start',
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.hairline,
+    borderRadius: Radius.md,
+  },
+  inspectText: { flex: 1, gap: Spacing.xs },
+  inspectHead: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
+  inspectNames: { flex: 1 },
+  thumb: { width: 40, height: 40, borderRadius: Radius.sm },
+  play: { flexDirection: 'row', gap: Spacing.xs, alignSelf: 'flex-start' },
   actions: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
   primary: { ...Ui.outlineButton, flex: 1, backgroundColor: Colors.accent, borderColor: Colors.accent },
   primaryText: { ...Ui.label, color: Colors.accentText },
@@ -140,7 +220,8 @@ const styles = StyleSheet.create({
   secondaryText: Ui.label,
   note: { color: Colors.textSecondary, marginTop: Spacing.sm },
   section: { marginTop: Spacing.xl, marginBottom: Spacing.sm },
+  row: { minHeight: 44, justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: Colors.rule },
+  rowText: { color: Colors.text },
   past: { gap: 4, marginBottom: Spacing.md },
-  pastPiece: { borderRadius: Radius.md, width: '100%' },
   link: { textDecorationLine: 'underline', color: Colors.text },
 });
