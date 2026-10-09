@@ -1,15 +1,11 @@
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ArtPiece } from '@/components/art/art-piece';
-import { FlyingCover } from '@/components/art/flying-cover';
-import { CardStack } from '@/components/discovery/card-stack';
 import { FindsNewsSheet } from '@/components/finds-news-sheet';
 import { GenrePicker } from '@/components/discovery/genre-picker';
 import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
-import { REVEAL_COVER, REVEAL_COVER_CENTER, RevealCard } from '@/components/discovery/reveal-card';
 import { DropRing } from '@/components/drop-ring';
 import { onLikeChange, saveLike } from '@/components/like-button';
 import { flySave } from '@/components/save-flight';
@@ -23,10 +19,18 @@ import {
 import { TuneSheet, type NextMode } from '@/components/discovery/tune-sheet';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { CreditLine } from '@/components/credits';
+import { ActionRow } from '@/components/home/action-row';
+import { DetailsSheet } from '@/components/home/details-sheet';
+import { FlyingPrint } from '@/components/home/flying-print';
+import { GenreStamp } from '@/components/home/genre-stamp';
+import { ListenCard, StackFace, type ListenCardHandle } from '@/components/home/listen-card';
+import { PieceStrip, slotCenter, type StripRect } from '@/components/home/piece-strip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
-import { addToCanvas, saveOnCanvas, undoOnCanvas, useArt } from '@/hooks/use-art';
+import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { addToPiece, forkPiece, saveOnPiece, undoOnPiece, useArt } from '@/hooks/use-art';
+import { useCoverColors } from '@/hooks/use-cover-colors';
+import { useSound } from '@/hooks/use-sound';
 import { useFindsNews } from '@/hooks/use-finds-news';
 import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import {
@@ -47,6 +51,7 @@ import {
   appendPresetChangeEntry,
   appendSwipeEntry,
   loadDiscoveredGenres,
+  loadLikedTracks,
   loadRegion,
   loadShuffleGenres,
   loadSwipeHistory,
@@ -56,11 +61,15 @@ import {
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
 import { pickSimilar } from '@/lib/charts';
-import { fetchArtistListeners, fetchSimilarArtists, getTracks, trackToDiscoveryTrack } from '@/lib/pool';
+import { fetchArtistListeners, fetchSimilarArtists, getTracks, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
 import { findItunesArtist } from '@/lib/song-details';
 import type { PresetId } from '@/lib/pool-types';
 import { GENRES } from '@/lib/taste-test';
-import { ART, collageRects, type ArtCanvas, type Mark } from '@/lib/collage';
+import { createActionLock } from '@/lib/action-lock';
+import { PIECE, type PieceMark } from '@/lib/piece';
+import { recipeFor, type PrintRecipe } from '@/lib/print-recipe';
+import { moreLikeLabel } from '@/lib/sound';
+import { soundFor } from '@/lib/sound-index';
 import { hideFromDiscovery, shouldSkip } from '@/lib/human-check-api';
 import { takeSteerRequest } from '@/lib/steer-request';
 import { alreadyKnown, setKnownArtists } from '@/lib/known-artists';
@@ -76,7 +85,12 @@ type UndoSnapshot = {
   discoveredGenres: string[];
   swipeHistory: SwipeEntry[];
   seenArtists: Set<string>;
+  /** The card was revealed when the action happened (Next, or down from a reveal): undo shows it revealed again. */
+  revealed: { track: DiscoveryTrack; recipe: PrintRecipe | null; listeners: number | null | undefined } | null;
 };
+
+type Stamp = { id: number; genre: string; fresh: boolean };
+type Flight = { mark: Omit<PieceMark, 'branch'>; from: { x: number; y: number }; to: { x: number; y: number }; endSize: number };
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -166,13 +180,54 @@ export default function HomeScreen() {
   // "nothing to play" (see lib/pool.ts), so nothing is loaded.
   usePreviewWhileFocused(currentTrack?.previewUrl || undefined, queue[1]?.previewUrl);
 
-  // ---- The collage: every swipe adds the song's cover (see lib/collage.ts) ----
-  const { canvas } = useArt();
+  // ---- The piece: every swipe adds the song's print (see lib/piece.ts) ----
+  const { piece } = useArt();
+  const pieceRef = useRef(piece);
+  pieceRef.current = piece;
   const cardAreaRef = useRef<LayoutRectangle | null>(null);
-  const stripRef = useRef<LayoutRectangle | null>(null);
+  const stripRef = useRef<StripRect | null>(null);
   const savedIdsRef = useRef(new Set<number>());
-  const [flying, setFlying] = useState<{ mark: Mark; from: { x: number; y: number }; to: { x: number; y: number }; endPx: number } | null>(null);
+  const [savedIds, setSavedIds] = useState(new Set<number>());
+  const [flying, setFlying] = useState<Flight | null>(null);
   const flyingIdRef = useRef<number | null>(null);
+  const cardRef = useRef<ListenCardHandle>(null);
+  // One action at a time: every swipe, button and Undo takes it first (lib/action-lock.ts).
+  const lock = useRef(createActionLock()).current;
+  // The revealed song's recipe, frozen when the swipe commits: the card, the flight and the mark all use it.
+  const revealRecipeRef = useRef<PrintRecipe | null>(null);
+  const [stamp, setStamp] = useState<Stamp | null>(null);
+  const [moreLike, setMoreLike] = useState<{ ids: Set<number>; label: string } | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  useEffect(() => {
+    loadLikedTracks().then((liked) => {
+      const ids = new Set(liked.map((t) => t.id));
+      ids.forEach((id) => savedIdsRef.current.add(id));
+      setSavedIds(ids);
+    });
+  }, []);
+
+  // The top card's sound and print. Cards underneath show their still print from the index.
+  const { record: topSound } = useSound(currentTrack);
+  const coverColors = useCoverColors(currentTrack?.artworkUrl100 ? [currentTrack.artworkUrl100] : []);
+  const liveRecipe = useMemo(
+    () =>
+      currentTrack
+        ? recipeFor(currentTrack.id, topSound?.status === 'measured' ? topSound.features : null, coverColors[currentTrack.artworkUrl100] ?? null)
+        : null,
+    [currentTrack, topSound, coverColors]
+  );
+  const topRecipe = revealTrack && revealRecipeRef.current ? revealRecipeRef.current : liveRecipe;
+  const underIds = queue
+    .slice(1, 3)
+    .map((t) => t.id)
+    .join(',');
+  const underRecipes = useMemo(
+    () => queue.slice(1, 3).map((t) => recipeFor(t.id, soundFor(t.id), null)),
+    // Only the two cards underneath matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [underIds]
+  );
 
   // What a save needs to fly from the card into the You tab, read by the listener below.
   const cardAreaViewRef = useRef<View>(null);
@@ -187,16 +242,22 @@ export default function HomeScreen() {
     };
   });
 
-  // A save anywhere (double-tap, heart) gets the song's red dot. A new one
+  // A save anywhere (double-tap, heart, Save) gets the song's red ring. A new one
   // made right here also flies down into the You tab (components/save-flight.tsx):
   // as blurred colors if it's still blind, as the cover once revealed.
   useEffect(
     () =>
       onLikeChange((id, liked) => {
+        setSavedIds((prev) => {
+          const next = new Set(prev);
+          if (liked) next.add(id);
+          else next.delete(id);
+          return next;
+        });
         if (!liked) return;
         const first = !savedIdsRef.current.has(id);
         savedIdsRef.current.add(id);
-        saveOnCanvas(id);
+        saveOnPiece(id);
         const f = flightRef.current;
         const track = f.tracks.find((t) => t.id === id);
         if (!first || !f.focused || !track?.artworkUrl100) return;
@@ -207,33 +268,40 @@ export default function HomeScreen() {
     []
   );
 
-  async function commitMark(mark: Mark) {
-    const finished: ArtCanvas | undefined = await addToCanvas(mark);
+  async function commitMark(mark: Omit<PieceMark, 'branch'>) {
+    const finished = await addToPiece(mark);
     if (finished) router.push({ pathname: '/art', params: { piece: String(finished.number) } });
   }
 
-  function markSwipe(track: DiscoveryTrack, kind: Mark['kind']) {
-    const mark: Mark = { trackId: track.id, kind, saved: savedIdsRef.current.has(track.id), artwork: track.artworkUrl100 };
-    const area = cardAreaRef.current;
-    const strip = stripRef.current;
-    if (kind === 'ghost' || !area || !strip || !mark.artwork) return commitMark(mark);
-    // A reveal: once the cover has sharpened, it drops into its new tile.
+  function markSwipe(track: DiscoveryTrack, kind: PieceMark['kind'], recipe?: PrintRecipe) {
+    const saved = savedIdsRef.current.has(track.id);
+    // A skip stays blind: its mark carries no song.
+    if (kind === 'skip') return commitMark({ trackId: track.id, kind, saved, recipe: recipeFor(track.id, soundFor(track.id), null) });
+    const mark: Omit<PieceMark, 'branch'> = {
+      trackId: track.id,
+      kind,
+      saved,
+      recipe: recipe ?? recipeFor(track.id, soundFor(track.id), null),
+      song: { title: track.trackName, artist: track.artistName, artwork: track.artworkUrl100, previewUrl: track.previewUrl || undefined },
+    };
     if (flying) commitMark(flying.mark); // one still in the air lands now
-    const scale = strip.width / ART.width;
-    const count = canvas.marks.length + (flying ? 1 : 0);
-    const tile = collageRects(Math.min(count + 1, ART.slots))[Math.min(count, ART.slots - 1)];
-    flyingIdRef.current = mark.trackId;
-    setFlying({
-      mark,
-      // The revealed cover is the small square beside the title.
-      from: { x: area.x + REVEAL_COVER_CENTER.x, y: area.y + REVEAL_COVER_CENTER.y },
-      // The first cover lands in a collage that doesn't exist yet: it'll open up just above the label.
-      to: { x: strip.x + (tile.x + tile.w / 2) * scale, y: strip.y - (count === 0 ? ART.height * scale : 0) + (tile.y + tile.h / 2) * scale },
-      endPx: Math.min(tile.w, tile.h) * scale,
-    });
+    flyingIdRef.current = track.id;
+    // The print badge appears ~700ms into the reveal; it takes off from there into its slot.
+    setTimeout(async () => {
+      if (flyingIdRef.current !== track.id) return; // undone meanwhile
+      const from = await cardRef.current?.badgeCenter();
+      const strip = stripRef.current;
+      if (!from || !strip) {
+        flyingIdRef.current = null;
+        commitMark(mark);
+        return;
+      }
+      const to = slotCenter(pieceRef.current, strip);
+      setFlying({ mark, from, to: { x: to.x, y: to.y }, endSize: to.size });
+    }, 800);
   }
 
-  function handleLanded(mark: Mark) {
+  function handleLanded(mark: Omit<PieceMark, 'branch'>) {
     if (flyingIdRef.current !== mark.trackId) return; // undone mid-flight
     flyingIdRef.current = null;
     setFlying(null);
@@ -251,13 +319,9 @@ export default function HomeScreen() {
     if (status.didJustFinish) setHasEnded(true);
   }, [status.didJustFinish]);
 
-  const showPlayIcon = !!currentTrack && status.isLoaded && !status.playing;
 
-  // Triggered by a ~400ms hold on the card now, not a tap — see
-  // components/discovery/swipe-card.tsx's onHold. Toggle logic itself is
-  // unchanged; only the gesture that fires it moved, since a plain tap now
-  // belongs to skip/like.
-  async function handleCardHold() {
+  // A tap on the card pauses or plays; once the preview has run out, it starts over.
+  async function handleTogglePlay() {
     if (!currentTrack || !status.isLoaded) return;
     if (hasEnded) {
       setHasEnded(false);
@@ -446,12 +510,13 @@ export default function HomeScreen() {
 
   async function handleSkip(track: DiscoveryTrack) {
     cardsSeenSincePresetChangeRef.current += 1;
-    markSwipe(track, 'ghost');
+    markSwipe(track, 'skip');
     const nextHistory = await logSwipe(track, 'skip');
     const nextSeen = markArtistSeen(track);
     const nextQueue = queue.slice(1);
     promotePeek(nextQueue[0]?.previewUrl);
     setQueue(nextQueue);
+    lock.release();
     // A similar-artist hop can take seconds; if another swipe lands first,
     // its refill wins and this one (with its older queue) is dropped.
     const epoch = ++refillEpochRef.current;
@@ -460,18 +525,40 @@ export default function HomeScreen() {
     await runRefill(nextQueue, nextStrategy, nextHistory, discoveredGenres, region, preset, nextSeen);
   }
 
-  // Swipe right: "who is this?" — flip to the reveal (and its comments)
-  // without saving it. Saving is a double-tap (handleSave).
+  // Swipe right: who is this? The card reveals in place, its print joins the
+  // piece, and the next 3 songs are the closest in sound (More like this).
+  // Saving stays separate: double-tap or Save. The lock is released when the
+  // reveal has settled (ListenCard's onRevealSettled).
   async function handleReveal(track: DiscoveryTrack) {
+    ++refillEpochRef.current;
     cardsSeenSincePresetChangeRef.current += 1;
-    markSwipe(track, 'bold');
-    await logSwipe(track, 'reveal');
-    markArtistSeen(track);
+    const recipe = liveRecipe ?? recipeFor(track.id, null, null);
+    revealRecipeRef.current = recipe;
+    markSwipe(track, 'reveal', recipe);
     setRevealTrack(track);
     setRevealListeners(track.artistListeners);
     revealIdRef.current = track.id;
+    steerToNeighbors(track);
+    await logSwipe(track, 'reveal');
+    markArtistSeen(track);
     const found = track.artistListeners ?? (await fetchArtistListeners(track.artistName));
     if (revealIdRef.current === track.id) setRevealListeners(found);
+  }
+
+  // More like this: the bundled catalog's nearest songs in sound go next, no network (lib/pool.ts nearestBySound).
+  function steerToNeighbors(track: DiscoveryTrack) {
+    const sound = topSound?.status === 'measured' ? topSound.features : null;
+    if (strategy.type !== 'genre') return setMoreLike(null);
+    const near = sound
+      ? nearestBySound(preset, strategy.genre, { sound, artist: track.artistName }, 3, seenArtists, (a) => !hideFromDiscovery(a) && !alreadyKnown(a))
+      : [];
+    if (sound && near.length) {
+      const rest = queue.slice(1).filter((t) => !near.some((n) => n.id === t.id));
+      setQueue([queue[0], ...near, ...rest]);
+      setMoreLike({ ids: new Set(near.map((t) => t.id)), label: moreLikeLabel(sound) });
+    } else {
+      setMoreLike({ ids: new Set(queue.slice(1, 4).map((t) => t.id)), label: 'same genre' });
+    }
   }
 
   // Double-tap: save to Liked while staying blind; the card stays put.
@@ -482,13 +569,15 @@ export default function HomeScreen() {
   }
 
   async function handleRevealDone() {
-    // A double-tap on Next lands twice; only the first moves on.
-    if (revealIdRef.current == null) return;
+    if (revealIdRef.current == null) return lock.release();
     const revealed = revealTrack;
     setRevealTrack(null);
     revealIdRef.current = null;
+    revealRecipeRef.current = null;
+    setDetailsOpen(false);
     const nextQueue = queue.slice(1);
     setQueue(nextQueue);
+    lock.release();
     const epoch = ++refillEpochRef.current;
     const nextStrategy = revealed ? await strategyAfterSwipe(revealed, swipeHistory, epoch) : nextFeedStrategy(swipeHistory);
     if (refillEpochRef.current !== epoch) return;
@@ -545,6 +634,11 @@ export default function HomeScreen() {
   }, [hydrated, isFocused]);
 
   async function commitGenreJump(genre: string, nextHistory: SwipeEntry[], excludeArtists: Set<string>) {
+    // A jump always leaves the card behind, revealed or not.
+    setRevealTrack(null);
+    revealIdRef.current = null;
+    revealRecipeRef.current = null;
+    setMoreLike(null);
     if (nextMode === 'artist') setNextMode('genre');
     const nextStrategy: Strategy = { type: 'genre', genre };
     setStrategy(nextStrategy);
@@ -554,29 +648,69 @@ export default function HomeScreen() {
     await runRefill([], nextStrategy, nextHistory, discoveredGenres, region, preset, excludeArtists);
   }
 
+  // Swipe down: the song you jumped from leaves a blind mark, the piece forks, and the new genre's name stamps in.
   async function handleGenreJump(track: DiscoveryTrack) {
     cardsSeenSincePresetChangeRef.current += 1;
+    markSwipe(track, 'skip');
+    forkPiece();
+    const heardBefore = deriveGenresHeard(swipeHistory);
     const nextHistory = await logSwipe(track, 'genre-jump');
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const newGenre = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
+    setStamp({ id: Date.now(), genre: newGenre, fresh: !heardBefore.has(newGenre) });
     const nextSeen = markArtistSeen(track);
     await commitGenreJump(newGenre, nextHistory, nextSeen);
   }
 
   function captureUndoSnapshot() {
-    setUndoSnapshot({ queue, strategy, discoveredGenres, swipeHistory, seenArtists });
+    setUndoSnapshot({
+      queue,
+      strategy,
+      discoveredGenres,
+      swipeHistory,
+      seenArtists,
+      revealed: revealTrack ? { track: revealTrack, recipe: revealRecipeRef.current, listeners: revealListeners } : null,
+    });
   }
 
+  // Swipe down from a revealed card: the reveal was already logged, so nothing new is logged for this song.
+  async function handleJumpFromReveal() {
+    ++refillEpochRef.current;
+    setDetailsOpen(false);
+    forkPiece();
+    const heard = deriveGenresHeard(swipeHistory);
+    const genre = pickJumpGenre(discoveredGenres, heard, GENRES, swipeHistory);
+    setStamp({ id: Date.now(), genre, fresh: !heard.has(genre) });
+    await commitGenreJump(genre, swipeHistory, seenArtists);
+  }
+
+  // Every committed swipe lands here holding the action lock (ListenCard asks for it, or press() took it).
   function handleCardSwipe(direction: SwipeDirection, track: DiscoveryTrack) {
     captureUndoSnapshot();
-    if (direction === 'left') handleSkip(track);
-    else if (direction === 'right') handleReveal(track);
-    else handleGenreJump(track);
+    if (revealTrack) {
+      if (direction === 'down') void handleJumpFromReveal();
+      else void handleRevealDone();
+      return;
+    }
+    if (direction === 'left') void handleSkip(track);
+    else if (direction === 'right') void handleReveal(track);
+    else void handleGenreJump(track);
+  }
+
+  // The buttons under the card: the same animation and handler as the swipe.
+  function press(direction: SwipeDirection) {
+    if (!lock.take()) return;
+    cardRef.current?.fling(direction, true);
   }
 
   async function handlePickGenre(genre: string) {
     captureUndoSnapshot();
-    if (currentTrack) cardsSeenSincePresetChangeRef.current += 1;
+    if (currentTrack) {
+      cardsSeenSincePresetChangeRef.current += 1;
+      markSwipe(currentTrack, 'skip');
+    }
+    forkPiece();
+    setStamp({ id: Date.now(), genre, fresh: !deriveGenresHeard(swipeHistory).has(genre) });
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
     await commitGenreJump(genre, nextHistory, nextSeen);
@@ -584,10 +718,16 @@ export default function HomeScreen() {
 
   async function handleExplore() {
     captureUndoSnapshot();
-    if (currentTrack) cardsSeenSincePresetChangeRef.current += 1;
+    if (currentTrack) {
+      cardsSeenSincePresetChangeRef.current += 1;
+      markSwipe(currentTrack, 'skip');
+    }
+    forkPiece();
+    const heardBefore = deriveGenresHeard(swipeHistory);
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const target = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
+    setStamp({ id: Date.now(), genre: target, fresh: !heardBefore.has(target) });
     const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
     await commitGenreJump(target, nextHistory, nextSeen);
   }
@@ -616,18 +756,24 @@ export default function HomeScreen() {
 
   async function handleUndo() {
     const snapshot = undoSnapshot;
-    if (!snapshot) return;
+    if (!snapshot || !lock.take()) return;
     refillEpochRef.current += 1;
     const undone = snapshot.queue[0];
-    if (undone) {
+    // Undoing Next (or a jump from a reveal) shows the card revealed again; its print stays in the piece.
+    if (undone && !snapshot.revealed) {
       if (flyingIdRef.current === undone.id) {
         flyingIdRef.current = null;
         setFlying(null);
-      } else undoOnCanvas(undone.id);
+      } else undoOnPiece(undone.id);
     }
     setUndoSnapshot(null);
-    setRevealTrack(null);
-    revealIdRef.current = null;
+    setRevealTrack(snapshot.revealed?.track ?? null);
+    revealIdRef.current = snapshot.revealed?.track.id ?? null;
+    revealRecipeRef.current = snapshot.revealed?.recipe ?? null;
+    if (snapshot.revealed) setRevealListeners(snapshot.revealed.listeners);
+    setMoreLike(null);
+    setStamp(null);
+    setDetailsOpen(false);
     setQueue(snapshot.queue);
     setStrategy(snapshot.strategy);
     setDiscoveredGenres(snapshot.discoveredGenres);
@@ -638,6 +784,7 @@ export default function HomeScreen() {
       saveSwipeHistory(restoredHistory),
       saveDiscoveredGenres(snapshot.discoveredGenres),
     ]);
+    lock.release();
   }
 
   async function handleToggleRegion() {
@@ -689,52 +836,73 @@ export default function HomeScreen() {
 
       {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
-      {currentTrack ? (
+      {currentTrack && topRecipe ? (
         <>
+          <View style={styles.noteLine}>
+            {!!moreLike && moreLike.ids.has(currentTrack.id) && (
+              <ThemedText style={styles.note} numberOfLines={1}>
+                More like this: {moreLike.label}
+              </ThemedText>
+            )}
+          </View>
+
           <View ref={cardAreaViewRef} style={styles.cardArea} onLayout={handleCardAreaLayout}>
-            {revealTrack ? (
-              // The card grows to fit everything and scrolls itself, so it never clips.
-              <RevealCard
-                track={{ ...revealTrack, artistListeners: revealListeners ?? revealTrack.artistListeners }}
-                listeners={revealListeners}
-                width={cardSize.width}
-                onDone={handleRevealDone}
-                onSave={handleSave}
-              />
-            ) : (
-              <CardStack
-                queue={queue}
-                cardSize={cardSize}
-                onSwipe={handleCardSwipe}
-                onDoubleTap={handleSave}
-                onHold={handleCardHold}
+            <View style={cardSize}>
+              {queue
+                .slice(1, 3)
+                .map((t, i) => ({ t, i: i + 1, recipe: underRecipes[i] }))
+                .reverse()
+                .map(({ t, i, recipe }) =>
+                  recipe ? (
+                    <View key={t.id} style={[styles.under, { transform: [{ scale: 1 - i * 0.04 }, { translateY: i * 10 }] }]}>
+                      <StackFace track={t} size={cardSize} recipe={recipe} />
+                    </View>
+                  ) : null
+                )}
+              <ListenCard
+                key={currentTrack.id}
+                ref={cardRef}
+                track={currentTrack}
+                size={cardSize}
+                recipe={topRecipe}
+                revealed={revealTrack?.id === currentTrack.id}
+                slotLabel={`PRINT ${Math.min(piece.marks.length + 1, PIECE.slots)}/${PIECE.slots}`}
+                listeners={revealTrack?.id === currentTrack.id ? revealListeners : undefined}
+                takeLock={lock.take}
+                onSwipe={(d) => handleCardSwipe(d, currentTrack)}
+                onSave={() => handleSave(currentTrack)}
+                onTogglePlay={handleTogglePlay}
+                onRevealSettled={lock.release}
+                onCallSave={handleSave}
                 onMix={setMix}
                 onCancelPeek={cancelPeek}
-                playing={status.playing}
-                showPlayIcon={showPlayIcon}
+              />
+            </View>
+            {stamp && (
+              <GenreStamp
+                key={stamp.id}
+                genre={stamp.genre}
+                fresh={stamp.fresh}
+                onDone={() => {
+                  setStamp(null);
+                  lock.release();
+                }}
               />
             )}
           </View>
 
-          <Pressable
-            onPress={() => router.push('/art')}
-            onLayout={(e) => (stripRef.current = e.nativeEvent.layout)}
-            accessibilityLabel={`Your piece, ${canvas.marks.length} of ${ART.slots} songs`}>
-            {/* Until the first swipe it's a single line and the card takes the room; then the covers appear above it. */}
-            {canvas.marks.length > 0 && <ArtPiece canvas={canvas} style={styles.strip} />}
-            {canvas.marks.length === 0 ? (
-              <View style={[styles.stripCaption, styles.stripCaptionEmpty]}>
-                <ThemedText style={styles.stripLabel}>Your collage starts with your first swipe</ThemedText>
-              </View>
-            ) : (
-              <View style={styles.stripCaption}>
-                <ThemedText style={styles.stripLabel}>Your collage</ThemedText>
-                <ThemedText style={styles.stripLabel}>
-                  {canvas.marks.length}/{ART.slots}
-                </ThemedText>
-              </View>
-            )}
-          </Pressable>
+          <ActionRow
+            mode={revealTrack ? 'revealed' : 'blind'}
+            saved={savedIds.has(currentTrack.id)}
+            onSkip={() => press('left')}
+            onJump={() => press('down')}
+            onMore={() => press('right')}
+            onSave={() => handleSave(currentTrack)}
+            onDetails={() => setDetailsOpen(true)}
+            onNext={() => press('right')}
+          />
+
+          <PieceStrip piece={piece} onPress={() => router.push('/art')} onLayoutStrip={(rect) => (stripRef.current = rect)} />
 
           <View style={styles.bottomRow}>
             <View style={styles.half}>
@@ -762,17 +930,22 @@ export default function HomeScreen() {
         <ThemedText style={styles.emptyText}>No more tracks — try again in a bit.</ThemedText>
       )}
       {flying && (
-        <FlyingCover
+        <FlyingPrint
           key={flying.mark.trackId}
-          artwork={flying.mark.artwork}
+          recipe={flying.mark.recipe}
           from={flying.from}
           to={flying.to}
-          startPx={REVEAL_COVER}
-          endPx={flying.endPx}
-          delay={1500}
+          endSize={flying.endSize}
           onLanded={() => handleLanded(flying.mark)}
         />
       )}
+      <DetailsSheet
+        visible={detailsOpen}
+        track={revealTrack}
+        listeners={revealListeners}
+        onSave={handleSave}
+        onClose={() => setDetailsOpen(false)}
+      />
       <FindsNewsSheet
         visible={newsSheetVisible}
         items={news}
@@ -828,27 +1001,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
   },
-  // Part of the page, not a box: tiles straight on the navy, a rule and a label under them.
-  strip: {
-    width: '100%',
-    borderRadius: Radius.sm,
-  },
-  stripCaption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: Colors.rule,
-    marginTop: Spacing.xs,
-    paddingTop: Spacing.xs,
-  },
-  stripCaptionEmpty: {
-    justifyContent: 'center',
-  },
-  stripLabel: {
-    ...Ui.label,
-    fontSize: 10,
-    color: Colors.textTertiary,
-  },
+  // Reserved height, so the card never jumps when the More like this note comes and goes.
+  noteLine: { height: 16, justifyContent: 'center' },
+  note: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1, color: Colors.textSecondary },
+  under: { position: 'absolute', top: 0, left: 0 },
   // Tune and Liked: equal halves of one row.
   bottomRow: {
     flexDirection: 'row',

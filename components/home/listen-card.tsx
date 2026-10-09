@@ -248,7 +248,9 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   const described = listeners != null ? describeListeners(listeners) : null;
   const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
   const paused = status.isLoaded && !status.playing;
-  const printTop = (size.height - size.width) / 2;
+  // The print is square: the card's shorter side, centered (the card fills whatever room Home has).
+  const side = Math.min(size.width, size.height);
+  const printBox = { top: (size.height - side) / 2, left: (size.width - side) / 2, width: side, height: side };
 
   return (
     <Animated.View style={cardStyle}>
@@ -266,11 +268,11 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
             key={`${recipe.source}:${recipe.label ?? ''}`}
             entering={FadeIn.duration(400)}
             pointerEvents="none"
-            style={[styles.print, { top: printTop, width: size.width, height: size.width }, printStyle]}>
+            style={[styles.print, printBox, printStyle]}>
             {reduceMotion ? (
-              <PrintStill recipe={recipe} size={size.width} ground={false} />
+              <PrintStill recipe={recipe} size={side} ground={false} />
             ) : (
-              <LivePrint recipe={recipe} size={size.width} clock={clock} gather={gather} />
+              <LivePrint recipe={recipe} size={side} clock={clock} gather={gather} />
             )}
           </Animated.View>
 
@@ -353,11 +355,12 @@ function Gradient() {
 
 /** A card waiting under the top one: its still print over a faint blur of its cover. No gestures, no labels. */
 export function StackFace({ track, size, recipe }: { track: DiscoveryTrack; size: CardSize; recipe: PrintRecipe }) {
+  const side = Math.min(size.width, size.height);
   return (
     <View style={[styles.card, size, { backgroundColor: recipe.ground }]} pointerEvents="none">
       <Image source={{ uri: artworkUrl(track.artworkUrl100, 300) }} style={[StyleSheet.absoluteFill, { opacity: 0.25 }]} blurRadius={COVER_BLUR} />
-      <View style={[styles.print, { top: (size.height - size.width) / 2, width: size.width, height: size.width }]}>
-        <PrintStill recipe={recipe} size={size.width} ground={false} />
+      <View style={[styles.print, { top: (size.height - side) / 2, left: (size.width - side) / 2, width: side, height: side }]}>
+        <PrintStill recipe={recipe} size={side} ground={false} />
       </View>
     </View>
   );
@@ -373,7 +376,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
   },
-  print: { position: 'absolute', left: 0 },
+  print: { position: 'absolute' },
   topRow: { position: 'absolute', top: Spacing.md, left: Spacing.lg, right: Spacing.lg, flexDirection: 'row', justifyContent: 'space-between' },
   mono: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1, color: Colors.textSecondary },
   paused: {
