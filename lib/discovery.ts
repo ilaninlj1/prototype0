@@ -1,6 +1,7 @@
 // ---------- Types ----------
 
 import type { PresetId } from './pool-types';
+import { releaseDay } from './song-age.ts';
 
 export type DiscoveryTrack = {
   id: number;
@@ -19,6 +20,10 @@ export type DiscoveryTrack = {
   // result had none. Purely additive alongside collectionId above — display
   // data only, nothing here reads it for dedup/grouping.
   collectionName: string | null;
+  // The day iTunes says the song came out, "1978-03-23". Optional: tracks
+  // saved before 2026-10-14 don't have it. Ages the blind card and shows on
+  // the reveal (lib/song-age.ts).
+  releaseDate?: string | null;
   // Optional solid-color fallback CardFace renders when artworkUrl100 is
   // empty, instead of a flat gray box — set by lib/pool.ts's stub (colored
   // per preset, so swapping presets is visually confirmable), left unset
@@ -359,6 +364,7 @@ function toDiscoveryTrack(r: any): DiscoveryTrack {
     trackViewUrl: r.trackViewUrl ?? '',
     collectionId: r.collectionId,
     collectionName: r.collectionName ?? null,
+    releaseDate: releaseDay(r.releaseDate),
   };
 }
 

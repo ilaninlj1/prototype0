@@ -17,6 +17,14 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-14] Older songs look older; the reveal says when a song came out
+Every bundled catalog song now carries its iTunes release date (`npm run add-release-dates`), and live iTunes
+results keep theirs. Blind, an older song's card comes in warmer and its colors faded, so you can guess the era
+before the swipe: navy for this year's songs, charcoal around 2000, espresso at 50 years and older. The fade moves
+toward grey, which keeps each color's hue, so the print still shows the song's key and nothing turns violet. The
+badge, the piece, posters and the Edition keep the true print. After a reveal, a third line under the artist
+reads "Released Mar 23, 1978 · Kaya", with Single or EP for those.
+
 ## [2026-10-09] The Edition looks like the motion reel now
 With `claude-motion-reel.html` on hand, the Edition was rebuilt in its style: the reel's HUD in the corners (scene,
 frame counter, timecode), orange and cream wipes at every cut, film grain, a vignette and an orange progress line;

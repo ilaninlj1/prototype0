@@ -28,6 +28,7 @@ export interface Track {
   artist: string;
   title: string;
   album: string | null;
+  releaseDate?: string | null; // "1978-03-23", when known
   artworkUrl: string | null;
   previewUrl: string; // guaranteed
   source: {
@@ -83,6 +84,8 @@ export interface CatalogEntry {
   itunesTrackId: number;
   artworkUrl: string | null;
   album: string | null;
+  // The day iTunes says the song came out, "1978-03-23"; filled in by scripts/add-release-dates.ts.
+  releaseDate?: string;
 }
 
 /**

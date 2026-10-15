@@ -183,6 +183,7 @@ function toCatalogEntry(c: IntersectedCandidate): CatalogEntry {
     itunesTrackId: c.itunesTrackId,
     artworkUrl: c.artworkUrl,
     album: c.album,
+    releaseDate: c.releaseDate ?? undefined,
   };
 }
 

@@ -16,6 +16,24 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-10-14] Song age on the blind card, release date on the reveal
+The user always wants to know when a song came out, and asked whether a song's age could shape the blind card
+before the swipe. Blind, an older song's card comes in warmer and its colors faded (navy, then charcoal around
+2000, then espresso at 50 years and older), so you can guess the era; the reveal says "Released Mar 23, 1978 ·
+Kaya". A random sample of 180 catalog songs on 2026-10-14: 33% from the 2020s, 23% 2010s, 23% 2000s, 10% 1990s,
+11% older, so the look changes often. iTunes mostly keeps the original year even on remasters and deluxe
+editions (Bob Marley's Kaya deluxe still says 1978).
+**Status (2026-10-14): Built** on branch `release-dates` (`lib/song-age.ts`, `npm run add-release-dates`). Not yet
+checked on a phone.
+
+## [2026-10-14] Marbles: particles with weight
+From the same conversation: make the blind card's particles feel like marbles, with real gravity, bouncing off
+the card's edges and a light haptic tick when they hit. Calm songs could float up like balloons and loud songs
+sink, from one gravity setting rather than two kinds of objects. Most of the motion already exists (particles
+follow the drag and breathe at the song's tempo), so this is a tuning pass. Keep any beat pulse soft: the index
+has each song's tempo but not where its beats land, so a hard thump would drift off the music.
+**Status (2026-10-14): Waiting** on a phone check of whether today's particles feel floaty.
+
 ## [2026-10-08] The Edition: a motion reel of your last 5 finds
 After every 5 reveals, a ~30-second full-screen reel plays those 5 songs as scenes in the style of the user's
 `claude-motion-reel.html` (particle fields gathering into rings, terrain, a glass orb holding the cover, a final

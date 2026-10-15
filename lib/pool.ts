@@ -55,6 +55,7 @@ import { shuffle } from './taste-test.ts';
 import { soundFor } from './sound-index.ts';
 import { pickSorted, type SoundFilter } from './sound-filter.ts';
 import { pickNeighbors, type Candidate } from './sound-neighbors.ts';
+import { releaseDay } from './song-age.ts';
 import type { SoundFeatures } from './sound.ts';
 
 const genresSeed = genresSeedRaw as unknown as Record<string, SeedArtistEntry[]>;
@@ -322,6 +323,7 @@ interface ItunesLookupTrack {
   previewUrl?: string;
   artworkUrl100?: string;
   collectionName?: string;
+  releaseDate?: string;
   trackExplicitness?: string;
 }
 interface ItunesLookupResponse {
@@ -334,6 +336,7 @@ export interface ItunesEntry {
   itunesTrackId: number;
   artworkUrl: string | null;
   album: string | null;
+  releaseDate: string | null;
   explicit: boolean;
 }
 
@@ -353,6 +356,7 @@ export async function fetchItunesCatalog(itunesArtistId: number): Promise<Itunes
       itunesTrackId: r.trackId,
       artworkUrl: r.artworkUrl100 ?? null,
       album: r.collectionName ?? null,
+      releaseDate: releaseDay(r.releaseDate),
       explicit: r.trackExplicitness === 'explicit',
     }));
 }
@@ -367,6 +371,7 @@ export interface IntersectedCandidate {
   itunesTrackId: number;
   artworkUrl: string | null;
   album: string | null;
+  releaseDate: string | null;
 }
 
 /**
@@ -419,6 +424,7 @@ export function intersectByTitle(rankedTracks: RankedTrack[], itunesCatalog: Itu
       itunesTrackId: match.itunesTrackId,
       artworkUrl: match.artworkUrl,
       album: match.album,
+      releaseDate: match.releaseDate,
     });
   }
   return candidates;
@@ -555,6 +561,7 @@ export function catalogTrack(artist: SeedArtistEntry, catalog: ArtistCatalog, ch
     artist: artist.name,
     title: chosen.title,
     album: chosen.album,
+    releaseDate: chosen.releaseDate ?? null,
     artworkUrl: chosen.artworkUrl,
     previewUrl: chosen.previewUrl,
     source: {
@@ -665,6 +672,7 @@ async function resolveOneTrack(artist: SeedArtistEntry, preset: PresetId, genreT
     artist: artist.name,
     title: chosen.title,
     album: chosen.album,
+    releaseDate: chosen.releaseDate ?? null,
     artworkUrl: chosen.artworkUrl,
     previewUrl: chosen.previewUrl!,
     source: {
@@ -928,6 +936,7 @@ export function trackToDiscoveryTrack(track: Track): DiscoveryTrack {
     trackViewUrl: '',
     collectionId: undefined,
     collectionName: track.album,
+    releaseDate: track.releaseDate ?? null,
     placeholderColor: track.artworkUrl ? undefined : PLACEHOLDER_COLORS[track.source.preset],
     // Phase 3 logging (2026-09-16) — carried through so app/(tabs)/index.tsx's
     // logSwipe can record them; DiscoveryTrack has no other source for

@@ -31,6 +31,7 @@ import { usePlayback } from '@/hooks/use-playback';
 import { mixForDrag, shouldReportMix } from '@/lib/crossfade';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 import type { PrintRecipe } from '@/lib/print-recipe';
+import { agedRecipe, releaseLine, songAge } from '@/lib/song-age';
 import { DragLabels, TintWash } from './drag-label';
 
 const H = DEFAULT_SWIPE_THRESHOLDS.horizontal;
@@ -111,10 +112,12 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   );
   const scatter = useDerivedValue(() => (isRevealed.get() ? 0 : interpolate(-tx.get(), [0, H], [0, 1], 'clamp')));
   const fall = useDerivedValue(() => interpolate(ty.get(), [0, V * 1.5], [0, 1], 'clamp'));
+  // An older song comes in warmer and faded, a hint at its era before the reveal gives the date. The badge keeps the true print.
+  const aged = useMemo(() => agedRecipe(recipe, songAge(track.releaseDate)), [recipe, track.releaseDate]);
   // Far from your taste, the particles get restless.
   const liveRecipe = useMemo(
-    () => (restless ? { ...recipe, turbulence: recipe.turbulence * (1 + 1.5 * restless), speed: recipe.speed * (1 + 0.6 * restless) } : recipe),
-    [recipe, restless]
+    () => (restless ? { ...aged, turbulence: aged.turbulence * (1 + 1.5 * restless), speed: aged.speed * (1 + 0.6 * restless) } : aged),
+    [aged, restless]
   );
   const [burst, setBurst] = useState(0);
 
@@ -283,6 +286,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   const rightTint = useAnimatedStyle(() => ({ opacity: interpolate(tx.get(), [0, H], [0, TINT], 'clamp') }));
 
   const described = listeners != null ? describeListeners(listeners) : null;
+  const release = releaseLine(track.releaseDate, track.collectionName);
   const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
   const paused = status.isLoaded && !status.playing;
   // The print is square: the card's shorter side, centered (the card fills whatever room Home has).
@@ -292,7 +296,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   return (
     <Animated.View style={cardStyle}>
       <GestureDetector gesture={gesture}>
-        <View style={[styles.card, size, { backgroundColor: recipe.ground }]} accessibilityLabel={revealed ? `${track.trackName} by ${track.artistName}` : 'A song, playing blind'}>
+        <View style={[styles.card, size, { backgroundColor: aged.ground }]} accessibilityLabel={revealed ? `${track.trackName} by ${track.artistName}` : 'A song, playing blind'}>
           <Animated.View style={[StyleSheet.absoluteFill, blurStyle]} pointerEvents="none">
             <Image source={{ uri: artworkUrl(track.artworkUrl100, 300) }} style={StyleSheet.absoluteFill} blurRadius={COVER_BLUR} />
           </Animated.View>
@@ -305,7 +309,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
             {/* Keyed apart from the opacity above: the entering fade and the reveal fade can't share one view. */}
             <Animated.View key={`${recipe.source}:${recipe.label ?? ''}`} entering={FadeIn.duration(400)}>
               {reduceMotion ? (
-                <PrintStill recipe={recipe} size={side} ground={false} />
+                <PrintStill recipe={aged} size={side} ground={false} />
               ) : (
                 <LivePrint recipe={liveRecipe} size={side} clock={clock} gather={living} scatter={scatter} fall={fall} />
               )}
@@ -339,6 +343,11 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
                 <ThemedText style={styles.artist} numberOfLines={1}>
                   {track.artistName}
                 </ThemedText>
+                {!!release && (
+                  <ThemedText style={styles.release} numberOfLines={1}>
+                    {release}
+                  </ThemedText>
+                )}
               </Animated.View>
               <Animated.View entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={styles.badge} pointerEvents="none">
                 {/* Measured for the flight: a plain view, since an animated one doesn't measure on every platform. */}
@@ -396,11 +405,12 @@ function Gradient() {
 /** A card waiting under the top one: its still print over a faint blur of its cover. No gestures, no labels. */
 export function StackFace({ track, size, recipe }: { track: DiscoveryTrack; size: CardSize; recipe: PrintRecipe }) {
   const side = Math.min(size.width, size.height);
+  const aged = useMemo(() => agedRecipe(recipe, songAge(track.releaseDate)), [recipe, track.releaseDate]);
   return (
-    <View style={[styles.card, size, { backgroundColor: recipe.ground }]} pointerEvents="none">
+    <View style={[styles.card, size, { backgroundColor: aged.ground }]} pointerEvents="none">
       <Image source={{ uri: artworkUrl(track.artworkUrl100, 300) }} style={[StyleSheet.absoluteFill, { opacity: 0.25 }]} blurRadius={COVER_BLUR} />
       <View style={[styles.print, { top: (size.height - side) / 2, left: (size.width - side) / 2, width: side, height: side }]}>
-        <PrintStill recipe={recipe} size={side} ground={false} />
+        <PrintStill recipe={aged} size={side} ground={false} />
       </View>
     </View>
   );
@@ -438,6 +448,7 @@ const styles = StyleSheet.create({
   names: { position: 'absolute', left: Spacing.lg, right: Spacing.lg, bottom: 64, gap: 2 },
   title: { fontFamily: Fonts.display, fontSize: 22, lineHeight: 26, color: Colors.text },
   artist: { color: Colors.textSecondary },
+  release: { fontSize: 13, lineHeight: 18, color: Colors.textSecondary },
   badge: {
     position: 'absolute',
     top: Spacing.xl + Spacing.md,
