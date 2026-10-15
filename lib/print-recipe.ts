@@ -192,6 +192,15 @@ export function particleAt(r: PrintRecipe, i: number, t: number, gather: number)
   return [x, y];
 }
 
+/** One particle where it is now, then pushed outward (scatter) or dropped (fall) by the drag. */
+export function placeParticle(r: PrintRecipe, i: number, t: number, gather: number, scatter: number, fall: number): [number, number] {
+  'worklet';
+  const [x, y] = particleAt(r, i, t, gather);
+  const h = particleHash(i, r.seed);
+  const k = 1 + scatter * (1.2 + 1.6 * h);
+  return [0.5 + (x - 0.5) * k, 0.5 + (y - 0.5) * k + fall * fall * (0.5 + 0.9 * h)];
+}
+
 /**
  * The still print. `heard` (0–1, how much of the song you listened to) sets
  * how settled it is: fully heard is crisp rings, a quick reveal stays loose.
