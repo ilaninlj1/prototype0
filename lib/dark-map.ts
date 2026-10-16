@@ -1,7 +1,7 @@
 // Lighting the Dark Map: which songs you've heard and how brightly, how much of the map that lights, which lights
 // are new since your last look, and each region's tally. Pure; lib/dark-map-app.ts feeds it from storage.
 
-import type { SwipeEntry } from './discovery.ts';
+import type { Strategy, SwipeEntry } from './discovery.ts';
 import type { SoundFeatures } from './sound.ts';
 import { measureVector, placeByNeighbors, standardize, type MapPoint, type Neighbor, type SoundMap } from './sound-map.ts';
 
@@ -112,4 +112,21 @@ export function lightMap(
     .map((r, i) => ({ region: i, words: r.words, songs: r.songs, heard: regionHeard[i] }))
     .sort((a, b) => a.heard / a.songs - b.heard / b.songs || a.region - b.region);
   return { dots, lights, litShare: litShare(dots, lights), unmapped, regions, litIds: lights.map((l) => l.id) };
+}
+
+/** Where Home's next songs come from: the map whenever you're in the dark, even over artist steering; otherwise as before. */
+export function refillSource(strategy: Strategy['type'], inDark: boolean, sorted: boolean): 'map' | 'artist' | 'sorted' | 'genre' {
+  if (inDark) return 'map';
+  if (strategy === 'artist') return 'artist';
+  return sorted ? 'sorted' : 'genre';
+}
+
+/**
+ * The genre Home keeps underneath the dark, and goes back to when you leave: the current one, or the playing
+ * song's when steering by artist (if it's one of `genres`, which have catalogs), else one of `genres` at random.
+ */
+export function genreUnderDark(strategy: Strategy, playingGenre: string | null, genres: readonly string[], random: () => number = Math.random): Strategy {
+  if (strategy.type === 'genre') return strategy;
+  const genre = playingGenre && genres.includes(playingGenre) ? playingGenre : genres[Math.floor(random() * genres.length)];
+  return { type: 'genre', genre };
 }

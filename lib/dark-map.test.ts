@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { brightness, glowRadius, GRID, heardIds, lightMap, litShare, newLights } from './dark-map.ts';
-import type { SwipeEntry } from './discovery.ts';
+import { brightness, genreUnderDark, glowRadius, GRID, heardIds, lightMap, litShare, newLights, refillSource } from './dark-map.ts';
+import type { Strategy, SwipeEntry } from './discovery.ts';
 import type { SoundFeatures } from './sound.ts';
 import { MAP_MEASURES, type SoundMap } from './sound-map.ts';
 
@@ -102,4 +102,22 @@ test('heard songs light their spot; off-map ones are placed by their neighbors o
   assert.deepEqual(v.lights.filter((l) => l.fresh).map((l) => l.id).sort((a, b) => a - b), [2, 99]);
   assert.equal(v.regions[0].region, 1, 'least heard region first');
   assert.equal(v.regions[1].heard, 2, 'region tallies count map songs only');
+});
+
+test('in the dark the map serves the songs, even over artist steering; otherwise as before', () => {
+  assert.equal(refillSource('artist', true, false), 'map');
+  assert.equal(refillSource('genre', true, true), 'map');
+  assert.equal(refillSource('artist', false, true), 'artist');
+  assert.equal(refillSource('genre', false, true), 'sorted');
+  assert.equal(refillSource('genre', false, false), 'genre');
+});
+
+test("the genre kept underneath the dark: the current one, or the playing song's when steering by artist", () => {
+  const jazz: Strategy = { type: 'genre', genre: 'Jazz' };
+  const byArtist: Strategy = { type: 'artist', artistId: 1, artistName: 'X' };
+  const genres = ['Pop', 'Rock', 'Jazz'];
+  assert.equal(genreUnderDark(jazz, 'Pop', genres), jazz);
+  assert.deepEqual(genreUnderDark(byArtist, 'Pop', genres), { type: 'genre', genre: 'Pop' });
+  assert.deepEqual(genreUnderDark(byArtist, 'Alternative', genres, () => 0.5), { type: 'genre', genre: 'Rock' }, "an iTunes genre with no catalog isn't kept");
+  assert.deepEqual(genreUnderDark(byArtist, null, genres, () => 0), { type: 'genre', genre: 'Pop' });
 });

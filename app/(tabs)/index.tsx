@@ -66,7 +66,7 @@ import {
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
 import { pickSimilar } from '@/lib/charts';
-import { heardIds } from '@/lib/dark-map';
+import { genreUnderDark, heardIds, refillSource } from '@/lib/dark-map';
 import { loadMapView } from '@/lib/dark-map-app';
 import { fetchArtistListeners, fetchSimilarArtists, getTracks, getTracksBySound, getTracksNear, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
 import { deckSize } from '@/lib/pool-config';
@@ -91,7 +91,7 @@ import { recipeFor, type PrintRecipe } from '@/lib/print-recipe';
 import { moreLikeLabel } from '@/lib/sound';
 import { soundFor } from '@/lib/sound-index';
 import { soundLookup } from '@/lib/sound-lookup-app';
-import type { MapPoint } from '@/lib/sound-map';
+import { loadSoundMap, mapPointOf, type MapPoint } from '@/lib/sound-map';
 import { restlessness, tasteDistance, TIER_LABEL, tierFor } from '@/lib/taste-distance';
 import { hideFromDiscovery, shouldSkip } from '@/lib/human-check-api';
 import { takeSteerRequest } from '@/lib/steer-request';
@@ -481,15 +481,20 @@ export default function HomeScreen() {
         // genre-term search — see bugs.md's 2026-09-14 entry on why that
         // path is retired here, not patched.
         (strategy) =>
-          simulate(networkTestRef.current, () =>
-          (strategy.type === 'artist'
-            ? fetchForStrategy(strategy, activeRegion)
-            : mapFocusRef.current
-              ? mapTracks(history, excludeArtists, activePreset, strategy.genre)
-              : isActive(soundFilterRef.current)
-              ? Promise.resolve(sortedTracks(activePreset, strategy.genre, excludeArtists))
-              : getTracks(activePreset, strategy.genre, excludeArtists).then((tracks) => tracks.map(trackToDiscoveryTrack))
-          ).then((tracks) => tracks.filter((t) => !hideFromDiscovery(t.artistName) && !alreadyKnown(t.artistName))), // human-only unless AI music is on; never an artist already in your Spotify
+          simulate(networkTestRef.current, () => {
+            // In the dark the map serves the songs, even over artist steering (lib/dark-map.ts refillSource).
+            const source = refillSource(strategy.type, mapFocusRef.current != null, isActive(soundFilterRef.current));
+            const genre = strategy.type === 'genre' ? strategy.genre : randomGenre();
+            const fetched =
+              source === 'map'
+                ? mapTracks(history, excludeArtists, activePreset, genre)
+                : strategy.type === 'artist'
+                  ? fetchForStrategy(strategy, activeRegion)
+                  : source === 'sorted'
+                    ? Promise.resolve(sortedTracks(activePreset, genre, excludeArtists))
+                    : getTracks(activePreset, genre, excludeArtists).then((tracks) => tracks.map(trackToDiscoveryTrack));
+            return fetched.then((tracks) => tracks.filter((t) => !hideFromDiscovery(t.artistName) && !alreadyKnown(t.artistName))); // human-only unless AI music is on; never an artist already in your Spotify
+          },
           (ms) => new Promise((r) => setTimeout(r, ms)))
       );
       if (refillEpochRef.current !== epoch) return;
@@ -655,6 +660,8 @@ export default function HomeScreen() {
     if (next && refillEpochRef.current === epoch) applySteeringStrategy('artist', next);
   }
   async function strategyAfterSwipe(track: DiscoveryTrack, history: SwipeEntry[], epoch: number): Promise<Strategy> {
+    // In the dark the map picks the songs: no Similar hops or genre shuffles out of it.
+    if (mapFocusRef.current) return strategy;
     if (nextMode !== 'similar') return nextFeedStrategy(history);
     similarCountRef.current += 1;
     if (similarCountRef.current % 3 !== 0) return strategy;
@@ -705,6 +712,17 @@ export default function HomeScreen() {
   // More like this: the bundled catalog's nearest songs in sound go next, no network (lib/pool.ts nearestBySound).
   function steerToNeighbors(track: DiscoveryTrack) {
     const sound = topSound?.status === 'measured' ? topSound.features : null;
+    // In the dark, the next songs come from beside this one on the map, from any genre, as the map serves them.
+    const map = mapFocusRef.current ? loadSoundMap() : null;
+    const here = map ? mapPointOf(map, track.id) : null;
+    if (here) {
+      const heard = heardIds(swipeHistory).add(track.id);
+      const near = getTracksNear(here, 3, heard, seenArtists, (a) => !hideFromDiscovery(a) && !alreadyKnown(a));
+      const rest = queue.slice(1).filter((t) => !near.some((n) => n.id === t.id));
+      setQueue([queue[0], ...near, ...rest]);
+      setMoreLike({ ids: new Set(near.map((t) => t.id)), label: sound ? moreLikeLabel(sound) : 'nearby on the map' });
+      return;
+    }
     if (strategy.type !== 'genre') return setMoreLike(null);
     const near = sound
       ? nearestBySound(preset, strategy.genre, { sound, artist: track.artistName }, 3, seenArtists, (a) => !hideFromDiscovery(a) && !alreadyKnown(a))
@@ -804,9 +822,13 @@ export default function HomeScreen() {
     revealIdRef.current = null;
     revealRecipeRef.current = null;
     setMoreLike(null);
+    // Underneath the dark is a genre, never an artist: it's what Home goes back to when you leave.
+    const under = genreUnderDark(strategy, currentTrack?.primaryGenreName ?? null, GENRES);
+    if (under !== strategy) setStrategy(under);
+    if (nextMode === 'artist') setNextMode('genre');
     setMapFocus({ point, words });
     setQueue([]);
-    await runRefill([], strategy, nextHistory, discoveredGenres, region, preset, nextSeen);
+    await runRefill([], under, nextHistory, discoveredGenres, region, preset, nextSeen);
   }
 
   // ✕ on the "In the dark" line: back to the current genre, keeping the card that's playing.

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { MAP_MEASURES, measureVector, pickNear, placeByNeighbors, regionAt, songsWithin, standardize, type SoundMap } from './sound-map.ts';
+import { MAP_MEASURES, mapPointOf, measureVector, pickNear, placeByNeighbors, regionAt, songsWithin, standardize, type SoundMap } from './sound-map.ts';
 
 // Two regions, five songs in two genres.
 const MAP: SoundMap = {
@@ -73,4 +73,9 @@ test('picking near a spot: one song per artist, filtered artists and unresolvabl
 test('a spot that has run dry gives nothing', () => {
   assert.deepEqual(pickNear(MAP, { x: 0.2, y: 0.2 }, 2, new Set([1, 2, 3, 4, 5]), resolveAll(), () => true), []);
   assert.deepEqual(pickNear(MAP, { x: 0.2, y: 0.2 }, 2, new Set(), resolveAll(), () => false), [], 'every artist filtered');
+});
+
+test("a song's spot on the map, or none when it isn't on it", () => {
+  assert.deepEqual(mapPointOf(MAP, 4), { x: 0.8, y: 0.8 });
+  assert.equal(mapPointOf(MAP, 99), null);
 });

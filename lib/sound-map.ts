@@ -80,6 +80,12 @@ export function placeByNeighbors(vector: number[], neighbors: Neighbor[], k = 5)
   };
 }
 
+/** A song's spot on the map, or null when it isn't on it. */
+export function mapPointOf(map: Pick<SoundMap, 'songs'>, id: number): MapPoint | null {
+  const s = map.songs[String(id)];
+  return s ? { x: s[0], y: s[1] } : null;
+}
+
 /** Ids of the map songs within `radius` of a point. */
 export function songsWithin(map: Pick<SoundMap, 'songs'>, point: MapPoint, radius: number): number[] {
   return Object.entries(map.songs)
