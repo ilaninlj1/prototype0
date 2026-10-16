@@ -47,8 +47,9 @@ function readCatalogs() {
   for (const file of fs.readdirSync(CATALOGS).filter((f) => f.endsWith('.json')).sort()) {
     const catalog: Catalog = JSON.parse(fs.readFileSync(path.join(CATALOGS, file), 'utf8'));
     const ids = new Set<string>();
-    for (const [artist, { hits, deepCuts }] of Object.entries(catalog)) {
-      for (const entry of [...hits, ...deepCuts]) {
+    // Mixed too: Home's Mixed preset serves it, and the Dark Map places every measured song.
+    for (const [artist, { hits, deepCuts, mixed }] of Object.entries(catalog)) {
+      for (const entry of [...hits, ...deepCuts, ...(mixed ?? [])]) {
         const id = String(entry.itunesTrackId);
         ids.add(id);
         if (!songs.has(id)) songs.set(id, { ...entry, artist });
