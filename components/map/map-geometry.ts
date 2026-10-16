@@ -30,6 +30,18 @@ export function toMap(sx: number, sy: number, width: number, height: number, zoo
   return x < 0 || x > 1 || y < 0 || y > 1 ? null : { x, y };
 }
 
+/** A region label's left edge: centered on its region, kept inside the map so edge regions stay readable. */
+export function labelLeft(sx: number, labelWidth: number, width: number): number {
+  'worklet';
+  return Math.min(width - labelWidth, Math.max(0, sx - labelWidth / 2));
+}
+
+/** Whether a screen point is on the map: a label whose region has slid off screen hides instead of pinning to the edge. */
+export function onScreen(sx: number, sy: number, width: number, height: number): boolean {
+  'worklet';
+  return sx >= 0 && sx <= width && sy >= 0 && sy <= height;
+}
+
 /** Pan limits at a zoom, so the map never slides off screen. */
 export function clampPan(v: number, zoom: number, size: number): number {
   'worklet';

@@ -10,13 +10,13 @@ import type { Light } from '@/lib/dark-map';
 import type { MapPoint, MapRegion } from '@/lib/sound-map';
 
 import type { DarkMapCanvasProps } from './dark-map-canvas';
-import { clampPan, MAP_GROUND, MAP_PAD, toCanvas, toMap, toScreen } from './map-geometry';
+import { clampPan, labelLeft, MAP_GROUND, MAP_PAD, onScreen, toCanvas, toMap, toScreen } from './map-geometry';
 
 const Canvas = lazySkia<DarkMapCanvasProps>(() => import('./dark-map-canvas'));
 const MAX_ZOOM = 4;
 const DOUBLE_TAP_ZOOM = 2.5;
 const SPRING = { damping: 18, stiffness: 180 };
-const LABEL_W = 180;
+const LABEL_W = 220; // room for three words
 
 type Props = {
   width: number;
@@ -144,7 +144,7 @@ function MapLabel({ region, width, height, zoom, panX, panY }: Motion & { region
   const at = toCanvas(region, width, height);
   const style = useAnimatedStyle(() => {
     const s = toScreen(at, width, height, zoom.get(), panX.get(), panY.get());
-    return { transform: [{ translateX: s.x - LABEL_W / 2 }, { translateY: s.y - 7 }] };
+    return { opacity: onScreen(s.x, s.y, width, height) ? 1 : 0, transform: [{ translateX: labelLeft(s.x, LABEL_W, width) }, { translateY: s.y - 7 }] };
   });
   return (
     <Animated.View pointerEvents="none" style={[styles.label, style]}>
