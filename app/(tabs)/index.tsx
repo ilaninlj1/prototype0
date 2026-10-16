@@ -25,6 +25,7 @@ import { FeedStatus } from '@/components/home/feed-status';
 import { FlyingPrint } from '@/components/home/flying-print';
 import { GenreStamp } from '@/components/home/genre-stamp';
 import { ListenCard, StackFace, type ListenCardHandle } from '@/components/home/listen-card';
+import { MapButton } from '@/components/home/map-button';
 import { PieceStrip, slotCenter, type StripRect } from '@/components/home/piece-strip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -65,7 +66,9 @@ import {
   saveSwipeHistory,
 } from '@/lib/discovery-storage';
 import { pickSimilar } from '@/lib/charts';
-import { fetchArtistListeners, fetchSimilarArtists, getTracks, getTracksBySound, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
+import { heardIds } from '@/lib/dark-map';
+import { loadMapView } from '@/lib/dark-map-app';
+import { fetchArtistListeners, fetchSimilarArtists, getTracks, getTracksBySound, getTracksNear, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
 import { deckSize } from '@/lib/pool-config';
 import { ANY_FILTER, DIMENSIONS, describeFilter, isActive, relax, type SoundFilter } from '@/lib/sound-filter';
 import { findItunesArtist } from '@/lib/song-details';
@@ -88,6 +91,7 @@ import { recipeFor, type PrintRecipe } from '@/lib/print-recipe';
 import { moreLikeLabel } from '@/lib/sound';
 import { soundFor } from '@/lib/sound-index';
 import { soundLookup } from '@/lib/sound-lookup-app';
+import type { MapPoint } from '@/lib/sound-map';
 import { restlessness, tasteDistance, TIER_LABEL, tierFor } from '@/lib/taste-distance';
 import { hideFromDiscovery, shouldSkip } from '@/lib/human-check-api';
 import { takeSteerRequest } from '@/lib/steer-request';
@@ -104,11 +108,15 @@ type UndoSnapshot = {
   discoveredGenres: string[];
   swipeHistory: SwipeEntry[];
   seenArtists: Set<string>;
+  /** Where on the Dark Map the feed was, if anywhere: undoing a jump into the dark leaves it. */
+  mapFocus: MapFocus | null;
   /** The card was revealed when the action happened (Next, or down from a reveal): undo shows it revealed again. */
   revealed: { track: DiscoveryTrack; recipe: PrintRecipe | null; listeners: number | null | undefined } | null;
 };
 
 type Stamp = { id: number; genre: string; fresh: boolean };
+/** A spot on the Dark Map that Home is serving songs from. */
+type MapFocus = { point: MapPoint; words: string };
 type Flight = { mark: Omit<PieceMark, 'branch'>; from: { x: number; y: number }; to: { x: number; y: number }; endSize: number };
 
 export default function HomeScreen() {
@@ -147,6 +155,15 @@ export default function HomeScreen() {
   const [soundFilter, setSoundFilter] = useState<SoundFilter>(ANY_FILTER);
   const soundFilterRef = useRef<SoundFilter>(ANY_FILTER);
   const [loosened, setLoosened] = useState<string[]>([]);
+  // The Dark Map: while set, every refill comes from the songs nearest this spot (lib/pool.ts getTracksNear).
+  const [mapFocus, setMapFocusState] = useState<MapFocus | null>(null);
+  const mapFocusRef = useRef<MapFocus | null>(null);
+  function setMapFocus(focus: MapFocus | null) {
+    mapFocusRef.current = focus;
+    setMapFocusState(focus);
+  }
+  // The MAP button's share, recomputed each time Home is focused.
+  const [litShare, setLitShare] = useState<number | null>(null);
 
   // Preset and genre (strategy) are independent axes — see runRefill's
   // fetcher branch below. Not persisted (yet): resets to the default A on
@@ -190,8 +207,8 @@ export default function HomeScreen() {
   const currentTrack = queue[0];
 
 
-  const currentGenre = strategy.type === 'genre' ? strategy.genre : null;
-  const currentLabel = strategy.type === 'genre' ? strategy.genre : `More from: ${strategy.artistName}`;
+  const currentGenre = strategy.type === 'genre' && !mapFocus ? strategy.genre : null;
+  const currentLabel = mapFocus ? 'Dark map' : strategy.type === 'genre' ? strategy.genre : `More from: ${strategy.artistName}`;
 
   const { player, status, setMix, cancelPeek, promotePeek } = usePlayback();
   const [hasEnded, setHasEnded] = useState(false);
@@ -379,6 +396,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       loadSwipeHistory().then(setSwipeHistory);
+      loadMapView().then((v) => setLitShare(v?.litShare ?? null));
     }, [])
   );
 
@@ -466,7 +484,9 @@ export default function HomeScreen() {
           simulate(networkTestRef.current, () =>
           (strategy.type === 'artist'
             ? fetchForStrategy(strategy, activeRegion)
-            : isActive(soundFilterRef.current)
+            : mapFocusRef.current
+              ? mapTracks(history, excludeArtists, activePreset, strategy.genre)
+              : isActive(soundFilterRef.current)
               ? Promise.resolve(sortedTracks(activePreset, strategy.genre, excludeArtists))
               : getTracks(activePreset, strategy.genre, excludeArtists).then((tracks) => tracks.map(trackToDiscoveryTrack))
           ).then((tracks) => tracks.filter((t) => !hideFromDiscovery(t.artistName) && !alreadyKnown(t.artistName))), // human-only unless AI music is on; never an artist already in your Spotify
@@ -526,6 +546,16 @@ export default function HomeScreen() {
     return tracks;
   }
 
+  // In the dark: the unheard songs nearest the map spot. When that spot has nothing left, leave the dark and go
+  // back to the genre, so the feed never stalls.
+  async function mapTracks(history: SwipeEntry[], excludeArtists: Set<string>, activePreset: PresetId, genre: string): Promise<DiscoveryTrack[]> {
+    const focus = mapFocusRef.current;
+    const near = focus ? getTracksNear(focus.point, deckSize, heardIds(history), excludeArtists, (a) => !hideFromDiscovery(a) && !alreadyKnown(a)) : [];
+    if (near.length > 0) return near;
+    setMapFocus(null);
+    return (await getTracks(activePreset, genre, excludeArtists)).map(trackToDiscoveryTrack);
+  }
+
   async function handleChangeSoundFilter(filter: SoundFilter) {
     soundFilterRef.current = filter;
     setSoundFilter(filter);
@@ -556,6 +586,7 @@ export default function HomeScreen() {
       preset,
       artistListeners: track.artistListeners,
       trackRank: track.trackRank,
+      ...(track.via === 'map' ? { source: 'map' as const } : {}),
       ...(isSteer
         ? {}
         : {
@@ -719,6 +750,7 @@ export default function HomeScreen() {
   }
 
   async function applySteeringStrategy(kind: 'artist' | 'sound', next: Strategy) {
+    setMapFocus(null);
     const nextHistory = currentTrack
       ? await logSwipe(currentTrack, kind === 'artist' ? 'steer-artist' : 'steer-sound')
       : swipeHistory;
@@ -752,14 +784,51 @@ export default function HomeScreen() {
     void applySteeringStrategy(kind, next);
   });
 
-  // Liked list → "More from this artist" / "More like this sound".
+  // The Dark Map → "Swipe blind here": a jump like a genre pick, into the songs nearest that spot.
+  const applyMapJump = useEffectEvent((point: MapPoint, words: string) => {
+    void jumpIntoMap(point, words);
+  });
+
+  async function jumpIntoMap(point: MapPoint, words: string) {
+    if (!lock.take()) return;
+    captureUndoSnapshot();
+    if (currentTrack) {
+      cardsSeenSincePresetChangeRef.current += 1;
+      markSwipe(currentTrack, 'skip');
+    }
+    forkPiece();
+    setStamp({ id: Date.now(), genre: words, fresh: false });
+    const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
+    const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
+    setRevealTrack(null);
+    revealIdRef.current = null;
+    revealRecipeRef.current = null;
+    setMoreLike(null);
+    setMapFocus({ point, words });
+    setQueue([]);
+    await runRefill([], strategy, nextHistory, discoveredGenres, region, preset, nextSeen);
+  }
+
+  // ✕ on the "In the dark" line: back to the current genre, keeping the card that's playing.
+  async function leaveMap() {
+    if (!mapFocusRef.current) return;
+    setMapFocus(null);
+    const preserved = queue.slice(0, 1);
+    setQueue(preserved);
+    await runRefill(preserved, strategy, swipeHistory, discoveredGenres, region, preset, seenArtists);
+  }
+
+  // Liked list → "More from this artist" / "More like this sound"; the Dark Map → "Swipe blind here".
   useEffect(() => {
     if (!hydrated || !isFocused) return;
     const request = takeSteerRequest();
-    if (request && request.kind !== 'map') applyRouteSteering(request.kind, request.strategy);
+    if (!request) return;
+    if (request.kind === 'map') applyMapJump(request.point, request.words);
+    else applyRouteSteering(request.kind, request.strategy);
   }, [hydrated, isFocused]);
 
   async function commitGenreJump(genre: string, nextHistory: SwipeEntry[], excludeArtists: Set<string>) {
+    setMapFocus(null);
     // A jump always leaves the card behind, revealed or not.
     setRevealTrack(null);
     revealIdRef.current = null;
@@ -795,6 +864,7 @@ export default function HomeScreen() {
       discoveredGenres,
       swipeHistory,
       seenArtists,
+      mapFocus: mapFocusRef.current,
       revealed: revealTrack ? { track: revealTrack, recipe: revealRecipeRef.current, listeners: revealListeners } : null,
     });
   }
@@ -906,6 +976,7 @@ export default function HomeScreen() {
     setDetailsOpen(false);
     setQueue(snapshot.queue);
     setStrategy(snapshot.strategy);
+    setMapFocus(snapshot.mapFocus);
     setDiscoveredGenres(snapshot.discoveredGenres);
     const restoredHistory = keepDropEntries(snapshot.swipeHistory, await loadSwipeHistory());
     setSwipeHistory(restoredHistory);
@@ -956,8 +1027,13 @@ export default function HomeScreen() {
             }}
             />
           </View>
-          <View style={styles.half}>
-            <LikedTracksButton onPress={() => router.push('/modal')} />
+          <View style={[styles.half, styles.pair]}>
+            <View style={styles.half}>
+              <MapButton share={litShare} onPress={() => router.push('/map')} />
+            </View>
+            <View style={styles.half}>
+              <LikedTracksButton onPress={() => router.push('/modal')} />
+            </View>
           </View>
         </View>
         <CreditLine />
@@ -1018,6 +1094,12 @@ export default function HomeScreen() {
               <ThemedText style={styles.note} numberOfLines={1}>
                 More like this: {moreLike.label}
               </ThemedText>
+            ) : mapFocus ? (
+              <Pressable onPress={leaveMap} hitSlop={{ top: 14, bottom: 14 }} accessibilityRole="button" accessibilityLabel={`In the dark: ${mapFocus.words.replace(/ · /g, ', ')}. Leave`}>
+                <ThemedText style={[styles.note, styles.editionNote]} numberOfLines={1}>
+                  IN THE DARK · {mapFocus.words.toUpperCase()} ✕
+                </ThemedText>
+              </Pressable>
             ) : isActive(soundFilter) && strategy.type === 'genre' ? (
               <ThemedText style={styles.note} numberOfLines={1}>
                 Sorted: {describeFilter(soundFilter)}
@@ -1183,6 +1265,11 @@ const styles = StyleSheet.create({
   },
   half: {
     flex: 1,
+  },
+  // Map and Liked share the right half, so Tune keeps room for its preset's name.
+  pair: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
   },
   centered: {
     flex: 1,
