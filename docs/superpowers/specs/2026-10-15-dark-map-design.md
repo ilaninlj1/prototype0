@@ -110,16 +110,17 @@ honest.
 ## Accessibility
 
 The map screen has a `LIST` toggle next to `47% LIT`. It shows the regions, least heard first, as buttons with
-whole-region counts (the sheet counts only its ring): "Instrumental · groovy. 3 of 802 heard. Swipe blind
-here." Each does what tapping that region's center does.
+whole-region counts (the sheet counts only its ring): "Instrumental · groovy. 3 of 802 heard. Opens this
+spot." Each does what tapping that region's center does: it opens the sheet there.
 VoiceOver reads the top bar and lit share. This is part of P10's audit (11/12).
 
 ## Drawing
 
 - `components/map/dark-map-canvas.tsx` (Skia, loaded through `lazySkia` like the prints): the dim dots are one
   path built once per map load; the glow is one path of discs drawn with a `BlurMask`; heard dots and red saves are
-  two more paths; labels use Skia's DM Mono typeface, as the Edition does. Pan and zoom move one `Group` transform
-  from gesture shared values, so the paths are never rebuilt while you move.
+  two more paths. Pan and zoom move one `Group` transform from gesture shared values, so the paths are never rebuilt
+  while you move. Region labels are DM Mono text laid over the canvas and moved by the same zoom and pan, so they
+  stay the same size at any zoom; the tap ring is drawn the same way.
 - Tap: the screen point goes back through the inverse transform to a map point, then to the sheet.
 - The bloom: the set of lit song ids from the last visit is stored at `blindspotDiscovery:mapSeen`. On open, lit
   songs not in it animate in; the set is saved when the bloom ends.
