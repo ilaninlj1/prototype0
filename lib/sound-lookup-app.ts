@@ -6,6 +6,15 @@ import type { SoundRecord } from './sound';
 
 const KEY = 'blindspot:sound:v1';
 
+/** Every cached lookup by track id, measured or not. The Dark Map places heard songs that aren't in the index from it. */
+export async function loadSoundRecords(): Promise<Record<number, SoundRecord>> {
+  try {
+    return JSON.parse((await AsyncStorage.getItem(KEY)) ?? '{}') as Record<number, SoundRecord>;
+  } catch {
+    return {};
+  }
+}
+
 export const soundLookup = createSoundLookup({
   // Deezer sends no CORS headers, so on web only the bundled index answers.
   fetch: Platform.OS === 'web' ? ((async () => new Response(null, { status: 503 })) as typeof fetch) : fetch,

@@ -756,7 +756,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!hydrated || !isFocused) return;
     const request = takeSteerRequest();
-    if (request) applyRouteSteering(request.kind, request.strategy);
+    if (request && request.kind !== 'map') applyRouteSteering(request.kind, request.strategy);
   }, [hydrated, isFocused]);
 
   async function commitGenreJump(genre: string, nextHistory: SwipeEntry[], excludeArtists: Set<string>) {

@@ -55,6 +55,7 @@ import { shuffle } from './taste-test.ts';
 import { soundFor } from './sound-index.ts';
 import { pickSorted, type SoundFilter } from './sound-filter.ts';
 import { pickNeighbors, type Candidate } from './sound-neighbors.ts';
+import { loadSoundMap, pickNear, type MapPoint } from './sound-map.ts';
 import { releaseDay } from './song-age.ts';
 import type { SoundFeatures } from './sound.ts';
 
@@ -777,6 +778,44 @@ export function getTracksBySound(preset: PresetId, genreTag: string, excludeArti
   const band = preset === 'M' ? null : PRESET_ARTIST_BAND[preset];
   const first = collect(band);
   return (first.length >= 3 || band === null ? first : collect(null)).map(trackToDiscoveryTrack);
+}
+
+// Per genre: each catalog song's artist, catalog and entry by iTunes id, built on first use.
+const entryIndex = new Map<string, Map<number, { artist: string; catalog: ArtistCatalog; entry: CatalogEntry }>>();
+
+function catalogEntryById(genreTag: string, id: number) {
+  let byId = entryIndex.get(genreTag);
+  if (!byId) {
+    byId = new Map();
+    for (const [artist, catalog] of Object.entries(loadCatalog(genreTag) ?? {}))
+      for (const entry of [...catalog.mixed, ...catalog.hits, ...catalog.deepCuts]) if (!byId.has(entry.itunesTrackId)) byId.set(entry.itunesTrackId, { artist, catalog, entry });
+    entryIndex.set(genreTag, byId);
+  }
+  return byId.get(id) ?? null;
+}
+
+/**
+ * Unheard songs nearest a spot on the Dark Map, from any genre (lib/sound-map.ts pickNear). The popularity
+ * preset doesn't apply: the map is about sound. Every track is marked `via: 'map'`.
+ */
+export function getTracksNear(point: MapPoint, n: number, heard: Set<number>, excludeArtists: Set<string>, keep: (artist: string) => boolean): DiscoveryTrack[] {
+  const map = loadSoundMap();
+  if (!map) return [];
+  const excluded = new Set([...excludeArtists].map(normalizeArtist));
+  return pickNear(
+    map,
+    point,
+    n,
+    heard,
+    (id, genreTag) => {
+      const found = catalogEntryById(genreTag, id);
+      const seed = found ? genresSeed[genreTag]?.find((a) => a.name === found.artist) : undefined;
+      if (!found || !seed || seed.itunesArtistId == null) return null;
+      const track = trackToDiscoveryTrack(catalogTrack(seed, found.catalog, found.entry, 'M', genreTag));
+      return { artist: found.artist, track: { ...track, via: 'map' as const } };
+    },
+    (artist) => !excluded.has(normalizeArtist(artist)) && keep(artist)
+  );
 }
 
 /**

@@ -24,6 +24,9 @@ export type DiscoveryTrack = {
   // saved before 2026-10-14 don't have it. Ages the blind card and shows on
   // the reveal (lib/song-age.ts).
   releaseDate?: string | null;
+  // Set on songs Home served from a spot on the Dark Map (lib/pool.ts getTracksNear): their swipes are logged
+  // with source 'map', so saves from the map can be compared with saves from genres.
+  via?: 'map';
   // Optional solid-color fallback CardFace renders when artworkUrl100 is
   // empty, instead of a flat gray box — set by lib/pool.ts's stub (colored
   // per preset, so swapping presets is visually confirmable), left unset
@@ -90,8 +93,8 @@ export type SwipeEntry = {
   // — steering doesn't dismiss the current card, so neither "how long
   // dwelled" nor "how long listened" has a real endpoint yet.
   preset?: PresetId;
-  // Set for Daily Drop swipes, so analysis can separate them from the feed.
-  source?: 'drop';
+  // Set for Daily Drop swipes, so analysis can separate them from the feed, and for songs served from the Dark Map.
+  source?: 'drop' | 'map';
   artistListeners?: number;
   trackRank?: number;
   dwellMs?: number;

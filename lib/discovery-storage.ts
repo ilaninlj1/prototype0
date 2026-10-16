@@ -426,6 +426,13 @@ const SOUND_FILTER_KEY = `${STORAGE_PREFIX}:soundFilter`;
 export const loadSoundFilter = () => readJson<SoundFilter>(SOUND_FILTER_KEY, ANY_FILTER);
 export const saveSoundFilter = (filter: SoundFilter) => writeJson(SOUND_FILTER_KEY, filter);
 
+// ---------- Dark Map ----------
+
+// The song ids lit at the last look at the map, so the lights that are new next time can bloom in.
+const MAP_SEEN_KEY = `${STORAGE_PREFIX}:mapSeen`;
+export const loadMapSeen = () => readJson<number[]>(MAP_SEEN_KEY, []);
+export const saveMapSeen = (ids: number[]) => writeJson(MAP_SEEN_KEY, ids);
+
 // ---------- Taste Decoded ----------
 
 const DECODED_SEEN_KEY = `${STORAGE_PREFIX}:decodedSeen`;
