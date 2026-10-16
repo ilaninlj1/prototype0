@@ -17,6 +17,15 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-16] The Dark Map
+A new map of every measured song, placed by how it sounds: songs you've heard glow (brighter the longer you
+listened), saves are red, and everything still dark is your blind spot. Home's bottom row shows how much you've lit
+(`MAP · 47%`), and You → Discoveries shows a still of it. Tap a dark spot to see what's there in plain words
+("instrumental · electric, 374 songs around here, you've heard 0") and swipe blind there: Home plays the nearest
+unheard songs from any genre until you leave, and goes back to the genre by itself when a spot runs dry. New lights
+bloom in each time you open it, and a list of regions reads it out for VoiceOver. The sound index now also measures
+songs that are only in an artist's Mixed list, so 8,296 of 10,889 catalog songs have sound data (was 5,559).
+
 ## [2026-10-14] Older songs look older; the reveal says when a song came out
 Every bundled catalog song now carries its iTunes release date (`npm run add-release-dates`), and live iTunes
 results keep theirs. Blind, an older song's card comes in warmer and its colors faded, so you can guess the era

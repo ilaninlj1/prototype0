@@ -16,6 +16,17 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-10-16] The Dark Map
+Every measured song on one map by how it sounds; what you've heard lights up and the dark is your blind spot. Tap
+somewhere dark and Home plays unheard songs from there, blind. Picked with real renders in the brainstorm (islands
+layout), claims left for later. Spec `docs/superpowers/specs/2026-10-15-dark-map-design.md`, plan
+`docs/superpowers/plans/2026-10-16-dark-map.md`. The sound index now measures mixed-only catalog songs too, so the
+map holds 8,296 of 10,889 songs in 8 regions (loose · loud, loud · electric, instrumental · electric, wordy · sung,
+acoustic · calm, bright · groovy, sung · calm, instrumental · acoustic).
+**Status (2026-10-16): Built** on branch `dark-map`; checked in a web build (map, lights, the bloom, a spot, going in,
+Undo, ✕, the You card). Not yet checked on a phone. For the paper: lit share per tester, and saves per
+`source: 'map'` song against saves per genre song.
+
 ## [2026-10-14] Song age on the blind card, release date on the reveal
 The user always wants to know when a song came out, and asked whether a song's age could shape the blind card
 before the swipe. Blind, an older song's card comes in warmer and its colors faded (navy, then charcoal around
