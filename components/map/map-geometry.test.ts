@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { clampPan, labelCovered, labelLeft, MAP_PAD, onScreen, toCanvas, toMap, toScreen } from './map-geometry.ts';
+import { clampPan, labelCenter, labelCovered, MAP_PAD, onScreen, toCanvas, toMap, toScreen } from './map-geometry.ts';
 
 const W = 360;
 const H = 560;
@@ -25,10 +25,10 @@ test('a tap outside the map is no point at all', () => {
   assert.notEqual(toMap(W / 2, H / 2, W, H, 1, 0, 0), null);
 });
 
-test('a label stays on screen near the edges, and hides once its region slides off screen', () => {
-  assert.equal(labelLeft(10, 220, W), 0, 'near the left edge');
-  assert.equal(labelLeft(350, 220, W), W - 220, 'near the right edge');
-  assert.equal(labelLeft(180, 220, W), 70, 'centered on its region');
+test("a label's text stays on screen near the edges, and hides once its region slides off screen", () => {
+  assert.equal(labelCenter(10, 100, W), 50, 'near the left edge');
+  assert.equal(labelCenter(350, 100, W), W - 50, 'near the right edge');
+  assert.equal(labelCenter(180, 100, W), 180, 'centered on its region');
   assert.equal(onScreen(-5, 100, W, H), false);
   assert.equal(onScreen(100, H + 1, W, H), false);
   assert.equal(onScreen(100, 100, W, H), true);

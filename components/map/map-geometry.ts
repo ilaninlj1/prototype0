@@ -30,10 +30,10 @@ export function toMap(sx: number, sy: number, width: number, height: number, zoo
   return x < 0 || x > 1 || y < 0 || y > 1 ? null : { x, y };
 }
 
-/** A region label's left edge: centered on its region, kept inside the map so edge regions stay readable. */
-export function labelLeft(sx: number, labelWidth: number, width: number): number {
+/** Where a region label's text is centered: on its region, moved in just enough that the text stays on the map. */
+export function labelCenter(sx: number, textWidth: number, width: number): number {
   'worklet';
-  return Math.min(width - labelWidth, Math.max(0, sx - labelWidth / 2));
+  return Math.min(width - textWidth / 2, Math.max(textWidth / 2, sx));
 }
 
 /** Whether a screen point is on the map: a label whose region has slid off screen hides instead of pinning to the edge. */

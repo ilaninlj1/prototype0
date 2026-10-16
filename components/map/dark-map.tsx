@@ -10,13 +10,13 @@ import type { Light } from '@/lib/dark-map';
 import type { MapPoint, MapRegion } from '@/lib/sound-map';
 
 import type { DarkMapCanvasProps } from './dark-map-canvas';
-import { clampPan, labelCovered, labelLeft, labelTextWidth, MAP_GROUND, MAP_PAD, onScreen, toCanvas, toMap, toScreen } from './map-geometry';
+import { clampPan, labelCenter, labelCovered, labelTextWidth, MAP_GROUND, MAP_PAD, onScreen, toCanvas, toMap, toScreen } from './map-geometry';
 
 const Canvas = lazySkia<DarkMapCanvasProps>(() => import('./dark-map-canvas'));
 const MAX_ZOOM = 4;
 const DOUBLE_TAP_ZOOM = 2.5;
 const SPRING = { damping: 18, stiffness: 180 };
-const LABEL_W = 220; // room for three words
+const LABEL_W = 220; // a box wider than any label's words; the text is centered in it
 
 type Props = {
   width: number;
@@ -157,10 +157,14 @@ function MapLabel({ words, lit, rank, anchors, width, height, zoom, panX, panY }
     const z = zoom.get();
     const px = panX.get();
     const py = panY.get();
-    const screens = anchors.map((a) => ({ ...toScreen(a, width, height, z, px, py), w: a.w }));
-    const s = screens[rank];
-    const shown = onScreen(s.x, s.y, width, height) && !labelCovered(rank, screens);
-    return { opacity: shown ? 1 : 0, transform: [{ translateX: labelLeft(s.x, LABEL_W, width) }, { translateY: s.y - 7 }] };
+    // Overlap is judged where the text actually sits: near an edge it's moved in to stay on the map.
+    const screens = anchors.map((a) => {
+      const s = toScreen(a, width, height, z, px, py);
+      return { x: labelCenter(s.x, a.w, width), y: s.y, w: a.w, region: s };
+    });
+    const me = screens[rank];
+    const shown = onScreen(me.region.x, me.region.y, width, height) && !labelCovered(rank, screens);
+    return { opacity: shown ? 1 : 0, transform: [{ translateX: me.x - LABEL_W / 2 }, { translateY: me.y - 7 }] };
   });
   return (
     <Animated.View pointerEvents="none" style={[styles.label, style]}>
