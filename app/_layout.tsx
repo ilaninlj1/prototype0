@@ -124,6 +124,7 @@ export default function RootLayout() {
             <Stack.Screen name="art" options={{ headerShown: false }} />
             <Stack.Screen name="decoded" options={{ headerShown: false }} />
             <Stack.Screen name="rewind" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+            <Stack.Screen name="map" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="spotify-auth" options={{ presentation: 'transparentModal', animation: 'none', headerShown: false }} />
             <Stack.Screen name="spotify-callback" options={{ headerShown: false }} />
             <Stack.Screen name="dj-picks" options={{ presentation: 'fullScreenModal', headerShown: false }} />
