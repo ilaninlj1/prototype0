@@ -77,6 +77,14 @@ test('a region is named by the two measures it differs on most, loudness skipped
   assert.deepEqual(names, ['instrumental · groovy', 'loud · fast']);
 });
 
+test('the same two words in a different order are the same name, so both get a third', () => {
+  const names = nameRegions([
+    [-1.5, 0, 1.0, 0, 0.3, 0, 0, 0],
+    [-1.0, 0, 1.4, 0, 0, -0.4, 0, 0],
+  ]);
+  assert.deepEqual(names, ['calm · acoustic · wordy', 'acoustic · calm · dark']);
+});
+
 test('two regions with the same two words get a third', () => {
   const names = nameRegions([
     [1.5, 0, 0.3, 0, 0, 0, 0, 0.9],

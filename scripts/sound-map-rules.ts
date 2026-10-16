@@ -108,8 +108,9 @@ function ranked(meanZ: number[]): string[] {
     .map((m) => WORDS[m.measure][m.z > 0 ? 1 : 0]);
 }
 
-/** Two plain words per region ("instrumental · groovy"), three when two regions would share the same two. */
+/** Two plain words per region ("instrumental · groovy"), three when two regions would share the same two, in any order. */
 export function nameRegions(meanZs: number[][]): string[] {
-  const two = meanZs.map((z) => ranked(z).slice(0, 2).join(' · '));
-  return meanZs.map((z, i) => (two.filter((t) => t === two[i]).length > 1 ? ranked(z).slice(0, 3).join(' · ') : two[i]));
+  const words = meanZs.map(ranked);
+  const pair = (w: string[]) => [...w.slice(0, 2)].sort().join(' ');
+  return words.map((w) => (words.filter((other) => pair(other) === pair(w)).length > 1 ? w.slice(0, 3) : w.slice(0, 2)).join(' · '));
 }

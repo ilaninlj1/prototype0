@@ -21,6 +21,7 @@
     "scan-ai-artists": "node --experimental-strip-types --env-file=.env.local scripts/scan-ai-artists.ts",
     "build-sound-index": "node --experimental-strip-types scripts/build-sound-index.ts",
     "add-release-dates": "node --experimental-strip-types scripts/add-release-dates.ts",
+    "build-sound-map": "node --experimental-strip-types scripts/build-sound-map.ts",
     "measure-genre-sound": "node --experimental-strip-types scripts/measure-genre-sound.ts"
   },
   "dependencies": {
@@ -78,7 +79,8 @@
     "eslint-config-expo": "~57.0.2",
     "essentia.js": "^0.1.3",
     "node-web-audio-api": "^2.2.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "umap-js": "1.4.0"
   },
   "private": true
 }
