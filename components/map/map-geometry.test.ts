@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { clampPan, labelLeft, MAP_PAD, onScreen, toCanvas, toMap, toScreen } from './map-geometry.ts';
+import { clampPan, labelCovered, labelLeft, MAP_PAD, onScreen, toCanvas, toMap, toScreen } from './map-geometry.ts';
 
 const W = 360;
 const H = 560;
@@ -32,6 +32,31 @@ test('a label stays on screen near the edges, and hides once its region slides o
   assert.equal(onScreen(-5, 100, W, H), false);
   assert.equal(onScreen(100, H + 1, W, H), false);
   assert.equal(onScreen(100, 100, W, H), true);
+});
+
+test('a label that would overlap a more important one hides until zooming pulls them apart', () => {
+  // In priority order, as screen positions with each label's text width.
+  const labels = [
+    { x: 100, y: 200, w: 120 },
+    { x: 160, y: 205, w: 120 },
+    { x: 100, y: 300, w: 120 },
+  ];
+  assert.deepEqual(
+    labels.map((_, i) => labelCovered(i, labels)),
+    [false, true, false]
+  );
+  assert.equal(labelCovered(1, [labels[0], { x: 260, y: 205, w: 120 }, labels[2]]), false, 'zoomed apart');
+  assert.equal(labelCovered(1, [labels[0], { x: 160, y: 230, w: 120 }]), false, 'on the next line');
+  const chain = [
+    { x: 100, y: 200, w: 120 },
+    { x: 200, y: 200, w: 120 },
+    { x: 300, y: 200, w: 120 },
+  ];
+  assert.deepEqual(
+    chain.map((_, i) => labelCovered(i, chain)),
+    [false, true, false],
+    'a hidden label hides nothing'
+  );
 });
 
 test('panning stops at the edge', () => {

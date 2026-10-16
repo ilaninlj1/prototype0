@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
@@ -10,7 +10,7 @@ import type { Light } from '@/lib/dark-map';
 import type { MapPoint, MapRegion } from '@/lib/sound-map';
 
 import type { DarkMapCanvasProps } from './dark-map-canvas';
-import { clampPan, labelLeft, MAP_GROUND, MAP_PAD, onScreen, toCanvas, toMap, toScreen } from './map-geometry';
+import { clampPan, labelCovered, labelLeft, labelTextWidth, MAP_GROUND, MAP_PAD, onScreen, toCanvas, toMap, toScreen } from './map-geometry';
 
 const Canvas = lazySkia<DarkMapCanvasProps>(() => import('./dark-map-canvas'));
 const MAX_ZOOM = 4;
@@ -124,12 +124,20 @@ export function DarkMap({ width, height, dots, lights, regions, lens, lensRadius
 
   const gesture = Gesture.Simultaneous(pinch, pan, Gesture.Exclusive(doubleTap, tap));
 
+  // Labels, most important first: regions you've heard, then bigger ones. A less important label hides while it
+  // would overlap, and comes back as zooming pulls them apart.
+  const labels = useMemo(() => {
+    const order = regions.map((_, i) => i).sort((a, b) => Number(regions[b].lit) - Number(regions[a].lit) || regions[b].songs - regions[a].songs || a - b);
+    return order.map((i) => ({ words: regions[i].words, lit: regions[i].lit, anchor: { ...toCanvas(regions[i], width, height), w: labelTextWidth(regions[i].words) } }));
+  }, [regions, width, height]);
+  const anchors = labels.map((l) => l.anchor);
+
   return (
     <GestureDetector gesture={gesture}>
       <View style={[styles.map, { width, height }]} accessible accessibilityLabel={label}>
         <Canvas width={width} height={height} dots={dots} lights={lights} zoom={zoom} panX={panX} panY={panY} bloom={bloom} />
-        {regions.map((r, i) => (
-          <MapLabel key={i} region={r} width={width} height={height} zoom={zoom} panX={panX} panY={panY} />
+        {labels.map((l, rank) => (
+          <MapLabel key={l.words} words={l.words} lit={l.lit} rank={rank} anchors={anchors} width={width} height={height} zoom={zoom} panX={panX} panY={panY} />
         ))}
         {lens && <MapLens point={lens} radius={lensRadius} width={width} height={height} zoom={zoom} panX={panX} panY={panY} />}
       </View>
@@ -139,17 +147,25 @@ export function DarkMap({ width, height, dots, lights, regions, lens, lensRadius
 
 type Motion = { width: number; height: number; zoom: SharedValue<number>; panX: SharedValue<number>; panY: SharedValue<number> };
 
-/** A region's words, at its center, the same size at any zoom. Cream where you've heard some of it. */
-function MapLabel({ region, width, height, zoom, panX, panY }: Motion & { region: MapRegion & { lit: boolean } }) {
-  const at = toCanvas(region, width, height);
+/**
+ * A region's words, at its center, the same size at any zoom. Cream where you've heard some of it. Hidden while its
+ * region is off screen or it would overlap a more important label (`anchors` are every label's canvas spot and text
+ * width, most important first; this one is `rank`).
+ */
+function MapLabel({ words, lit, rank, anchors, width, height, zoom, panX, panY }: Motion & { words: string; lit: boolean; rank: number; anchors: { x: number; y: number; w: number }[] }) {
   const style = useAnimatedStyle(() => {
-    const s = toScreen(at, width, height, zoom.get(), panX.get(), panY.get());
-    return { opacity: onScreen(s.x, s.y, width, height) ? 1 : 0, transform: [{ translateX: labelLeft(s.x, LABEL_W, width) }, { translateY: s.y - 7 }] };
+    const z = zoom.get();
+    const px = panX.get();
+    const py = panY.get();
+    const screens = anchors.map((a) => ({ ...toScreen(a, width, height, z, px, py), w: a.w }));
+    const s = screens[rank];
+    const shown = onScreen(s.x, s.y, width, height) && !labelCovered(rank, screens);
+    return { opacity: shown ? 1 : 0, transform: [{ translateX: labelLeft(s.x, LABEL_W, width) }, { translateY: s.y - 7 }] };
   });
   return (
     <Animated.View pointerEvents="none" style={[styles.label, style]}>
-      <ThemedText style={[styles.labelText, { color: region.lit ? Colors.text : Colors.textTertiary }]} numberOfLines={1}>
-        {region.words.toUpperCase()}
+      <ThemedText style={[styles.labelText, { color: lit ? Colors.text : Colors.textTertiary }]} numberOfLines={1}>
+        {words.toUpperCase()}
       </ThemedText>
     </Animated.View>
   );

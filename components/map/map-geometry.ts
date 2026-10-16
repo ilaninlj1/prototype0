@@ -42,6 +42,32 @@ export function onScreen(sx: number, sy: number, width: number, height: number):
   return sx >= 0 && sx <= width && sy >= 0 && sy <= height;
 }
 
+/** px between label lines: labels closer than this vertically share a line. */
+export const LABEL_LINE = 14;
+
+/** A label's text width, roughly: 9pt DM Mono caps with 0.8 letter spacing, plus a little air. */
+export function labelTextWidth(words: string): number {
+  return words.length * 6.2 + 8;
+}
+
+/**
+ * Whether label `i` is hidden by a more important one: `labels` are screen positions with text widths, most
+ * important first. A label that overlaps a shown one hides until zooming pulls them apart; a hidden label hides
+ * nothing.
+ */
+export function labelCovered(i: number, labels: { x: number; y: number; w: number }[]): boolean {
+  'worklet';
+  const shown: boolean[] = [];
+  for (let k = 0; k <= i; k++) {
+    let hit = false;
+    for (let j = 0; j < k && !hit; j++) {
+      hit = shown[j] && Math.abs(labels[k].x - labels[j].x) < (labels[k].w + labels[j].w) / 2 && Math.abs(labels[k].y - labels[j].y) < LABEL_LINE;
+    }
+    shown.push(!hit);
+  }
+  return !shown[i];
+}
+
 /** Pan limits at a zoom, so the map never slides off screen. */
 export function clampPan(v: number, zoom: number, size: number): number {
   'worklet';
