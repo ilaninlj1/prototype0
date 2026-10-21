@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, Platform } from 'react-native';
 
 import { chromeVisible, msUntilHide, pinnedOpen, type ChromeState } from '@/lib/home-chrome';
 
@@ -42,6 +42,8 @@ export function useHomeChrome(inputs: Inputs) {
   const [screenReader, setScreenReader] = useState(false);
 
   useEffect(() => {
+    // react-native-web can't tell and always answers yes, which would pin the buttons for good on web.
+    if (Platform.OS === 'web') return;
     let live = true;
     AccessibilityInfo.isScreenReaderEnabled().then((on) => {
       if (live) setScreenReader(on);

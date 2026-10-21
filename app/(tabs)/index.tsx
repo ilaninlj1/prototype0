@@ -1134,7 +1134,7 @@ export default function HomeScreen() {
               setNetworkTest(mode);
             }}
           />
-          <UndoButton disabled={!undoSnapshot} onPress={() => {
+          <UndoButton variant="icon" disabled={!undoSnapshot} onPress={() => {
               wake();
               handleUndo();
             }} />
