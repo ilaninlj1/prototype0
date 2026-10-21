@@ -20,9 +20,9 @@ const NEAREST = 3;
 export const TIER_CUTS: [number, number] = [0.155, 0.2];
 
 export const TIER_LABEL: Record<Tier, string> = {
-  close: 'CLOSE TO HOME',
-  new: 'NEW GROUND',
-  deep: 'DEEP IN YOUR BLIND SPOT',
+  close: 'Close to home',
+  new: 'New ground',
+  deep: 'Deep in your blind spot',
 };
 
 export function tasteDistance(song: SoundFeatures, saves: SoundFeatures[]): number | null {

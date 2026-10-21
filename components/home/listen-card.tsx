@@ -56,7 +56,7 @@ type Props = {
   slotLabel: string;
   /** How far this song's sound is from your saves, 0 home to 1 deep (lib/taste-distance.ts), or null when unknown. */
   restless: number | null;
-  /** CLOSE TO HOME / NEW GROUND / DEEP IN YOUR BLIND SPOT, or null. */
+  /** Close to home / New ground / Deep in your blind spot, or null. */
   tierLabel: string | null;
   /** How much of the song you'd heard when you revealed it (0–1): the badge's print is as settled as your listen. */
   heard: number;
