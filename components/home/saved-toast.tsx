@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
@@ -11,11 +11,13 @@ type Props = { visible: boolean; onViewLibrary: () => void; onHide: () => void }
 
 /** "Saved to Liked Songs", for a few seconds after a save. It never covers the card or its buttons. */
 export function SavedToast({ visible, onViewLibrary, onHide }: Props) {
+  // Counted from when it appears: Home re-renders often, and that mustn't restart the clock.
+  const hide = useEffectEvent(onHide);
   useEffect(() => {
     if (!visible) return;
-    const t = setTimeout(onHide, TOAST_MS);
+    const t = setTimeout(hide, TOAST_MS);
     return () => clearTimeout(t);
-  }, [visible, onHide]);
+  }, [visible]);
   if (!visible) return null;
   return (
     <Animated.View entering={FadeInDown.duration(220)} exiting={FadeOut.duration(180)} style={styles.toast} accessibilityLiveRegion="polite">

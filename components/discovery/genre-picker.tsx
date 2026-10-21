@@ -11,7 +11,7 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, TapTarget, Ui } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, TapTarget, Ui } from '@/constants/theme';
 import { buildGenreSections, type GenreSection } from './genre-taxonomy';
 
 type GenrePickerProps = {
@@ -23,6 +23,8 @@ type GenrePickerProps = {
   currentLabel: string;
   onSelect: (genre: string) => void;
   onExplore: () => void;
+  /** Told every time the sheet opens or closes (Home keeps its buttons up while a sheet is open). */
+  onOpenChange?: (open: boolean) => void;
 };
 
 type GroupSection = Extract<GenreSection, { type: 'group' }>;
@@ -40,8 +42,13 @@ export function GenrePicker({
   currentLabel,
   onSelect,
   onExplore,
+  onOpenChange,
 }: GenrePickerProps) {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisibleState] = useState(false);
+  const setVisible = (open: boolean) => {
+    setVisibleState(open);
+    onOpenChange?.(open);
+  };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
   const rowOffsets = useRef(new Map<string, number>());
@@ -151,7 +158,7 @@ export function GenrePicker({
         <ThemedText numberOfLines={1} style={styles.triggerText}>
           {currentLabel}
         </ThemedText>
-        <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
+        <Ionicons name="chevron-down" size={16} color={Colors.text} />
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
@@ -174,14 +181,21 @@ export function GenrePicker({
 }
 
 const styles = StyleSheet.create({
+  // A light pill: the genre you're in, at the top left of Home.
   trigger: {
     maxWidth: 220,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingHorizontal: Spacing.md,
+    borderRadius: TapTarget / 2,
+    backgroundColor: Colors.surface,
   },
   triggerText: {
-    ...Ui.label,
+    fontFamily: Fonts.sans,
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
     flexShrink: 1,
   },
   backdrop: {

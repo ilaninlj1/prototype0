@@ -1,12 +1,11 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FindsNewsSheet } from '@/components/finds-news-sheet';
 import { GenrePicker } from '@/components/discovery/genre-picker';
-import { LikedTracksButton } from '@/components/discovery/liked-tracks-button';
-import { DropRing } from '@/components/drop-ring';
 import { onLikeChange, saveLike } from '@/components/like-button';
 import { flySave } from '@/components/save-flight';
 import {
@@ -20,16 +19,23 @@ import { TuneSheet, type NextMode } from '@/components/discovery/tune-sheet';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { CreditLine } from '@/components/credits';
 import { ActionRow } from '@/components/home/action-row';
+import { ChromeFade } from '@/components/home/chrome-fade';
+import { CornerPause } from '@/components/home/corner-pause';
 import { DetailsSheet } from '@/components/home/details-sheet';
 import { FeedStatus } from '@/components/home/feed-status';
 import { FlyingPrint } from '@/components/home/flying-print';
 import { GenreStamp } from '@/components/home/genre-stamp';
 import { ListenCard, StackFace, type ListenCardHandle } from '@/components/home/listen-card';
+import { ListenInfo } from '@/components/home/listen-info';
 import { MapButton } from '@/components/home/map-button';
 import { PieceStrip, slotCenter, type StripRect } from '@/components/home/piece-strip';
+import { SavedToast } from '@/components/home/saved-toast';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Typography } from '@/constants/theme';
+import { useHomeChrome } from '@/hooks/use-home-chrome';
+import { cluesLine } from '@/lib/home-copy';
+import { pickStatus, statusText, type StatusItem } from '@/lib/status-line';
 import { addToPiece, forkPiece, saveOnPiece, undoOnPiece, useArt } from '@/hooks/use-art';
 import { useCoverColors } from '@/hooks/use-cover-colors';
 import { addRevealToEditions, undoRevealInEditions, useEditions } from '@/hooks/use-editions';
@@ -86,7 +92,7 @@ import {
   type FeedLoad,
   type NetworkTest,
 } from '@/lib/feed-load';
-import { PIECE, type PieceMark } from '@/lib/piece';
+import { type PieceMark } from '@/lib/piece';
 import { recipeFor, type PrintRecipe } from '@/lib/print-recipe';
 import { moreLikeLabel } from '@/lib/sound';
 import { soundFor } from '@/lib/sound-index';
@@ -1019,6 +1025,20 @@ export default function HomeScreen() {
     await runRefill(preserved, strategy, swipeHistory, discoveredGenres, nextRegion, preset, seenArtists);
   }
 
+  // Home's buttons come and go (lib/home-chrome.ts): only the card and its clues stay while you listen.
+  const [tuneOpen, setTuneOpen] = useState(false);
+  const [genreOpen, setGenreOpen] = useState(false);
+  const [toast, setToast] = useState(false);
+  const chrome = useHomeChrome({
+    songsDecided: swipeHistory.length,
+    clipEnded: hasEnded,
+    feedStatusUp: !currentTrack,
+    sheetOpen: detailsOpen || newsSheetVisible || tuneOpen || genreOpen,
+  });
+  const { wake } = chrome;
+  // Coming back to Home brings them back for a moment.
+  useFocusEffect(wake);
+
   if (!hydrated) {
     return (
       <ThemedView style={styles.centered}>
@@ -1027,12 +1047,78 @@ export default function HomeScreen() {
     );
   }
 
-  // Tune and Liked, under the card or under the loading panel: you can always change course.
-  const controls = (
-    <>
-        <View style={styles.bottomRow}>
-          <View style={styles.half}>
-            <TuneSheet
+  // Every button also keeps the buttons up (wake), so a tap never makes them vanish mid-use.
+
+  // A save shows the toast once, the first time a song is kept.
+  async function saveFromHome(track: DiscoveryTrack) {
+    const fresh = !savedIds.has(track.id);
+    await handleSave(track);
+    if (fresh) setToast(true);
+  }
+
+  // One line at the top, the most important thing first (lib/status-line.ts).
+  const statusItem = pickStatus({
+    failedOffline: !!currentTrack && load.phase === 'failed' && load.reason === 'offline',
+    editionReady: editionReady ?? null,
+    newsCount: news.length,
+    mapWords: mapFocus ? mapFocus.words : null,
+    moreLabel: !!moreLike && !!currentTrack && moreLike.ids.has(currentTrack.id) ? moreLike.label : null,
+    sortedText:
+      isActive(soundFilter) && strategy.type === 'genre'
+        ? `${describeFilter(soundFilter)}${loosened.length > 0 ? ` · loosened ${loosened.join(', ')}` : ''}`
+        : null,
+  });
+  const statusTappable = !!statusItem && statusItem.kind !== 'more' && statusItem.kind !== 'sorted';
+  function openStatus(item: StatusItem) {
+    wake();
+    if (item.kind === 'failed') handleFeedAction('retry');
+    else if (item.kind === 'edition') router.push({ pathname: '/edition', params: { n: String(item.n) } });
+    else if (item.kind === 'news') setNewsSheetVisible(true);
+    else if (item.kind === 'map') leaveMap();
+  }
+
+  const revealedNow = !!currentTrack && revealTrack?.id === currentTrack.id;
+
+  return (
+    <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.sm }]}>
+      {/* Behind everything: a tap on empty space brings the buttons back. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={wake} accessible={false} />
+
+      <ChromeFade visible={chrome.visible} alwaysShow={statusItem?.kind === 'failed'} style={styles.statusLine}>
+        {statusItem && (
+          <Pressable
+            onPress={() => openStatus(statusItem)}
+            disabled={!statusTappable}
+            hitSlop={{ top: 12, bottom: 12 }}
+            accessibilityRole={statusTappable ? 'button' : 'text'}
+            style={styles.statusRow}>
+            {(statusItem.kind === 'failed' || statusItem.kind === 'edition' || statusItem.kind === 'news') && <View style={styles.dot} />}
+            <ThemedText style={styles.statusText} numberOfLines={1}>
+              {statusText(statusItem)}
+            </ThemedText>
+            {statusTappable && statusItem.kind !== 'map' && <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />}
+          </Pressable>
+        )}
+      </ChromeFade>
+
+      <ChromeFade visible={chrome.visible} style={styles.headerRow}>
+        <GenrePicker
+          curatedGenres={GENRES}
+          discoveredGenres={discoveredGenres}
+          currentGenre={currentGenre}
+          currentLabel={currentLabel}
+          onSelect={handlePickGenre}
+          onExplore={handleExplore}
+          onOpenChange={setGenreOpen}
+        />
+        <View style={styles.headerRight}>
+          <MapButton variant="icon" share={litShare} onPress={() => {
+              wake();
+              router.push('/map');
+            }} />
+          <TuneSheet
+            trigger="icon"
+            onOpenChange={setTuneOpen}
             preset={preset}
             presetLoading={presetLoading}
             region={region}
@@ -1047,90 +1133,17 @@ export default function HomeScreen() {
               networkTestRef.current = mode;
               setNetworkTest(mode);
             }}
-            />
-          </View>
-          <View style={[styles.half, styles.pair]}>
-            <View style={styles.half}>
-              <MapButton share={litShare} onPress={() => router.push('/map')} />
-            </View>
-            <View style={styles.half}>
-              <LikedTracksButton onPress={() => router.push('/modal')} />
-            </View>
-          </View>
+          />
+          <UndoButton disabled={!undoSnapshot} onPress={() => {
+              wake();
+              handleUndo();
+            }} />
         </View>
-        <CreditLine />
-    </>
-  );
-
-  return (
-    <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
-      {news.length > 0 && (
-        <TouchableOpacity
-          onPress={() => setNewsSheetVisible(true)}
-          activeOpacity={0.8}
-          style={styles.newsStrip}
-          accessibilityRole="button"
-          accessibilityLabel={`While you were gone, ${news.length} updates`}>
-          <ThemedText style={styles.newsStripText}>
-            While you were gone · {news.length}
-          </ThemedText>
-        </TouchableOpacity>
-      )}
-
-      <View style={styles.headerRow}>
-        <View style={styles.headerLeft}>
-          <DropRing />
-          <UndoButton disabled={!undoSnapshot} onPress={handleUndo} />
-        </View>
-        <GenrePicker
-          curatedGenres={GENRES}
-          discoveredGenres={discoveredGenres}
-          currentGenre={currentGenre}
-          currentLabel={currentLabel}
-          onSelect={handlePickGenre}
-          onExplore={handleExplore}
-        />
-      </View>
-
+      </ChromeFade>
 
       {currentTrack && topRecipe ? (
         <>
-          <View style={styles.noteLine}>
-            {load.phase === 'failed' && load.reason === 'offline' ? (
-              <Pressable onPress={() => handleFeedAction('retry')} hitSlop={{ top: 14, bottom: 14 }} accessibilityRole="button" accessibilityLabel="Couldn't load more songs. Try again">
-                <ThemedText style={[styles.note, styles.editionNote]} numberOfLines={1}>
-                  COULDN’T LOAD MORE SONGS · TAP TO TRY AGAIN
-                </ThemedText>
-              </Pressable>
-            ) : editionReady != null ? (
-              <Pressable
-                onPress={() => router.push({ pathname: '/edition', params: { n: String(editionReady) } })}
-                hitSlop={{ top: 14, bottom: 14 }}
-                accessibilityRole="button"
-                accessibilityLabel={`Edition number ${editionReady} is ready. Play it`}>
-                <ThemedText style={[styles.note, styles.editionNote]} numberOfLines={1}>
-                  EDITION No. {editionReady} IS READY · TAP TO PLAY ▸
-                </ThemedText>
-              </Pressable>
-            ) : !!moreLike && moreLike.ids.has(currentTrack.id) ? (
-              <ThemedText style={styles.note} numberOfLines={1}>
-                More like this: {moreLike.label}
-              </ThemedText>
-            ) : mapFocus ? (
-              <Pressable onPress={leaveMap} hitSlop={{ top: 14, bottom: 14 }} accessibilityRole="button" accessibilityLabel={`In the dark: ${mapFocus.words.replace(/ · /g, ', ')}. Leave`}>
-                <ThemedText style={[styles.note, styles.editionNote]} numberOfLines={1}>
-                  IN THE DARK · {mapFocus.words.toUpperCase()} ✕
-                </ThemedText>
-              </Pressable>
-            ) : isActive(soundFilter) && strategy.type === 'genre' ? (
-              <ThemedText style={styles.note} numberOfLines={1}>
-                Sorted: {describeFilter(soundFilter)}
-                {loosened.length > 0 ? ` · loosened ${loosened.join(', ')}` : ''}
-              </ThemedText>
-            ) : null}
-          </View>
-
-          <View ref={cardAreaViewRef} style={styles.cardArea} onLayout={handleCardAreaLayout}>
+          <View ref={cardAreaViewRef} style={styles.cardArea} onLayout={handleCardAreaLayout} pointerEvents="box-none">
             <View style={cardSize}>
               {queue
                 .slice(1, 3)
@@ -1149,47 +1162,96 @@ export default function HomeScreen() {
                 track={currentTrack}
                 size={cardSize}
                 recipe={topRecipe}
-                revealed={revealTrack?.id === currentTrack.id}
-                slotLabel={`PRINT ${Math.min(piece.marks.length + 1, PIECE.slots)}/${PIECE.slots}`}
+                revealed={revealedNow}
                 restless={depth == null ? null : restlessness(depth)}
-                tierLabel={depth == null ? null : TIER_LABEL[tierFor(depth)]}
-                heard={revealTrack?.id === currentTrack.id ? revealHeard : 1}
-                listeners={revealTrack?.id === currentTrack.id ? revealListeners : undefined}
+                heard={revealedNow ? revealHeard : 1}
                 takeLock={lock.take}
                 onSwipe={(d) => handleCardSwipe(d, currentTrack)}
-                onSave={() => handleSave(currentTrack)}
-                onTogglePlay={handleTogglePlay}
+                onSave={() => saveFromHome(currentTrack)}
+                onTap={chrome.toggleFromCard}
                 onRevealSettled={lock.release}
-                onCallSave={handleSave}
                 onMix={setMix}
                 onCancelPeek={cancelPeek}
               />
+              <ChromeFade visible={chrome.visible} style={styles.cornerPause}>
+                <CornerPause paused={!status.playing} onPress={() => {
+                    wake();
+                    handleTogglePlay();
+                  }} />
+              </ChromeFade>
             </View>
           </View>
 
-          <ActionRow
-            mode={revealTrack ? 'revealed' : 'blind'}
-            saved={savedIds.has(currentTrack.id)}
-            onSkip={() => press('left')}
-            onJump={() => press('down')}
-            onMore={() => press('right')}
-            onSave={() => handleSave(currentTrack)}
-            onDetails={() => setDetailsOpen(true)}
-            onNext={() => press('right')}
+          <ListenInfo
+            track={currentTrack}
+            revealed={revealedNow}
+            clues={cluesLine(topRecipe.label, depth == null ? null : TIER_LABEL[tierFor(depth)])}
+            listeners={revealedNow ? revealListeners : undefined}
+            onCallSave={handleSave}
           />
 
-          <PieceStrip piece={piece} onPress={() => router.push('/art')} onLayoutStrip={(rect) => (stripRef.current = rect)} />
+          <ChromeFade visible={chrome.visible} style={styles.bottom}>
+            <ActionRow
+              mode={revealTrack ? 'revealed' : 'blind'}
+              saved={savedIds.has(currentTrack.id)}
+              onSkip={() => {
+                wake();
+                press('left');
+              }}
+              onJump={() => {
+                wake();
+                press('down');
+              }}
+              onMore={() => {
+                wake();
+                press('right');
+              }}
+              onSave={() => {
+                wake();
+                saveFromHome(currentTrack);
+              }}
+              onDetails={() => {
+                wake();
+                setDetailsOpen(true);
+              }}
+              onNext={() => {
+                wake();
+                press('right');
+              }}
+            />
+            <PieceStrip piece={piece} onPress={() => {
+                wake();
+                router.push('/art');
+              }} onLayoutStrip={(rect) => (stripRef.current = rect)} />
+            <CreditLine />
+          </ChromeFade>
 
-          {controls}
+          {!chrome.visible && (
+            <ThemedText style={styles.hint} pointerEvents="none">
+              {revealedNow ? 'Double-tap to save · swipe for the next song' : 'Tap anywhere for buttons · swipe the card to choose'}
+            </ThemedText>
+          )}
         </>
       ) : (
         <>
           <View style={styles.statusArea}>
             <FeedStatus load={load} onAction={handleFeedAction} />
           </View>
-          {controls}
+          <CreditLine />
         </>
       )}
+
+      <View style={styles.toast} pointerEvents="box-none">
+        <SavedToast
+          visible={toast}
+          onHide={() => setToast(false)}
+          onViewLibrary={() => {
+            setToast(false);
+            router.navigate('/library');
+          }}
+        />
+      </View>
+
       {/* Outside the card branch: the queue empties for a moment during a jump, and the stamp must not remount. */}
       {stamp && (
         <GenreStamp
@@ -1216,7 +1278,7 @@ export default function HomeScreen() {
         visible={detailsOpen}
         track={revealTrack}
         listeners={revealListeners}
-        onSave={handleSave}
+        onSave={saveFromHome}
         onClose={() => setDetailsOpen(false)}
       />
       <FindsNewsSheet
@@ -1237,72 +1299,38 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  newsStrip: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.sm,
-    paddingVertical: Spacing.xs + 2,
-    paddingHorizontal: Spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  newsStripText: {
-    fontFamily: Fonts.monoMedium,
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: Colors.accentText,
-  },
   container: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
+    paddingBottom: Spacing.md,
     gap: Spacing.md,
     alignItems: 'stretch',
   },
-  cardArea: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
+  // Reserved height, so the card never jumps when the line comes and goes.
+  statusLine: { height: 20, justifyContent: 'center' },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.signal },
+  statusText: { ...Typography.caption, fontSize: 14, lineHeight: 18, flexShrink: 1 },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  // Reserved height, so the card never jumps when the More like this note comes and goes.
-  noteLine: { height: 16, justifyContent: 'center' },
-  statusArea: { flex: 1, marginBottom: Spacing.lg },
-  note: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1, color: Colors.textSecondary },
-  editionNote: { color: Colors.text },
-  under: { position: 'absolute', top: 0, left: 0, opacity: 0.55 },
-  // Tune and Liked: equal halves of one row.
-  bottomRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  half: {
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  cardArea: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
   },
-  // Map and Liked share the right half, so Tune keeps room for its preset's name.
-  pair: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
+  cornerPause: { position: 'absolute', top: Spacing.md, left: Spacing.md },
+  bottom: { gap: Spacing.md },
+  hint: { ...Typography.caption, position: 'absolute', left: 0, right: 0, bottom: 120, textAlign: 'center' },
+  toast: { position: 'absolute', left: Spacing.lg, right: Spacing.lg, bottom: Spacing.md },
+  statusArea: { flex: 1, marginBottom: Spacing.lg },
+  under: { position: 'absolute', top: 0, left: 0, opacity: 0.55 },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: Colors.textSecondary,
-  },
-  errorText: {
-    color: Colors.destructive,
   },
 });

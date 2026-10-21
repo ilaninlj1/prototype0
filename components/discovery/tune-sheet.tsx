@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
@@ -36,6 +37,10 @@ type TuneSheetProps = {
   /** Make the feed's loading slow or fail on purpose, to see the loading screens. Not saved. */
   networkTest: NetworkTest;
   onChangeNetworkTest: (mode: NetworkTest) => void;
+  /** 'icon': a round icon button for Home's top bar instead of the labeled one. */
+  trigger?: 'button' | 'icon';
+  /** Told every time the sheet opens or closes (Home keeps its buttons up while a sheet is open). */
+  onOpenChange?: (open: boolean) => void;
 };
 
 /** One "Tune" button holding every feed control, so the main screen is just the card. */
@@ -51,8 +56,14 @@ export function TuneSheet({
   onChangeSoundFilter,
   networkTest,
   onChangeNetworkTest,
+  trigger = 'button',
+  onOpenChange,
 }: TuneSheetProps) {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisibleState] = useState(false);
+  const setVisible = (open: boolean) => {
+    setVisibleState(open);
+    onOpenChange?.(open);
+  };
   const allowAi = useAllowAi();
 
   function close() {
@@ -62,11 +73,22 @@ export function TuneSheet({
 
   return (
     <>
-      <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.6} style={Ui.outlineButton}>
-        <ThemedText style={Ui.label} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-          Tune · {PRESET_LABELS[preset]}
-        </ThemedText>
-      </TouchableOpacity>
+      {trigger === 'icon' ? (
+        <TouchableOpacity
+          onPress={() => setVisible(true)}
+          activeOpacity={0.6}
+          style={styles.iconTrigger}
+          accessibilityRole="button"
+          accessibilityLabel={`Tune: ${PRESET_LABELS[preset]}`}>
+          <Ionicons name="options-outline" size={22} color={Colors.text} />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.6} style={Ui.outlineButton}>
+          <ThemedText style={Ui.label} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            Tune · {PRESET_LABELS[preset]}
+          </ThemedText>
+        </TouchableOpacity>
+      )}
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
         <Pressable style={styles.backdrop} onPress={close}>
@@ -185,6 +207,7 @@ export function TuneSheet({
 }
 
 const styles = StyleSheet.create({
+  iconTrigger: { width: TapTarget, height: TapTarget, borderRadius: TapTarget / 2, alignItems: 'center', justifyContent: 'center' },
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
