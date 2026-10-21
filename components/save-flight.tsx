@@ -16,9 +16,9 @@ import { COVER_BLUR } from '@/components/discovery/swipe-card';
 import { Colors } from '@/constants/theme';
 import { artworkUrl } from '@/lib/discovery';
 
-// A save on Home drops into the You tab, where the Tasteform lives: the heart
+// A save on Home drops into the Library tab, where your saves live: the heart
 // pops on the card, then the song detaches as a glowing cell and falls into
-// the YOU icon. Saved blind, it's the blurred cover (colors only, nothing
+// the Library tab's icon. Saved blind, it's the blurred cover (colors only, nothing
 // given away); saved from the reveal, it's the real cover. The layer sits at
 // the app's root so the flight can cross over the tab bar.
 
@@ -29,12 +29,12 @@ let measureTarget: ((done: (p: Point) => void) => void) | null = null;
 let launch: ((f: Omit<Flight, 'id' | 'to'>) => void) | null = null;
 const landings = new Set<() => void>();
 
-/** The tab bar lends a way to find the YOU icon on screen, measured fresh for every flight. */
-export function setYouTabTarget(measure: ((done: (p: Point) => void) => void) | null) {
+/** The tab bar lends a way to find the Library icon on screen, measured fresh for every flight. */
+export function setSaveTabTarget(measure: ((done: (p: Point) => void) => void) | null) {
   measureTarget = measure;
 }
 
-/** Hear about each save landing on the YOU icon. Returns an unsubscribe. */
+/** Hear about each save landing on the Library icon. Returns an unsubscribe. */
 export function onSaveLanded(fn: () => void): () => void {
   landings.add(fn);
   return () => {
@@ -42,7 +42,7 @@ export function onSaveLanded(fn: () => void): () => void {
   };
 }
 
-/** Send a just-saved song from `from` (screen coordinates) into the You tab. */
+/** Send a just-saved song from `from` (screen coordinates) into the Library tab. */
 export function flySave(f: { artwork: string; blind: boolean; from: Point }) {
   launch?.(f);
 }

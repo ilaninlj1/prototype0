@@ -113,7 +113,8 @@ export default function RootLayout() {
               headerTintColor: Colors.text,
             }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Liked Tracks' }} />
+            {/* The Liked list is the Library tab now; this route only redirects there. */}
+            <Stack.Screen name="modal" options={{ headerShown: false, animation: 'none' }} />
             <Stack.Screen name="export-history" options={{ presentation: 'modal', title: 'Export History' }} />
             <Stack.Screen name="recently-deleted" options={{ presentation: 'modal', title: 'Recently deleted' }} />
             <Stack.Screen name="drop-play" options={{ presentation: 'fullScreenModal', headerShown: false }} />
