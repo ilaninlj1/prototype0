@@ -1,6 +1,7 @@
 import { View, type ViewProps } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { useDarkRoom } from '@/components/dark-room';
+import { Colors, toDark } from '@/constants/theme';
 
 export type ThemedViewProps = ViewProps & {
   /** Defaults to the app background; pass `'transparent'` or a surface token explicitly when needed. */
@@ -8,5 +9,6 @@ export type ThemedViewProps = ViewProps & {
 };
 
 export function ThemedView({ style, backgroundColor = Colors.background, ...otherProps }: ThemedViewProps) {
-  return <View style={[{ backgroundColor }, style]} {...otherProps} />;
+  const dark = useDarkRoom();
+  return <View style={[{ backgroundColor: dark ? toDark(backgroundColor) : backgroundColor }, style]} {...otherProps} />;
 }

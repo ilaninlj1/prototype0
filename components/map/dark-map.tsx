@@ -5,7 +5,7 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTi
 
 import { lazySkia } from '@/components/print/lazy-skia';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts } from '@/constants/theme';
+import { DarkColors, Fonts } from '@/constants/theme';
 import type { Light } from '@/lib/dark-map';
 import type { MapPoint, MapRegion } from '@/lib/sound-map';
 
@@ -168,7 +168,7 @@ function MapLabel({ words, lit, rank, anchors, width, height, zoom, panX, panY }
   });
   return (
     <Animated.View pointerEvents="none" style={[styles.label, style]}>
-      <ThemedText style={[styles.labelText, { color: lit ? Colors.text : Colors.textTertiary }]} numberOfLines={1}>
+      <ThemedText style={[styles.labelText, { color: lit ? DarkColors.text : DarkColors.textTertiary }]} numberOfLines={1}>
         {words.toUpperCase()}
       </ThemedText>
     </Animated.View>
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     top: 0,
     borderWidth: 1.2,
     borderStyle: 'dashed',
-    borderColor: Colors.text,
+    borderColor: DarkColors.text,
     backgroundColor: 'rgba(243, 234, 216, 0.06)',
   },
 });

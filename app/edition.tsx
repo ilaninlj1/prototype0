@@ -11,11 +11,13 @@ import { ReelCard } from '@/components/edition/reel-card';
 import { EditionView } from '@/components/edition/edition-view';
 import { loadSkia } from '@/components/print/load-skia';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Spacing, Ui } from '@/constants/theme';
+import { DarkColors, Fonts, Spacing, DarkUi } from '@/constants/theme';
 import { markEditionSeen, useEditions } from '@/hooks/use-editions';
 import { usePlayback } from '@/hooks/use-playback';
 import { beatIndex, frameLabel, timecode, timeline, TOTAL, type SceneKind } from '@/lib/edition';
 import { expoOut, prog } from '@/lib/reel-ease';
+import { DarkRoom } from '@/components/dark-room';
+import { useLightStatusBar } from '@/hooks/use-light-status-bar';
 
 const KIND: Record<SceneKind, string> = {
   intro: 'INTRO',
@@ -36,7 +38,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
  * timecode, and beat squares that tick at the song's measured tempo (never a
  * made-up bar count). Tap to pause, swipe down or ✕ to leave.
  */
-export default function EditionScreen() {
+function EditionScreenBody() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -167,8 +169,8 @@ export default function EditionScreen() {
     return (
       <View style={[styles.screen, styles.center]}>
         <ThemedText style={styles.dim}>This edition isn’t on this phone.</ThemedText>
-        <Pressable onPress={close} style={[Ui.outlineButton, styles.closeWide]}>
-          <ThemedText style={Ui.label}>Back</ThemedText>
+        <Pressable onPress={close} style={[DarkUi.outlineButton, styles.closeWide]}>
+          <ThemedText style={DarkUi.label}>Back</ThemedText>
         </Pressable>
       </View>
     );
@@ -227,16 +229,16 @@ export default function EditionScreen() {
 
         {done && (
           <Animated.View entering={FadeIn.duration(400)} style={[styles.endRow, { bottom: insets.bottom + 48 }]}>
-            <Pressable onPress={replay} style={[Ui.outlineButton, styles.endButton]} accessibilityRole="button">
-              <Ionicons name="refresh" size={16} color={Colors.text} />
-              <ThemedText style={Ui.label}>Replay</ThemedText>
+            <Pressable onPress={replay} style={[DarkUi.outlineButton, styles.endButton]} accessibilityRole="button">
+              <Ionicons name="refresh" size={16} color={DarkColors.text} />
+              <ThemedText style={DarkUi.label}>Replay</ThemedText>
             </Pressable>
-            <Pressable onPress={share} style={[Ui.outlineButton, styles.endButton, styles.primary]} accessibilityRole="button">
+            <Pressable onPress={share} style={[DarkUi.outlineButton, styles.endButton, styles.primary]} accessibilityRole="button">
               <Ionicons name="share-outline" size={16} color="#0A0A0A" />
-              <ThemedText style={[Ui.label, { color: '#0A0A0A' }]}>Share</ThemedText>
+              <ThemedText style={[DarkUi.label, { color: '#0A0A0A' }]}>Share</ThemedText>
             </Pressable>
-            <Pressable onPress={close} style={[Ui.outlineButton, styles.endButton]} accessibilityRole="button">
-              <ThemedText style={Ui.label}>Done</ThemedText>
+            <Pressable onPress={close} style={[DarkUi.outlineButton, styles.endButton]} accessibilityRole="button">
+              <ThemedText style={DarkUi.label}>Done</ThemedText>
             </Pressable>
           </Animated.View>
         )}
@@ -283,7 +285,7 @@ const styles = StyleSheet.create({
   mask: { overflow: 'hidden' },
   capBig: { fontFamily: Fonts.reelBold, letterSpacing: -1.5, color: '#F4F1EC' },
   capMono: { marginTop: 14, color: 'rgba(244,241,236,0.9)' },
-  dim: { color: Colors.textSecondary },
+  dim: { color: DarkColors.textSecondary },
   pausedBadge: { position: 'absolute', alignSelf: 'center', top: '50%' },
   endRow: { position: 'absolute', left: Spacing.lg, right: Spacing.lg, flexDirection: 'row', gap: Spacing.sm },
   endButton: { flex: 1, flexDirection: 'row', gap: 6, height: 48, backgroundColor: 'rgba(10,10,10,0.6)' },
@@ -291,3 +293,13 @@ const styles = StyleSheet.create({
   closeWide: { paddingHorizontal: Spacing.xl },
   note: { position: 'absolute', alignSelf: 'center', bottom: 24 },
 });
+
+/** A dark room in the light app: navy defaults for everything inside, and a light status bar. */
+export default function EditionScreen() {
+  useLightStatusBar();
+  return (
+    <DarkRoom>
+      <EditionScreenBody />
+    </DarkRoom>
+  );
+}

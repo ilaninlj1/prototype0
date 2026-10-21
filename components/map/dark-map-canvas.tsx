@@ -2,7 +2,7 @@ import { BlurMask, Canvas, Group, Path, Skia } from '@shopify/react-native-skia'
 import { useMemo } from 'react';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 
-import { Colors } from '@/constants/theme';
+import { DarkColors } from '@/constants/theme';
 import { glowRadius, type Light } from '@/lib/dark-map';
 import type { MapPoint } from '@/lib/sound-map';
 
@@ -67,20 +67,20 @@ export default function DarkMapCanvas({ width, height, dots, lights, zoom, panX,
   return (
     <Canvas style={{ width, height }} pointerEvents="none">
       <Group transform={transform}>
-        <Path path={layers.glowOld} color={Colors.text} opacity={0.16}>
+        <Path path={layers.glowOld} color={DarkColors.text} opacity={0.16}>
           <BlurMask blur={6} style="normal" />
         </Path>
-        <Path path={layers.glowNew} color={Colors.text} opacity={newGlowOpacity}>
+        <Path path={layers.glowNew} color={DarkColors.text} opacity={newGlowOpacity}>
           <BlurMask blur={6} style="normal" />
         </Path>
         <Path path={layers.dim} color={MAP_DIM} opacity={0.6} />
-        <Path path={layers.litOld} color={Colors.text} />
-        <Path path={layers.savedOld} color={Colors.signal} />
+        <Path path={layers.litOld} color={DarkColors.text} />
+        <Path path={layers.savedOld} color={DarkColors.signal} />
         <Group opacity={newOpacity}>
-          <Path path={layers.litNew} color={Colors.text} />
-          <Path path={layers.savedNew} color={Colors.signal} />
+          <Path path={layers.litNew} color={DarkColors.text} />
+          <Path path={layers.savedNew} color={DarkColors.signal} />
         </Group>
-        <Path path={rings} color={Colors.text} style="stroke" strokeWidth={1} opacity={ringOpacity} />
+        <Path path={rings} color={DarkColors.text} style="stroke" strokeWidth={1} opacity={ringOpacity} />
       </Group>
     </Canvas>
   );

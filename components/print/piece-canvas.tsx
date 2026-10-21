@@ -1,7 +1,7 @@
 import { Canvas, Circle, DashPathEffect, Group, Path, Skia } from '@shopify/react-native-skia';
 import { useMemo } from 'react';
 
-import { Colors } from '@/constants/theme';
+import { DarkColors } from '@/constants/theme';
 import { PIECE, piecePositions, type Piece } from '@/lib/piece';
 import { stillPaths, strokeFor } from './print-still-canvas';
 
@@ -35,10 +35,10 @@ export function PieceDrawing({ piece, width }: PieceCanvasProps) {
 
   return (
     <Group>
-      <Path path={line} color={Colors.text} opacity={0.25} style="stroke" strokeWidth={1} />
+      <Path path={line} color={DarkColors.text} opacity={0.25} style="stroke" strokeWidth={1} />
       {placed.length === 0 && (
         // The first slot, waiting.
-        <Circle cx={143 * scale} cy={120 * scale} r={42 * scale} color={Colors.textTertiary} style="stroke" strokeWidth={1}>
+        <Circle cx={143 * scale} cy={120 * scale} r={42 * scale} color={DarkColors.textTertiary} style="stroke" strokeWidth={1}>
           <DashPathEffect intervals={[3, 4]} />
         </Circle>
       )}
@@ -58,9 +58,9 @@ export function PieceDrawing({ piece, width }: PieceCanvasProps) {
               </Group>
             ) : (
               // A quick skip is a dot; a long listen before skipping is a wider ring.
-              <Circle cx={x} cy={y} r={Math.max(2, s * (0.06 + 0.16 * (m.heard ?? 1)))} color={Colors.textTertiary} style="stroke" strokeWidth={1} />
+              <Circle cx={x} cy={y} r={Math.max(2, s * (0.06 + 0.16 * (m.heard ?? 1)))} color={DarkColors.textTertiary} style="stroke" strokeWidth={1} />
             )}
-            {m.saved && <Circle cx={x} cy={y} r={s * 0.55} color={Colors.signal} style="stroke" strokeWidth={1.5} />}
+            {m.saved && <Circle cx={x} cy={y} r={s * 0.55} color={DarkColors.signal} style="stroke" strokeWidth={1.5} />}
           </Group>
         );
       })}

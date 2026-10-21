@@ -2,7 +2,7 @@ import { drawAsImage, Group, matchFont, Path, Rect, Text } from '@shopify/react-
 import { Platform } from 'react-native';
 
 import { stillPaths, strokeFor } from '@/components/print/print-still-canvas';
-import { Colors } from '@/constants/theme';
+import { DarkColors } from '@/constants/theme';
 import type { Edition } from '@/lib/edition';
 
 const W = 1080;
@@ -25,8 +25,8 @@ export async function renderEditionPoster(edition: Edition): Promise<string | nu
   const image = await drawAsImage(
     <Group>
       <Rect x={0} y={0} width={W} height={H} color="#0d1426" />
-      <Text x={M} y={200} text="BLINDSPOT" font={big} color={Colors.text} />
-      <Text x={M} y={250} text={`EDITION No. ${edition.number} · ${date}`} font={small} color={Colors.textSecondary} />
+      <Text x={M} y={200} text="BLINDSPOT" font={big} color={DarkColors.text} />
+      <Text x={M} y={250} text={`EDITION No. ${edition.number} · ${date}`} font={small} color={DarkColors.textSecondary} />
       {edition.songs.map((s, i) => {
         const { rings } = stillPaths(s.recipe, size, 'mini', s.heard);
         return (
@@ -38,9 +38,9 @@ export async function renderEditionPoster(edition: Edition): Promise<string | nu
         );
       })}
       {edition.songs.map((s, i) => (
-        <Text key={s.trackId} x={M} y={top + size + 110 + i * 44} text={`${i + 1}  ${s.title} — ${s.artist}`.slice(0, 60)} font={small} color={Colors.text} />
+        <Text key={s.trackId} x={M} y={top + size + 110 + i * 44} text={`${i + 1}  ${s.title} — ${s.artist}`.slice(0, 60)} font={small} color={DarkColors.text} />
       ))}
-      <Text x={M} y={H - 90} text={`${n} FOUND BLIND`} font={small} color={Colors.textTertiary} />
+      <Text x={M} y={H - 90} text={`${n} FOUND BLIND`} font={small} color={DarkColors.textTertiary} />
     </Group>,
     { width: W, height: H }
   );

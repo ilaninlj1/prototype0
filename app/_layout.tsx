@@ -16,7 +16,7 @@ import * as Notifications from 'expo-notifications';
 import { router, Stack, usePathname } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { DarkTheme, ThemeProvider } from 'expo-router/react-navigation';
+import { DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -34,9 +34,9 @@ export const unstable_settings = {
 };
 
 const customTheme = {
-  ...DarkTheme,
+  ...DefaultTheme,
   colors: {
-    ...DarkTheme.colors,
+    ...DefaultTheme.colors,
     primary: Colors.accent,
     background: Colors.background,
     card: Colors.surface,
@@ -141,7 +141,7 @@ export default function RootLayout() {
             <Stack.Screen name="drop-results" options={{ presentation: 'fullScreenModal', headerShown: false }} />
           </Stack>
           <SaveFlightLayer />
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
         </PlaybackProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

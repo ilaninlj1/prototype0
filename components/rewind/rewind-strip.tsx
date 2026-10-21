@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
+import { DarkColors, Radius, Spacing, DarkUi } from '@/constants/theme';
 import { BAND_STARTS, UNITS, zoneLabel, type Unit } from '@/lib/rewind';
 
 const HEIGHT = 82;
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   track: {
     height: HEIGHT,
     borderWidth: 1,
-    borderColor: Colors.hairline,
+    borderColor: DarkColors.hairline,
     borderRadius: Radius.lg,
     overflow: 'hidden',
   },
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: RAIL - 0.5,
     height: 1,
-    backgroundColor: Colors.rule,
+    backgroundColor: DarkColors.rule,
   },
   zone: {
     position: 'absolute',
@@ -120,35 +120,35 @@ const styles = StyleSheet.create({
     paddingTop: 7,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: Colors.border,
+    borderColor: DarkColors.border,
   },
   zoneOn: {
-    backgroundColor: Colors.accent,
+    backgroundColor: DarkColors.accent,
   },
   // Dragged into a step that has nowhere to go: lit, but not cream.
   zoneDead: {
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: DarkColors.surfaceElevated,
   },
   zoneName: {
-    ...Ui.label,
+    ...DarkUi.label,
     fontSize: 10,
     lineHeight: 13,
     letterSpacing: 0.5,
-    color: Colors.textSecondary,
+    color: DarkColors.textSecondary,
     paddingHorizontal: 2,
   },
   zoneDate: {
-    ...Ui.label,
+    ...DarkUi.label,
     fontSize: 11,
     lineHeight: 15,
     letterSpacing: 0.3,
     paddingHorizontal: 2,
   },
   zoneTextOn: {
-    color: Colors.accentText,
+    color: DarkColors.accentText,
   },
   zoneOff: {
-    color: Colors.textTertiary,
+    color: DarkColors.textTertiary,
   },
   thumb: {
     position: 'absolute',
@@ -156,10 +156,10 @@ const styles = StyleSheet.create({
     width: THUMB,
     height: THUMB,
     borderRadius: Radius.round,
-    backgroundColor: Colors.accent,
+    backgroundColor: DarkColors.accent,
     // Navy edge so it still shows on a lit (cream) zone.
     borderWidth: 2,
-    borderColor: Colors.accentText,
+    borderColor: DarkColors.accentText,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: Radius.round,
-    backgroundColor: Colors.signal,
+    backgroundColor: DarkColors.signal,
   },
   ends: {
     flexDirection: 'row',
@@ -175,8 +175,8 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   end: {
-    ...Ui.label,
+    ...DarkUi.label,
     fontSize: 10,
-    color: Colors.textTertiary,
+    color: DarkColors.textTertiary,
   },
 });

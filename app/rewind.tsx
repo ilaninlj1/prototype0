@@ -24,7 +24,7 @@ import { Cassette } from '@/components/rewind/cassette';
 import { RewindStrip } from '@/components/rewind/rewind-strip';
 import { SpotifySheet } from '@/components/rewind/spotify-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
+import { DarkColors, Fonts, Radius, Spacing, DarkUi } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import { artworkUrl, withLikedAt, type DiscoveryTrack, type SwipeEntry } from '@/lib/discovery';
 import { loadLikedTracks, loadSwipeHistory } from '@/lib/discovery-storage';
@@ -51,6 +51,8 @@ import {
 } from '@/lib/rewind';
 import { knownCount, setKnownArtists } from '@/lib/known-artists';
 import { describeImport, mergeSaves, spotifyTrackUrl, type SpotifyLike } from '@/lib/spotify';
+import { DarkRoom } from '@/components/dark-room';
+import { useLightStatusBar } from '@/hooks/use-light-status-bar';
 import {
   clearSpotifyLibrary,
   FAIL_TEXT,
@@ -117,7 +119,7 @@ function rubber(x: number, half: number): number {
  * back; how far you drag sets the step, and every step lands on a day you
  * actually found something. Tap a cover to hear it.
  */
-export default function RewindScreen() {
+function RewindScreenBody() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -436,7 +438,7 @@ export default function RewindScreen() {
   if (!loaded) {
     return (
       <View style={[styles.screen, styles.centered]}>
-        <ActivityIndicator color={Colors.accent} />
+        <ActivityIndicator color={DarkColors.accent} />
       </View>
     );
   }
@@ -451,8 +453,8 @@ export default function RewindScreen() {
     <GestureDetector gesture={scrub}>
       <View style={[styles.screen, { paddingTop: insets.top + Spacing.sm }]}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Close" style={Ui.textButton}>
-            <Ionicons name="close" size={26} color={Colors.textSecondary} />
+          <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Close" style={DarkUi.textButton}>
+            <Ionicons name="close" size={26} color={DarkColors.textSecondary} />
           </Pressable>
           <Cassette spin={spin} size={72} />
           {/* The Spotify switch: connects the first time, then shows or hides your Spotify songs. */}
@@ -464,9 +466,9 @@ export default function RewindScreen() {
             accessibilityLabel="Spotify songs"
             style={[styles.chip, spotifyOn && styles.chipOn]}>
             {importing != null ? (
-              <ActivityIndicator size="small" color={Colors.text} />
+              <ActivityIndicator size="small" color={DarkColors.text} />
             ) : (
-              <FontAwesome name="spotify" size={16} color={spotifyOn ? Colors.accentText : Colors.text} />
+              <FontAwesome name="spotify" size={16} color={spotifyOn ? DarkColors.accentText : DarkColors.text} />
             )}
             <ThemedText style={[styles.chipText, spotifyOn && styles.chipTextOn]}>
               {importing != null ? (importing > 0 ? `${importing}` : '…') : spotify?.likes.length ? 'Spotify' : '+ Spotify'}
@@ -487,9 +489,9 @@ export default function RewindScreen() {
               Save songs on Home and they line up here by the day you found them. Or bring in the songs you&apos;ve liked on
               Spotify.
             </ThemedText>
-            <Pressable onPress={() => setSheet(true)} style={[Ui.outlineButton, styles.connect]}>
-              <FontAwesome name="spotify" size={16} color={Colors.text} />
-              <ThemedText style={Ui.label}>Connect Spotify</ThemedText>
+            <Pressable onPress={() => setSheet(true)} style={[DarkUi.outlineButton, styles.connect]}>
+              <FontAwesome name="spotify" size={16} color={DarkColors.text} />
+              <ThemedText style={DarkUi.label}>Connect Spotify</ThemedText>
             </Pressable>
           </View>
         ) : (
@@ -508,7 +510,7 @@ export default function RewindScreen() {
                 {/* No songs on the day you aimed at: say how far these are from it. */}
                 {off && (
                   <View style={styles.off}>
-                    <Ionicons name="locate" size={14} color={Colors.text} />
+                    <Ionicons name="locate" size={14} color={DarkColors.text} />
                     <ThemedText style={styles.offText}>{off}</ThemedText>
                   </View>
                 )}
@@ -534,7 +536,7 @@ export default function RewindScreen() {
                             />
                             {picked && (
                               <View style={styles.playing}>
-                                <Ionicons name={status.playing ? 'pause' : 'play'} size={16} color={Colors.accentText} />
+                                <Ionicons name={status.playing ? 'pause' : 'play'} size={16} color={DarkColors.accentText} />
                               </View>
                             )}
                             <ThemedText style={styles.song} numberOfLines={1}>
@@ -553,7 +555,7 @@ export default function RewindScreen() {
                 {liked.length > 0 && (
                   <>
                     <View style={[styles.group, styles.groupRow]}>
-                      <FontAwesome name="spotify" size={14} color={Colors.textSecondary} />
+                      <FontAwesome name="spotify" size={14} color={DarkColors.textSecondary} />
                       <ThemedText type="eyebrow">From your Spotify</ThemedText>
                     </View>
                     <View style={styles.grid}>
@@ -576,14 +578,14 @@ export default function RewindScreen() {
                   </ThemedText>
                   <View style={styles.footerActions}>
                     {loginLib && (
-                      <Pressable onPress={connect} hitSlop={8} style={Ui.textButton}>
+                      <Pressable onPress={connect} hitSlop={8} style={DarkUi.textButton}>
                         <ThemedText style={styles.link}>Sync again</ThemedText>
                       </Pressable>
                     )}
-                    <Pressable onPress={importFile} hitSlop={8} style={Ui.textButton}>
+                    <Pressable onPress={importFile} hitSlop={8} style={DarkUi.textButton}>
                       <ThemedText style={styles.link}>{fileLib ? 'Import again' : 'Import a file'}</ThemedText>
                     </Pressable>
-                    <Pressable onPress={removeSpotify} hitSlop={8} style={Ui.textButton}>
+                    <Pressable onPress={removeSpotify} hitSlop={8} style={DarkUi.textButton}>
                       <ThemedText style={styles.link}>Remove</ThemedText>
                     </Pressable>
                   </View>
@@ -664,7 +666,7 @@ function SpotifyCover({ like, size, delay }: { like: SpotifyLike; size: number; 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: DarkColors.background,
   },
   flex: {
     flex: 1,
@@ -688,28 +690,28 @@ const styles = StyleSheet.create({
   },
   // Outlined off, cream on, like the app's other switches.
   chip: {
-    ...Ui.outlineButton,
+    ...DarkUi.outlineButton,
     minHeight: 36,
     paddingHorizontal: Spacing.sm,
     gap: 6,
   },
   chipOn: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+    backgroundColor: DarkColors.accent,
+    borderColor: DarkColors.accent,
   },
   chipText: {
-    ...Ui.label,
+    ...DarkUi.label,
     fontSize: 11,
   },
   chipTextOn: {
-    color: Colors.accentText,
+    color: DarkColors.accentText,
   },
   notice: {
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.sm,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.hairline,
+    borderColor: DarkColors.hairline,
     borderRadius: Radius.sm,
   },
   noticeText: {
@@ -741,13 +743,13 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xl,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: Colors.rule,
+    borderTopColor: DarkColors.rule,
     gap: Spacing.xs,
   },
   footerText: {
     fontSize: 13,
     lineHeight: 18,
-    color: Colors.textTertiary,
+    color: DarkColors.textTertiary,
   },
   footerActions: {
     flexDirection: 'row',
@@ -755,7 +757,7 @@ const styles = StyleSheet.create({
   },
   link: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: DarkColors.textSecondary,
     textDecorationLine: 'underline',
   },
   scroll: {
@@ -766,7 +768,7 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   dim: {
-    color: Colors.textSecondary,
+    color: DarkColors.textSecondary,
   },
   grid: {
     flexDirection: 'row',
@@ -776,7 +778,7 @@ const styles = StyleSheet.create({
   },
   art: {
     borderRadius: Radius.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: DarkColors.surface,
   },
   // The song you tapped: a cream button on its cover, like the mini player's.
   playing: {
@@ -786,7 +788,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: Radius.round,
-    backgroundColor: Colors.accent,
+    backgroundColor: DarkColors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -799,13 +801,13 @@ const styles = StyleSheet.create({
   artist: {
     fontSize: 12,
     lineHeight: 16,
-    color: Colors.textSecondary,
+    color: DarkColors.textSecondary,
   },
   // Where a Spotify song came from: liked, or added to which playlist.
   from: {
     fontSize: 11,
     lineHeight: 15,
-    color: Colors.textTertiary,
+    color: DarkColors.textTertiary,
   },
   // How far the songs are from the day you aimed at: a cream outline, read right after the date.
   off: {
@@ -816,7 +818,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: Colors.hairline,
+    borderColor: DarkColors.hairline,
     borderRadius: Radius.sm,
     marginBottom: Spacing.xs,
   },
@@ -830,7 +832,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     gap: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.rule,
+    borderTopColor: DarkColors.rule,
   },
   status: {
     height: 48,
@@ -847,7 +849,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.display,
     fontSize: 40,
     lineHeight: 46,
-    color: Colors.signal,
+    color: DarkColors.signal,
     fontVariant: ['tabular-nums'],
   },
   readoutDate: {
@@ -858,21 +860,31 @@ const styles = StyleSheet.create({
   readoutCount: {
     fontSize: 13,
     lineHeight: 17,
-    color: Colors.textSecondary,
+    color: DarkColors.textSecondary,
   },
   hintSub: {
     fontSize: 12,
     lineHeight: 16,
     textAlign: 'center',
-    color: Colors.textTertiary,
+    color: DarkColors.textTertiary,
   },
   hint: {
     fontSize: 14,
     textAlign: 'center',
-    color: Colors.textSecondary,
+    color: DarkColors.textSecondary,
   },
   hintOn: {
-    color: Colors.text,
+    color: DarkColors.text,
     fontWeight: '700',
   },
 });
+
+/** A dark room in the light app: navy defaults for everything inside, and a light status bar. */
+export default function RewindScreen() {
+  useLightStatusBar();
+  return (
+    <DarkRoom>
+      <RewindScreenBody />
+    </DarkRoom>
+  );
+}

@@ -1,4 +1,6 @@
-import { Pressable, type GestureResponderEvent } from 'react-native';
+import { Pressable, View, type GestureResponderEvent } from 'react-native';
+
+import { DarkColors, Radius } from '@/constants/theme';
 
 import { PIECE, piecePositions, type Piece, type PieceMark } from '@/lib/piece';
 import { lazySkia } from './lazy-skia';
@@ -6,10 +8,15 @@ import type { PieceCanvasProps } from './piece-canvas';
 
 const PieceCanvas = lazySkia<PieceCanvasProps>(() => import('./piece-canvas'));
 
-/** Your piece: the line of prints. With `onPressMark`, tapping near a print picks it. */
+/** Your piece: the line of prints, always on a navy tile (prints are drawn for a dark ground). With `onPressMark`, tapping near a print picks it. */
 export function PieceView({ piece, width, onPressMark }: { piece: Piece; width: number; onPressMark?: (mark: PieceMark) => void }) {
   const height = (width * PIECE.height) / PIECE.width;
-  if (!onPressMark) return <PieceCanvas piece={piece} width={width} />;
+  if (!onPressMark)
+    return (
+      <View style={{ width, height, backgroundColor: DarkColors.background, borderRadius: Radius.lg, overflow: 'hidden' }}>
+        <PieceCanvas piece={piece} width={width} />
+      </View>
+    );
 
   function pick(e: GestureResponderEvent) {
     const scale = width / PIECE.width;
@@ -29,7 +36,7 @@ export function PieceView({ piece, width, onPressMark }: { piece: Piece; width: 
   }
 
   return (
-    <Pressable onPress={pick} style={{ width, height }} accessibilityLabel={`Your piece, ${piece.marks.length} prints`}>
+    <Pressable onPress={pick} style={{ width, height, backgroundColor: DarkColors.background, borderRadius: Radius.lg, overflow: 'hidden' }} accessibilityLabel={`Your piece, ${piece.marks.length} prints`}>
       <PieceCanvas piece={piece} width={width} />
     </Pressable>
   );

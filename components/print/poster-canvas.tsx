@@ -1,7 +1,7 @@
 import { drawAsImage, Group, matchFont, Rect, Text } from '@shopify/react-native-skia';
 import { Platform } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { DarkColors } from '@/constants/theme';
 import { PIECE, type Piece } from '@/lib/piece';
 import { PieceDrawing } from './piece-canvas';
 
@@ -25,13 +25,13 @@ export async function renderPoster(piece: Piece): Promise<string | null> {
   const date = new Date(piece.finishedAt ?? Date.now()).toDateString().toUpperCase();
   const image = await drawAsImage(
     <Group>
-      <Rect x={0} y={0} width={W} height={H} color={Colors.background} />
-      <Text x={MARGIN} y={top - 64} text={`BLINDSPOT · PIECE No. ${piece.number}`} font={font} color={Colors.text} />
+      <Rect x={0} y={0} width={W} height={H} color={DarkColors.background} />
+      <Text x={MARGIN} y={top - 64} text={`BLINDSPOT · PIECE No. ${piece.number}`} font={font} color={DarkColors.text} />
       <Group transform={[{ translateX: MARGIN }, { translateY: top }]}>
         <PieceDrawing piece={piece} width={width} />
       </Group>
-      <Text x={MARGIN} y={top + pieceHeight + 72} text={`${revealed} FOUND BLIND · ${piece.marks.length - revealed} SKIPPED`} font={small} color={Colors.textSecondary} />
-      <Text x={MARGIN} y={top + pieceHeight + 108} text={date} font={small} color={Colors.textTertiary} />
+      <Text x={MARGIN} y={top + pieceHeight + 72} text={`${revealed} FOUND BLIND · ${piece.marks.length - revealed} SKIPPED`} font={small} color={DarkColors.textSecondary} />
+      <Text x={MARGIN} y={top + pieceHeight + 108} text={date} font={small} color={DarkColors.textTertiary} />
     </Group>,
     { width: W, height: H }
   );

@@ -1,13 +1,46 @@
 /**
- * Dark-only design system. Album artwork is the app's real visual content and
- * reads best against a near-black backdrop, and every custom surface built
- * this far had already drifted toward hardcoded dark colors regardless of the
- * system light/dark toggle — one deliberate palette instead of an adaptive
- * one nobody was actually using.
+ * Two fixed palettes, no system light/dark switching (Minimal UI, 2026-10-21).
+ * `Colors` is the room: white, black text, light grey surfaces, black as the
+ * only strong color. `DarkColors` is the old navy room, kept for the things
+ * that are dark on purpose: the blind card (the sound print lives on navy),
+ * the cards under it, and the full-screen experiences (Edition, Dark Map,
+ * Rewind).
  */
 
-
 export const Colors = {
+  // White is the room; black carries text, symbols and the main button; one
+  // red marks what matters (the heart, saves, streaks, big numbers). Red on
+  // white is 4.0:1, fine for symbols and large text, so small text stays black.
+  background: '#FFFFFF',
+  surface: '#F2F2F2',
+  surfaceElevated: '#FFFFFF',
+  border: 'rgba(17, 17, 17, 0.08)',
+  /** Thin outlines on buttons and cards. */
+  hairline: 'rgba(17, 17, 17, 0.16)',
+  /** Section rules (tab bar top, lists). */
+  rule: 'rgba(17, 17, 17, 0.10)',
+
+  text: '#111111',
+  textSecondary: '#6B6B6B',
+  // Large text and decoration only: 3.5:1 on white.
+  textTertiary: '#8A8A8A',
+
+  // Buttons and selected states: black with white text (18.9:1).
+  accent: '#111111',
+  accentText: '#FFFFFF',
+
+  signal: '#E63946',
+
+  highlight: '#f4c542',
+
+  destructive: '#E63946',
+  positive: '#2E8B57',
+
+  tint: '#111111',
+  icon: '#6B6B6B',
+};
+
+export const DarkColors = {
   // Navy is the room; cream carries text and every symbol's line; one red
   // marks what matters. Imperial red on navy is a classic pairing and passes
   // 3:1 for symbols and large text (3.8:1), so small text stays cream.
@@ -41,6 +74,27 @@ export const Colors = {
   tint: '#f3ead8',
   icon: 'rgba(243, 234, 216, 0.68)',
 };
+
+const LIGHT_TO_DARK = new Map<string, string>(
+  (Object.keys(Colors) as (keyof typeof Colors)[]).map((k) => [Colors[k], DarkColors[k]])
+);
+
+/** A light token's twin in the navy set (text → cream, surface → navy surface…); any other color passes through. */
+export function toDark<T>(color: T): T | string {
+  return typeof color === 'string' ? (LIGHT_TO_DARK.get(color) ?? color) : color;
+}
+
+const channel = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const luminance = (hex: string) => {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return 0.2126 * channel(((n >> 16) & 255) / 255) + 0.7152 * channel(((n >> 8) & 255) / 255) + 0.0722 * channel((n & 255) / 255);
+};
+
+/** WCAG contrast between two #rrggbb colors, 1 to 21. */
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100;
+}
 
 export const Spacing = {
   xs: 4,
@@ -200,3 +254,9 @@ export const Ui = {
   /** Mono uppercase, for button labels and section labels. */
   label: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: 1.2, textTransform: 'uppercase' as const, color: Colors.text },
 };
+
+const darkenStyle = <T extends object>(style: T): T =>
+  Object.fromEntries(Object.entries(style).map(([k, v]) => [k, typeof v === 'string' ? toDark(v) : v])) as T;
+
+/** Ui for the dark rooms (Edition, Dark Map, Rewind): the same controls with navy-set colors. */
+export const DarkUi = Object.fromEntries(Object.entries(Ui).map(([k, v]) => [k, darkenStyle(v)])) as typeof Ui;
