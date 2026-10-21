@@ -3,7 +3,7 @@ import Animated, { interpolate, useAnimatedStyle, type AnimatedStyle, type Share
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius } from '@/constants/theme';
+import { DarkColors, Fonts, Radius } from '@/constants/theme';
 import { DEFAULT_SWIPE_THRESHOLDS } from '@/components/discovery/swipe-physics';
 
 const H = DEFAULT_SWIPE_THRESHOLDS.horizontal;
@@ -61,11 +61,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     backgroundColor: 'rgba(19, 33, 63, 0.7)',
     borderWidth: 1,
-    borderColor: Colors.hairline,
+    borderColor: DarkColors.hairline,
   },
   // Each label sits on the edge that stays on screen as the card moves away from it.
   left: { right: 16, top: '42%' },
   right: { left: 16, top: '42%' },
   bottom: { alignSelf: 'center', bottom: 72 },
-  label: { fontFamily: Fonts.monoMedium, fontSize: 14, lineHeight: 18, letterSpacing: 2, color: Colors.text },
+  label: { fontFamily: Fonts.monoMedium, fontSize: 14, lineHeight: 18, letterSpacing: 2, color: DarkColors.text },
 });

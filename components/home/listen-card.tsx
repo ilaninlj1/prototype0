@@ -17,21 +17,18 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
-import { CallButton } from '@/components/discovery/call-button';
 import { COVER_BLUR } from '@/components/discovery/swipe-card';
 import { DEFAULT_SWIPE_THRESHOLDS, resolveSwipeDirection, rotationForDrag, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
 import { HeartBurst } from '@/components/heart-burst';
 import { LivePrint } from '@/components/print/live-print';
 import { PrintStill } from '@/components/print/print-still';
-import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { DarkColors, Radius, Spacing } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import { mixForDrag, shouldReportMix } from '@/lib/crossfade';
-import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
+import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import type { PrintRecipe } from '@/lib/print-recipe';
-import { agedRecipe, releaseLine, songAge } from '@/lib/song-age';
+import { agedRecipe, songAge } from '@/lib/song-age';
 import { DragLabels, TintWash } from './drag-label';
 
 const H = DEFAULT_SWIPE_THRESHOLDS.horizontal;
@@ -52,39 +49,31 @@ type Props = {
   size: CardSize;
   recipe: PrintRecipe;
   revealed: boolean;
-  /** e.g. PRINT 12/50: the piece slot this song will take. */
-  slotLabel: string;
   /** How far this song's sound is from your saves, 0 home to 1 deep (lib/taste-distance.ts), or null when unknown. */
   restless: number | null;
-  /** Close to home / New ground / Deep in your blind spot, or null. */
-  tierLabel: string | null;
   /** How much of the song you'd heard when you revealed it (0–1): the badge's print is as settled as your listen. */
   heard: number;
-  /** The artist's Last.fm listeners: undefined while loading, null if unknown. */
-  listeners: number | null | undefined;
   /** Asked before a gesture commits; false means another action is running and the card goes back. */
   takeLock: () => boolean;
   /** Once per committed swipe, blind or revealed. */
   onSwipe: (direction: SwipeDirection) => void;
   onSave: () => void;
-  onTogglePlay: () => void;
+  /** A single tap: Home shows or hides its buttons (pause lives with them). */
+  onTap: () => void;
   onRevealSettled: () => void;
-  onCallSave?: (track: DiscoveryTrack) => Promise<void>;
   onMix?: (mix: number) => void;
   onCancelPeek?: () => void;
 };
 
-const clockText = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-
 /**
- * The song you're hearing, blind: its sound drawn as moving particles, a few
- * measured facts, and the clock. Swipe or use the buttons below. A right
- * swipe reveals it in place: the particles settle into the song's print, the
- * cover sharpens in the same frame, then the name comes in.
+ * The song you're hearing, blind: its sound drawn as moving particles on the
+ * one dark thing on a light screen. No words on it: the clues and, after the
+ * reveal, the name sit under it (ListenInfo). A right swipe reveals it in
+ * place: the particles settle into the song's print and the cover sharpens in
+ * the same frame.
  */
 export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCard(props, ref) {
-  const { track, size, recipe, revealed, slotLabel, restless, tierLabel, heard, listeners, takeLock, onSwipe, onSave, onTogglePlay, onRevealSettled, onCallSave, onMix, onCancelPeek } =
-    props;
+  const { track, size, recipe, revealed, restless, heard, takeLock, onSwipe, onSave, onTap, onRevealSettled, onMix, onCancelPeek } = props;
   const { status } = usePlayback();
   const reduceMotion = useReducedMotion();
 
@@ -162,6 +151,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
         })
       )
     );
+    // ListenInfo's name comes in on the same beat (FadeIn after 700ms); this timing is the lock's.
     names.set(
       withDelay(
         reduceMotion ? 200 : 850,
@@ -265,7 +255,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
       }
     });
   const tap = Gesture.Tap().onEnd((_e, ok) => {
-    if (ok) runOnJS(onTogglePlay)();
+    if (ok) runOnJS(onTap)();
   });
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
@@ -280,13 +270,9 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   const blurStyle = useAnimatedStyle(() => ({ opacity: 0.25 * (1 - cover.get()) }));
   const coverStyle = useAnimatedStyle(() => ({ opacity: cover.get() }));
   const printStyle = useAnimatedStyle(() => ({ opacity: 1 - cover.get() }));
-  const blindStyle = useAnimatedStyle(() => ({ opacity: 1 - cover.get() }));
-  const namesStyle = useAnimatedStyle(() => ({ opacity: names.get(), transform: [{ translateY: 16 * (1 - names.get()) }] }));
   const leftTint = useAnimatedStyle(() => ({ opacity: interpolate(tx.get(), [-H, 0], [TINT, 0], 'clamp') }));
   const rightTint = useAnimatedStyle(() => ({ opacity: interpolate(tx.get(), [0, H], [0, TINT], 'clamp') }));
 
-  const described = listeners != null ? describeListeners(listeners) : null;
-  const release = releaseLine(track.releaseDate, track.collectionName);
   const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
   const paused = status.isLoaded && !status.playing;
   // The print is square: the card's shorter side, centered (the card fills whatever room Home has).
@@ -316,51 +302,21 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
             </Animated.View>
           </Animated.View>
 
-          {!revealed && <TintWash side="left" color={Colors.destructive} style={leftTint} />}
-          {!revealed && <TintWash side="right" color={Colors.positive} style={rightTint} />}
-
-          <View style={styles.topRow} pointerEvents="none">
-            <ThemedText style={styles.mono}>{slotLabel}</ThemedText>
-            <ThemedText style={styles.mono}>
-              {clockText(status.currentTime)}
-              {status.duration > 0 ? ` / ${clockText(status.duration)}` : ''}
-            </ThemedText>
-          </View>
+          {!revealed && <TintWash side="left" color={DarkColors.destructive} style={leftTint} />}
+          {!revealed && <TintWash side="right" color={DarkColors.positive} style={rightTint} />}
 
           {paused && !revealed && (
             <View style={styles.paused} pointerEvents="none">
-              <Ionicons name="play" size={30} color={Colors.text} />
+              <Ionicons name="play" size={30} color={DarkColors.text} />
             </View>
           )}
 
-          {revealed ? (
-            <>
-              <Gradient />
-              <Animated.View style={[styles.names, namesStyle]} pointerEvents="none">
-                <ThemedText style={styles.title} numberOfLines={2}>
-                  {track.trackName}
-                </ThemedText>
-                <ThemedText style={styles.artist} numberOfLines={1}>
-                  {track.artistName}
-                </ThemedText>
-                {!!release && (
-                  <ThemedText style={styles.release} numberOfLines={1}>
-                    {release}
-                  </ThemedText>
-                )}
-              </Animated.View>
-              <Animated.View entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={styles.badge} pointerEvents="none">
-                {/* Measured for the flight: a plain view, since an animated one doesn't measure on every platform. */}
-                <View ref={badgeRef} collapsable={false}>
-                  <PrintStill recipe={recipe} size={BADGE} detail="mini" heard={heard} />
-                </View>
-              </Animated.View>
-            </>
-          ) : (
-            <Animated.View style={[styles.blindFoot, blindStyle]} pointerEvents="none">
-              <ThemedText type="subtitle">Just listen.</ThemedText>
-              {!!recipe.label && <ThemedText style={styles.mono}>{recipe.label}</ThemedText>}
-              {!!tierLabel && <ThemedText style={[styles.mono, styles.tier]}>{tierLabel}</ThemedText>}
+          {revealed && (
+            <Animated.View entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={styles.badge} pointerEvents="none">
+              {/* Measured for the flight: a plain view, since an animated one doesn't measure on every platform. */}
+              <View ref={badgeRef} collapsable={false}>
+                <PrintStill recipe={recipe} size={BADGE} detail="mini" heard={heard} />
+              </View>
             </Animated.View>
           )}
 
@@ -370,37 +326,9 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
         </View>
       </GestureDetector>
 
-      {/* Above the gesture layer, so tapping Call it never also pauses the song. */}
-      {revealed && (
-        <Animated.View style={[styles.callRow, namesStyle]} pointerEvents="box-none">
-          <ThemedText style={styles.listeners} numberOfLines={1}>
-            {described ? `${described.count} listeners` : listeners === undefined ? 'Counting listeners…' : 'No listener count yet'}
-          </ThemedText>
-          <View style={styles.call}>
-            <CallButton track={track} listeners={listeners} onSave={onCallSave} />
-          </View>
-        </Animated.View>
-      )}
     </Animated.View>
   );
 });
-
-/** Navy rising from the bottom of the revealed cover, so the name reads over any artwork. */
-function Gradient() {
-  return (
-    <View style={styles.gradient} pointerEvents="none">
-      <Svg width="100%" height="100%">
-        <Defs>
-          <LinearGradient id="reveal-fade" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={Colors.background} stopOpacity={0} />
-            <Stop offset="1" stopColor={Colors.background} stopOpacity={0.92} />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#reveal-fade)" />
-      </Svg>
-    </View>
-  );
-}
 
 /** A card waiting under the top one: its still print over a faint blur of its cover. No gestures, no labels. */
 export function StackFace({ track, size, recipe }: { track: DiscoveryTrack; size: CardSize; recipe: PrintRecipe }) {
@@ -427,9 +355,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   print: { position: 'absolute' },
-  topRow: { position: 'absolute', top: Spacing.md, left: Spacing.lg, right: Spacing.lg, flexDirection: 'row', justifyContent: 'space-between' },
-  mono: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1, color: Colors.textSecondary },
-  tier: { color: Colors.text },
   paused: {
     position: 'absolute',
     alignSelf: 'center',
@@ -443,12 +368,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: 4,
   },
-  blindFoot: { position: 'absolute', left: Spacing.xl, right: Spacing.xl, bottom: Spacing.xl, gap: Spacing.xs },
-  gradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
-  names: { position: 'absolute', left: Spacing.lg, right: Spacing.lg, bottom: 64, gap: 2 },
-  title: { fontFamily: Fonts.display, fontSize: 22, lineHeight: 26, color: Colors.text },
-  artist: { color: Colors.textSecondary },
-  release: { fontSize: 13, lineHeight: 18, color: Colors.textSecondary },
   badge: {
     position: 'absolute',
     top: Spacing.xl + Spacing.md,
@@ -458,18 +377,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.hairline,
+    borderColor: DarkColors.hairline,
   },
-  progress: { position: 'absolute', left: 0, bottom: 0, height: 2, backgroundColor: Colors.text, opacity: 0.5 },
-  callRow: {
-    position: 'absolute',
-    left: Spacing.lg,
-    right: Spacing.lg,
-    bottom: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  listeners: { flex: 1, fontSize: 14, color: Colors.textSecondary },
-  call: { width: 116, flexDirection: 'row' },
+  progress: { position: 'absolute', left: 0, bottom: 0, height: 2, backgroundColor: DarkColors.text, opacity: 0.5 },
 });

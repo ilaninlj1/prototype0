@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { PieceView } from '@/components/print/piece-view';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Typography } from '@/constants/theme';
 import { PIECE, piecePositions, type Piece, type PieceMark } from '@/lib/piece';
 import { recipeFor } from '@/lib/print-recipe';
 
@@ -45,14 +45,14 @@ export function PieceStrip({ piece, onPress, onLayoutStrip }: { piece: Piece; on
         {width > 0 && <PieceView piece={piece} width={width} />}
       </View>
       <View style={styles.caption}>
-        <ThemedText style={styles.label}>{n > 0 ? `${n} ${n === 1 ? 'PRINT' : 'PRINTS'} · TAP TO SEE YOUR PIECE` : 'YOUR FIRST SWIPE STARTS YOUR PIECE'}</ThemedText>
+        <ThemedText style={styles.label}>{n > 0 ? `${n} of ${PIECE.slots} prints · Tap to see your piece` : 'Your first swipe starts your piece'}</ThemedText>
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  piece: { alignSelf: 'stretch', borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.rule },
+  piece: { alignSelf: 'stretch' },
   caption: { paddingTop: Spacing.xs },
-  label: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1, color: Colors.textSecondary },
+  label: { ...Typography.caption, color: Colors.textSecondary, textAlign: 'center' },
 });
