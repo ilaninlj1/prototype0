@@ -1219,8 +1219,24 @@ export default function HomeScreen() {
                 press('right');
               }}
             />
-            <CreditLine />
           </ChromeFade>
+          {/* One row under the buttons: the credits, or for a few seconds after a save, the toast in their place. */}
+          <View style={styles.slot} pointerEvents="box-none">
+            {toast ? (
+              <SavedToast
+                visible
+                onHide={() => setToast(false)}
+                onViewLibrary={() => {
+                  setToast(false);
+                  router.navigate('/library');
+                }}
+              />
+            ) : (
+              <ChromeFade visible={chrome.visible}>
+                <CreditLine />
+              </ChromeFade>
+            )}
+          </View>
 
           {!chrome.visible && (
             <ThemedText style={styles.hint} pointerEvents="none">
@@ -1236,17 +1252,6 @@ export default function HomeScreen() {
           <CreditLine />
         </>
       )}
-
-      <View style={styles.toast} pointerEvents="box-none">
-        <SavedToast
-          visible={toast}
-          onHide={() => setToast(false)}
-          onViewLibrary={() => {
-            setToast(false);
-            router.navigate('/library');
-          }}
-        />
-      </View>
 
       {/* Outside the card branch: the queue empties for a moment during a jump, and the stamp must not remount. */}
       {stamp && (
@@ -1326,7 +1331,7 @@ const styles = StyleSheet.create({
   cornerPause: { position: 'absolute', top: Spacing.md, left: Spacing.md },
   bottom: { gap: Spacing.lg },
   hint: { ...Typography.caption, position: 'absolute', left: 0, right: 0, bottom: 72, textAlign: 'center' },
-  toast: { position: 'absolute', left: Spacing.lg, right: Spacing.lg, bottom: Spacing.md },
+  slot: { height: 52, justifyContent: 'center' },
   statusArea: { flex: 1, marginBottom: Spacing.lg },
   under: { position: 'absolute', top: 0, left: 0, opacity: 0.55 },
   centered: {
