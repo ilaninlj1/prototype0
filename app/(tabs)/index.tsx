@@ -1052,9 +1052,9 @@ export default function HomeScreen() {
 
   // A save shows the toast once, the first time a song is kept.
   async function saveFromHome(track: DiscoveryTrack) {
-    const fresh = !savedIds.has(track.id);
+    // Shown at the tap, not after storage answers: the save itself can take a moment.
+    if (!savedIds.has(track.id)) setToast(true);
     await handleSave(track);
-    if (fresh) setToast(true);
   }
 
   // One line at the top, the most important thing first (lib/status-line.ts).
