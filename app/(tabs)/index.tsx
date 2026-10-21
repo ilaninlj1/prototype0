@@ -9,7 +9,6 @@ import { GenrePicker } from '@/components/discovery/genre-picker';
 import { onLikeChange, saveLike } from '@/components/like-button';
 import { flySave } from '@/components/save-flight';
 import {
-  fitCardToWidth,
   MAX_CARD_HEIGHT,
   MAX_CARD_WIDTH,
   type CardSize,
@@ -26,9 +25,9 @@ import { FeedStatus } from '@/components/home/feed-status';
 import { FlyingPrint } from '@/components/home/flying-print';
 import { GenreStamp } from '@/components/home/genre-stamp';
 import { ListenCard, StackFace, type ListenCardHandle } from '@/components/home/listen-card';
-import { ListenInfo } from '@/components/home/listen-info';
+import { LISTEN_INFO_HEIGHT, ListenInfo } from '@/components/home/listen-info';
 import { MapButton } from '@/components/home/map-button';
-import { PieceStrip, slotCenter, type StripRect } from '@/components/home/piece-strip';
+import { slotCenter, type StripRect } from '@/components/home/piece-strip';
 import { SavedToast } from '@/components/home/saved-toast';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -148,7 +147,9 @@ export default function HomeScreen() {
   function handleCardAreaLayout(e: LayoutChangeEvent) {
     cardAreaRef.current = e.nativeEvent.layout;
     const { width, height } = e.nativeEvent.layout;
-    setCardSize(fitCardToWidth({ width, height }));
+    // A square, as big as fits above its words, never wider than the mockup's 340.
+    const side = Math.max(160, Math.min(width, height - LISTEN_INFO_HEIGHT - Spacing.xl, CARD_MAX));
+    setCardSize({ width: side, height: side });
   }
 
   const [queue, setQueue] = useState<DiscoveryTrack[]>([]);
@@ -1180,15 +1181,14 @@ export default function HomeScreen() {
                   }} />
               </ChromeFade>
             </View>
+            <ListenInfo
+              track={currentTrack}
+              revealed={revealedNow}
+              clues={cluesLine(topRecipe.label, depth == null ? null : TIER_LABEL[tierFor(depth)])}
+              listeners={revealedNow ? revealListeners : undefined}
+              onCallSave={handleSave}
+            />
           </View>
-
-          <ListenInfo
-            track={currentTrack}
-            revealed={revealedNow}
-            clues={cluesLine(topRecipe.label, depth == null ? null : TIER_LABEL[tierFor(depth)])}
-            listeners={revealedNow ? revealListeners : undefined}
-            onCallSave={handleSave}
-          />
 
           <ChromeFade visible={chrome.visible} style={styles.bottom}>
             <ActionRow
@@ -1219,10 +1219,6 @@ export default function HomeScreen() {
                 press('right');
               }}
             />
-            <PieceStrip piece={piece} onPress={() => {
-                wake();
-                router.push('/art');
-              }} onLayoutStrip={(rect) => (stripRef.current = rect)} />
             <CreditLine />
           </ChromeFade>
 
@@ -1298,6 +1294,9 @@ export default function HomeScreen() {
   );
 }
 
+// The mockup's card: a 340pt square at most.
+const CARD_MAX = 340;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1317,14 +1316,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  // The card and its words, together in the middle of the white.
   cardArea: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
+    gap: Spacing.xl,
   },
   cornerPause: { position: 'absolute', top: Spacing.md, left: Spacing.md },
-  bottom: { gap: Spacing.md },
-  hint: { ...Typography.caption, position: 'absolute', left: 0, right: 0, bottom: 120, textAlign: 'center' },
+  bottom: { gap: Spacing.lg },
+  hint: { ...Typography.caption, position: 'absolute', left: 0, right: 0, bottom: 72, textAlign: 'center' },
   toast: { position: 'absolute', left: Spacing.lg, right: Spacing.lg, bottom: Spacing.md },
   statusArea: { flex: 1, marginBottom: Spacing.lg },
   under: { position: 'absolute', top: 0, left: 0, opacity: 0.55 },

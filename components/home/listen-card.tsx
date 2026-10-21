@@ -35,6 +35,8 @@ const H = DEFAULT_SWIPE_THRESHOLDS.horizontal;
 const V = DEFAULT_SWIPE_THRESHOLDS.vertical;
 const FLY = 600;
 const BADGE = 64;
+/** The blind card is a soft square: big round corners, like an album sleeve on a white table. */
+export const CARD_RADIUS = 28;
 const TINT = 0.5;
 
 export type ListenCardHandle = {
@@ -346,7 +348,7 @@ export function StackFace({ track, size, recipe }: { track: DiscoveryTrack; size
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: Radius.lg,
+    borderRadius: CARD_RADIUS,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.3,

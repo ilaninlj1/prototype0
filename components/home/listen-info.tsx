@@ -18,7 +18,7 @@ type Props = {
 };
 
 // Fixed, so the buttons under it never move between blind and revealed.
-const HEIGHT = 92;
+export const LISTEN_INFO_HEIGHT = 92;
 
 /**
  * The words under the card. Blind: "Just listen." and the only clues, tempo,
@@ -60,7 +60,7 @@ export function ListenInfo({ track, revealed, clues, listeners, onCallSave }: Pr
 }
 
 const styles = StyleSheet.create({
-  box: { height: HEIGHT, justifyContent: 'center', gap: 4 },
+  box: { height: LISTEN_INFO_HEIGHT, alignSelf: 'stretch', justifyContent: 'center', gap: 4 },
   center: { textAlign: 'center' },
   caption: { ...Typography.caption, fontSize: 15, lineHeight: 20, color: Colors.textSecondary },
   title: { fontFamily: Fonts.display, fontSize: 22, lineHeight: 26 },
