@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useEffectEvent } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
+import { ChromeFade } from '@/components/home/chrome-fade';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { TOAST_MS } from '@/lib/home-chrome';
@@ -18,17 +18,19 @@ export function SavedToast({ visible, onViewLibrary, onHide }: Props) {
     const t = setTimeout(hide, TOAST_MS);
     return () => clearTimeout(t);
   }, [visible]);
-  if (!visible) return null;
+  // The same plain fade as Home's buttons (layout animations are unreliable on web).
   return (
-    <Animated.View entering={FadeInDown.duration(220)} exiting={FadeOut.duration(180)} style={styles.toast} accessibilityLiveRegion="polite">
-      <View style={styles.what}>
-        <Ionicons name="checkmark" size={18} color={Colors.accentText} />
-        <ThemedText style={styles.text}>Saved to Liked Songs</ThemedText>
+    <ChromeFade visible={visible}>
+      <View style={styles.toast} accessibilityLiveRegion="polite">
+        <View style={styles.what}>
+          <Ionicons name="checkmark" size={18} color={Colors.accentText} />
+          <ThemedText style={styles.text}>Saved to Liked Songs</ThemedText>
+        </View>
+        <Pressable onPress={onViewLibrary} accessibilityRole="button" style={({ pressed }) => [styles.button, pressed && { opacity: 0.7 }]}>
+          <ThemedText style={styles.buttonText}>View Library</ThemedText>
+        </Pressable>
       </View>
-      <Pressable onPress={onViewLibrary} accessibilityRole="button" style={({ pressed }) => [styles.button, pressed && { opacity: 0.7 }]}>
-        <ThemedText style={styles.buttonText}>View Library</ThemedText>
-      </Pressable>
-    </Animated.View>
+    </ChromeFade>
   );
 }
 
