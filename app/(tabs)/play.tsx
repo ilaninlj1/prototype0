@@ -12,6 +12,7 @@ import {
   DailyDropEmblem,
   DjPicksEmblem,
   HeadToHeadEmblem,
+  RunEmblem,
   SpotTheStarEmblem,
   TasteTwinsEmblem,
   WorldChartsEmblem,
@@ -30,6 +31,7 @@ import {
   type BlindTestResult,
 } from '@/lib/discovery-storage';
 import { orbitPose } from '@/lib/orbit';
+import { loadRuns } from '@/lib/run-storage';
 
 type Mode = {
   key: string;
@@ -55,6 +57,7 @@ export default function PlayScreen() {
   const [best, setBest] = useState<BestStreaks>({ spot: 0, h2h: 0 });
   const [test, setTest] = useState<BlindTestResult | null>(null);
   const [sendable, setSendable] = useState(0);
+  const [runs, setRuns] = useState(0);
   const [focused, setFocused] = useState(0);
   const scrollRef = useRef<Animated.ScrollView>(null);
   const scrollX = useSharedValue(0);
@@ -65,6 +68,7 @@ export default function PlayScreen() {
       loadBestStreaks().then(setBest);
       loadBlindTest().then(setTest);
       loadLikedTracks().then((liked) => setSendable(liked.filter(packable).length));
+      loadRuns().then((r) => setRuns(r.filter((x) => !x.simulated).length));
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
@@ -98,6 +102,17 @@ export default function PlayScreen() {
       statLabel: daily.streak === 1 ? 'day streak' : 'day streak',
       cta: dropCta,
       href: dropHref,
+    },
+    {
+      key: 'run',
+      emblem: (s) => <RunEmblem size={s} />,
+      eyebrow: 'Move · any pace',
+      title: 'Run',
+      blurb: 'Blind songs that match your stride. Pick easy, steady or push, put your phone away, and find out what you heard at the end.',
+      stat: String(runs),
+      statLabel: runs === 1 ? 'run' : 'runs',
+      cta: 'Start a run',
+      href: '/run',
     },
     {
       key: 'h2h',

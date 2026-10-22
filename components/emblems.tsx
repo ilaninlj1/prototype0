@@ -168,3 +168,14 @@ export function RewindEmblem({ size = 52 }: Props) {
     </View>
   );
 }
+
+/** Run: a running shoe with the beat it's keeping. */
+export function RunEmblem({ size = 52 }: Props) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <Path stroke={RED} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" d="M4 18 L13 18 L17 9 L22 27 L26 18 L36 18" />
+      <Path {...FILL} d="M8 44 C8 36 12 30 18 29 L27 33 C31 35 36 34 40 33 L52 37 C58 39 60 42 60 46 L60 48 L8 48 Z" />
+      <Path {...LINE} d="M8 48 L60 48 M23 32 L21 38 M30 34 L28 39 M8 42 L2 42 M10 36 L4 36" />
+    </Svg>
+  );
+}
