@@ -55,6 +55,7 @@ import { shuffle } from './taste-test.ts';
 import { soundFor } from './sound-index.ts';
 import { pickSorted, type SoundFilter } from './sound-filter.ts';
 import { pickNeighbors, type Candidate } from './sound-neighbors.ts';
+import type { RunCandidate } from './run-songs.ts';
 import { loadSoundMap, pickNear, type MapPoint } from './sound-map.ts';
 import { releaseDay } from './song-age.ts';
 import type { SoundFeatures } from './sound.ts';
@@ -816,6 +817,34 @@ export function getTracksNear(point: MapPoint, n: number, heard: Set<number>, ex
     },
     (artist) => !excluded.has(normalizeArtist(artist)) && keep(artist)
   );
+}
+
+/**
+ * Run mode's pool (lib/run-songs.ts): every catalog song with a measured tempo, once per iTunes id, any genre and
+ * popularity. Built on first use and cached; the caller filters out heard, known and AI artists.
+ */
+let runPool: RunCandidate[] | null = null;
+export function runCandidates(): RunCandidate[] {
+  if (runPool) return runPool;
+  const out: RunCandidate[] = [];
+  const seen = new Set<number>();
+  for (const genreTag of Object.keys(CATALOG_LOADERS)) {
+    const catalog = loadCatalog(genreTag);
+    if (!catalog) continue;
+    const seeds = new Map((genresSeed[genreTag] ?? []).map((a) => [a.name, a]));
+    for (const [name, ac] of Object.entries(catalog)) {
+      const seed = seeds.get(name);
+      if (!seed || seed.itunesArtistId == null) continue;
+      for (const entry of [...ac.mixed, ...ac.hits, ...ac.deepCuts]) {
+        if (seen.has(entry.itunesTrackId)) continue;
+        const sound = soundFor(entry.itunesTrackId);
+        if (!sound || !(sound.tempo > 0)) continue;
+        seen.add(entry.itunesTrackId);
+        out.push({ track: trackToDiscoveryTrack(catalogTrack(seed, ac, entry, 'M', genreTag)), tempo: sound.tempo, energy: sound.energy, artist: name });
+      }
+    }
+  }
+  return (runPool = out);
 }
 
 /**
