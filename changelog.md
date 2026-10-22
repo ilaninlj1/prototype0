@@ -17,6 +17,19 @@ What changed and why.
 
 <!-- Add entries below this line -->
 
+## [2026-10-22] Run mode (Prototype 7)
+A Run card on Play. Pick how hard (Easy, Steady or Push, explained as how much you could still talk, or type a pace)
+and which songs (Blind, Mix or Liked), put the phone away and run or walk. Songs are picked to your stride: a song
+fits when its tempo, at half, normal or double time, is within 4% of your step rate, read from the accelerometer.
+Every minute the app compares your GPS pace with your goal and plays calmer songs when you're too fast and
+higher-energy songs when you're too slow, since tempo moves your step rate and energy moves your step length. The
+screen stays on but black, because Expo Go stops GPS when the phone locks; touches only count after a half-second hold.
+Knocking twice on your pocket likes a song once the knock tester has caught three in a row, and the lock screen's jump
+buttons skip and go back. Afterward, the talk test ("Could you talk the whole time?") sets the next Easy pace, and the
+reveal shows the pace line with a bar per song, the hardest-hitting song, every song marked "you liked" or "legs
+liked" (your pace picked up), and your route with pins. Runs stay on the phone. New native modules (expo-sensors,
+expo-location, expo-keep-awake), so the app is now 1.0.4.
+
 ## [2026-10-16] The Dark Map
 A new map of every measured song, placed by how it sounds: songs you've heard glow (brighter the longer you
 listened), saves are red, and everything still dark is your blind spot. Home's bottom row shows how much you've lit

@@ -69,7 +69,7 @@ How hard (Easy · Steady · Push, with a one-line meaning under each), songs (Bl
 ### During the run
 - **The screen stays on but black** (keep-awake, OLED black). Expo Go stops GPS and sensor updates when the app is in the background, so locking the phone would blind the app. The music keeps playing if the phone does get locked, and the app says so when you come back ("Your phone was locked for 4 minutes, so those minutes aren't in your run").
 - **Shown, big and dim:** current pace, the goal state ("On pace · Easy", "A bit fast, easing off", "Picking it up"), elapsed time and distance, and a small "164 steps/min · song 164 BPM" line.
-- **Touches are ignored** unless you **hold the screen for half a second.** That wakes the controls for 5 seconds: double-tap to like, swipe left to skip, swipe right to go back, plus End run. That protects against pocket touches.
+- **Touches are ignored** unless you **hold the screen for half a second.** That wakes the controls for 5 seconds: big Back, Like and Skip buttons, plus "Hold to end run". That protects against pocket touches. *(Built as buttons, not double-tap and swipes, since buttons are easier to find mid-run.)*
 - **Lock screen and earbuds:** the lock screen player shows the blind card's title ("Blind song #12"), never the real name, plus the jump-forward and jump-back buttons. A forward jump of 8 s or more counts as a skip and a backward jump as back. Single-press play/pause works as usual.
 - **Haptics:** a success buzz when a like lands, so you feel it in your pocket.
 

@@ -16,6 +16,14 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-10-22] Run mode
+Blind songs on a run, matched to your stride and steered toward an Easy, Steady or Push pace, with "your legs liked
+it" likes and a post-run reveal. Prototype 7 (device capability: accelerometer, GPS, keep-awake, haptics, lock screen
+audio). Spec `docs/superpowers/specs/2026-10-22-run-mode-design.md`, plan `docs/superpowers/plans/2026-10-22-run-mode.md`.
+Left for later: the run's print in the You tab and a shareable picture (never with the route), run songs as their own
+Library shelf (saves already carry `via: 'run'`), background GPS in a 1.0.4+ build so the phone can lock, and a
+Couch to 5K style run/walk plan.
+
 ## [2026-10-16] The Dark Map
 Every measured song on one map by how it sounds; what you've heard lights up and the dark is your blind spot. Tap
 somewhere dark and Home plays unheard songs from there, blind. Picked with real renders in the brainstorm (islands
