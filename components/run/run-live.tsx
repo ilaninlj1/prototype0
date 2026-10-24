@@ -90,7 +90,9 @@ export function RunLive({ state, goal, onLike, onSkip, onBack, onEnd }: Props) {
           </Pressable>
         </Animated.View>
       ) : (
-        <ThemedText style={styles.hint}>Hold anywhere for controls</ThemedText>
+        <Animated.View entering={FadeIn.delay(250)}>
+          <ThemedText style={styles.hint}>Hold anywhere for controls</ThemedText>
+        </Animated.View>
       )}
     </Pressable>
   );
@@ -98,17 +100,14 @@ export function RunLive({ state, goal, onLike, onSkip, onBack, onEnd }: Props) {
 
 function Control({ icon, label, onPress, big }: { icon: 'play-back' | 'heart' | 'play-forward'; label: string; onPress: () => void; big?: boolean }) {
   const size = big ? 84 : 64;
+  // The circle and its label are one target, so a tap anywhere on either counts.
   return (
-    <View style={styles.control}>
-      <Pressable
-        onPress={onPress}
-        style={[styles.circle, { width: size, height: size, borderRadius: size / 2 }, big && { backgroundColor: DarkColors.signal, borderColor: DarkColors.signal }]}
-        accessibilityRole="button"
-        accessibilityLabel={label}>
+    <Pressable onPress={onPress} style={styles.control} hitSlop={8} accessibilityRole="button" accessibilityLabel={label}>
+      <View style={[styles.circle, { width: size, height: size, borderRadius: size / 2 }, big && { backgroundColor: DarkColors.signal, borderColor: DarkColors.signal }]}>
         <Ionicons name={icon} size={big ? 34 : 26} color="#f3ead8" />
-      </Pressable>
+      </View>
       <ThemedText style={styles.controlLabel}>{label}</ThemedText>
-    </View>
+    </Pressable>
   );
 }
 
