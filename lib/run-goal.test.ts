@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { goalLine, goalPace, learnEasyPace, settledPace, steerFor, targetSpm } from './run-goal.ts';
+import { goalLine, goalPace, learnEasyPace, restride, settledPace, steerFor, targetSpm } from './run-goal.ts';
 import { EMPTY_PROFILE, type RunPoint } from './run-types.ts';
 
 const withEasy = { ...EMPTY_PROFILE, easyPace: 400 };
@@ -80,4 +80,27 @@ test('goal line copy', () => {
   assert.equal(goalLine('hold', 'steady', false), 'On pace · Steady');
   assert.equal(goalLine('ease', 'easy', false), 'A bit fast, easing off');
   assert.equal(goalLine('lift', 'push', false), 'Picking it up');
+});
+
+const strides = (spms: (number | null)[], start = 60_000) => spms.map((spm, i) => ({ t: start + i * 5000, spm }));
+
+test('restride: 30 s of running after a walking start re-learns the stride', () => {
+  assert.equal(restride(110, strides([158, 160, 162, 160, 161, 159, 160]), 90_000), 160);
+});
+
+test('restride: slowing from a run to a walk re-learns too', () => {
+  assert.equal(restride(160, strides([112, 110, 108, 110, 111, 109, 110]), 90_000), 110);
+});
+
+test('restride: within 10 % is a nudge, not a new stride', () => {
+  assert.equal(restride(110, strides([118, 119, 120, 118, 119, 120, 118]), 90_000), null);
+});
+
+test('restride: needs the change to last 30 s', () => {
+  assert.equal(restride(110, strides([160, 160, 160, 160]), 75_000), null);
+});
+
+test('restride: a stop or one step back near the old stride waits', () => {
+  assert.equal(restride(110, strides([160, 160, null, 160, 160, 160, 160]), 90_000), null);
+  assert.equal(restride(110, strides([160, 160, 112, 160, 160, 160, 160]), 90_000), null);
 });

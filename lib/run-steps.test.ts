@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { WALK_MAX_SPM, cadence, createMotionTracker, detectDoubleKnocks, detectSteps } from './run-steps.ts';
+import { WALK_MAX_SPM, cadence, createMotionTracker, detectKnocks, detectSteps } from './run-steps.ts';
 import type { AccelSample } from './run-types.ts';
 
 function mulberry32(seed: number): () => number {
@@ -95,7 +95,7 @@ test('a double knock on top of running is found once', () => {
     const peak = magnitude(samples[i]);
     assert.ok(Math.max(peak - magnitude(samples[i - 1]), peak - magnitude(samples[i + 1])) > 0.8);
   }
-  assert.deepEqual(detectDoubleKnocks(samples, steps), [knocks[1]]);
+  assert.deepEqual(detectKnocks(samples, steps), [knocks[1]]);
   const tracker = createMotionTracker();
   const reported: number[] = [];
   for (const sample of samples) {
@@ -103,35 +103,60 @@ test('a double knock on top of running is found once', () => {
   }
   assert.equal(reported.length, 1);
   assert.ok(reported[0] >= knocks[1] + 400);
-  assert.ok(reported[0] <= knocks[1] + 540);
+  assert.ok(reported[0] <= knocks[1] + 590);
   assertCadence(tracker.spm(60000), 165);
-  assert.deepEqual(detectDoubleKnocks(samples, [...steps, knocks[0] + 60]), []);
-  assert.deepEqual(detectDoubleKnocks(samples, [...steps, knocks[1] - 60]), []);
+  assert.deepEqual(detectKnocks(samples, [...steps, knocks[0] + 60]), []);
+  assert.deepEqual(detectKnocks(samples, [...steps, knocks[1] - 60]), []);
 });
 
 test('60 s of running alone finds no knocks', () => {
   for (const amplitude of [1.6, 3.2, 5]) {
     const samples = signal({ hz: 2.75, amplitude });
-    assert.deepEqual(detectDoubleKnocks(samples, detectSteps(samples)), []);
+    assert.deepEqual(detectKnocks(samples, detectSteps(samples)), []);
     // Wide impacts must be rejected even when no footstrike veto is available.
-    assert.deepEqual(detectDoubleKnocks(samples, []), []);
+    assert.deepEqual(detectKnocks(samples, []), []);
     const tracker = createMotionTracker();
     for (const sample of samples) assert.equal(tracker.push(sample).knock, false);
   }
 });
 
-test('a triple knock is not a double', () => {
-  for (const knocks of [[8000, 8250, 8500], [8000, 8250, 8650], [7800, 8250, 8500]]) {
+test('two or three quick knocks are one like', () => {
+  for (const knocks of [[8000, 8250], [8000, 8250, 8500], [8000, 8250, 8650], [7800, 8250, 8500]]) {
     const samples = signal({ duration: 10000, knocks });
-    assert.deepEqual(detectDoubleKnocks(samples, detectSteps(samples)), []);
+    assert.deepEqual(detectKnocks(samples, detectSteps(samples)), [knocks[knocks.length - 1]]);
     const tracker = createMotionTracker();
-    for (const sample of samples) assert.equal(tracker.push(sample).knock, false);
+    let likes = 0;
+    for (const sample of samples) if (tracker.push(sample).knock) likes++;
+    assert.equal(likes, 1, `knocks at ${knocks}`);
   }
+});
+
+test('knocks between strides count while walking or running', () => {
+  for (const [hz, knocks] of [[1.8, [10100, 10330]], [2.75, [10220, 10470, 10850]]] as [number, number[]][]) {
+    const samples = signal({ hz, knocks });
+    const steps = detectSteps(samples);
+    assert.deepEqual(detectKnocks(samples, steps), [knocks[knocks.length - 1]], `${hz} Hz`);
+  }
+});
+
+test('four knocks are not a like', () => {
+  const samples = signal({ duration: 10000, knocks: [7500, 7750, 8000, 8250] });
+  assert.deepEqual(detectKnocks(samples, detectSteps(samples)), []);
+  const tracker = createMotionTracker();
+  for (const sample of samples) assert.equal(tracker.push(sample).knock, false);
+});
+
+test('the tracker reports each tap it feels, even ones that are not a like', () => {
+  const samples = signal({ duration: 10000, knocks: [6000, 8000] });
+  const tracker = createMotionTracker();
+  let taps = 0;
+  for (const sample of samples) if (tracker.push(sample).tap) taps++;
+  assert.equal(taps, 2);
 });
 
 test('two knocks 700 ms apart are not a double', () => {
   const samples = signal({ duration: 10000, knocks: [8000, 8700] });
-  assert.deepEqual(detectDoubleKnocks(samples, detectSteps(samples)), []);
+  assert.deepEqual(detectKnocks(samples, detectSteps(samples)), []);
   const tracker = createMotionTracker();
   for (const sample of samples) assert.equal(tracker.push(sample).knock, false);
 });

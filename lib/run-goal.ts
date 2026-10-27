@@ -10,6 +10,8 @@ export const GOAL_NAMES: Record<Goal, string> = { easy: 'Easy', steady: 'Steady'
 const BAND = 0.05;
 const NUDGE = 0.02;
 const SPM_RANGE = 0.06;
+const RESTRIDE_MS = 30_000;
+const RESTRIDE_OFF = 0.1;
 const TALK_FACTOR: Record<TalkAnswer, number> = { yes: 0.98, mostly: 1, no: 1.04 };
 
 /** A typed pace wins; otherwise the learned Easy pace scaled to the goal; null before any learning. */
@@ -42,6 +44,23 @@ export function steerFor(pace: number | null, goal: number | null, opts: { first
 export function targetSpm(natural: number, current: number, steer: Steer): number {
   const aim = steer === 'ease' ? current * (1 - NUDGE) : steer === 'lift' ? current * (1 + NUDGE) : current;
   return Math.min(natural * (1 + SPM_RANGE), Math.max(natural * (1 - SPM_RANGE), aim));
+}
+
+/**
+ * A new natural step rate when the last 30 s all sit more than 10 % to one side of it: a walk became a run, or a
+ * run a walk. Steering's nudges stay within 6 %, so they can't cause this. A stop (no reading) waits.
+ */
+export function restride(natural: number, points: { t: number; spm: number | null }[], now: number): number | null {
+  const recent = points.filter((p) => p.t >= now - RESTRIDE_MS);
+  if (recent.length < 6 || recent[recent.length - 1].t - recent[0].t < RESTRIDE_MS - 5000) return null;
+  const spms = recent.map((p) => p.spm);
+  if (spms.some((spm) => spm == null)) return null;
+  const faster = spms.every((spm) => spm! > natural * (1 + RESTRIDE_OFF));
+  const slower = spms.every((spm) => spm! < natural * (1 - RESTRIDE_OFF));
+  if (!faster && !slower) return null;
+  const sorted = (spms as number[]).sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /** Next Easy pace from a finished run: the Easy pace it implies, 2 % faster for "yes", 4 % slower for "no". */

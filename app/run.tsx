@@ -57,7 +57,7 @@ export default function RunScreen() {
   if (run.state.phase === 'running')
     return (
       <DarkRoom>
-        <RunLive state={run.state} goal={goal} onLike={run.like} onSkip={run.skip} onBack={run.back} onEnd={end} />
+        <RunLive state={run.state} goal={goal} tapToLike={profile.knockOn} onLike={run.like} onSkip={run.skip} onBack={run.back} onEnd={end} />
       </DarkRoom>
     );
 

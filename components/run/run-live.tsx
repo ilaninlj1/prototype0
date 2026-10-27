@@ -14,13 +14,13 @@ import type { LiveState } from '@/hooks/use-run-session';
 
 const DIM = 'rgba(243, 234, 216, 0.55)';
 
-type Props = { state: LiveState; goal: Goal; onLike: () => void; onSkip: () => void; onBack: () => void; onEnd: () => void };
+type Props = { state: LiveState; goal: Goal; tapToLike: boolean; onLike: () => void; onSkip: () => void; onBack: () => void; onEnd: () => void };
 
 /**
  * The run's screen: black, so it costs almost nothing in a pocket. Touches do nothing until you hold the screen
  * for half a second; then Like, Skip, Back and End show for 5 s.
  */
-export function RunLive({ state, goal, onLike, onSkip, onBack, onEnd }: Props) {
+export function RunLive({ state, goal, tapToLike, onLike, onSkip, onBack, onEnd }: Props) {
   const insets = useSafeAreaInsets();
   const [awake, setAwake] = useState(false);
   const sleepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -91,6 +91,7 @@ export function RunLive({ state, goal, onLike, onSkip, onBack, onEnd }: Props) {
         </Animated.View>
       ) : (
         <Animated.View entering={FadeIn.delay(250)}>
+          {tapToLike ? <ThemedText style={styles.hint}>Tap your pocket 2 or 3 times to like a song</ThemedText> : null}
           <ThemedText style={styles.hint}>Hold anywhere for controls</ThemedText>
         </Animated.View>
       )}

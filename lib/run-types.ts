@@ -58,10 +58,15 @@ export type RunProfile = {
   /** Learned Easy pace in s/km, from talk-test answers. */
   easyPace: number | null;
   naturalSpm: number | null;
-  /** Knock to like is allowed once the tester caught 3 double knocks in a row. */
+  /** True once the person switched tap to like on or off themselves; until then it's on. */
   knockCalibrated: boolean;
   knockOn: boolean;
   runs: number;
 };
 
-export const EMPTY_PROFILE: RunProfile = { easyPace: null, naturalSpm: null, knockCalibrated: false, knockOn: false, runs: 0 };
+export const EMPTY_PROFILE: RunProfile = { easyPace: null, naturalSpm: null, knockCalibrated: false, knockOn: true, runs: 0 };
+
+/** Tap to like used to start off behind the tester; profiles saved then turn it on unless someone chose. */
+export function withKnockDefault(profile: RunProfile): RunProfile {
+  return profile.knockCalibrated ? profile : { ...profile, knockOn: true };
+}

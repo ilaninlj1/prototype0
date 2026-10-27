@@ -113,7 +113,7 @@ export function RunSetup({ profile, busy, problem, hasRuns, onStart, onKnock, on
       </Pressable>
       <View style={styles.footer}>
         <Pressable onPress={onKnock} hitSlop={8} style={styles.link}>
-          <ThemedText style={styles.linkText}>{profile.knockOn ? 'Knock to like is on' : 'Try knock to like'}</ThemedText>
+          <ThemedText style={styles.linkText}>{profile.knockOn ? 'Tap to like is on' : 'Tap to like is off'}</ThemedText>
         </Pressable>
         {hasRuns ? (
           <Pressable onPress={onRuns} hitSlop={8} style={styles.link}>

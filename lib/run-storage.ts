@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { EMPTY_PROFILE, type RunProfile, type RunRecord } from './run-types';
+import { EMPTY_PROFILE, type RunProfile, type RunRecord, withKnockDefault } from './run-types';
 
 // Runs stay on the phone: location never leaves it. Best-effort like discovery-storage.ts.
 const RUNS_KEY = 'blindspotDiscovery:runs';
@@ -36,7 +36,7 @@ export async function saveRun(run: RunRecord): Promise<void> {
 export async function loadRunProfile(): Promise<RunProfile> {
   try {
     const raw = await AsyncStorage.getItem(PROFILE_KEY);
-    return raw ? { ...EMPTY_PROFILE, ...JSON.parse(raw) } : EMPTY_PROFILE;
+    return raw ? withKnockDefault({ ...EMPTY_PROFILE, ...JSON.parse(raw) }) : EMPTY_PROFILE;
   } catch {
     return EMPTY_PROFILE;
   }

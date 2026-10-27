@@ -6,6 +6,16 @@ staleness.
 
 Add new entries at the top, newest first.
 
+## [2026-10-27] Run mode: tap to like that works, and the stride follows a walk-to-run switch
+Pocket taps did nothing on a phone, for three reasons. Taps were measured by the size of the acceleration, and a tap
+pushes an upright phone sideways, across gravity, where the size barely changes, so `spikes` now measures impulses as
+vectors. Standing still, the step finder read the tap itself as a step and vetoed it, so only steps in a stride (6
+within 5 s) veto now. And people tap three times: a quick burst of 2 or 3 taps is now one like (4 or more is not).
+Tap to like is on by default (profiles that never chose get it on, via `withKnockDefault`), the live screen says
+"Tap your pocket 2 or 3 times to like a song", and the tester is a practice screen with a taps-felt count and an
+on/off switch instead of a three-in-a-row gate. The stride used to stay within 6 % of the first 90 seconds, so a walk
+that became a run kept walking songs; `restride` re-learns it when 30 s of step rate sit more than 10 % to one side.
+
 ## [2026-10-27] Expo SDK 58
 The App Store's Expo Go moved to SDK 58 and only opens SDK 58 projects, so the Prototype 7 link stopped opening on
 iPhones ("Project is incompatible with this version of Expo Go"). Upgraded with `npx expo install expo@^58.0.0 --fix`

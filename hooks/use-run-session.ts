@@ -10,7 +10,7 @@ import { heardIds } from '@/lib/dark-map';
 import { hideFromDiscovery } from '@/lib/human-check-api';
 import { alreadyKnown } from '@/lib/known-artists';
 import { runCandidates } from '@/lib/pool';
-import { goalPace as goalPaceFor, settledPace, steerFor, targetSpm } from '@/lib/run-goal';
+import { goalPace as goalPaceFor, restride, settledPace, steerFor, targetSpm } from '@/lib/run-goal';
 import { seekJump } from '@/lib/run-gate';
 import { runNative } from '@/lib/run-native';
 import { createPaceTracker, haversineM } from '@/lib/run-pace';
@@ -283,6 +283,14 @@ export function useRunSession() {
       s.naturalSpm = median(s.points.filter((p) => p.t >= 30_000 && p.spm != null).map((p) => p.spm!)) ?? spm ?? s.spmTarget;
       s.spmTarget = s.naturalSpm;
       s.lastSteerAt = t - STEER_MS; // steer right away
+    } else {
+      // A walk became a run, or a run a walk: learn the new stride and pick the next song for it.
+      const stride = restride(s.naturalSpm, s.points, at);
+      if (stride != null) {
+        s.naturalSpm = stride;
+        s.spmTarget = targetSpm(stride, spm ?? stride, s.steer ?? 'hold');
+        if (!s.fading) pickAhead(s);
+      }
     }
 
     // A first run with no goal takes its settled pace from minutes 2 to 4.

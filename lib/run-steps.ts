@@ -65,11 +65,16 @@ export function cadence(stepTimes: number[], now: number, windowMs = 10000): num
 
 type Spike = { t: number; strong: boolean; narrow: boolean };
 
+/**
+ * Impulses measured as vectors, not as the size of the acceleration: a pocket tap pushes an upright phone
+ * sideways, across gravity, which barely changes the size (1 g with a 0.5 g side push is still 1.12 g).
+ */
 function spikes(samples: AccelSample[]): Spike[] {
-  const magnitude = magnitudes(samples);
   const groups: { start: number; end: number; strong: boolean }[] = [];
   for (let i = 1; i < samples.length; i++) {
-    const jerk = Math.abs(magnitude[i] - magnitude[i - 1]);
+    const a = samples[i];
+    const b = samples[i - 1];
+    const jerk = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
     // Weaker impulses can veto a noisy triple, but can never count as a knock.
     if (jerk <= 0.6) continue;
     const previous = groups[groups.length - 1];
@@ -82,18 +87,25 @@ function spikes(samples: AccelSample[]): Spike[] {
   }
 
   return groups.map(({ start, end, strong }) => {
+    // Leave out the sample before the jerk: it may be the impulse's falling edge.
+    const from = Math.max(0, start - 6);
+    const to = Math.max(from + 1, start - 1);
+    const base = { x: 0, y: 0, z: 0 };
+    for (let i = from; i < to; i++) {
+      base.x += samples[i].x / (to - from);
+      base.y += samples[i].y / (to - from);
+      base.z += samples[i].z / (to - from);
+    }
+    const away = (i: number) => Math.hypot(samples[i].x - base.x, samples[i].y - base.y, samples[i].z - base.z);
+
     let peak = start - 1;
     for (let i = start; i <= end; i++) {
-      if (magnitude[i] > magnitude[peak]) peak = i;
+      if (away(i) > away(peak)) peak = i;
     }
     const spike = { t: samples[peak].t, strong, narrow: false };
     if (start < 6 || samples[end].t - samples[start].t > 30) return spike;
-
-    // Leave out the sample before the jerk: it may be the impulse's falling edge.
-    let baseline = 0;
-    for (let i = start - 6; i < start - 1; i++) baseline += magnitude[i] / 5;
-    if (magnitude[peak] - baseline < 0.3) return spike;
-    const settled = (i: number) => Math.abs(magnitude[i] - baseline) < 0.3;
+    if (away(peak) < 0.3) return spike;
+    const settled = (i: number) => away(i) < 0.3;
 
     let onset = peak;
     while (onset > 0 && !settled(onset - 1)) onset--;
@@ -113,31 +125,43 @@ function spikes(samples: AccelSample[]): Spike[] {
   });
 }
 
-/** Returns second-knock times only after the complete third-spike exclusion window. */
-export function detectDoubleKnocks(samples: AccelSample[], stepTimes: number[]): number[] {
-  if (samples.length === 0) return [];
-  const candidates = spikes(samples).filter(spike => spike.strong || spike.narrow);
-  const doubles: number[] = [];
-  const now = samples[samples.length - 1].t;
-  for (let i = 0; i + 1 < candidates.length; i++) {
-    const first = candidates[i];
-    const second = candidates[i + 1];
-    const gap = second.t - first.t;
-    if (!first.strong || !second.strong || !first.narrow || !second.narrow) continue;
-    if (gap < 120 || gap > 450) continue;
-    // An extra 40 ms also reveals a third impulse whose qualifying jerk is its fall.
-    if (first.t - samples[0].t < 450 || now - second.t < 440) continue;
-    if (i > 0 && first.t - candidates[i - 1].t <= 450) continue;
-    if (i + 2 < candidates.length && candidates[i + 2].t - second.t <= 400) continue;
-    if (stepTimes.some(t => Math.abs(t - first.t) <= 60 || Math.abs(t - second.t) <= 60)) continue;
-    doubles.push(second.t);
-  }
-  return doubles;
+/** Times of the sharp, narrow taps a knock is made of, whether or not they make a like. */
+export function detectTaps(samples: AccelSample[]): number[] {
+  return spikes(samples).filter(spike => spike.strong && spike.narrow).map(spike => spike.t);
 }
 
-/** Retains 15 s, checks knocks every ten samples, and reports each confirmed pair once. */
+/**
+ * The last tap of every quick burst of 2 or 3 knocks (each 120–450 ms after the one before), reported only once
+ * nothing has followed it for 490 ms. Four or more, a weak impulse in the burst, or a footstrike within 60 ms of
+ * any of them is not a like.
+ */
+export function detectKnocks(samples: AccelSample[], stepTimes: number[]): number[] {
+  if (samples.length === 0) return [];
+  const candidates = spikes(samples).filter(spike => spike.strong || spike.narrow);
+  const knocks: number[] = [];
+  const now = samples[samples.length - 1].t;
+  for (let i = 0; i < candidates.length; ) {
+    let j = i;
+    while (j + 1 < candidates.length && candidates[j + 1].t - candidates[j].t <= 450) j++;
+    const burst = candidates.slice(i, j + 1);
+    i = j + 1;
+    if (burst.length < 2 || burst.length > 3) continue;
+    if (!burst.every(spike => spike.strong && spike.narrow)) continue;
+    if (burst.some((spike, k) => k > 0 && spike.t - burst[k - 1].t < 120)) continue;
+    const last = burst[burst.length - 1].t;
+    // An extra 40 ms also reveals a following impulse whose qualifying jerk is its fall.
+    if (burst[0].t - samples[0].t < 450 || now - last < 490) continue;
+    // Standing still, the step finder reads the knock itself as a step; only steps in a stride can veto.
+    const striding = stepTimes.filter(t => Math.abs(t - last) <= 5000).length >= 6;
+    if (striding && burst.some(spike => stepTimes.some(t => Math.abs(t - spike.t) <= 60))) continue;
+    knocks.push(last);
+  }
+  return knocks;
+}
+
+/** Retains 15 s, checks knocks every ten samples, and reports each tap and each confirmed burst once. */
 export function createMotionTracker(): {
-  push(s: AccelSample): { knock: boolean };
+  push(s: AccelSample): { knock: boolean; tap: boolean };
   spm(now: number): number | null;
   steps(): number[];
 } {
@@ -146,6 +170,7 @@ export function createMotionTracker(): {
   let dirty = false;
   let pending = 0;
   let lastKnock = -Infinity;
+  let lastTap = -Infinity;
 
   function refreshSteps(): void {
     if (!dirty) return;
@@ -158,14 +183,14 @@ export function createMotionTracker(): {
       samples.push({ ...s });
       while (samples.length && samples[0].t < s.t - 15000) samples.shift();
       dirty = true;
-      if (++pending < 10) return { knock: false };
+      if (++pending < 10) return { knock: false, tap: false };
       pending = 0;
       refreshSteps();
-      const detected = detectDoubleKnocks(samples, stepTimes);
-      const fresh = detected.filter(t => t > lastKnock);
-      if (fresh.length === 0) return { knock: false };
-      lastKnock = fresh[fresh.length - 1];
-      return { knock: true };
+      const taps = detectTaps(samples).filter(t => t > lastTap);
+      if (taps.length) lastTap = taps[taps.length - 1];
+      const fresh = detectKnocks(samples, stepTimes).filter(t => t > lastKnock);
+      if (fresh.length) lastKnock = fresh[fresh.length - 1];
+      return { knock: fresh.length > 0, tap: taps.length > 0 };
     },
     spm(now) {
       refreshSteps();
