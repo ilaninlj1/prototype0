@@ -6,6 +6,15 @@ staleness.
 
 Add new entries at the top, newest first.
 
+## [2026-10-27] Expo SDK 58
+The App Store's Expo Go moved to SDK 58 and only opens SDK 58 projects, so the Prototype 7 link stopped opening on
+iPhones ("Project is incompatible with this version of Expo Go"). Upgraded with `npx expo install expo@^58.0.0 --fix`
+(React Native 0.88, React 19.3, Reanimated 4.7, Gesture Handler 3.3, Skia 2.14) and a fresh lockfile, since the old
+one pinned expo-router 57's `@expo/ui`. React Native's strict types made refs `ViewInstance` / `ScrollViewInstance`
+and styles read-only (`ThemedText` no longer writes into the flattened style). Expo Router's tab bar no longer gets
+`navigation`, so `BlindspotTabBar` presses through `emitter` and `navigateToTab`. Native versions changed, so the
+app is now 1.0.5.
+
 ## Format
 
 ```

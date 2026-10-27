@@ -2,7 +2,7 @@ import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import type { ReactNode, RefObject } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type ViewInstance } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
 import { ThemedText } from '@/components/themed-text';
@@ -14,7 +14,7 @@ import type { Tier } from '@/lib/you-stats';
 // they're shared, like the Decoded share card.
 
 /** Saves a card as a picture and opens the share sheet. `size` sets the picture's pixels (an Instagram story: 1080×1920). */
-export async function shareCard(ref: RefObject<View | null>, title: string, size?: { width: number; height: number }) {
+export async function shareCard(ref: RefObject<ViewInstance | null>, title: string, size?: { width: number; height: number }) {
   try {
     const uri = await captureRef(ref, { format: 'png', quality: 1, result: 'tmpfile', ...size });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -135,7 +135,7 @@ const LAYER = {
 } as const;
 
 /** Your blind finds as an iceberg: famous above the water, buried at the bottom. */
-export function IcebergCard({ cardRef, tiers }: { cardRef: RefObject<View | null>; tiers: Tier[] }) {
+export function IcebergCard({ cardRef, tiers }: { cardRef: RefObject<ViewInstance | null>; tiers: Tier[] }) {
   return (
     <View ref={cardRef} collapsable={false} style={styles.shareCard}>
       <ThemedText style={styles.shareEyebrow}>My Blindspot iceberg</ThemedText>
@@ -179,7 +179,7 @@ export function ReceiptCard({
   median,
   date,
 }: {
-  cardRef: RefObject<View | null>;
+  cardRef: RefObject<ViewInstance | null>;
   lines: { song: string; artist: string; price: string }[];
   total: number;
   median: string | null;
@@ -229,7 +229,7 @@ export function ReceiptCard({
 }
 
 /** Your most-saved Spotify artists as a festival lineup: headliners big, then smaller rows. */
-export function PosterCard({ cardRef, artists, year }: { cardRef: RefObject<View | null>; artists: string[]; year: number }) {
+export function PosterCard({ cardRef, artists, year }: { cardRef: RefObject<ViewInstance | null>; artists: string[]; year: number }) {
   const rows = [artists.slice(0, 3), artists.slice(3, 9), artists.slice(9, 18)];
   return (
     <View ref={cardRef} collapsable={false} style={styles.poster}>

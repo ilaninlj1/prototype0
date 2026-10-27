@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import type { RefObject } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type ViewInstance } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
@@ -8,7 +8,7 @@ import { artworkUrl } from '@/lib/discovery';
 import type { Finding } from '@/lib/taste-decoded';
 
 /** What "Share my taste" sends, shown as-is above the button: the top finding, up to 3 covers, and where it came from. */
-export function ShareCard({ cardRef, finding }: { cardRef: RefObject<View | null>; finding: Finding }) {
+export function ShareCard({ cardRef, finding }: { cardRef: RefObject<ViewInstance | null>; finding: Finding }) {
   const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   return (
     <View ref={cardRef} collapsable={false} style={styles.card}>

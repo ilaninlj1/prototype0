@@ -5,6 +5,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  type ScrollViewInstance,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
@@ -50,7 +51,7 @@ export function GenrePicker({
     onOpenChange?.(open);
   };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const rowOffsets = useRef(new Map<string, number>());
   const scrolledForRef = useRef<string | null>(null);
 

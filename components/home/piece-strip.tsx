@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type ViewInstance } from 'react-native';
 
 import { PieceView } from '@/components/print/piece-view';
 import { ThemedText } from '@/components/themed-text';
@@ -31,7 +31,7 @@ export function slotCenter(piece: Piece, rect: StripRect): { x: number; y: numbe
 /** Your piece under the card: one line of prints that grows with every swipe. Same height empty or full, so nothing shifts. */
 export function PieceStrip({ piece, onPress, onLayoutStrip }: { piece: Piece; onPress: () => void; onLayoutStrip: (rect: StripRect) => void }) {
   const [width, setWidth] = useState(0);
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewInstance>(null);
   const n = piece.marks.length;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`Your piece, ${n} of ${PIECE.slots} prints`}>

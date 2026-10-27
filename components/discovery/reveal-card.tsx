@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FlipInEasyY, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { AppleMusicLink, SpotifyLink, LastfmLink } from '@/components/credits';
@@ -47,7 +47,7 @@ type RevealCardProps = {
 export function RevealCard({ track, listeners, width, onDone, onSave, extra }: RevealCardProps) {
   const router = useRouter();
   const { player, status } = usePlayback();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const moreY = useRef(0);
   // The cover arrives still blurred, as it was on the blind card, then sharpens.
   const blur = useSharedValue(1);

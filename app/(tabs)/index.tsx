@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, View, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FindsNewsSheet } from '@/components/finds-news-sheet';
@@ -309,7 +309,7 @@ export default function HomeScreen() {
   );
 
   // What a save needs to fly from the card into the You tab, read by the listener below.
-  const cardAreaViewRef = useRef<View>(null);
+  const cardAreaViewRef = useRef<ViewInstance>(null);
   const isFocused = useIsFocused();
   const flightRef = useRef({ focused: false, revealId: null as number | null, tracks: [] as DiscoveryTrack[], cardHeight: 0 });
   useEffect(() => {

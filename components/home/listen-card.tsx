@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type ViewInstance } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
@@ -92,7 +92,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   const duration = useSharedValue(0);
   const furthest = useSharedValue(0);
   const isRevealed = useSharedValue(revealed);
-  const badgeRef = useRef<View>(null);
+  const badgeRef = useRef<ViewInstance>(null);
 
   // Listening develops the print: the particles gather as the song plays, fully formed at 80% of the preview.
   // It follows the furthest point heard, so a replay never undoes it.

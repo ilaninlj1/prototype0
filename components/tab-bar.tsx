@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import type { Tabs } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
-import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
+import { type LayoutChangeEvent, Pressable, StyleSheet, View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -31,7 +31,7 @@ const INDICATOR = 22;
  * On Home it fades with Home's buttons (lib/home-chrome.ts) and keeps its
  * height, so nothing above it moves.
  */
-export function BlindspotTabBar({ state, navigation }: TabBarProps) {
+export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const [tabWidth, setTabWidth] = useState(0);
@@ -57,7 +57,7 @@ export function BlindspotTabBar({ state, navigation }: TabBarProps) {
   const fade = useAnimatedStyle(() => ({ opacity: opacity.get() }));
 
   // A save on Home lands on Library: the icon bumps, and a +N stays until you open it.
-  const libraryRef = useRef<View>(null);
+  const libraryRef = useRef<ViewInstance>(null);
   const bump = useSharedValue(1);
   const [newSaves, setNewSaves] = useState(0);
   if (focusedName === 'library' && newSaves > 0) setNewSaves(0);
@@ -127,8 +127,8 @@ export function BlindspotTabBar({ state, navigation }: TabBarProps) {
               accessibilityLabel={route.name === 'library' && newSaves > 0 ? `${icon.label}, ${newSaves} new` : icon.label}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-                if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+                const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+                if (!focused && !event.defaultPrevented) navigateToTab(route.key);
               }}>
               {route.name === 'library' ? (
                 <Animated.View ref={libraryRef} style={bumpStyle}>

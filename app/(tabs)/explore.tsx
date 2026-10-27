@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, useWindowDimensions, View, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DecodedLine } from '@/components/decoded/decoded-line';
@@ -97,10 +97,10 @@ export default function ProfileScreen() {
   const [importNote, setImportNote] = useState<string | null>(null);
   // "Today" for streaks and dates, refreshed each time you open the tab.
   const [today, setToday] = useState(() => Date.now());
-  const icebergRef = useRef<View>(null);
-  const receiptRef = useRef<View>(null);
-  const posterRef = useRef<View>(null);
-  const storyRef = useRef<View>(null);
+  const icebergRef = useRef<ViewInstance>(null);
+  const receiptRef = useRef<ViewInstance>(null);
+  const posterRef = useRef<ViewInstance>(null);
+  const storyRef = useRef<ViewInstance>(null);
   const [storyAt, setStoryAt] = useState(0);
   // Piece first, then what you found, then the numbers.
   const [view, setView] = useState<YouView>('piece');

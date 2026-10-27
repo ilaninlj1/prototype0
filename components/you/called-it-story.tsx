@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import type { RefObject } from 'react';
-import { View } from 'react-native';
+import { View, type ViewInstance } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
@@ -16,7 +16,7 @@ const BASE = 360;
  * their listeners the day you saved them to now, and the growth. Only the two ends of the line
  * are data, so only they get labels.
  */
-export function CalledItStory({ cardRef, story, width }: { cardRef: RefObject<View | null>; story: CalledStory; width: number }) {
+export function CalledItStory({ cardRef, story, width }: { cardRef: RefObject<ViewInstance | null>; story: CalledStory; width: number }) {
   const k = width / BASE;
   const s = (n: number) => Math.round(n * k * 10) / 10;
   const found = new Date(story.track.likedAt!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
