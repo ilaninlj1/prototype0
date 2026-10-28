@@ -65,7 +65,7 @@ export function CoverCell({ track, listenersNow, today, call, onShare, playing, 
         {found && (
           <ThemedText style={styles.found} numberOfLines={2}>
             {found.text}
-            {found.change && <ThemedText style={[styles.found, found.up && styles.up]}> · {found.change}</ThemedText>}
+            {found.change && <ThemedText style={[styles.found, found.up && styles.up]}>{` · ${found.change.replace(' ', '\u00a0')}`}</ThemedText>}
           </ThemedText>
         )}
         {call && <ThemedText style={styles.found}>{callLabel(call, listenersNow)}</ThemedText>}

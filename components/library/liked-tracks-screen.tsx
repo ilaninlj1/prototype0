@@ -352,10 +352,12 @@ export function LikedTracksScreen() {
               </ScrollView>
             )}
 
-            <ThemedText style={styles.hint}>
-              {query.trim() ? `${shown.length} ${shown.length === 1 ? 'match' : 'matches'}` : pluralize(shown.length, 'song')}
-              {selectionMode ? ' · tap covers to pick them' : ' · tap a cover to play it, hold to pick'}
-            </ThemedText>
+            {shown.length > 0 && (
+              <ThemedText style={styles.hint}>
+                {query.trim() ? `${shown.length} ${shown.length === 1 ? 'match' : 'matches'}` : pluralize(shown.length, 'song')}
+                {selectionMode ? ' · tap covers to pick them' : ' · tap a cover to play it, hold to pick'}
+              </ThemedText>
+            )}
 
             {shown.length === 0 ? (
               <View style={styles.noMatch}>
