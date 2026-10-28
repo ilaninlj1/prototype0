@@ -21,9 +21,10 @@ export const Colors = {
   rule: 'rgba(17, 17, 17, 0.10)',
 
   text: '#111111',
+  // 5.3:1 on white, 4.8:1 on the grey surface.
   textSecondary: '#6B6B6B',
-  // Large text and decoration only: 3.5:1 on white.
-  textTertiary: '#8A8A8A',
+  // The quietest text: 4.5:1 on white only, so never small on the grey surface.
+  textTertiary: '#767676',
 
   // Buttons and selected states: black with white text (18.9:1).
   accent: '#111111',
@@ -33,8 +34,9 @@ export const Colors = {
 
   highlight: '#f4c542',
 
-  destructive: '#E63946',
-  positive: '#2E8B57',
+  // Darker than the signal so a small "Delete" or "+2%" still reads (5.6:1 and 5.3:1 on white).
+  destructive: '#C62828',
+  positive: '#1F7A4A',
 
   tint: '#111111',
   icon: '#6B6B6B',
@@ -122,6 +124,8 @@ export const Fonts = {
   display: 'Archivo_800ExtraBold',
   displayBold: 'Archivo_700Bold',
   sans: 'Figtree_400Regular',
+  sansSemiBold: 'Figtree_600SemiBold',
+  sansBold: 'Figtree_700Bold',
   mono: 'DMMono_400Regular',
   monoMedium: 'DMMono_500Medium',
   // Handwritten touches, used sparingly: stickers and margin notes.
@@ -147,9 +151,19 @@ export function fontFor(family: string | undefined, weight: string | number | un
   return FIGTREE[String(weight)] ?? (Number(weight) >= 700 ? FIGTREE['700'] : family);
 }
 
+// The old label: small tracked-out uppercase mono, like a record's catalog
+// line. Only the dark rooms (Edition, Dark Map, Rewind) still use it.
+const MONO_LABEL = {
+  fontFamily: Fonts.monoMedium,
+  fontSize: 12,
+  lineHeight: 16,
+  letterSpacing: 1.2,
+  textTransform: 'uppercase' as const,
+};
+
 // Type with a point of view: heavy Archivo for anything you should read
-// first; small tracked-out mono "eyebrows" above it, like a label's catalog
-// line; Figtree for everything you read after.
+// first; a small grey sentence-case line above it; Figtree for everything you
+// read after. DM Mono is for numbers.
 export const Typography = {
   hero: {
     fontFamily: Fonts.display,
@@ -170,11 +184,9 @@ export const Typography = {
     letterSpacing: -0.2,
   },
   eyebrow: {
-    fontFamily: Fonts.monoMedium,
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase' as const,
+    fontFamily: Fonts.sansSemiBold,
+    fontSize: 13,
+    lineHeight: 18,
     color: Colors.textSecondary,
   },
   number: {
@@ -223,18 +235,21 @@ export const Typography = {
 /** Smallest comfortable tap target, even when the visual is smaller. */
 export const TapTarget = 44;
 
+/** Typography inside a dark room: the same styles, with the old mono eyebrow. ThemedText maps the colors. */
+export const DarkTypography = { ...Typography, eyebrow: { ...MONO_LABEL, color: Colors.textSecondary } };
+
 /**
- * Flat controls shared across screens: plain text or a thin cream outline,
- * never a filled rounded pill.
+ * Controls shared across light screens: plain text, or a pill with a thin
+ * outline (fill it black for the one main action on a screen).
  */
 export const Ui = {
   textButton: { minHeight: TapTarget, minWidth: TapTarget, justifyContent: 'center' as const },
   outlineButton: {
     minHeight: TapTarget,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.hairline,
-    borderRadius: Radius.sm,
+    borderRadius: TapTarget / 2,
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
@@ -251,12 +266,20 @@ export const Ui = {
     fontFamily: Fonts.sans,
     fontSize: 16,
   },
-  /** Mono uppercase, for button labels and section labels. */
-  label: { fontFamily: Fonts.monoMedium, fontSize: 12, lineHeight: 16, letterSpacing: 1.2, textTransform: 'uppercase' as const, color: Colors.text },
+  /** Sentence-case Figtree, for button labels and section labels. */
+  label: { fontFamily: Fonts.sansSemiBold, fontSize: 14, lineHeight: 18, color: Colors.text },
+};
+
+// The dark rooms keep the controls they were designed with: square-ish outlines and mono uppercase labels.
+const MONO_UI = {
+  textButton: Ui.textButton,
+  outlineButton: { ...Ui.outlineButton, paddingHorizontal: Spacing.md, borderRadius: Radius.sm },
+  input: Ui.input,
+  label: { ...MONO_LABEL, color: Colors.text },
 };
 
 const darkenStyle = <T extends object>(style: T): T =>
   Object.fromEntries(Object.entries(style).map(([k, v]) => [k, typeof v === 'string' ? toDark(v) : v])) as T;
 
-/** Ui for the dark rooms (Edition, Dark Map, Rewind): the same controls with navy-set colors. */
-export const DarkUi = Object.fromEntries(Object.entries(Ui).map(([k, v]) => [k, darkenStyle(v)])) as typeof Ui;
+/** Ui for the dark rooms (Edition, Dark Map, Rewind): their own controls, with navy-set colors. */
+export const DarkUi = Object.fromEntries(Object.entries(MONO_UI).map(([k, v]) => [k, darkenStyle(v)])) as typeof MONO_UI;
