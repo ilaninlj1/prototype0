@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { AccessibilityInfo, Platform } from 'react-native';
 
+import { useScreenReader } from '@/hooks/use-screen-reader';
 import { chromeVisible, msUntilHide, pinnedOpen, type ChromeState } from '@/lib/home-chrome';
 
 // Home writes, the tab bar reads: the bar lives outside Home but fades with its buttons.
@@ -39,21 +39,8 @@ const woken = (): Clock => {
  */
 export function useHomeChrome(inputs: Inputs) {
   const [clock, setClock] = useState(woken);
-  const [screenReader, setScreenReader] = useState(false);
-
-  useEffect(() => {
-    // react-native-web can't tell and always answers yes, which would pin the buttons for good on web.
-    if (Platform.OS === 'web') return;
-    let live = true;
-    AccessibilityInfo.isScreenReaderEnabled().then((on) => {
-      if (live) setScreenReader(on);
-    });
-    const sub = AccessibilityInfo.addEventListener('screenReaderChanged', setScreenReader);
-    return () => {
-      live = false;
-      sub.remove();
-    };
-  }, []);
+  // Off on the web, which can't tell and always answers yes (that would pin the buttons for good).
+  const screenReader = useScreenReader();
 
   const state: ChromeState = { ...inputs, ...clock, screenReader };
   const visible = chromeVisible(state);

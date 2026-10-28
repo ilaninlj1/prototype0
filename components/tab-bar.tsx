@@ -11,8 +11,10 @@ import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
 import { useDailyDrop } from '@/hooks/use-daily-drop';
 import { useHomeChromeVisible } from '@/hooks/use-home-chrome';
+import { tabBarScrollHidden } from '@/hooks/use-scroll-chrome';
 import { onDecodedNews } from '@/hooks/use-taste-decoded';
 import { FADE_MS, tabBarVisible } from '@/lib/home-chrome';
+import { tabBarScrollShare } from '@/lib/scroll-chrome';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -28,8 +30,9 @@ const INDICATOR = 22;
 
 /**
  * Edge to edge under a thin rule; a short black bar springs to the active tab.
- * On Home it fades with Home's buttons (lib/home-chrome.ts) and keeps its
- * height, so nothing above it moves.
+ * On Home it fades with Home's buttons (lib/home-chrome.ts); on the other tabs
+ * it slides away while you scroll down a list (lib/scroll-chrome.ts). Either
+ * way it keeps its height, so nothing above it moves.
  */
 export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) {
   const insets = useSafeAreaInsets();
@@ -54,7 +57,13 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
   useEffect(() => {
     opacity.set(reduceMotion ? (shown ? 1 : 0) : withTiming(shown ? 1 : 0, { duration: FADE_MS }));
   }, [shown, reduceMotion, opacity]);
-  const fade = useAnimatedStyle(() => ({ opacity: opacity.get() }));
+  // Home's fade and the scroll slide multiply; tabBarScrollShare keeps the scroll out of it on Home.
+  const height = useSharedValue(0);
+  const onHome = focusedName === 'index';
+  const fade = useAnimatedStyle(() => {
+    const away = tabBarScrollShare(onHome ? 'index' : 'other', tabBarScrollHidden.get());
+    return { opacity: opacity.get() * Math.min(1, Math.max(0, 1 - away * 1.2)), transform: [{ translateY: away * height.get() }] };
+  });
 
   // A save on Home lands on Library: the icon bumps, and a +N stays until you open it.
   const libraryRef = useRef<ViewInstance>(null);
@@ -99,6 +108,7 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
 
   return (
     <Animated.View
+      onLayout={(e) => height.set(e.nativeEvent.layout.height)}
       style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, Spacing.md) }, fade]}
       pointerEvents={shown ? 'auto' : 'none'}
       accessibilityElementsHidden={!shown}
