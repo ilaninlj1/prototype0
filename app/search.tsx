@@ -1,25 +1,50 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, TapTarget } from '@/constants/theme';
+import { useScrollChrome } from '@/hooks/use-scroll-chrome';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { lookupTracks, searchMusic, type SearchResults } from '@/lib/song-details';
 import { groupTalkedAbout } from '@/lib/song-facts';
 import { fetchRecentCommentRows } from '@/lib/supabase';
 
-/** Look up any song, artist or album. Search runs on Return, not per keystroke (iTunes rate-limits hard). */
+/**
+ * Look up any song, artist or album. Search runs on Return, not per keystroke
+ * (iTunes rate-limits hard). `?q=` (from the Library's "Search all music")
+ * starts with that search. The search bar slides away while you scroll down
+ * the results and comes back on a short scroll up.
+ */
 export default function SearchScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [term, setTerm] = useState('');
+  const { q } = useLocalSearchParams<{ q?: string }>();
+  const [term, setTerm] = useState(q ?? '');
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
   const [talked, setTalked] = useState<{ track: DiscoveryTrack; count: number }[]>([]);
+  const [typing, setTyping] = useState(!q);
+  const [barHeight, setBarHeight] = useState(insets.top + Spacing.md + TapTarget + Spacing.md);
+  const chrome = useScrollChrome({ pinned: typing, tabBar: false });
+
+  useEffect(() => {
+    if (!q?.trim()) return;
+    let live = true;
+    setLoading(true);
+    searchMusic(q.trim()).then((r) => {
+      if (!live) return;
+      setResults(r);
+      setLoading(false);
+    });
+    return () => {
+      live = false;
+    };
+  }, [q]);
 
   useEffect(() => {
     (async () => {
@@ -41,35 +66,19 @@ export default function SearchScreen() {
   const openSong = (t: DiscoveryTrack) => router.push({ pathname: '/song', params: { id: String(t.id) } });
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + Spacing.md }]}>
-      <View style={styles.bar}>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Ionicons name="chevron-back" size={26} color={Colors.text} />
-        </Pressable>
-        <View style={styles.inputWrap}>
-          <Ionicons name="search" size={18} color={Colors.textTertiary} />
-          <TextInput
-            value={term}
-            onChangeText={setTerm}
-            onSubmitEditing={run}
-            placeholder="Any song, artist or album"
-            placeholderTextColor={Colors.textTertiary}
-            returnKeyType="search"
-            autoFocus
-            style={styles.input}
-          />
-        </View>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+    <View style={styles.screen}>
+      <Animated.ScrollView
+        {...chrome.scrollProps}
+        contentContainerStyle={[styles.scroll, { paddingTop: barHeight }]}
+        keyboardShouldPersistTaps="handled">
         {loading && <ActivityIndicator color={Colors.text} style={{ marginTop: Spacing.xl }} />}
 
         {!results && !loading && (
           <>
             <Pressable style={styles.chartsLink} onPress={() => router.push('/charts')}>
-              <Ionicons name="trending-up" size={20} color={Colors.signal} />
+              <Ionicons name="trending-up" size={20} color={Colors.text} />
               <ThemedText style={styles.chartsText}>World charts · what&apos;s rising today</ThemedText>
-              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+              <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
             </Pressable>
             <ThemedText type="eyebrow" style={styles.section}>
               What people are talking about
@@ -142,7 +151,35 @@ export default function SearchScreen() {
             {results.songs.length === 0 && <ThemedText style={styles.note}>Nothing found. Try the artist&apos;s name.</ThemedText>}
           </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
+
+      <Animated.View
+        style={[styles.bar, { paddingTop: insets.top + Spacing.md }, chrome.barStyle]}
+        onLayout={(e) => {
+          chrome.onBarLayout(e);
+          setBarHeight(e.nativeEvent.layout.height);
+        }}>
+        <Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Back">
+          <Ionicons name="chevron-back" size={24} color={Colors.text} />
+        </Pressable>
+        <View style={styles.inputWrap}>
+          <Ionicons name="search" size={18} color={Colors.textSecondary} />
+          <TextInput
+            value={term}
+            onChangeText={setTerm}
+            onSubmitEditing={run}
+            onFocus={() => setTyping(true)}
+            onBlur={() => setTyping(false)}
+            placeholder="Any song, artist or album"
+            placeholderTextColor={Colors.textSecondary}
+            returnKeyType="search"
+            autoFocus={!q}
+            style={styles.input}
+            accessibilityLabel="Search all music"
+          />
+        </View>
+      </Animated.View>
+      <View style={[styles.statusStrip, { height: insets.top }]} />
     </View>
   );
 }
@@ -159,30 +196,43 @@ function SongRow({ track, detail, onPress }: { track: DiscoveryTrack; detail: st
           {detail}
         </ThemedText>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+      <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md },
-  inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: Spacing.md },
-  input: { flex: 1, color: Colors.text, fontFamily: Fonts.sans, fontSize: 16, paddingVertical: Spacing.md },
+  bar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+    backgroundColor: Colors.background,
+  },
+  statusStrip: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: Colors.background },
+  back: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: TapTarget / 2, paddingHorizontal: Spacing.lg, minHeight: TapTarget },
+  input: { flex: 1, color: Colors.text, fontFamily: Fonts.sans, fontSize: 16, minHeight: TapTarget },
   scroll: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl },
   section: { marginTop: Spacing.xl, marginBottom: Spacing.sm },
-  chartsLink: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, marginTop: Spacing.lg },
+  chartsLink: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: 20, padding: Spacing.lg, marginTop: Spacing.sm },
   chartsText: { flex: 1, fontFamily: 'Figtree_600SemiBold' },
   note: { fontFamily: Fonts.note, fontSize: 20, lineHeight: 24, color: Colors.textSecondary, marginTop: Spacing.sm },
   hRow: { gap: Spacing.md },
   artist: { width: 96, alignItems: 'center', gap: 6 },
   artistArt: { width: 96, height: 96, borderRadius: Radius.round },
   album: { width: 130, gap: 2 },
-  albumArt: { width: 130, height: 130, borderRadius: Radius.md },
+  albumArt: { width: 130, height: 130, borderRadius: 16 },
   cap: { fontFamily: 'Figtree_700Bold', fontSize: 14, lineHeight: 18 },
   capDim: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm },
-  rowArt: { width: 56, height: 56, borderRadius: Radius.sm },
+  rowArt: { width: 56, height: 56, borderRadius: Radius.lg },
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
 });

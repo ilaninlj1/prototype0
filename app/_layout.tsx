@@ -57,14 +57,15 @@ if (Platform.OS !== 'web') {
 }
 
 export default function RootLayout() {
-  // Tapping the weekly reminder opens the Liked list, or the Decoded page when it announced a finding.
+  // Tapping the weekly reminder opens the Library (its old /modal link still lands there), or the Decoded page when it announced a finding.
   useEffect(() => {
     if (Platform.OS === 'web') return;
     startTwinSync(); // Taste Twins members: saves and unsaves follow them to the server
     refreshDecodedNews(); // the YOU dot and Sunday reminder for a finding nobody has opened
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const url = response.notification.request.content.data?.url;
-      if (url === '/modal' || url === '/decoded') router.push(url);
+      if (url === '/modal' || url === '/library') router.navigate('/library');
+      else if (url === '/decoded') router.push(url);
     });
     return () => sub.remove();
   }, []);

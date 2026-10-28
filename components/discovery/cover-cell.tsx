@@ -1,17 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { noteText } from '@/components/note-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
+import { Colors, Fonts, Spacing, TapTarget, Ui } from '@/constants/theme';
 import { callLabel, callReceipt, type CalledShot } from '@/lib/called-shots';
-import { artworkUrl, growthLabel, type DiscoveryTrack } from '@/lib/discovery';
+import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
+import { foundLine } from '@/lib/library';
 
 type Props = {
   track: DiscoveryTrack;
   listenersNow?: number;
+  /** Now, for "Found at 98.6K · today". */
+  today: number;
   call?: CalledShot;
   onShare?: (message: string) => void;
   playing: boolean;
@@ -21,46 +23,36 @@ type Props = {
   onLongPress: () => void;
 };
 
-/** A Liked song as a cover, YouTube-style: art first, growth over it like a view count. */
-export function CoverCell({ track, listenersNow, call, onShare, playing, selected, selecting, onPress, onLongPress }: Props) {
-  const growth = growthLabel(track.artistListeners, listenersNow);
+/** A saved song in the Library grid: the cover, then the title, the artist and how the artist grew since you found them. */
+export function CoverCell({ track, listenersNow, today, call, onShare, playing, selected, selecting, onPress, onLongPress }: Props) {
+  const found = foundLine(track.artistListeners, listenersNow, track.likedAt, today);
   const receipt = call ? callReceipt(call, listenersNow) : null;
+  const a11y = [track.trackName, track.artistName, found?.text, found?.change].filter(Boolean).join(', ');
   return (
     <View style={styles.cell}>
-      <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={styles.content}>
+      <Pressable
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={350}
+        style={styles.content}
+        accessibilityRole="button"
+        accessibilityLabel={a11y}
+        accessibilityHint={selecting ? (selected ? 'Picked. Tap to unpick.' : 'Tap to pick.') : 'Plays a preview. Hold to pick songs.'}
+        accessibilityState={selecting ? { selected: !!selected } : undefined}>
         <View style={[styles.art, selected && styles.artSelected]}>
           <Image source={{ uri: artworkUrl(track.artworkUrl100, 400) }} style={StyleSheet.absoluteFill} />
-          <Svg style={StyleSheet.absoluteFill}>
-            <Defs>
-              <LinearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0.45" stopColor="#000" stopOpacity={0} />
-                <Stop offset="1" stopColor="#000" stopOpacity={0.75} />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill="url(#shade)" />
-          </Svg>
           {receipt && (
             <View style={styles.called}>
               <ThemedText style={styles.calledText}>called it</ThemedText>
             </View>
           )}
           {(playing || selecting) && (
-            <View style={styles.badge}>
+            <View style={[styles.badge, selected && styles.badgeOn]}>
               <Ionicons
-                name={selecting ? (selected ? 'checkmark-circle' : 'ellipse-outline') : 'pause'}
-                size={20}
-                color={Colors.text}
+                name={selecting ? (selected ? 'checkmark' : 'ellipse-outline') : 'pause'}
+                size={18}
+                color={selected ? Colors.accentText : Colors.text}
               />
-            </View>
-          )}
-          {growth && (
-            <View style={styles.growth}>
-              <ThemedText style={styles.growthText}>{growth.text}</ThemedText>
-              {growth.change && (
-                <ThemedText style={[styles.growthText, { color: growth.change.startsWith('↑') ? Colors.highlight : Colors.textSecondary }]}>
-                  {growth.change}
-                </ThemedText>
-              )}
             </View>
           )}
         </View>
@@ -70,7 +62,13 @@ export function CoverCell({ track, listenersNow, call, onShare, playing, selecte
         <ThemedText style={styles.artist} numberOfLines={1}>
           {track.artistName}
         </ThemedText>
-        {call && <ThemedText type="caption">{callLabel(call, listenersNow)}</ThemedText>}
+        {found && (
+          <ThemedText style={styles.found} numberOfLines={2}>
+            {found.text}
+            {found.change && <ThemedText style={[styles.found, found.up && styles.up]}> · {found.change}</ThemedText>}
+          </ThemedText>
+        )}
+        {call && <ThemedText style={styles.found}>{callLabel(call, listenersNow)}</ThemedText>}
         {track.note && (
           <ThemedText style={[noteText, styles.note]} numberOfLines={2}>
             “{track.note}”
@@ -93,19 +91,31 @@ export function CoverCell({ track, listenersNow, call, onShare, playing, selecte
 }
 
 const styles = StyleSheet.create({
-  cell: { width: '48%', gap: 2, marginBottom: Spacing.md },
+  cell: { width: '48%', gap: 2, marginBottom: Spacing.lg },
   content: { gap: 2 },
-  share: { ...Ui.outlineButton, alignSelf: 'flex-start', backgroundColor: Colors.accent, borderColor: Colors.accent, marginTop: Spacing.xs },
+  share: { ...Ui.outlineButton, minHeight: 36, alignSelf: 'flex-start', backgroundColor: Colors.accent, borderColor: Colors.accent, marginTop: Spacing.xs },
   shareLabel: { ...Ui.label, color: Colors.accentText },
   disabled: { opacity: 0.5 },
-  art: { aspectRatio: 1, borderRadius: Radius.md, overflow: 'hidden', backgroundColor: Colors.surface },
+  art: { aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: Colors.surface, marginBottom: Spacing.xs },
   artSelected: { borderWidth: 3, borderColor: Colors.accent },
-  growth: { position: 'absolute', left: Spacing.sm, right: Spacing.sm, bottom: Spacing.sm, flexDirection: 'row', justifyContent: 'space-between' },
-  growthText: { fontFamily: Fonts.monoMedium, fontSize: 11, lineHeight: 14, color: Colors.text },
+  // A hand-placed gold scrap, black marker on it.
   called: { position: 'absolute', top: Spacing.sm, left: Spacing.sm, backgroundColor: Colors.highlight, paddingHorizontal: 6, paddingTop: 2, transform: [{ rotate: '-4deg' }], borderTopRightRadius: 4, borderBottomLeftRadius: 5 },
-  calledText: { fontFamily: Fonts.marker, fontSize: 12, lineHeight: 16, color: Colors.accentText },
-  badge: { position: 'absolute', top: Spacing.sm, right: Spacing.sm, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: Radius.round, padding: 4 },
-  title: { fontFamily: 'Figtree_700Bold', fontSize: 15, lineHeight: 19, marginTop: Spacing.xs },
+  calledText: { fontFamily: Fonts.marker, fontSize: 12, lineHeight: 16, color: Colors.text },
+  badge: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    width: TapTarget - 12,
+    height: TapTarget - 12,
+    borderRadius: (TapTarget - 12) / 2,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeOn: { backgroundColor: Colors.accent },
+  title: { fontFamily: Fonts.sansSemiBold, fontSize: 15, lineHeight: 19 },
   artist: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
+  found: { fontSize: 12, lineHeight: 16, color: Colors.textSecondary },
+  up: { color: Colors.text, fontFamily: Fonts.sansSemiBold },
   note: { marginTop: 2, transform: [{ rotate: '-1deg' }] },
 });

@@ -74,9 +74,22 @@ export function MiniPlayer({
 }
 
 const styles = StyleSheet.create({
-  wrap: { backgroundColor: Colors.surfaceElevated, borderRadius: Radius.lg, overflow: 'hidden', marginHorizontal: Spacing.md },
+  // A white card lifted off the page by a soft shadow and a hairline.
+  wrap: {
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+    marginHorizontal: Spacing.md,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.sm },
-  art: { width: 44, height: 44, borderRadius: Radius.sm },
+  art: { width: 44, height: 44, borderRadius: Radius.lg },
   text: { flex: 1, minWidth: 0 },
   title: { fontFamily: 'Figtree_700Bold', fontSize: 14, lineHeight: 18 },
   note: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, paddingHorizontal: Spacing.sm },
@@ -84,6 +97,6 @@ const styles = StyleSheet.create({
   addNote: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
   links: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingBottom: 2 },
   artist: { fontSize: 12, lineHeight: 16, color: Colors.textSecondary, flexShrink: 1 },
-  track: { height: 2, backgroundColor: 'rgba(243,234,216,0.15)' },
-  fill: { height: 2, backgroundColor: Colors.signal },
+  track: { height: 3, backgroundColor: Colors.rule },
+  fill: { height: 3, backgroundColor: Colors.text },
 });

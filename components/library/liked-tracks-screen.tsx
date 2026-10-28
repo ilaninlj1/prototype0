@@ -3,17 +3,19 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    Share,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CreditLine } from '@/components/credits';
@@ -23,13 +25,15 @@ import { MiniPlayer } from '@/components/mini-player';
 import { NoteSheet } from '@/components/note-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, TapTarget } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, TapTarget, Typography, Ui } from '@/constants/theme';
 import { useCalledShots } from '@/hooks/use-called-shots';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
+import { useScrollChrome } from '@/hooks/use-scroll-chrome';
 import { summarizeCalls } from '@/lib/called-shots';
-import { buildSpotifySearchUrl, filterByGenre, likedGenres, summarizeFinds, type DiscoveryTrack } from '@/lib/discovery';
+import { buildSpotifySearchUrl, likedGenres, summarizeFinds, type DiscoveryTrack } from '@/lib/discovery';
 import { appendExportBatch, loadLikedTracks, loadRecentlyDeleted, saveLikedTracks, setLikedNote } from '@/lib/discovery-storage';
+import { libraryView } from '@/lib/library';
 import { setNote } from '@/lib/saved-songs';
 import { requestSteer, type SteerRequest } from '@/lib/steer-request';
 
@@ -65,7 +69,20 @@ function buildExportText(selected: DiscoveryTrack[]): string {
   return lines.join('\n').trim();
 }
 
-/** Everything you've saved: the Library tab (app/(tabs)/library.tsx). It used to be the Liked Tracks modal. */
+/** A round grey icon button for the top bar. */
+function BarIcon({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.barIcon} accessibilityRole="button" accessibilityLabel={label} hitSlop={4}>
+      <Ionicons name={icon} size={20} color={Colors.text} />
+    </Pressable>
+  );
+}
+
+/**
+ * Everything you've saved: the Library tab (app/(tabs)/library.tsx), once the
+ * Liked Tracks modal. A top bar with the search slides away while you scroll
+ * down the covers and comes back on a short scroll up (hooks/use-scroll-chrome.ts).
+ */
 export function LikedTracksScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -79,6 +96,8 @@ export function LikedTracksScreen() {
   const [playingTrack, setPlayingTrack] = useState<DiscoveryTrack | null>(null);
   const [playerHeight, setPlayerHeight] = useState(0);
 
+  const [query, setQuery] = useState('');
+  const [typing, setTyping] = useState(false);
   const [genre, setGenre] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -87,6 +106,11 @@ export function LikedTracksScreen() {
   // manual-copy fallback (when Share.share isn't available) and the archive
   // confirm that follows it once the fallback is dismissed.
   const pendingArchiveRef = useRef<DiscoveryTrack[] | null>(null);
+  // The bar's height pads the list, so the bar sliding away never moves a cover.
+  const [barHeight, setBarHeight] = useState(insets.top + 128);
+
+  // The bar stays put while you type, pick songs, or a sheet is up.
+  const chrome = useScrollChrome({ pinned: typing || selectionMode || noteTrack !== null || fallbackText !== null });
 
   // Shared across every screen that plays audio — see hooks/use-playback.tsx —
   // so starting a preview here always stops one already playing on the swipe
@@ -255,127 +279,190 @@ export function LikedTracksScreen() {
     );
   }
 
+  const empty = tracks.length === 0;
   const genres = likedGenres(tracks);
   const savedPlaying = tracks.find((t) => t.id === playingId) ?? null;
   function steerHome(request: SteerRequest) {
     requestSteer(request);
     router.navigate('/');
   }
+  function lookUp() {
+    const q = query.trim();
+    router.push(q ? { pathname: '/search', params: { q } } : '/search');
+  }
   const nowPlaying = savedPlaying ?? (playingTrack?.id === playingId ? playingTrack : null);
-  const newestFirst = filterByGenre([...tracks].reverse(), genre && genres.includes(genre) ? genre : null);
+  const shown = libraryView(tracks, { query, genre });
   const { best } = summarizeFinds(
     tracks.map((t) => ({ artistName: t.artistName, found: t.artistListeners, now: listenersNow[t.artistName] }))
   );
   const callSummary = summarizeCalls(calls, listenersNow);
   const callsByTrack = new Map(calls.map((c) => [c.trackId, c]));
+  const today = Date.now();
 
   return (
-    <>
-      <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top + Spacing.sm, paddingBottom: playerHeight + Spacing.xl + Spacing.lg }]}>
-        <ThemedView style={styles.container}>
-          <ThemedText type="title">Library</ThemedText>
-          {selectionMode ? (
-            <ThemedView style={styles.toolbar} backgroundColor="transparent">
-              <ThemedText type="defaultSemiBold">{selectedIds.size} selected</ThemedText>
-              <ThemedView style={styles.toolbarActions} backgroundColor="transparent">
-                <TouchableOpacity onPress={() => selectAll(newestFirst)}>
-                  <ThemedText type="link">Select all</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleBulkExport} disabled={selectedIds.size === 0}>
-                  <ThemedText type="link">Export</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleBulkDelete} disabled={selectedIds.size === 0}>
-                  <ThemedText type="link" style={styles.deleteLink}>
-                    Delete
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={exitSelectionMode}>
-                  <ThemedText type="label" style={styles.cancelLink}>
-                    Cancel
-                  </ThemedText>
-                </TouchableOpacity>
-              </ThemedView>
-            </ThemedView>
-          ) : (
-            <ThemedView style={styles.links} backgroundColor="transparent">
-              <TouchableOpacity onPress={() => router.push('/export-history')}>
-                <ThemedText type="link">Export History</ThemedText>
+    <View style={styles.screen}>
+      <Animated.ScrollView
+        {...chrome.scrollProps}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.content, { paddingTop: barHeight + Spacing.sm, paddingBottom: playerHeight + Spacing.xl + Spacing.lg }]}>
+        {empty ? (
+          <View style={styles.empty}>
+            <ThemedText style={styles.emptyTitle}>Nothing saved yet.</ThemedText>
+            <ThemedText style={styles.emptyText}>Double-tap a song you love to keep it here.</ThemedText>
+            <Pressable onPress={() => router.navigate('/')} style={styles.primary} accessibilityRole="button">
+              <Ionicons name="headset" size={18} color={Colors.accentText} />
+              <ThemedText style={styles.primaryText}>Start listening</ThemedText>
+            </Pressable>
+            {deletedCount > 0 && (
+              <TouchableOpacity onPress={() => router.push('/recently-deleted')} style={Ui.textButton}>
+                <ThemedText style={styles.link}>Deleted something by mistake? Recently deleted · {deletedCount}</ThemedText>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push('/recently-deleted')}>
-                <ThemedText type="link">
-                  Recently deleted{deletedCount > 0 ? ` · ${deletedCount}` : ''}
-                </ThemedText>
-              </TouchableOpacity>
-            </ThemedView>
-          )}
-
-          {(tracks.length > 0 || calls.length > 0) && (
-            <ThemedView style={styles.summary} backgroundColor={Colors.surface}>
-              {best && (
-                <ThemedText type="defaultSemiBold">
-                  Best find: {best.artistName} ↑ {best.pct}%
-                </ThemedText>
-              )}
-              <ThemedText type="caption">
-                Your calls: {callSummary.hit} hit, {callSummary.waiting} waiting
-              </ThemedText>
-            </ThemedView>
-          )}
-
-          <Pressable style={styles.lookup} onPress={() => router.push('/search')} accessibilityRole="search">
-            <Ionicons name="search" size={18} color={Colors.textTertiary} />
-            <ThemedText style={styles.lookupText}>Look up any song, artist or album</ThemedText>
-          </Pressable>
-
-          {genres.length > 1 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              {[null, ...genres].map((g) => {
-                const on = g === genre || (g === null && genre === null);
-                return (
-                  <TouchableOpacity key={g ?? 'all'} onPress={() => setGenre(g)} activeOpacity={0.7}>
-                    <ThemedView style={styles.chip} backgroundColor={on ? Colors.accent : Colors.surfaceElevated}>
-                      <ThemedText type="label" style={{ color: on ? Colors.accentText : Colors.textSecondary }}>
-                        {g ?? 'All'}
-                      </ThemedText>
-                    </ThemedView>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          )}
-
-          {newestFirst.length === 0 ? (
-            <ThemedView style={styles.empty} backgroundColor="transparent">
-              <ThemedText style={styles.emptyText}>Nothing saved yet. Double-tap a song on Home to save it.</ThemedText>
-              {deletedCount > 0 && (
-                <TouchableOpacity onPress={() => router.push('/recently-deleted')}>
-                  <ThemedText type="link">
-                    Deleted something by mistake? Get it back from Recently deleted
+            )}
+          </View>
+        ) : (
+          <>
+            {(best || calls.length > 0) && (
+              <View style={styles.summary}>
+                {best && (
+                  <ThemedText style={styles.summaryTitle}>
+                    Best find: {best.artistName} ↑ {best.pct}% since you found it
                   </ThemedText>
-                </TouchableOpacity>
-              )}
-            </ThemedView>
-          ) : (
-            <View style={styles.grid}>
-              {newestFirst.map((track) => (
-                <CoverCell
-                  key={track.id}
-                  track={track}
-                  listenersNow={listenersNow[track.artistName]}
-                  call={callsByTrack.get(track.id)}
-                  onShare={shareCall}
-                  playing={playingId === track.id && status.playing}
-                  selecting={selectionMode}
-                  selected={selectedIds.has(track.id)}
-                  onPress={() => (selectionMode ? toggleSelected(track) : togglePlay(track))}
-                  onLongPress={() => handleLongPressRow(track)}
-                />
-              ))}
+                )}
+                <ThemedText style={styles.summaryLine}>
+                  Your calls: {callSummary.hit} hit, {callSummary.waiting} waiting
+                </ThemedText>
+              </View>
+            )}
+
+            {genres.length > 1 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipsRow}>
+                {[null, ...genres].map((g) => {
+                  const on = g === genre || (g === null && (genre === null || !genres.includes(genre)));
+                  return (
+                    <Pressable
+                      key={g ?? 'all'}
+                      onPress={() => setGenre(g)}
+                      style={[styles.chip, on && styles.chipOn]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}>
+                      <ThemedText style={[styles.chipText, on && styles.chipTextOn]}>{g ?? 'All'}</ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            <ThemedText style={styles.hint}>
+              {query.trim() ? `${shown.length} ${shown.length === 1 ? 'match' : 'matches'}` : pluralize(shown.length, 'song')}
+              {selectionMode ? ' · tap covers to pick them' : ' · tap a cover to play it, hold to pick'}
+            </ThemedText>
+
+            {shown.length === 0 ? (
+              <View style={styles.noMatch}>
+                <ThemedText style={styles.emptyText}>No saved songs match “{query.trim()}”.</ThemedText>
+                <Pressable onPress={lookUp} style={[Ui.outlineButton, styles.lookUp]} accessibilityRole="button">
+                  <Ionicons name="search" size={16} color={Colors.text} />
+                  <ThemedText style={Ui.label}>Search all music for “{query.trim()}”</ThemedText>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.grid}>
+                {shown.map((track) => (
+                  <CoverCell
+                    key={track.id}
+                    track={track}
+                    listenersNow={listenersNow[track.artistName]}
+                    today={today}
+                    call={callsByTrack.get(track.id)}
+                    onShare={shareCall}
+                    playing={playingId === track.id && status.playing}
+                    selecting={selectionMode}
+                    selected={selectedIds.has(track.id)}
+                    onPress={() => (selectionMode ? toggleSelected(track) : togglePlay(track))}
+                    onLongPress={() => handleLongPressRow(track)}
+                  />
+                ))}
+              </View>
+            )}
+
+            <View style={styles.links}>
+              <TouchableOpacity onPress={() => router.push('/export-history')} style={Ui.textButton}>
+                <ThemedText style={styles.link}>Export history</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/recently-deleted')} style={Ui.textButton}>
+                <ThemedText style={styles.link}>Recently deleted{deletedCount > 0 ? ` · ${deletedCount}` : ''}</ThemedText>
+              </TouchableOpacity>
             </View>
-          )}
-          <CreditLine />
-        </ThemedView>
-      </ScrollView>
+          </>
+        )}
+        <CreditLine />
+      </Animated.ScrollView>
+
+      {/* The top bar: over the list, sliding up under the status bar strip while you scroll down. */}
+      <Animated.View
+        style={[styles.bar, { paddingTop: insets.top + Spacing.sm }, chrome.barStyle]}
+        onLayout={(e) => {
+          chrome.onBarLayout(e);
+          setBarHeight(e.nativeEvent.layout.height);
+        }}>
+        {selectionMode ? (
+          <>
+            <View style={styles.titleRow}>
+              <ThemedText style={styles.selectedTitle}>{pluralize(selectedIds.size, 'song')} picked</ThemedText>
+              <TouchableOpacity onPress={exitSelectionMode} style={Ui.textButton} accessibilityRole="button">
+                <ThemedText style={styles.cancel}>Cancel</ThemedText>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.selectActions}>
+              <Pressable onPress={() => selectAll(shown)} style={styles.pill} accessibilityRole="button">
+                <ThemedText style={Ui.label}>Pick all</ThemedText>
+              </Pressable>
+              <Pressable onPress={handleBulkExport} disabled={selectedIds.size === 0} style={[styles.pill, selectedIds.size === 0 && styles.off]} accessibilityRole="button">
+                <Ionicons name="share-outline" size={16} color={Colors.text} />
+                <ThemedText style={Ui.label}>Export</ThemedText>
+              </Pressable>
+              <Pressable onPress={handleBulkDelete} disabled={selectedIds.size === 0} style={[styles.pill, selectedIds.size === 0 && styles.off]} accessibilityRole="button">
+                <Ionicons name="trash-outline" size={16} color={Colors.destructive} />
+                <ThemedText style={[Ui.label, styles.delete]}>Delete</ThemedText>
+              </Pressable>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.titleRow}>
+              <ThemedText type="title">Library</ThemedText>
+              <View style={styles.barIcons}>
+                <BarIcon icon="earth-outline" label="Look up any song, artist or album" onPress={lookUp} />
+                {!empty && <BarIcon icon="checkmark-circle-outline" label="Pick songs to export or delete" onPress={() => setSelectionMode(true)} />}
+              </View>
+            </View>
+            {!empty && (
+              <View style={styles.search}>
+                <Ionicons name="search" size={18} color={Colors.textSecondary} />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  onFocus={() => setTyping(true)}
+                  onBlur={() => setTyping(false)}
+                  placeholder="Songs, artists or albums"
+                  placeholderTextColor={Colors.textSecondary}
+                  returnKeyType="search"
+                  autoCorrect={false}
+                  style={styles.searchInput}
+                  accessibilityLabel="Search your Library"
+                />
+                {query.length > 0 && (
+                  <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
+                    <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
+                  </Pressable>
+                )}
+              </View>
+            )}
+          </>
+        )}
+      </Animated.View>
+      {/* The clock and battery always sit on white, even with the bar away. */}
+      <View style={[styles.statusStrip, { height: insets.top }]} />
 
       {nowPlaying && (
         <View style={styles.mini} onLayout={(e) => setPlayerHeight(e.nativeEvent.layout.height)}>
@@ -389,7 +476,7 @@ export function LikedTracksScreen() {
                   onPress={() =>
                     steerHome({ kind: 'artist', strategy: { type: 'artist', artistId: savedPlaying.artistId, artistName: savedPlaying.artistName } })
                   }>
-                  <ThemedText type="label" style={styles.exploreLabel}>More from this artist</ThemedText>
+                  <ThemedText style={styles.exploreLabel}>More from this artist</ThemedText>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -397,7 +484,7 @@ export function LikedTracksScreen() {
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 onPress={() => steerHome({ kind: 'sound', strategy: { type: 'genre', genre: savedPlaying.primaryGenreName } })}>
-                <ThemedText type="label" style={styles.exploreLabel}>More like this sound</ThemedText>
+                <ThemedText style={styles.exploreLabel}>More like this sound</ThemedText>
               </TouchableOpacity>
             </View>
           )}
@@ -416,146 +503,101 @@ export function LikedTracksScreen() {
       <Modal visible={fallbackText !== null} transparent animationType="fade" onRequestClose={dismissFallback}>
         <Pressable style={styles.backdrop} onPress={dismissFallback}>
           <Pressable style={styles.fallbackSheet} onPress={(e) => e.stopPropagation()}>
-            <ThemedText type="defaultSemiBold">
-              Sharing isn&apos;t available here — select and copy instead:
-            </ThemedText>
+            <ThemedText type="defaultSemiBold">Sharing isn&apos;t available here. Select and copy instead:</ThemedText>
             <ScrollView style={styles.fallbackScroll}>
               <ThemedText selectable type="caption" style={styles.fallbackText}>
                 {fallbackText}
               </ThemedText>
             </ScrollView>
-            <TouchableOpacity onPress={dismissFallback} activeOpacity={0.7}>
-              <ThemedView style={styles.fallbackDone} backgroundColor={Colors.surfaceElevated}>
-                <ThemedText type="label">Done</ThemedText>
-              </ThemedView>
-            </TouchableOpacity>
+            <Pressable onPress={dismissFallback} style={styles.primary} accessibilityRole="button">
+              <ThemedText style={styles.primaryText}>Done</ThemedText>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    flexGrow: 1,
-  },
-  container: {
-    flex: 1,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    color: Colors.textSecondary,
-  },
-  summary: {
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    gap: 2,
-  },
-  chips: {
-    gap: Spacing.sm,
-  },
-  chip: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.pill,
-  },
-  lookup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-  },
-  lookupText: {
-    color: Colors.textTertiary,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  mini: {
+  screen: { flex: 1, backgroundColor: Colors.background },
+  content: { flexGrow: 1, paddingHorizontal: Spacing.lg, gap: Spacing.md },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  bar: {
     position: 'absolute',
+    top: 0,
     left: 0,
     right: 0,
-    bottom: Spacing.xl,
+    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+    gap: Spacing.md,
   },
-  exploreActions: {
+  statusStrip: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: Colors.background },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
+  barIcons: { flexDirection: 'row', gap: Spacing.sm },
+  barIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  selectedTitle: { ...Typography.subtitle, color: Colors.text },
+  cancel: { ...Ui.label, color: Colors.textSecondary },
+  selectActions: { flexDirection: 'row', gap: Spacing.sm },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: Spacing.lg, borderRadius: 20, backgroundColor: Colors.surface },
+  off: { opacity: 0.4 },
+  delete: { color: Colors.destructive },
+  search: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.sm,
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.sm,
+    minHeight: TapTarget,
+    borderRadius: TapTarget / 2,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.lg,
   },
+  searchInput: { flex: 1, minHeight: TapTarget, color: Colors.text, fontFamily: Fonts.sans, fontSize: 16 },
+  summary: { borderRadius: 20, padding: Spacing.lg, gap: 4, backgroundColor: Colors.surface },
+  summaryTitle: { fontFamily: Fonts.sansSemiBold, fontSize: 16, lineHeight: 21, color: Colors.text },
+  summaryLine: { fontSize: 14, lineHeight: 19, color: Colors.textSecondary },
+  chipsRow: { marginHorizontal: -Spacing.lg, flexGrow: 0 },
+  chips: { gap: Spacing.sm, paddingHorizontal: Spacing.lg },
+  chip: { minHeight: 36, paddingHorizontal: Spacing.lg, borderRadius: 18, justifyContent: 'center', backgroundColor: Colors.surface },
+  chipOn: { backgroundColor: Colors.accent },
+  chipText: { fontFamily: Fonts.sansSemiBold, fontSize: 14, color: Colors.text },
+  chipTextOn: { color: Colors.accentText },
+  hint: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  noMatch: { gap: Spacing.md, alignItems: 'flex-start', paddingVertical: Spacing.lg },
+  lookUp: { maxWidth: '100%' },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: Spacing.xxl, minHeight: 360 },
+  emptyTitle: { ...Typography.subtitle, color: Colors.text, textAlign: 'center' },
+  emptyText: { fontSize: 16, lineHeight: 22, color: Colors.textSecondary, textAlign: 'center' },
+  primary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    minHeight: 48,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: 24,
+    backgroundColor: Colors.accent,
+    marginTop: Spacing.md,
+    alignSelf: 'center',
+  },
+  primaryText: { fontFamily: Fonts.sansSemiBold, fontSize: 16, color: Colors.accentText },
+  links: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.lg },
+  link: { fontSize: 15, lineHeight: 20, color: Colors.text, textDecorationLine: 'underline' },
+  mini: { position: 'absolute', left: 0, right: 0, bottom: Spacing.md },
+  exploreActions: { flexDirection: 'row', gap: Spacing.sm, marginHorizontal: Spacing.md, marginBottom: Spacing.sm },
   exploreButton: {
     flex: 1,
     minHeight: TapTarget,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Radius.sm,
+    borderRadius: TapTarget / 2,
     backgroundColor: Colors.accent,
   },
-  exploreLabel: {
-    color: Colors.accentText,
-    textAlign: 'center',
-  },
-  links: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.lg,
-  },
-  empty: {
-    gap: Spacing.md,
-  },
-  toolbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  toolbarActions: {
-    flexDirection: 'row',
-    gap: Spacing.lg,
-  },
-  deleteLink: {
-    color: Colors.destructive,
-  },
-  cancelLink: {
-    color: Colors.textSecondary,
-  },
-  backdrop: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: Spacing.xl,
-  },
-  fallbackSheet: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    gap: Spacing.lg,
-    maxHeight: '80%',
-    width: '100%',
-  },
-  fallbackScroll: {
-    maxHeight: 300,
-  },
-  fallbackText: {
-    lineHeight: 20,
-  },
-  fallbackDone: {
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-  },
+  exploreLabel: { ...Ui.label, color: Colors.accentText, textAlign: 'center' },
+  backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.35)', padding: Spacing.xl },
+  fallbackSheet: { backgroundColor: Colors.background, borderRadius: 28, padding: Spacing.xl, gap: Spacing.lg, maxHeight: '80%', width: '100%' },
+  fallbackScroll: { maxHeight: 300 },
+  fallbackText: { lineHeight: 20 },
 });
