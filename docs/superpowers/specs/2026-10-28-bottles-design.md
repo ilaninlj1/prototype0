@@ -46,7 +46,7 @@ The student's own framing: "if you swipe right, we give that card to someone els
 
 ## The life of a bottle
 
-1. **Launch.** You save a song (double-tap, or Save after the reveal). If it was an organic blind find, a bottle floats: it came from the genre feed, Shuffle, Sort by sound, the Dark Map or Run, you listened for at least 10 s (`RATED_LISTEN_THRESHOLD_MS`), and it wasn't a bottle or a Daily Drop song. The bottle carries the song's iTunes track id, the Blindspot genre you were in, and your city.
+1. **Launch.** You save a song (double-tap, or Save after the reveal). If it was an organic blind find, a bottle floats: it came from the genre feed, Shuffle, Sort by sound, the Dark Map or Run, you listened for at least 10 s (`RATED_LISTEN_THRESHOLD_MS`), and it wasn't a bottle or a Daily Drop song. The bottle carries the song's iTunes track id, the Blindspot genre you were in, and your city. Phase 1 launches only from Home's saves. Run's Keep joins later, and past run saves can float through "Float your old finds" in the meantime.
 2. **Floating.** The bottle waits on the server until a stranger's Home asks for one.
 3. **Washing up.** When Home refills, it asks for one bottle, at most 1 card in 5. The server lends it to that one phone for 2 hours. The card is blind like every other card.
 4. **The verdict,** decided when the card leaves the top of the stack:
@@ -75,8 +75,20 @@ The student's own framing: "if you swipe right, we give that card to someone els
 - **Library:** a saved song that has a bottle shows a small wave mark. Tapping it opens its journey sheet: the route, each hop with its city and day, and whether it's still floating, waiting or sunk.
 - **Tune → Bottles:** one switch for both sending and receiving, so it's fair both ways and simple.
 
+## The bottle's print: a song mixed with everyone who kept it
+
+The student asked to "use songs or song data, smash it together or mix" into something cool. Each bottle has its own print:
+
+- **The core is the song's own print.** It uses the same recipe as Home (`lib/print-recipe.ts`), with key and mode for hue and energy for density, frozen as on the reveal.
+- **Every keeper adds a ring around it,** drawn from the last song *they* saved before keeping this one. That song's key and mode set the ring's hue on the same circle-of-fifths dial, its energy sets the ring's weight, and its tempo sets how fast the ring breathes. A keeper whose last save has no sound data leaves a plain cream hairline.
+- **How far the song was from the keeper's home** (close / new / deep, from `lib/taste-distance.ts`) sets how far out the ring sits. So a bottle that crossed into people's blind spots has wide, loose rings, and one passed among similar ears stays tight.
+- So the bottle literally carries a bit of every keeper's music, the song plus the songs that the people who kept it love. No identity goes with it, only three numbers from that previous song (key and mode, energy, tempo).
+- **Where it shows:** in the keep moment, your own ring draws in last, with a haptic, as the reward for keeping. Also in the Library journey sheet, as the wave mark (small), and later in the Sea.
+- Prints stay on a dark tile, per the Minimal UI rule.
+
 ## Where you are
 
+- **Decided by the student (2026-10-28): use my city.**
 - **First time:** the first save that would float shows a one-time card. "Your saves float to strangers, blind. Only your city goes with them." Two buttons: [Use my city] and [Not now]. "Use my city" asks for location at reduced accuracy, reverse-geocodes it to a city and country on the phone, and rounds the coordinates to 0.5° (about 55 km) before anything is sent. "Not now" still floats the bottle, and the hop shows a region from the phone's time zone ("Somewhere in Central US"). Never the time zone's city, because Dallas phones say America/Chicago.
 - The city is refreshed at most once a day, and only when the app is open.
 - No street, neighborhood or exact point ever leaves the phone.
