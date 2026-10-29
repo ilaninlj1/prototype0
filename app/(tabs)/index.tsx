@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, View, type ViewInstance } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, useWindowDimensions, View, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FindsNewsSheet } from '@/components/finds-news-sheet';
@@ -31,8 +31,11 @@ import { slotCenter, type StripRect } from '@/components/home/piece-strip';
 import { SavedToast } from '@/components/home/saved-toast';
 import { BottleAskCard } from '@/components/bottles/bottle-ask';
 import { KeepMoment } from '@/components/bottles/keep-moment';
+import { BottleOpening, type OpeningGeometry } from '@/components/bottles/bottle-opening';
 import { LaunchLight } from '@/components/bottles/launch-light';
-import { useBottles } from '@/hooks/use-bottles';
+import { SEA_HEIGHT, SeaLine, seaX } from '@/components/bottles/sea-line';
+import { songLight, useBottles } from '@/hooks/use-bottles';
+import { queueBottleNow, seaPosition } from '@/lib/bottle-countdown';
 import { revealLine } from '@/lib/bottle-journey';
 import type { FeedMode } from '@/lib/bottles';
 import { allDecks, deckCounts, deckLabel, pickDeck, type Deck } from '@/lib/decks';
@@ -150,6 +153,11 @@ export default function HomeScreen() {
   // layout pass) then shrinks to whatever cardArea actually measures — see
   // handleCardAreaLayout and fitCardToWidth — so the card fits a small
   // screen (e.g. iPhone SE) instead of overflowing behind the button rows.
+  // Where the card area and Home itself sit, for the sea and a bottle opening onto the card (components/bottles/).
+  const [cardArea, setCardArea] = useState<LayoutRectangle | null>(null);
+  const [frame, setFrame] = useState({ width: 0, height: 0 });
+  // Until Home has measured itself (some web views never report it), the window stands in: Home is full width.
+  const win = useWindowDimensions();
   const [cardSize, setCardSize] = useState<CardSize>({
     width: MAX_CARD_WIDTH,
     height: MAX_CARD_HEIGHT,
@@ -157,6 +165,7 @@ export default function HomeScreen() {
 
   function handleCardAreaLayout(e: LayoutChangeEvent) {
     cardAreaRef.current = e.nativeEvent.layout;
+    setCardArea(e.nativeEvent.layout);
     const { width, height } = e.nativeEvent.layout;
     // A square, as big as fits above its words, never wider than the mockup's 340.
     const side = Math.max(160, Math.min(width, height - LISTEN_INFO_HEIGHT - Spacing.xl, CARD_MAX));
@@ -327,7 +336,9 @@ export default function HomeScreen() {
   const prevTopRef = useRef<DiscoveryTrack | null>(null);
   const undoingRef = useRef(false);
   const settleExit = useEffectEvent((left: DiscoveryTrack) => {
-    void bottles.exit(left, savedIdsRef.current.has(left.id), swipeHistory);
+    // The sea's bottle only moves on plain swiping, never while you're steering, in a deck or in the dark.
+    const counts = !deckRef.current && !mapFocusRef.current && strategy.type !== 'artist';
+    void bottles.exit(left, savedIdsRef.current.has(left.id), swipeHistory, counts);
   });
   useEffect(() => {
     const prev = prevTopRef.current;
@@ -338,6 +349,16 @@ export default function HomeScreen() {
       return;
     }
     if (prev) settleExit(prev);
+  }, [currentTrack]);
+
+  // A stranger's bottle reaching the top opens onto the card (components/bottles/bottle-opening.tsx), once per bottle.
+  const [opening, setOpening] = useState<{ key: string; color: string } | null>(null);
+  const openedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = currentTrack?.via === 'bottle' ? currentTrack.bottleId : undefined;
+    if (!currentTrack || !id || openedRef.current === id) return;
+    openedRef.current = id;
+    setOpening({ key: id, color: songLight(currentTrack.id) });
   }, [currentTrack]);
   const underIds = queue
     .slice(1, 3)
@@ -567,24 +588,26 @@ export default function HomeScreen() {
     }
   }
 
-  // One card in five may be a stranger's bottle: it goes second, under the card you're hearing (lib/bottles.ts).
+  // A stranger's bottle goes out into the sea a few songs ahead (lib/bottle-countdown.ts); the effect below puts it in
+  // the queue once it's the next song.
   async function mixBottle(epoch: number, activeStrategy: Strategy, history: SwipeEntry[], nextQueue: DiscoveryTrack[]) {
-    if (nextQueue.length === 0) return;
+    if (nextQueue.length === 0 || refillEpochRef.current !== epoch) return;
     const steering = activeStrategy.type === 'artist' || (!!moreLike && nextQueue.some((t) => moreLike.ids.has(t.id)));
     const mode: FeedMode = deckRef.current ? 'deck' : mapFocusRef.current ? 'map' : steering ? 'artist' : isActive(soundFilterRef.current) ? 'sorted' : 'genre';
     const seen = deriveSeenTrackIds(history);
-    const bottle = await bottles.maybeBottle({
+    await bottles.ensureIncoming({
       genre: activeStrategy.type === 'genre' ? activeStrategy.genre : null,
       mode,
       songsHeard: countSongsHeard(history),
       offline: networkTestRef.current === 'offline',
-      bottleQueued: nextQueue.some((t) => t.via === 'bottle'),
       accept: (t) => !seen.has(t.id) && !savedIdsRef.current.has(t.id) && !hideFromDiscovery(t.artistName) && !alreadyKnown(t.artistName),
     });
-    // A bottle that lost the race stays lent for its 2 hours, then floats on to someone else.
-    if (!bottle || refillEpochRef.current !== epoch) return;
-    setQueue((q) => (q.length > 0 && !q.some((t) => t.id === bottle.id || t.via === 'bottle') ? [q[0], bottle, ...q.slice(1)] : q));
   }
+  const incoming = bottles.incoming;
+  useEffect(() => {
+    if (!incoming || !queueBottleNow(incoming.stepsLeft)) return;
+    setQueue((q) => (q.length > 0 && !q.some((t) => t.id === incoming.track.id) ? [q[0], incoming.track, ...q.slice(1)] : q));
+  }, [incoming, queue.length]);
 
   // The panel's buttons. Cancel abandons the load: back to where you were if there's an undo, otherwise just stop.
   function handleFeedAction(action: FeedAction) {
@@ -1195,6 +1218,25 @@ export default function HomeScreen() {
         ? `${describeFilter(soundFilter)}${loosened.length > 0 ? ` · loosened ${loosened.join(', ')}` : ''}`
         : null,
   });
+  // The sea and the opening, in Home's own coordinates.
+  const side = cardSize.width;
+  const cardLeft = cardArea ? cardArea.x + (cardArea.width - side) / 2 : 0;
+  const cardTop = cardArea ? cardArea.y + (cardArea.height - (side + Spacing.xl + LISTEN_INFO_HEIGHT)) / 2 : 0;
+  const frameW = frame.width || win.width;
+  const frameH = frame.height || win.height - 72 - insets.bottom;
+  const seaSurfaceY = frameH + 4 - SEA_HEIGHT + 17;
+  const openingGeometry: OpeningGeometry | null =
+    cardArea && frameW > 0
+      ? {
+          from: { x: seaX(0, frameW), y: seaSurfaceY },
+          stage: { x: cardLeft + side / 2, y: cardTop + side + Spacing.xl + LISTEN_INFO_HEIGHT / 2 },
+          card: { x: cardLeft, y: cardTop, size: side },
+        }
+      : null;
+  const seaBottle =
+    incoming && incoming.stepsLeft >= 1 && currentTrack?.bottleId !== incoming.track.bottleId
+      ? { key: incoming.track.bottleId ?? String(incoming.track.id), color: songLight(incoming.track.id), position: seaPosition(incoming.stepsLeft) }
+      : null;
   const statusTappable = !!statusItem && statusItem.kind !== 'more' && statusItem.kind !== 'sorted';
   function openStatus(item: StatusItem) {
     wake();
@@ -1208,9 +1250,12 @@ export default function HomeScreen() {
   const revealedNow = !!currentTrack && revealTrack?.id === currentTrack.id;
 
   return (
-    <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.sm }]}>
+    <ThemedView
+      style={[styles.container, { paddingTop: insets.top + Spacing.sm }]}
+      onLayout={(e) => setFrame({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
       {/* Behind everything: a tap on empty space brings the buttons back. */}
       <Pressable style={StyleSheet.absoluteFill} onPress={wake} accessible={false} />
+      {frameW > 0 && <SeaLine width={frameW} incoming={seaBottle} outgoing={bottles.launchFx} />}
 
       <ChromeFade visible={chrome.visible} alwaysShow={statusItem?.kind === 'failed'} style={styles.statusLine}>
         {statusItem && (
@@ -1307,7 +1352,12 @@ export default function HomeScreen() {
                 onMix={setMix}
                 onCancelPeek={cancelPeek}
               />
-              <LaunchLight trigger={bottles.launchFx} height={cardSize.height} />
+              <LaunchLight
+                trigger={bottles.launchFx?.key ?? 0}
+                height={cardSize.height}
+                fall={seaSurfaceY - (cardTop + side / 2)}
+                color={bottles.launchFx?.color ?? '#e8a33d'}
+              />
               <ChromeFade visible={chrome.visible} style={styles.cornerPause}>
                 <CornerPause paused={!status.playing} onPress={() => {
                     wake();
@@ -1423,6 +1473,9 @@ export default function HomeScreen() {
           endSize={flying.endSize}
           onLanded={() => handleLanded(flying.mark)}
         />
+      )}
+      {opening && openingGeometry && (
+        <BottleOpening runKey={opening.key} color={opening.color} geometry={openingGeometry} onDone={() => setOpening(null)} />
       )}
       <DetailsSheet
         visible={detailsOpen}

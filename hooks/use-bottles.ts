@@ -1,29 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { BOTTLE_LEAD, stepAfterExit } from '@/lib/bottle-countdown';
 import { keepLine, routeStops, type RouteStop } from '@/lib/bottle-journey';
 import { ringSeedOf } from '@/lib/bottle-print';
 import type { Hop, RingSeed, Tier } from '@/lib/bottle-rows';
-import { bottleSlotOpen, canLaunch, commit, enqueue, oldFinds, stage, unstage, type FeedMode, type OutboxItem } from '@/lib/bottles';
+import { BOTTLE_EVERY, bottleSlotOpen, canLaunch, commit, enqueue, oldFinds, stage, unstage, type FeedMode, type OutboxItem } from '@/lib/bottles';
 import {
   claimBottle,
   currentPlace,
   flushOutbox,
   launchesToday,
-  loadLaunchFxCount,
   loadOldFindsOffered,
   noteLaunch,
   queueOutbox,
   resolveBottleTrack,
   saveBottlesOn,
   saveCityOk,
-  saveLaunchFxCount,
   saveOldFindsOffered,
   useBottlesOn,
 } from '@/lib/bottles-api';
 import type { DiscoveryTrack, Region, SwipeEntry } from '@/lib/discovery';
 import { loadLikedTracks } from '@/lib/discovery-storage';
 import { normalizeArtist } from '@/lib/human-check';
+import { recipeFor } from '@/lib/print-recipe';
 import { soundFor } from '@/lib/sound-index';
 import { soundLookup } from '@/lib/sound-lookup-app';
 
@@ -35,7 +35,6 @@ export type KeepMoment = { key: number; trackId: number; hops: Hop[]; line: stri
 export type BottleAsk = { kind: 'consent' } | { kind: 'old'; finds: DiscoveryTrack[] };
 
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-const LAUNCH_FX_TIMES = 3;
 
 function soundOf(trackId: number) {
   const indexed = soundFor(trackId);
@@ -53,6 +52,18 @@ function previousRing(history: SwipeEntry[], trackId: number): RingSeed | null {
   return null;
 }
 
+/** The song's light: its print's main colour (amber when it has no sound data). */
+export function songLight(trackId: number): string {
+  const r = recipeFor(trackId, soundOf(trackId), null);
+  return r.source === 'sound' ? r.rings[0].color : '#e8a33d';
+}
+
+/** How long the card played before it left (its latest entry). */
+function exitListenMs(history: SwipeEntry[], trackId: number): number {
+  for (let i = history.length - 1; i >= 0; i--) if (history[i].trackId === trackId) return history[i].listenMs ?? 0;
+  return 0;
+}
+
 /** How long you'd listened when you saved it (the like's own entry). */
 function likeListenMs(history: SwipeEntry[], trackId: number): number {
   for (let i = history.length - 1; i >= 0; i--) {
@@ -62,14 +73,23 @@ function likeListenMs(history: SwipeEntry[], trackId: number): number {
   return 0;
 }
 
+export type Incoming = { track: DiscoveryTrack; stepsLeft: number };
+
 export function useBottles(region: Region) {
   const on = useBottlesOn();
-  const sinceBottleRef = useRef(Number.POSITIVE_INFINITY);
   const claimingRef = useRef(false);
+  // The stranger's bottle out in the sea (lib/bottle-countdown.ts), and whether the last card moved it (for Undo).
+  const [incoming, setIncomingState] = useState<Incoming | null>(null);
+  const incomingRef = useRef<Incoming | null>(null);
+  const setIncoming = (next: Incoming | null) => {
+    incomingRef.current = next;
+    setIncomingState(next);
+  };
+  const advancedRef = useRef(false);
   const tiersRef = useRef(new Map<number, Tier | null>());
   const [keep, setKeep] = useState<KeepMoment | null>(null);
   const [ask, setAsk] = useState<BottleAsk | null>(null);
-  const [launchFx, setLaunchFx] = useState(0);
+  const [launchFx, setLaunchFx] = useState<{ key: number; color: string } | null>(null);
 
   // Anything left from last time goes out now; leaving the app sends what's waiting.
   useEffect(() => {
@@ -85,40 +105,41 @@ export function useBottles(region: Region) {
     tiersRef.current.set(trackId, tier);
   }
 
-  /** A stranger's bottle for the next slot, already resolved and checked against `accept`, or null. */
-  async function maybeBottle(i: {
-    genre: string | null;
-    mode: FeedMode;
-    songsHeard: number;
-    offline: boolean;
-    bottleQueued: boolean;
-    accept: (t: DiscoveryTrack) => boolean;
-  }): Promise<DiscoveryTrack | null> {
-    if (i.bottleQueued || claimingRef.current) return null;
-    const open = bottleSlotOpen({ enabled: on === true, offline: i.offline, mode: i.mode, songsHeard: i.songsHeard, cardsSinceBottle: sinceBottleRef.current });
-    if (!open) return null;
+  /** Put a stranger's bottle out in the sea, BOTTLE_LEAD songs away, if there's none and one may come. */
+  async function ensureIncoming(i: { genre: string | null; mode: FeedMode; songsHeard: number; offline: boolean; accept: (t: DiscoveryTrack) => boolean }) {
+    if (incomingRef.current || claimingRef.current) return;
+    const open = bottleSlotOpen({ enabled: on === true, offline: i.offline, mode: i.mode, songsHeard: i.songsHeard, cardsSinceBottle: BOTTLE_EVERY });
+    if (!open) return;
     claimingRef.current = true;
     try {
       const b = await claimBottle(i.genre);
-      if (!b) return null;
+      if (!b) return;
       const track = await resolveBottleTrack(b, region);
       const verdict = !track ? 'unplayable' : !i.accept(track) ? 'known' : null;
-      if (verdict) {
-        await queueOutbox((o) => enqueue(o, { kind: 'verdict', id: id(), bottleId: b.id, verdict, place: null, tier: null, ring: null, at: Date.now() }));
+      if (verdict || !track) {
+        await queueOutbox((o) => enqueue(o, { kind: 'verdict', id: id(), bottleId: b.id, verdict: verdict ?? 'unplayable', place: null, tier: null, ring: null, at: Date.now() }));
         void flushOutbox();
-        return null;
+        return;
       }
-      return track;
+      setIncoming({ track, stepsLeft: BOTTLE_LEAD });
     } finally {
       claimingRef.current = false;
     }
   }
 
   /** A card left the top of the stack (any way: skip, Next, a genre jump). */
-  async function exit(track: DiscoveryTrack, saved: boolean, history: SwipeEntry[]) {
+  async function exit(track: DiscoveryTrack, saved: boolean, history: SwipeEntry[], counts: boolean) {
+    // The countdown: the bottle's own card leaving ends it; any other real listen floats it a step closer.
+    const inc = incomingRef.current;
+    advancedRef.current = false;
+    if (inc && track.via === 'bottle' && track.bottleId === inc.track.bottleId) setIncoming(null);
+    else if (inc) {
+      const next = stepAfterExit(inc.stepsLeft, exitListenMs(history, track.id), counts);
+      advancedRef.current = next !== inc.stepsLeft;
+      if (advancedRef.current) setIncoming({ ...inc, stepsLeft: next });
+    }
     let item: OutboxItem | null = null;
     if (track.via === 'bottle' && track.bottleId) {
-      sinceBottleRef.current = 0;
       item = {
         kind: 'verdict',
         id: id(),
@@ -130,7 +151,6 @@ export function useBottles(region: Region) {
         at: Date.now(),
       };
     } else {
-      sinceBottleRef.current = Number.isFinite(sinceBottleRef.current) ? sinceBottleRef.current + 1 : sinceBottleRef.current;
       if (saved && on === true && canLaunch(track, likeListenMs(history, track.id), await launchesToday())) {
         item = {
           kind: 'launch',
@@ -153,6 +173,9 @@ export function useBottles(region: Region) {
   /** Undo brought the last card back: whatever it would have sent never happens. */
   function undo() {
     void queueOutbox(unstage);
+    const inc = incomingRef.current;
+    if (inc && advancedRef.current) setIncoming({ ...inc, stepsLeft: Math.min(BOTTLE_LEAD, inc.stepsLeft + 1) });
+    advancedRef.current = false;
   }
 
   /**
@@ -181,13 +204,8 @@ export function useBottles(region: Region) {
       return false;
     }
     const floats = on === true && canLaunch(track, listenMs, await launchesToday());
-    if (floats) {
-      const shown = await loadLaunchFxCount();
-      if (shown < LAUNCH_FX_TIMES) {
-        setLaunchFx(Date.now());
-        void saveLaunchFxCount(shown + 1);
-      }
-    }
+    // Every save that floats sets sail: its light drops into the sea and a bottle carries it off.
+    if (floats) setLaunchFx({ key: Date.now(), color: songLight(track.id) });
     return floats;
   }
 
@@ -238,8 +256,9 @@ export function useBottles(region: Region) {
     answerOldFinds,
     dismissAsk: () => setAsk(null),
     launchFx,
+    incoming,
     noteTier,
-    maybeBottle,
+    ensureIncoming,
     exit,
     undo,
     saved,
