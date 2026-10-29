@@ -13,6 +13,7 @@ import { useSound } from '@/hooks/use-sound';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 import { listenerMeter } from '@/lib/home-copy';
 import { soundTiles, type Deck } from '@/lib/decks';
+import type { SoundRecord } from '@/lib/sound';
 import { releaseLine } from '@/lib/song-age';
 
 type Props = {
@@ -23,6 +24,8 @@ type Props = {
   onSave?: (track: DiscoveryTrack) => Promise<void>;
   /** Tapping a sound tile (or "Songs like this one") swipes a deck of it on Home (lib/decks.ts). */
   onPlayDeck?: (deck: Deck) => void;
+  /** The sound Home already has for this song (the card's BPM and key come from it); used before looking again. */
+  knownSound?: SoundRecord | null;
   onClose: () => void;
 };
 
@@ -31,10 +34,13 @@ type Props = {
  * cover, where to listen, how many people do, Call it, how it sounds,
  * comments and the credits.
  */
-export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, onClose }: Props) {
+export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, knownSound, onClose }: Props) {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { record, loading } = useSound(visible ? track : null);
+  const looked = useSound(visible ? track : null);
+  // A phone showed "No sound data" here while the card above had the song's BPM: trust what Home already measured.
+  const record = knownSound?.status === 'measured' ? knownSound : looked.record;
+  const loading = knownSound?.status === 'measured' ? false : looked.loading;
   if (!track) return null;
   const described = listeners != null ? describeListeners(listeners) : null;
   const side = Math.min(width, 520) - Spacing.xl * 2;

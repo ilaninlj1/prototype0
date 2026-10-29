@@ -1483,6 +1483,7 @@ export default function HomeScreen() {
         listeners={revealListeners}
         onSave={saveFromHome}
         onPlayDeck={startDeck}
+        knownSound={revealTrack && revealTrack.id === currentTrack?.id ? topSound : null}
         onClose={() => setDetailsOpen(false)}
       />
       <FindsNewsSheet
