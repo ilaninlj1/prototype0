@@ -1116,6 +1116,8 @@ export default function HomeScreen() {
     const listenMs = Math.round(status.currentTime * 1000);
     await handleSave(track);
     if (first && (await bottles.saved(track, swipeHistory, listenMs))) setToastFloating(true);
+    // Keeping a bottle shows the keep moment in the toast's place; the toast mustn't come back after it.
+    if (first && track.via === 'bottle') setToast(false);
   }
 
   // One line at the top, the most important thing first (lib/status-line.ts).
