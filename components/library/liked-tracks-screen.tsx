@@ -25,7 +25,7 @@ import { MiniPlayer } from '@/components/mini-player';
 import { NoteSheet } from '@/components/note-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Radius, Spacing, TapTarget, Typography, Ui } from '@/constants/theme';
+import { Colors, Fonts, Spacing, TapTarget, Typography, Ui } from '@/constants/theme';
 import { useCalledShots } from '@/hooks/use-called-shots';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
@@ -88,6 +88,8 @@ export function LikedTracksScreen() {
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
   const [tracks, setTracks] = useState<DiscoveryTrack[]>([]);
+  // "Found at 98.6K · today" is checked against when the list last loaded.
+  const [today, setToday] = useState(() => Date.now());
   const [deletedCount, setDeletedCount] = useState(0);
   const [noteTrack, setNoteTrack] = useState<DiscoveryTrack | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
@@ -124,6 +126,7 @@ export function LikedTracksScreen() {
     const [liked, deleted] = await Promise.all([loadLikedTracks(), loadRecentlyDeleted()]);
     setTracks(liked);
     setDeletedCount(deleted.length);
+    setToday(Date.now());
     setLoaded(true);
   }, []);
 
@@ -297,7 +300,6 @@ export function LikedTracksScreen() {
   );
   const callSummary = summarizeCalls(calls, listenersNow);
   const callsByTrack = new Map(calls.map((c) => [c.trackId, c]));
-  const today = Date.now();
 
   return (
     <View style={styles.screen}>

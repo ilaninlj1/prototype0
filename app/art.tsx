@@ -12,7 +12,7 @@ import { loadSkia } from '@/components/print/load-skia';
 import { PieceView } from '@/components/print/piece-view';
 import { PrintStill } from '@/components/print/print-still';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
+import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
 import { useArt } from '@/hooks/use-art';
 import { useEditions } from '@/hooks/use-editions';
 import { usePlayback } from '@/hooks/use-playback';

@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
-  Pressable,
   ScrollView,
   type ScrollViewInstance,
   StyleSheet,

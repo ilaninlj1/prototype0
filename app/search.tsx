@@ -26,7 +26,8 @@ export default function SearchScreen() {
   const { q } = useLocalSearchParams<{ q?: string }>();
   const [term, setTerm] = useState(q ?? '');
   const [results, setResults] = useState<SearchResults | null>(null);
-  const [loading, setLoading] = useState(false);
+  // A search handed over in ?q= starts loading right away.
+  const [loading, setLoading] = useState(!!q?.trim());
   const [talked, setTalked] = useState<{ track: DiscoveryTrack; count: number }[]>([]);
   const [typing, setTyping] = useState(!q);
   const [barHeight, setBarHeight] = useState(insets.top + Spacing.md + TapTarget + Spacing.md);
@@ -35,7 +36,6 @@ export default function SearchScreen() {
   useEffect(() => {
     if (!q?.trim()) return;
     let live = true;
-    setLoading(true);
     searchMusic(q.trim()).then((r) => {
       if (!live) return;
       setResults(r);

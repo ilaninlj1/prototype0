@@ -274,8 +274,8 @@ export const Ui = {
 // The dark rooms keep the controls they were designed with: square-ish outlines and mono uppercase labels.
 const MONO_UI = {
   textButton: Ui.textButton,
-  outlineButton: { ...Ui.outlineButton, paddingHorizontal: Spacing.md, borderRadius: Radius.sm },
-  input: Ui.input,
+  outlineButton: { ...Ui.outlineButton, paddingHorizontal: Spacing.md, borderRadius: 4 },
+  input: { ...Ui.input, borderRadius: 4 },
   label: { ...MONO_LABEL, color: Colors.text },
 };
 

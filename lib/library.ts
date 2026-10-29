@@ -23,7 +23,10 @@ export function searchLibrary(tracks: DiscoveryTrack[], query: string): Discover
  * The grid: newest save first (storage keeps them oldest first), only the
  * chosen genre when it's still one of yours, then the search.
  */
-export function libraryView(tracks: DiscoveryTrack[], { query, genre }: { query: string; genre: string | null }): DiscoveryTrack[] {
+export function libraryView(
+  tracks: DiscoveryTrack[],
+  { query, genre }: { query: string; genre: string | null }
+): DiscoveryTrack[] {
   const newestFirst = [...tracks].reverse();
   const chip = genre && likedGenres(tracks).includes(genre) ? genre : null;
   const inGenre = chip ? newestFirst.filter((t) => t.primaryGenreName === chip) : newestFirst;
@@ -45,7 +48,11 @@ export function foundLine(
   const fmt = (n: number) => describeListeners(n).count;
   if (found != null && now != null && fmt(found) !== fmt(now)) {
     const { pct } = describeGrowth(found, now);
-    return { text: `Found at ${fmt(found)} → now ${fmt(now)}`, change: pct === 0 ? null : `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}%`, up: pct > 0 };
+    return {
+      text: `Found at ${fmt(found)} → now ${fmt(now)}`,
+      change: pct === 0 ? null : `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}%`,
+      up: pct > 0,
+    };
   }
   if (found != null) {
     const when = likedAt != null && sameDay(likedAt, today) ? ' · today' : '';
