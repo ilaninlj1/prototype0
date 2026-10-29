@@ -29,6 +29,12 @@ import { LISTEN_INFO_HEIGHT, ListenInfo } from '@/components/home/listen-info';
 import { MapButton } from '@/components/home/map-button';
 import { slotCenter, type StripRect } from '@/components/home/piece-strip';
 import { SavedToast } from '@/components/home/saved-toast';
+import { BottleAskCard } from '@/components/bottles/bottle-ask';
+import { KeepMoment } from '@/components/bottles/keep-moment';
+import { LaunchLight } from '@/components/bottles/launch-light';
+import { useBottles } from '@/hooks/use-bottles';
+import { revealLine } from '@/lib/bottle-journey';
+import type { FeedMode } from '@/lib/bottles';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, Typography } from '@/constants/theme';
@@ -42,7 +48,9 @@ import { useSound } from '@/hooks/use-sound';
 import { useFindsNews } from '@/hooks/use-finds-news';
 import { usePlayback, usePreviewWhileFocused } from '@/hooks/use-playback';
 import {
+  countSongsHeard,
   deriveGenresHeard,
+  deriveSeenTrackIds,
   extractGenres,
   fetchForStrategy,
   keepDropEntries,
@@ -157,6 +165,8 @@ export default function HomeScreen() {
   const [swipeHistory, setSwipeHistory] = useState<SwipeEntry[]>([]);
   const [discoveredGenres, setDiscoveredGenres] = useState<string[]>([]);
   const [region, setRegion] = useState<Region>('US');
+  // Bottles (hooks/use-bottles.ts): strangers' saves wash up here, and yours float.
+  const bottles = useBottles(region);
   const [nextMode, setNextMode] = useState<NextMode>('genre');
   // Tune → Sound. The ref is what refills read, so a refill always uses the latest switches.
   const [soundFilter, setSoundFilter] = useState<SoundFilter>(ANY_FILTER);
@@ -297,6 +307,28 @@ export default function HomeScreen() {
     [savedIds, currentTrack?.id]
   );
   const depth = topSound?.status === 'measured' ? tasteDistance(topSound.features, saveSounds) : null;
+  const topTier = depth == null ? null : tierFor(depth);
+  useEffect(() => {
+    if (currentTrack) bottles.noteTier(currentTrack.id, topTier);
+  }, [currentTrack, topTier, bottles]);
+
+  // A card leaving the top, however it left, settles its bottle news (hooks/use-bottles.ts exit).
+  // Undo brings a card back instead, so that change is skipped and its news taken back.
+  const prevTopRef = useRef<DiscoveryTrack | null>(null);
+  const undoingRef = useRef(false);
+  const settleExit = useEffectEvent((left: DiscoveryTrack) => {
+    void bottles.exit(left, savedIdsRef.current.has(left.id), swipeHistory);
+  });
+  useEffect(() => {
+    const prev = prevTopRef.current;
+    prevTopRef.current = currentTrack ?? null;
+    if (prev?.id === currentTrack?.id) return;
+    if (undoingRef.current) {
+      undoingRef.current = false;
+      return;
+    }
+    if (prev) settleExit(prev);
+  }, [currentTrack]);
   const underIds = queue
     .slice(1, 3)
     .map((t) => t.id)
@@ -508,6 +540,7 @@ export default function HomeScreen() {
 
       setQueue(nextQueue);
       setLoad((prev) => (nextQueue.length === 0 ? failLoad(prev, 'empty') : succeedLoad()));
+      void mixBottle(epoch, landedStrategy, history, nextQueue);
       if (landedStrategy !== activeStrategy) {
         setStrategy(landedStrategy);
       }
@@ -521,6 +554,25 @@ export default function HomeScreen() {
       if (refillEpochRef.current !== epoch) return;
       setLoad((prev) => failLoad(prev, 'offline'));
     }
+  }
+
+  // One card in five may be a stranger's bottle: it goes second, under the card you're hearing (lib/bottles.ts).
+  async function mixBottle(epoch: number, activeStrategy: Strategy, history: SwipeEntry[], nextQueue: DiscoveryTrack[]) {
+    if (nextQueue.length === 0) return;
+    const steering = activeStrategy.type === 'artist' || (!!moreLike && nextQueue.some((t) => moreLike.ids.has(t.id)));
+    const mode: FeedMode = mapFocusRef.current ? 'map' : steering ? 'artist' : isActive(soundFilterRef.current) ? 'sorted' : 'genre';
+    const seen = deriveSeenTrackIds(history);
+    const bottle = await bottles.maybeBottle({
+      genre: activeStrategy.type === 'genre' ? activeStrategy.genre : null,
+      mode,
+      songsHeard: countSongsHeard(history),
+      offline: networkTestRef.current === 'offline',
+      bottleQueued: nextQueue.some((t) => t.via === 'bottle'),
+      accept: (t) => !seen.has(t.id) && !savedIdsRef.current.has(t.id) && !hideFromDiscovery(t.artistName) && !alreadyKnown(t.artistName),
+    });
+    // A bottle that lost the race stays lent for its 2 hours, then floats on to someone else.
+    if (!bottle || refillEpochRef.current !== epoch) return;
+    setQueue((q) => (q.length > 0 && !q.some((t) => t.id === bottle.id || t.via === 'bottle') ? [q[0], bottle, ...q.slice(1)] : q));
   }
 
   // The panel's buttons. Cancel abandons the load: back to where you were if there's an undo, otherwise just stop.
@@ -598,7 +650,7 @@ export default function HomeScreen() {
       preset,
       artistListeners: track.artistListeners,
       trackRank: track.trackRank,
-      ...(track.via === 'map' ? { source: 'map' as const } : {}),
+      ...(track.via === 'map' ? { source: 'map' as const } : track.via === 'bottle' ? { source: 'bottle' as const } : {}),
       ...(isSteer
         ? {}
         : {
@@ -996,6 +1048,8 @@ export default function HomeScreen() {
       } else undoOnPiece(undone.id);
     }
     setUndoSnapshot(null);
+    undoingRef.current = undone?.id !== currentTrack?.id;
+    bottles.undo();
     setRevealTrack(snapshot.revealed?.track ?? null);
     revealIdRef.current = snapshot.revealed?.track.id ?? null;
     revealRecipeRef.current = snapshot.revealed?.recipe ?? null;
@@ -1030,6 +1084,7 @@ export default function HomeScreen() {
   const [tuneOpen, setTuneOpen] = useState(false);
   const [genreOpen, setGenreOpen] = useState(false);
   const [toast, setToast] = useState(false);
+  const [toastFloating, setToastFloating] = useState(false);
   const chrome = useHomeChrome({
     songsDecided: swipeHistory.length,
     clipEnded: hasEnded,
@@ -1053,8 +1108,14 @@ export default function HomeScreen() {
   // A save shows the toast once, the first time a song is kept.
   async function saveFromHome(track: DiscoveryTrack) {
     // Shown at the tap, not after storage answers: the save itself can take a moment.
-    if (!savedIds.has(track.id)) setToast(true);
+    const first = !savedIds.has(track.id);
+    if (first) {
+      setToastFloating(false);
+      setToast(true);
+    }
+    const listenMs = Math.round(status.currentTime * 1000);
     await handleSave(track);
+    if (first && (await bottles.saved(track, swipeHistory, listenMs))) setToastFloating(true);
   }
 
   // One line at the top, the most important thing first (lib/status-line.ts).
@@ -1174,6 +1235,7 @@ export default function HomeScreen() {
                 onMix={setMix}
                 onCancelPeek={cancelPeek}
               />
+              <LaunchLight trigger={bottles.launchFx} height={cardSize.height} />
               <ChromeFade visible={chrome.visible} style={styles.cornerPause}>
                 <CornerPause paused={!status.playing} onPress={() => {
                     wake();
@@ -1187,6 +1249,7 @@ export default function HomeScreen() {
               clues={cluesLine(topRecipe.label, depth == null ? null : TIER_LABEL[tierFor(depth)])}
               listeners={revealedNow ? revealListeners : undefined}
               onCallSave={handleSave}
+              origin={currentTrack.bottle ? revealLine(currentTrack.bottle) : null}
             />
           </View>
 
@@ -1222,9 +1285,23 @@ export default function HomeScreen() {
           </ChromeFade>
           {/* One row under the buttons: the credits, or for a few seconds after a save, the toast in their place. */}
           <View style={styles.slot} pointerEvents="box-none">
-            {toast ? (
+            {/* Bottles' cards are taller than the row, so they rise from its bottom over the buttons. */}
+            {bottles.ask ? (
+              <View style={styles.lift} pointerEvents="box-none">
+                <BottleAskCard
+                  ask={bottles.ask}
+                  onConsent={(useCity) => void bottles.answerConsent(useCity, swipeHistory)}
+                  onOldFinds={(float) => void bottles.answerOldFinds(float)}
+                />
+              </View>
+            ) : bottles.keep ? (
+              <View style={styles.lift} pointerEvents="none">
+                <KeepMoment moment={bottles.keep} onDone={bottles.dismissKeep} />
+              </View>
+            ) : toast ? (
               <SavedToast
                 visible
+                floating={toastFloating}
                 onHide={() => setToast(false)}
                 onViewLibrary={() => {
                   setToast(false);
@@ -1332,6 +1409,7 @@ const styles = StyleSheet.create({
   bottom: { gap: Spacing.lg },
   hint: { ...Typography.caption, position: 'absolute', left: 0, right: 0, bottom: 72, textAlign: 'center' },
   slot: { height: 52, justifyContent: 'center' },
+  lift: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   statusArea: { flex: 1, marginBottom: Spacing.lg },
   under: { position: 'absolute', top: 0, left: 0, opacity: 0.55 },
   centered: {

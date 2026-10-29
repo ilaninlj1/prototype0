@@ -7,10 +7,11 @@ import { ThemedText } from '@/components/themed-text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { TOAST_MS } from '@/lib/home-chrome';
 
-type Props = { visible: boolean; onViewLibrary: () => void; onHide: () => void };
+/** `floating`: this save floats to a stranger as a bottle (lib/bottles.ts canLaunch). */
+type Props = { visible: boolean; floating?: boolean; onViewLibrary: () => void; onHide: () => void };
 
 /** "Saved to Liked Songs", for a few seconds after a save. It never covers the card or its buttons. */
-export function SavedToast({ visible, onViewLibrary, onHide }: Props) {
+export function SavedToast({ visible, floating = false, onViewLibrary, onHide }: Props) {
   // Counted from when it appears: Home re-renders often, and that mustn't restart the clock.
   const hide = useEffectEvent(onHide);
   useEffect(() => {
@@ -24,7 +25,10 @@ export function SavedToast({ visible, onViewLibrary, onHide }: Props) {
       <View style={styles.toast} accessibilityLiveRegion="polite">
         <View style={styles.what}>
           <Ionicons name="checkmark" size={18} color={Colors.accentText} />
-          <ThemedText style={styles.text}>Saved to Liked Songs</ThemedText>
+          <View>
+            <ThemedText style={styles.text}>Saved to Liked Songs</ThemedText>
+            {floating && <ThemedText style={styles.sub}>Floating to someone</ThemedText>}
+          </View>
         </View>
         <Pressable onPress={onViewLibrary} accessibilityRole="button" style={({ pressed }) => [styles.button, pressed && { opacity: 0.7 }]}>
           <ThemedText style={styles.buttonText}>View Library</ThemedText>
@@ -47,6 +51,7 @@ const styles = StyleSheet.create({
   },
   what: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   text: { fontSize: 14, fontWeight: '700', color: Colors.accentText },
+  sub: { fontSize: 12, color: Colors.accentText, opacity: 0.8 },
   button: { minHeight: 36, paddingHorizontal: Spacing.md, borderRadius: 18, backgroundColor: Colors.background, justifyContent: 'center' },
   buttonText: { fontSize: 13, fontWeight: '700', color: Colors.text },
 });

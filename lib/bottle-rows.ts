@@ -53,7 +53,6 @@ const count = (v: unknown): number => {
   const n = num(v);
   return n !== null && Number.isInteger(n) && n >= 0 ? n : 0;
 };
-// eslint-disable-next-line no-control-regex
 const clean = (v: unknown, max: number): string => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : '');
 
 function parseRing(v: unknown): RingSeed | null {

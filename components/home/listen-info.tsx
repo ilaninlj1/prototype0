@@ -15,6 +15,8 @@ type Props = {
   /** The artist's Last.fm listeners: undefined while loading, null if unknown. */
   listeners: number | null | undefined;
   onCallSave?: (track: DiscoveryTrack) => Promise<void>;
+  /** A bottle's "Washed up from Lisbon": takes the release line's place, which stays in Details. */
+  origin?: string | null;
 };
 
 // Fixed, so the buttons under it never move between blind and revealed.
@@ -25,7 +27,7 @@ export const LISTEN_INFO_HEIGHT = 92;
  * key and how far it is from your taste. Revealed: who it is, when it came
  * out, how many people listen, and Call it.
  */
-export function ListenInfo({ track, revealed, clues, listeners, onCallSave }: Props) {
+export function ListenInfo({ track, revealed, clues, listeners, onCallSave, origin }: Props) {
   const reduceMotion = useReducedMotion();
   if (!revealed) {
     return (
@@ -38,7 +40,7 @@ export function ListenInfo({ track, revealed, clues, listeners, onCallSave }: Pr
     );
   }
   const described = listeners != null ? describeListeners(listeners) : null;
-  const release = releaseLine(track.releaseDate, track.collectionName);
+  const release = origin ?? releaseLine(track.releaseDate, track.collectionName);
   return (
     <Animated.View key={track.id} entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={styles.box}>
       <ThemedText style={[styles.title, styles.center]} numberOfLines={1}>
