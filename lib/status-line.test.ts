@@ -49,3 +49,10 @@ test('the status line puts each item in words', () => {
   assert.equal(statusText({ kind: 'more', label: 'Brutha' }), 'More like this: Brutha');
   assert.equal(statusText({ kind: 'sorted', text: 'slow, calm' }), 'Sorted: slow, calm');
 });
+
+test('a sound deck shows after the map, with its name and a way out', () => {
+  const base = { failedOffline: false, editionReady: null, newsCount: 0, mapWords: null, moreLabel: null, sortedText: null };
+  assert.deepEqual(pickStatus({ ...base, deckLabel: 'Quiet and sparse' }), { kind: 'deck', label: 'Quiet and sparse' });
+  assert.equal(pickStatus({ ...base, deckLabel: 'Quiet and sparse', mapWords: 'dark' })?.kind, 'map');
+  assert.equal(statusText({ kind: 'deck', label: 'Quiet and sparse' }), 'Swiping: Quiet and sparse ✕');
+});

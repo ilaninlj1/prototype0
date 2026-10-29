@@ -28,8 +28,9 @@ test('no slot in the first 5 songs', () => {
   assert.equal(slot({ songsHeard: 5 }), true);
 });
 
-test('no slot in artist or map mode, offline, or turned off', () => {
+test('no slot in artist, map or deck mode, offline, or turned off', () => {
   assert.equal(slot({ mode: 'artist' }), false);
+  assert.equal(slot({ mode: 'deck' }), false);
   assert.equal(slot({ mode: 'map' }), false);
   assert.equal(slot({ offline: true }), false);
   assert.equal(slot({ enabled: false }), false);

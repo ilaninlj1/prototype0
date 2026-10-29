@@ -12,7 +12,7 @@ import { Colors, Fonts, Spacing, TapTarget, Typography, Ui } from '@/constants/t
 import { useSound } from '@/hooks/use-sound';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 import { listenerMeter } from '@/lib/home-copy';
-import { describeSound } from '@/lib/sound';
+import { soundTiles, type Deck } from '@/lib/decks';
 import { releaseLine } from '@/lib/song-age';
 
 type Props = {
@@ -21,6 +21,8 @@ type Props = {
   /** The artist's Last.fm listeners: undefined while loading, null if unknown. */
   listeners: number | null | undefined;
   onSave?: (track: DiscoveryTrack) => Promise<void>;
+  /** Tapping a sound tile (or "Songs like this one") swipes a deck of it on Home (lib/decks.ts). */
+  onPlayDeck?: (deck: Deck) => void;
   onClose: () => void;
 };
 
@@ -29,14 +31,14 @@ type Props = {
  * cover, where to listen, how many people do, Call it, how it sounds,
  * comments and the credits.
  */
-export function DetailsSheet({ visible, track, listeners, onSave, onClose }: Props) {
+export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, onClose }: Props) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { record } = useSound(visible ? track : null);
   if (!track) return null;
   const described = listeners != null ? describeListeners(listeners) : null;
   const side = Math.min(width, 520) - Spacing.xl * 2;
-  const sound = record?.status === 'measured' ? describeSound(record.features) : null;
+  const sound = record?.status === 'measured' ? soundTiles(record.features) : null;
   const release = releaseLine(track.releaseDate, track.collectionName);
   const meter = listeners != null ? listenerMeter(listeners) : null;
 
@@ -91,12 +93,30 @@ export function DetailsSheet({ visible, track, listeners, onSave, onClose }: Pro
         {sound ? (
           <>
             <View style={styles.tiles}>
-              {sound.map((line) => (
-                <View key={line} style={styles.tile}>
-                  <ThemedText style={styles.tileText}>{line}</ThemedText>
-                </View>
+              {sound.map((tile) => (
+                <Pressable
+                  key={tile.label}
+                  disabled={!onPlayDeck}
+                  onPress={() => onPlayDeck?.(tile.deck)}
+                  style={({ pressed }) => [styles.tile, styles.tileRow, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${tile.label}. Swipe songs like this`}>
+                  <ThemedText style={styles.tileText}>{tile.label}</ThemedText>
+                  {onPlayDeck && <Ionicons name="play" size={12} color={Colors.text} />}
+                </Pressable>
               ))}
+              {onPlayDeck && record?.status === 'measured' && (
+                <Pressable
+                  onPress={() => onPlayDeck({ kind: 'like', trackId: track.id, label: track.trackName, sound: record.features })}
+                  style={({ pressed }) => [styles.tile, styles.tileRow, styles.likeTile, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Songs like this one. Swipe songs that sound closest to it">
+                  <ThemedText style={[styles.tileText, styles.likeText]}>Songs like this one</ThemedText>
+                  <Ionicons name="play" size={12} color={Colors.accentText} />
+                </Pressable>
+              )}
             </View>
+            {onPlayDeck && <ThemedText style={styles.small}>Tap one to swipe songs that sound like it.</ThemedText>}
             <ThemedText style={styles.small}>Measured by ReccoBeats.</ThemedText>
           </>
         ) : (
@@ -144,6 +164,10 @@ const styles = StyleSheet.create({
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.xs },
   tile: { backgroundColor: Colors.surface, borderRadius: 14, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
   tileText: { fontFamily: Fonts.sansSemiBold, fontSize: 14, lineHeight: 18 },
+  tileRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  likeTile: { backgroundColor: Colors.accent },
+  likeText: { color: Colors.accentText },
+  pressed: { opacity: 0.7 },
   comments: { alignSelf: 'flex-start', marginTop: Spacing.lg },
   credit: { marginTop: Spacing.lg },
   close: { alignSelf: 'center', minHeight: TapTarget, justifyContent: 'center', paddingHorizontal: Spacing.lg, marginTop: Spacing.sm },

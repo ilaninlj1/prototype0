@@ -48,6 +48,7 @@
 // Node-only hack. Not yet verified against a live Metro build (Metro is
 // intentionally offline right now) — worth a bundle check once it's back.
 import genresSeedRaw from '../assets/genres.json' with { type: 'json' };
+import type { DeckCandidate } from './decks.ts';
 import type { DiscoveryTrack } from './discovery.ts';
 import { deckSize, deepCutMinTrackCount, deepCutRelativeFloor, hitRankMax, itunesDelayMs, lastfmDelayMs, poolQuickFillSize } from './pool-config.ts';
 import type { ArtistBand, ArtistCatalog, CatalogEntry, GenreCatalogFile, PresetId, SeedArtistEntry, SongBand, Track } from './pool-types.ts';
@@ -845,6 +846,17 @@ export function runCandidates(): RunCandidate[] {
     }
   }
   return (runPool = out);
+}
+
+let deckPoolCache: DeckCandidate[] | null = null;
+
+/** Every measured catalog song, any genre, for the sound decks (lib/decks.ts pickDeck). */
+export function deckPool(): DeckCandidate[] {
+  deckPoolCache ??= runCandidates().flatMap((c) => {
+    const sound = soundFor(c.track.id);
+    return sound ? [{ track: c.track, artist: c.artist, sound }] : [];
+  });
+  return deckPoolCache;
 }
 
 let byIdIndex: Map<number, DiscoveryTrack> | null = null;

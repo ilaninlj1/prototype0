@@ -5,6 +5,7 @@ export type StatusItem =
   | { kind: 'edition'; n: number }
   | { kind: 'news'; count: number }
   | { kind: 'map'; words: string }
+  | { kind: 'deck'; label: string }
   | { kind: 'more'; label: string }
   | { kind: 'sorted'; text: string };
 
@@ -13,6 +14,8 @@ export type StatusInputs = {
   editionReady: number | null;
   newsCount: number;
   mapWords: string | null;
+  /** A sound deck in charge of the feed (lib/decks.ts). */
+  deckLabel?: string | null;
   moreLabel: string | null;
   sortedText: string | null;
 };
@@ -22,6 +25,7 @@ export function pickStatus(i: StatusInputs): StatusItem | null {
   if (i.editionReady !== null) return { kind: 'edition', n: i.editionReady };
   if (i.newsCount > 0) return { kind: 'news', count: i.newsCount };
   if (i.mapWords) return { kind: 'map', words: i.mapWords };
+  if (i.deckLabel) return { kind: 'deck', label: i.deckLabel };
   if (i.moreLabel) return { kind: 'more', label: i.moreLabel };
   if (i.sortedText) return { kind: 'sorted', text: i.sortedText };
   return null;
@@ -33,6 +37,7 @@ export function statusText(item: StatusItem): string {
     case 'edition': return `Edition No. ${item.n} is ready · Play`;
     case 'news': return `While you were gone: ${item.count} ${item.count === 1 ? 'update' : 'updates'}`;
     case 'map': return `In the dark · ${item.words} ✕`;
+    case 'deck': return `Swiping: ${item.label} ✕`;
     case 'more': return `More like this: ${item.label}`;
     case 'sorted': return `Sorted: ${item.text}`;
   }

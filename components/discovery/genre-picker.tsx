@@ -14,6 +14,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomSheet, SheetHeader } from '@/components/ui/sheet';
 import { Colors, Fonts, Spacing, TapTarget, Ui } from '@/constants/theme';
+import { allDecks, deckKey, deckLabel, type Deck } from '@/lib/decks';
+import { hslToHex, keyHue } from '@/lib/print-recipe';
 import { buildGenreSections, pickableGenres, searchGenres, type GenreSection } from './genre-taxonomy';
 
 type GenrePickerProps = {
@@ -25,11 +27,23 @@ type GenrePickerProps = {
   currentLabel: string;
   onSelect: (genre: string) => void;
   onExplore: () => void;
+  /** What to swipe: a sound, a key or a tempo band instead of a genre (lib/decks.ts). */
+  onPickDeck?: (deck: Deck) => void;
+  /** Unheard songs left in each deck, by deckKey; asked when a deck tab opens. */
+  countDecks?: () => Map<string, number>;
   /** Told every time the sheet opens or closes (Home keeps its buttons up while a sheet is open). */
   onOpenChange?: (open: boolean) => void;
 };
 
 type GroupSection = Extract<GenreSection, { type: 'group' }>;
+
+type Tab = 'genres' | 'sound' | 'keys' | 'tempo';
+const TABS: { key: Tab; label: string; intro: string }[] = [
+  { key: 'genres', label: 'Genres', intro: '' },
+  { key: 'sound', label: 'Sound', intro: 'Songs from every genre that sound this way. Blind, like always.' },
+  { key: 'keys', label: 'Keys', intro: 'Every song in one key, colored like its print.' },
+  { key: 'tempo', label: 'Tempo', intro: 'Songs in one BPM band: for running, studying, or a mood.' },
+];
 
 /**
  * Trigger button (shows where you are) + a grouped, scrollable genre list in
@@ -44,8 +58,12 @@ export function GenrePicker({
   currentLabel,
   onSelect,
   onExplore,
+  onPickDeck,
+  countDecks,
   onOpenChange,
 }: GenrePickerProps) {
+  const [tab, setTab] = useState<Tab>('genres');
+  const [counts, setCounts] = useState<Map<string, number> | null>(null);
   const [visible, setVisibleState] = useState(false);
   const setVisible = (open: boolean) => {
     setVisibleState(open);
@@ -65,6 +83,46 @@ export function GenrePicker({
   function close() {
     setVisible(false);
     setQuery('');
+  }
+
+  function openTab(next: Tab) {
+    setTab(next);
+    if (next !== 'genres' && countDecks) setCounts(countDecks());
+  }
+
+  function pickDeck(deck: Deck) {
+    close();
+    onPickDeck?.(deck);
+  }
+
+  function renderDecks(kind: Deck['kind']) {
+    const decks = allDecks().filter((d) => d.kind === kind);
+    return (
+      <View style={styles.deckGrid}>
+        {decks.map((d) => {
+          const left = counts?.get(deckKey(d));
+          const none = left === 0;
+          return (
+            <TouchableOpacity
+              key={deckKey(d)}
+              onPress={() => pickDeck(d)}
+              disabled={none}
+              activeOpacity={0.7}
+              style={[styles.deckChip, none && styles.deckNone]}
+              accessibilityRole="button"
+              accessibilityLabel={`${deckLabel(d)}, ${left === undefined ? '' : `${left} songs left`}`}>
+              {d.kind === 'key' && <View style={[styles.keyDot, { backgroundColor: hslToHex(keyHue(d.key, d.mode), 0.62, 0.58) }]} />}
+              <View style={styles.deckWords}>
+                <ThemedText style={styles.deckLabel} numberOfLines={1}>
+                  {deckLabel(d)}
+                </ThemedText>
+                {left !== undefined && <ThemedText style={styles.deckCount}>{none ? 'Nothing left' : `${left} songs`}</ThemedText>}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
   }
 
   function pick(genre: string) {
@@ -173,8 +231,30 @@ export function GenrePicker({
       </TouchableOpacity>
 
       <BottomSheet visible={visible} onClose={close} maxHeight="80%">
-        <SheetHeader title={`${pickableGenres(sections).length} genres`} onDone={close} />
+        <SheetHeader title="What to swipe" onDone={close} />
+        {onPickDeck && (
+          <View style={styles.tabs} accessibilityRole="tablist">
+            {TABS.map((t) => (
+              <TouchableOpacity
+                key={t.key}
+                onPress={() => openTab(t.key)}
+                style={[styles.tab, tab === t.key && styles.tabOn]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: tab === t.key }}>
+                <ThemedText style={[styles.tabText, tab === t.key && styles.tabTextOn]}>{t.label}</ThemedText>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
         <ScrollView ref={scrollRef} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+          {tab !== 'genres' ? (
+            <>
+              <ThemedText style={styles.deckIntro}>{TABS.find((t) => t.key === tab)?.intro}</ThemedText>
+              {renderDecks(tab === 'sound' ? 'sound' : tab === 'keys' ? 'key' : 'tempo')}
+            </>
+          ) : (
+          <>
+          <ThemedText style={styles.deckIntro}>{pickableGenres(sections).length} genres</ThemedText>
           <TouchableOpacity onPress={explore} activeOpacity={0.7} style={styles.exploreButton} accessibilityRole="button">
             <Ionicons name="shuffle" size={18} color={Colors.accentText} />
             <ThemedText style={styles.exploreText}>Shuffle: explore somewhere new</ThemedText>
@@ -197,6 +277,8 @@ export function GenrePicker({
                 return hits.length > 0 ? hits.map((g) => renderRow(g, false)) : <ThemedText style={styles.none}>No genre called “{query.trim()}”.</ThemedText>;
               })()
             : sections.map((section) => (section.type === 'leaf' ? renderRow(section.genre, false) : renderGroup(section)))}
+          </>
+          )}
         </ScrollView>
       </BottomSheet>
     </>
@@ -224,6 +306,19 @@ const styles = StyleSheet.create({
   list: {
     paddingBottom: Spacing.xl,
   },
+  tabs: { flexDirection: 'row', gap: 4, padding: 4, marginHorizontal: Spacing.lg, marginBottom: Spacing.sm, borderRadius: 22, backgroundColor: Colors.surface },
+  tab: { flex: 1, minHeight: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  tabOn: { backgroundColor: Colors.accent },
+  tabText: { fontFamily: Fonts.sansSemiBold, fontSize: 14, color: Colors.text },
+  tabTextOn: { color: Colors.accentText },
+  deckIntro: { fontSize: 13, color: Colors.textSecondary, marginHorizontal: Spacing.lg, marginBottom: Spacing.sm },
+  deckGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, paddingHorizontal: Spacing.lg },
+  deckChip: { width: '48%', minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: 16, backgroundColor: Colors.surface },
+  deckNone: { opacity: 0.45 },
+  keyDot: { width: 14, height: 14, borderRadius: 7 },
+  deckWords: { flex: 1 },
+  deckLabel: { fontFamily: Fonts.sansSemiBold, fontSize: 14, color: Colors.text },
+  deckCount: { fontSize: 12, color: Colors.textSecondary },
   exploreButton: {
     flexDirection: 'row',
     alignItems: 'center',

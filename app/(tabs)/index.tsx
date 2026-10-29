@@ -35,6 +35,7 @@ import { LaunchLight } from '@/components/bottles/launch-light';
 import { useBottles } from '@/hooks/use-bottles';
 import { revealLine } from '@/lib/bottle-journey';
 import type { FeedMode } from '@/lib/bottles';
+import { allDecks, deckCounts, deckLabel, pickDeck, type Deck } from '@/lib/decks';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, Typography } from '@/constants/theme';
@@ -81,7 +82,7 @@ import {
 import { pickSimilar } from '@/lib/charts';
 import { genreUnderDark, heardIds, refillSource } from '@/lib/dark-map';
 import { loadMapView } from '@/lib/dark-map-app';
-import { fetchArtistListeners, fetchSimilarArtists, getTracks, getTracksBySound, getTracksNear, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
+import { deckPool, fetchArtistListeners, fetchSimilarArtists, getTracks, getTracksBySound, getTracksNear, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
 import { deckSize } from '@/lib/pool-config';
 import { ANY_FILTER, DIMENSIONS, describeFilter, isActive, relax, type SoundFilter } from '@/lib/sound-filter';
 import { findItunesArtist } from '@/lib/song-details';
@@ -123,6 +124,8 @@ type UndoSnapshot = {
   seenArtists: Set<string>;
   /** Where on the Dark Map the feed was, if anywhere: undoing a jump into the dark leaves it. */
   mapFocus: MapFocus | null;
+  /** The sound deck in charge, if any (lib/decks.ts). */
+  deck: Deck | null;
   /** The card was revealed when the action happened (Next, or down from a reveal): undo shows it revealed again. */
   revealed: { track: DiscoveryTrack; recipe: PrintRecipe | null; listeners: number | null | undefined } | null;
 };
@@ -179,6 +182,13 @@ export default function HomeScreen() {
     mapFocusRef.current = focus;
     setMapFocusState(focus);
   }
+  // A sound deck (lib/decks.ts): Details' tiles and the What to swipe page. While set, every refill comes from it.
+  const [deck, setDeckState] = useState<Deck | null>(null);
+  const deckRef = useRef<Deck | null>(null);
+  function setDeck(next: Deck | null) {
+    deckRef.current = next;
+    setDeckState(next);
+  }
   // The MAP button's share, recomputed each time Home is focused.
   const [litShare, setLitShare] = useState<number | null>(null);
 
@@ -225,7 +235,7 @@ export default function HomeScreen() {
 
 
   const currentGenre = strategy.type === 'genre' && !mapFocus ? strategy.genre : null;
-  const currentLabel = mapFocus ? 'Dark map' : strategy.type === 'genre' ? strategy.genre : `More from: ${strategy.artistName}`;
+  const currentLabel = mapFocus ? 'Dark map' : deck ? deckLabel(deck) : strategy.type === 'genre' ? strategy.genre : `More from: ${strategy.artistName}`;
 
   const { player, status, setMix, cancelPeek, promotePeek } = usePlayback();
   const [hasEnded, setHasEnded] = useState(false);
@@ -524,8 +534,9 @@ export default function HomeScreen() {
             // In the dark the map serves the songs, even over artist steering (lib/dark-map.ts refillSource).
             const source = refillSource(strategy.type, mapFocusRef.current != null, isActive(soundFilterRef.current));
             const genre = strategy.type === 'genre' ? strategy.genre : randomGenre();
-            const fetched =
-              source === 'map'
+            const fetched = deckRef.current
+              ? deckTracks(history, excludeArtists, activePreset, genre)
+              : source === 'map'
                 ? mapTracks(history, excludeArtists, activePreset, genre)
                 : strategy.type === 'artist'
                   ? fetchForStrategy(strategy, activeRegion)
@@ -560,7 +571,7 @@ export default function HomeScreen() {
   async function mixBottle(epoch: number, activeStrategy: Strategy, history: SwipeEntry[], nextQueue: DiscoveryTrack[]) {
     if (nextQueue.length === 0) return;
     const steering = activeStrategy.type === 'artist' || (!!moreLike && nextQueue.some((t) => moreLike.ids.has(t.id)));
-    const mode: FeedMode = mapFocusRef.current ? 'map' : steering ? 'artist' : isActive(soundFilterRef.current) ? 'sorted' : 'genre';
+    const mode: FeedMode = deckRef.current ? 'deck' : mapFocusRef.current ? 'map' : steering ? 'artist' : isActive(soundFilterRef.current) ? 'sorted' : 'genre';
     const seen = deriveSeenTrackIds(history);
     const bottle = await bottles.maybeBottle({
       genre: activeStrategy.type === 'genre' ? activeStrategy.genre : null,
@@ -608,6 +619,52 @@ export default function HomeScreen() {
     }
     setLoosened(dropped);
     return tracks;
+  }
+
+  // A sound deck's next songs: unheard, any genre, one per artist. When it runs dry, back to the genre.
+  async function deckTracks(history: SwipeEntry[], excludeArtists: Set<string>, activePreset: PresetId, genre: string): Promise<DiscoveryTrack[]> {
+    const d = deckRef.current;
+    const keep = (a: string) => !excludeArtists.has(a) && !hideFromDiscovery(a) && !alreadyKnown(a);
+    const picked = d ? pickDeck(deckPool(), d, { heard: heardIds(history), keep, n: deckSize, rand: Math.random }) : [];
+    if (picked.length > 0) return picked;
+    setDeck(null);
+    return (await getTracks(activePreset, genre, excludeArtists)).map(trackToDiscoveryTrack);
+  }
+
+  // Start a deck. The card that was playing leaves like a genre jump (a revealed one was already logged).
+  async function startDeck(next: Deck) {
+    if (!lock.take()) return;
+    captureUndoSnapshot();
+    setDetailsOpen(false);
+    const wasRevealed = !!currentTrack && revealTrack?.id === currentTrack.id;
+    if (currentTrack && !wasRevealed) {
+      cardsSeenSincePresetChangeRef.current += 1;
+      markSwipe(currentTrack, 'skip');
+    }
+    forkPiece();
+    setStamp({ id: Date.now(), genre: deckLabel(next), fresh: false });
+    const nextHistory = currentTrack && !wasRevealed ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
+    const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
+    setRevealTrack(null);
+    revealIdRef.current = null;
+    revealRecipeRef.current = null;
+    setMoreLike(null);
+    setMapFocus(null);
+    const under = genreUnderDark(strategy, currentTrack?.primaryGenreName ?? null, GENRES);
+    if (under !== strategy) setStrategy(under);
+    if (nextMode === 'artist') setNextMode('genre');
+    setDeck(next);
+    setQueue([]);
+    await runRefill([], under, nextHistory, discoveredGenres, region, preset, nextSeen);
+  }
+
+  // ✕ on the "Swiping: …" line: back to the genre, keeping the card that's playing.
+  async function leaveDeck() {
+    if (!deckRef.current) return;
+    setDeck(null);
+    const preserved = queue.slice(0, 1);
+    setQueue(preserved);
+    await runRefill(preserved, strategy, swipeHistory, discoveredGenres, region, preset, seenArtists);
   }
 
   // In the dark: the unheard songs nearest the map spot. When that spot has nothing left, leave the dark and go
@@ -828,6 +885,7 @@ export default function HomeScreen() {
 
   async function applySteeringStrategy(kind: 'artist' | 'sound', next: Strategy) {
     setMapFocus(null);
+    setDeck(null);
     const nextHistory = currentTrack
       ? await logSwipe(currentTrack, kind === 'artist' ? 'steer-artist' : 'steer-sound')
       : swipeHistory;
@@ -885,6 +943,7 @@ export default function HomeScreen() {
     const under = genreUnderDark(strategy, currentTrack?.primaryGenreName ?? null, GENRES);
     if (under !== strategy) setStrategy(under);
     if (nextMode === 'artist') setNextMode('genre');
+    setDeck(null);
     setMapFocus({ point, words });
     setQueue([]);
     await runRefill([], under, nextHistory, discoveredGenres, region, preset, nextSeen);
@@ -910,6 +969,7 @@ export default function HomeScreen() {
 
   async function commitGenreJump(genre: string, nextHistory: SwipeEntry[], excludeArtists: Set<string>) {
     setMapFocus(null);
+    setDeck(null);
     // A jump always leaves the card behind, revealed or not.
     setRevealTrack(null);
     revealIdRef.current = null;
@@ -946,6 +1006,7 @@ export default function HomeScreen() {
       swipeHistory,
       seenArtists,
       mapFocus: mapFocusRef.current,
+      deck: deckRef.current,
       revealed: revealTrack ? { track: revealTrack, recipe: revealRecipeRef.current, listeners: revealListeners } : null,
     });
   }
@@ -1060,6 +1121,7 @@ export default function HomeScreen() {
     setQueue(snapshot.queue);
     setStrategy(snapshot.strategy);
     setMapFocus(snapshot.mapFocus);
+    setDeck(snapshot.deck);
     setDiscoveredGenres(snapshot.discoveredGenres);
     const restoredHistory = keepDropEntries(snapshot.swipeHistory, await loadSwipeHistory());
     setSwipeHistory(restoredHistory);
@@ -1126,6 +1188,7 @@ export default function HomeScreen() {
     editionReady: editionReady ?? null,
     newsCount: news.length,
     mapWords: mapFocus ? mapFocus.words : null,
+    deckLabel: deck ? deckLabel(deck) : null,
     moreLabel: !!moreLike && !!currentTrack && moreLike.ids.has(currentTrack.id) ? moreLike.label : null,
     sortedText:
       isActive(soundFilter) && strategy.type === 'genre'
@@ -1139,6 +1202,7 @@ export default function HomeScreen() {
     else if (item.kind === 'edition') router.push({ pathname: '/edition', params: { n: String(item.n) } });
     else if (item.kind === 'news') setNewsSheetVisible(true);
     else if (item.kind === 'map') leaveMap();
+    else if (item.kind === 'deck') leaveDeck();
   }
 
   const revealedNow = !!currentTrack && revealTrack?.id === currentTrack.id;
@@ -1173,6 +1237,8 @@ export default function HomeScreen() {
           currentLabel={currentLabel}
           onSelect={handlePickGenre}
           onExplore={handleExplore}
+          onPickDeck={startDeck}
+          countDecks={() => deckCounts(deckPool(), allDecks(), heardIds(swipeHistory))}
           onOpenChange={setGenreOpen}
         />
         <View style={styles.headerRight}>
@@ -1363,6 +1429,7 @@ export default function HomeScreen() {
         track={revealTrack}
         listeners={revealListeners}
         onSave={saveFromHome}
+        onPlayDeck={startDeck}
         onClose={() => setDetailsOpen(false)}
       />
       <FindsNewsSheet

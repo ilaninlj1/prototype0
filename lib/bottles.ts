@@ -13,12 +13,12 @@ export const LAUNCHES_PER_DAY = 20;
 /** "Float your old finds" sends at most this many, once. */
 export const OLD_FINDS_MAX = 30;
 
-/** Where Home's songs are coming from. Artist steering and the Dark Map are you asking for something specific. */
-export type FeedMode = 'genre' | 'sorted' | 'artist' | 'map';
+/** Where Home's songs are coming from. Artist steering, the Dark Map and a sound deck are you asking for something specific. */
+export type FeedMode = 'genre' | 'sorted' | 'artist' | 'map' | 'deck';
 
 export function bottleSlotOpen(i: { enabled: boolean; offline: boolean; mode: FeedMode; songsHeard: number; cardsSinceBottle: number }): boolean {
   if (!i.enabled || i.offline) return false;
-  if (i.mode === 'artist' || i.mode === 'map') return false;
+  if (i.mode === 'artist' || i.mode === 'map' || i.mode === 'deck') return false;
   if (i.songsHeard < FIRST_SONGS_WITHOUT) return false;
   return i.cardsSinceBottle >= BOTTLE_EVERY - 1;
 }
