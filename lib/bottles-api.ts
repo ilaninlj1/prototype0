@@ -129,7 +129,8 @@ async function rpc(fn: string, args: object): Promise<Answer> {
       body: JSON.stringify(args),
       signal: abort.signal,
     });
-    if (res.status >= 500 || res.status === 429 || res.status === 401) return { kind: 'retry' };
+    // 404 = the Bottles functions aren't on the server yet (supabase/bottles.sql not run): keep everything for later.
+    if (res.status >= 500 || res.status === 429 || res.status === 401 || res.status === 404) return { kind: 'retry' };
     if (!res.ok) return { kind: 'drop' };
     const text = await res.text();
     try {
