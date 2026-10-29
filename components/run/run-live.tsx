@@ -5,7 +5,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { DarkColors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { DarkColors, Fonts, Spacing } from '@/constants/theme';
 import { AWAKE_MS, HOLD_MS } from '@/lib/run-gate';
 import { goalLine } from '@/lib/run-goal';
 import { formatClock, formatMiles, formatPace } from '@/lib/run-pace';
@@ -130,6 +130,6 @@ const styles = StyleSheet.create({
   control: { alignItems: 'center', gap: Spacing.xs },
   circle: { borderWidth: 1, borderColor: DarkColors.hairline, alignItems: 'center', justifyContent: 'center' },
   controlLabel: { fontSize: 13, color: DIM },
-  end: { minHeight: 52, borderRadius: Radius.lg, borderWidth: 1, borderColor: DarkColors.hairline, alignItems: 'center', justifyContent: 'center' },
+  end: { minHeight: 52, borderRadius: 10, borderWidth: 1, borderColor: DarkColors.hairline, alignItems: 'center', justifyContent: 'center' },
   endText: { fontSize: 16, fontWeight: '600', color: DarkColors.text },
 });

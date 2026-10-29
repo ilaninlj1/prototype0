@@ -63,7 +63,7 @@ export default function PackSendScreen() {
         value={name}
         onChangeText={setName}
         placeholder="Your name (shown to your friend)"
-        placeholderTextColor={Colors.textTertiary}
+        placeholderTextColor={Colors.textSecondary}
         maxLength={30}
         style={styles.input}
       />
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   // Picked songs get a thin cream outline.
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.sm, borderWidth: 1, borderColor: 'transparent', borderRadius: Radius.sm },
   rowOn: { borderColor: Colors.accent },
-  art: { width: 56, height: 56, borderRadius: Radius.sm },
+  art: { width: 56, height: 56, borderRadius: Radius.lg },
   info: { flex: 1, gap: 1 },
   rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
   check: { color: Colors.accent, fontSize: 20, fontWeight: '800', width: 24 },

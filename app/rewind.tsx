@@ -712,7 +712,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderWidth: 1,
     borderColor: DarkColors.hairline,
-    borderRadius: Radius.sm,
+    borderRadius: 4,
   },
   noticeText: {
     fontSize: 14,
@@ -777,7 +777,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.lg,
   },
   art: {
-    borderRadius: Radius.sm,
+    borderRadius: 4,
     backgroundColor: DarkColors.surface,
   },
   // The song you tapped: a cream button on its cover, like the mini player's.
@@ -819,7 +819,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderWidth: 1,
     borderColor: DarkColors.hairline,
-    borderRadius: Radius.sm,
+    borderRadius: 4,
     marginBottom: Spacing.xs,
   },
   offText: {

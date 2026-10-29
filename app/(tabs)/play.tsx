@@ -22,6 +22,7 @@ import { Sticker } from '@/components/sticker';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing, Ui, TapTarget } from '@/constants/theme';
 import { useDailyDrop } from '@/hooks/use-daily-drop';
+import { useScrollChrome } from '@/hooks/use-scroll-chrome';
 import { packable } from '@/lib/blind-pack';
 import {
   loadBestStreaks,
@@ -61,6 +62,8 @@ export default function PlayScreen() {
   const [focused, setFocused] = useState(0);
   const scrollRef = useRef<Animated.ScrollView>(null);
   const scrollX = useSharedValue(0);
+  // On a short phone the page scrolls, and the tab bar slides away like on Library and You; on a tall one it all fits and stays put.
+  const chrome = useScrollChrome();
 
   useFocusEffect(
     useCallback(() => {
@@ -222,7 +225,11 @@ export default function PlayScreen() {
   const mode = modes[focused];
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + Spacing.xl }]}>
+    <Animated.ScrollView
+      {...chrome.scrollProps}
+      style={styles.screen}
+      contentContainerStyle={[styles.page, { paddingTop: insets.top + Spacing.xl }]}
+      showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <ThemedText type="eyebrow">Pick a game · {modes.length} modes</ThemedText>
         <ThemedText type="hero">Play</ThemedText>
@@ -299,7 +306,7 @@ export default function PlayScreen() {
           </Pressable>
         ))}
       </View>
-    </View>
+    </Animated.ScrollView>
   );
 }
 
@@ -334,24 +341,24 @@ function OrbitEmblem({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
+  page: { flexGrow: 1 },
   header: { paddingHorizontal: Spacing.lg, gap: Spacing.xs, marginBottom: Spacing.md },
   hint: { ...Ui.label, color: Colors.textTertiary, marginTop: 2 },
   emblemSlot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  details: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, gap: Spacing.md },
+  details: { flexGrow: 1, minHeight: 300, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, gap: Spacing.md },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
   titleText: { flex: 1, gap: Spacing.xs },
-  // Red is for big numbers and symbols only; at label size it's too dim on navy.
   eyebrow: { color: Colors.textSecondary },
   badge: { marginTop: -6 },
   blurb: { color: Colors.textSecondary, fontSize: 16, lineHeight: 23 },
   statRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm },
   statLabel: { flexShrink: 1 },
-  // The one filled control on the page: cream, small radius, mono label.
-  cta: { ...Ui.outlineButton, backgroundColor: Colors.accent, borderColor: Colors.accent, marginTop: 'auto' },
+  // The one filled control on the page: a black pill.
+  cta: { ...Ui.outlineButton, minHeight: 52, borderRadius: 26, backgroundColor: Colors.accent, borderColor: Colors.accent, marginTop: 'auto' },
   ctaOff: { opacity: 0.4 },
-  ctaText: { ...Ui.label, color: Colors.accentText },
+  ctaText: { ...Ui.label, fontSize: 16, color: Colors.accentText },
   // Thin bars, like the tab bar's marker.
   dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: Spacing.sm, minHeight: TapTarget },
   dot: { width: 8, height: 2, backgroundColor: Colors.textTertiary },
-  dotOn: { width: 22, backgroundColor: Colors.signal },
+  dotOn: { width: 22, backgroundColor: Colors.text },
 });

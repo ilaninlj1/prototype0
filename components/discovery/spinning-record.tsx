@@ -4,8 +4,9 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { useDarkRoom } from '@/components/dark-room';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, TapTarget, Ui } from '@/constants/theme';
+import { Colors, DarkColors, TapTarget, Ui } from '@/constants/theme';
 
 /** A point on a circle of radius r around (50, 50), angle in degrees (0 = right). */
 const at = (r: number, deg: number) => `${50 + r * Math.cos((deg * Math.PI) / 180)} ${50 + r * Math.sin((deg * Math.PI) / 180)}`;
@@ -18,6 +19,8 @@ const arc = (r: number, from: number, to: number) => `M${at(r, from)} A${r} ${r}
  * dims and shows a play button.
  */
 export function SpinningRecord({ size, playing, paused }: { size: number; playing: boolean; paused: boolean }) {
+  // The blind card is dark on purpose (a DarkRoom): the record is drawn in the navy set there.
+  const C = useDarkRoom() ? DarkColors : Colors;
   const spin = useSharedValue(0);
   const pulse = useSharedValue(0);
 
@@ -45,23 +48,23 @@ export function SpinningRecord({ size, playing, paused }: { size: number; playin
       <Animated.View style={[StyleSheet.absoluteFill, styles.ring, { borderRadius: size / 2 }, ringStyle]} pointerEvents="none" />
       <Animated.View style={[StyleSheet.absoluteFill, recordStyle, paused && styles.dim]}>
         <Svg width={size} height={size} viewBox="0 0 100 100">
-          <Circle cx={50} cy={50} r={48} fill={Colors.surfaceElevated} stroke={Colors.text} strokeWidth={2} />
-          <Circle cx={50} cy={50} r={40} fill="none" stroke={Colors.text} strokeWidth={0.8} opacity={0.25} />
-          <Circle cx={50} cy={50} r={33} fill="none" stroke={Colors.text} strokeWidth={0.8} opacity={0.25} />
-          <Circle cx={50} cy={50} r={26} fill="none" stroke={Colors.text} strokeWidth={0.8} opacity={0.2} />
+          <Circle cx={50} cy={50} r={48} fill={C.surfaceElevated} stroke={C.text} strokeWidth={2} />
+          <Circle cx={50} cy={50} r={40} fill="none" stroke={C.text} strokeWidth={0.8} opacity={0.25} />
+          <Circle cx={50} cy={50} r={33} fill="none" stroke={C.text} strokeWidth={0.8} opacity={0.25} />
+          <Circle cx={50} cy={50} r={26} fill="none" stroke={C.text} strokeWidth={0.8} opacity={0.2} />
           {/* The glint: light catching the grooves on one side, so the turn shows. */}
-          <Path d={arc(44, -70, -25)} stroke={Colors.text} strokeWidth={4} strokeLinecap="round" fill="none" opacity={0.7} />
-          <Path d={arc(36, -60, -40)} stroke={Colors.text} strokeWidth={2} strokeLinecap="round" fill="none" opacity={0.4} />
-          <Circle cx={50} cy={50} r={16} fill={Colors.signal} />
+          <Path d={arc(44, -70, -25)} stroke={C.text} strokeWidth={4} strokeLinecap="round" fill="none" opacity={0.7} />
+          <Path d={arc(36, -60, -40)} stroke={C.text} strokeWidth={2} strokeLinecap="round" fill="none" opacity={0.4} />
+          <Circle cx={50} cy={50} r={16} fill={C.signal} />
           {/* A mark on the label, off-center. */}
-          <Path d={arc(11, 150, 210)} stroke={Colors.background} strokeWidth={2.5} strokeLinecap="round" fill="none" />
-          <Circle cx={50} cy={50} r={2.5} fill={Colors.background} />
+          <Path d={arc(11, 150, 210)} stroke={C.background} strokeWidth={2.5} strokeLinecap="round" fill="none" />
+          <Circle cx={50} cy={50} r={2.5} fill={C.background} />
         </Svg>
       </Animated.View>
       {paused && (
         <View style={styles.pausedOverlay} pointerEvents="none">
-          <View style={styles.playButton}>
-            <Ionicons name="play" size={24} color={Colors.accentText} style={styles.playIcon} />
+          <View style={[styles.playButton, { backgroundColor: C.accent }]}>
+            <Ionicons name="play" size={24} color={C.accentText} style={styles.playIcon} />
           </View>
         </View>
       )}

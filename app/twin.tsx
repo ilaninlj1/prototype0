@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   dim: { color: Colors.textSecondary },
   spinner: { marginTop: Spacing.xl },
   waveBox: { borderWidth: 1, borderColor: Colors.hairline, borderRadius: Radius.sm, padding: Spacing.lg, gap: Spacing.sm, marginTop: Spacing.md },
-  wavedAtYou: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.highlight },
+  wavedAtYou: { fontFamily: Fonts.sansSemiBold, fontSize: 13, color: Colors.text },
   contact: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   contactText: { flex: 1, fontFamily: 'Figtree_700Bold', fontSize: 16 },
   primary: { ...Ui.outlineButton, backgroundColor: Colors.accent, borderColor: Colors.accent },

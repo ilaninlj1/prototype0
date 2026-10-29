@@ -15,10 +15,11 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { SpinningRecord } from './spinning-record';
+import { DarkRoom } from '@/components/dark-room';
 import { HeartBurst } from '@/components/heart-burst';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { DarkColors, Spacing } from '@/constants/theme';
 import { mixForDrag, shouldReportMix } from '@/lib/crossfade';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { DEFAULT_SWIPE_THRESHOLDS, resolveSwipeDirection, rotationForDrag, type CardSize, type SwipeDirection } from './swipe-physics';
@@ -47,18 +48,20 @@ type CardFaceProps = {
 /** How blurred the cover is before the reveal: its shapes and colors show, never text or faces. The reveal starts from the same blur. */
 export const COVER_BLUR = 28;
 
+/** Like Home's card, the blind card is dark on purpose: navy under the blurred cover, cream words. */
 export function CardFace({ size, playing = false, showPlayIcon = false, leftTintStyle, rightTintStyle, artwork }: CardFaceProps) {
 
   return (
-    <ThemedView style={[styles.card, size]} backgroundColor={Colors.surface}>
+    <DarkRoom>
+    <ThemedView style={[styles.card, size]} backgroundColor={DarkColors.surface}>
       {!!artwork && (
         <>
           <Image source={{ uri: artworkUrl(artwork, 300) }} style={StyleSheet.absoluteFill} blurRadius={COVER_BLUR} transition={250} />
           <ThemedView style={[StyleSheet.absoluteFill, styles.blurScrim]} backgroundColor="transparent" />
         </>
       )}
-      {leftTintStyle && <TintWash side="left" color={Colors.destructive} style={leftTintStyle} />}
-      {rightTintStyle && <TintWash side="right" color={Colors.positive} style={rightTintStyle} />}
+      {leftTintStyle && <TintWash side="left" color={DarkColors.destructive} style={leftTintStyle} />}
+      {rightTintStyle && <TintWash side="right" color={DarkColors.positive} style={rightTintStyle} />}
 
       <ThemedView style={styles.center} backgroundColor="transparent">
         {/* The song: spinning while it plays, stopped with a play button when paused. */}
@@ -72,6 +75,7 @@ export function CardFace({ size, playing = false, showPlayIcon = false, leftTint
         </ThemedText>
       </ThemedView>
     </ThemedView>
+    </DarkRoom>
   );
 }
 
@@ -290,7 +294,7 @@ export function SwipeCard({ track, size, onSwipe, onHold, playing, showPlayIcon,
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: Radius.lg,
+    borderRadius: 28,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.3,
@@ -316,6 +320,6 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   hint: {
-    color: Colors.textSecondary,
+    color: DarkColors.textSecondary,
   },
 });

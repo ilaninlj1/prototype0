@@ -150,10 +150,10 @@ function MoveTag({ move, big }: { move?: Move; big?: boolean }) {
   if (!move) return null;
   const size = big ? 15 : 12;
   if (move.isNew) return <ThemedText style={[styles.move, { fontSize: size, color: Colors.signal }]}>NEW</ThemedText>;
-  if (!move.delta) return <ThemedText style={[styles.move, { fontSize: size, color: Colors.textTertiary }]}>–</ThemedText>;
+  if (!move.delta) return <ThemedText style={[styles.move, { fontSize: size, color: Colors.textSecondary }]}>–</ThemedText>;
   const up = move.delta > 0;
   return (
-    <ThemedText style={[styles.move, { fontSize: size, color: up ? Colors.highlight : Colors.textTertiary }]}>
+    <ThemedText style={[styles.move, { fontSize: size, color: up ? Colors.text : Colors.textSecondary }]}>
       {up ? '▲' : '▼'}
       {Math.abs(move.delta)}
     </ThemedText>
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   chips: { paddingHorizontal: Spacing.lg, gap: Spacing.sm },
   chip: { backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, flexDirection: 'row', gap: 6, alignItems: 'baseline' },
   chipOn: { backgroundColor: Colors.accent },
-  chipCode: { fontFamily: Fonts.monoMedium, fontSize: 12, color: Colors.signal },
+  chipCode: { fontFamily: Fonts.monoMedium, fontSize: 12, color: Colors.textSecondary },
   chipName: { fontFamily: 'Figtree_600SemiBold', fontSize: 14, color: Colors.text },
   chipOnText: { color: Colors.accentText },
   blind: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.accent, borderRadius: Radius.lg, padding: Spacing.lg, marginTop: Spacing.lg },
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 15, lineHeight: 19 },
   dim: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
-  history: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, color: Colors.textTertiary, marginTop: 1 },
-  historyPeak: { color: Colors.highlight },
+  history: { fontFamily: Fonts.mono, fontSize: 12, lineHeight: 16, color: Colors.textSecondary, marginTop: 1 },
+  historyPeak: { color: Colors.text, fontFamily: Fonts.monoMedium },
   move: { fontFamily: Fonts.monoMedium, minWidth: 34, textAlign: 'right' },
 });

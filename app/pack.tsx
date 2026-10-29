@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   big: { fontSize: 56, lineHeight: 60, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.rule },
-  art: { width: 64, height: 64, borderRadius: Radius.sm },
+  art: { width: 64, height: 64, borderRadius: Radius.lg },
   info: { flex: 1, gap: 1 },
   rowTitle: { fontFamily: 'Figtree_700Bold', fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
   links: { flexDirection: 'row', gap: Spacing.lg, alignItems: 'center' },

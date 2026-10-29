@@ -33,13 +33,7 @@ export function PresetChips({ activePreset, loading, onSelect }: PresetChipsProp
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      // Shrink-to-content, not stretched to the header's full width — the
-      // header overlay is pointerEvents="box-none" specifically so empty
-      // space passes taps through to the card underneath, which only
-      // works if this ScrollView's own touch-capturing bounds stop where
-      // its actual chips end. The parent column has no explicit
-      // alignItems, so it defaults to 'stretch' — without this, a short
-      // 4-chip row would still claim the full header width as its hit box.
+      // Bleeds to the sheet's edges, so the last chip scrolls in from the edge instead of being cut at the margin.
       style={styles.scrollView}
       contentContainerStyle={styles.row}>
       {PRESET_ORDER.map((preset) => {
@@ -64,12 +58,12 @@ export function PresetChips({ activePreset, loading, onSelect }: PresetChipsProp
 
 const styles = StyleSheet.create({
   scrollView: {
-    alignSelf: 'flex-start',
-    maxWidth: '100%',
+    marginHorizontal: -Spacing.xl,
+    flexGrow: 0,
   },
   row: {
     gap: Spacing.sm,
-    paddingRight: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   // Grey pills; the chosen one is black.
   chip: {

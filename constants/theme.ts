@@ -107,13 +107,14 @@ export const Spacing = {
   xxl: 32,
 };
 
-// One small radius family used sparingly; `pill` is now a soft rectangle for
-// buttons and chips, and `round` is for things that really are circles.
+// Soft corners for the light app (Minimal UI): thumbnails and small boxes `sm`,
+// tiles `md`, cards `lg`, chips `pill`; `round` is for real circles. Home's card,
+// the sheets and the big cards use 28. The dark rooms keep their own numbers.
 export const Radius = {
-  sm: 4,
-  md: 6,
-  lg: 10,
-  pill: 8,
+  sm: 6,
+  md: 12,
+  lg: 16,
+  pill: 18,
   round: 999,
 };
 

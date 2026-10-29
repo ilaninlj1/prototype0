@@ -117,7 +117,7 @@ export default function CommentsScreen() {
                 setNewVibe('');
               }}
               placeholder="+ your word"
-              placeholderTextColor={Colors.textTertiary}
+              placeholderTextColor={Colors.textSecondary}
               maxLength={24}
               style={styles.chipText}
               returnKeyType="done"
@@ -155,7 +155,7 @@ export default function CommentsScreen() {
           value={draft}
           onChangeText={setDraft}
           placeholder="Say something about it…"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={Colors.textSecondary}
           maxLength={280}
           multiline
           style={styles.input}
@@ -177,15 +177,15 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md },
   chipOn: { backgroundColor: Colors.accent },
-  chipCount: { fontFamily: Fonts.monoMedium, fontSize: 12, color: Colors.signal },
+  chipCount: { fontFamily: Fonts.monoMedium, fontSize: 12, color: Colors.textSecondary },
   chipInput: { backgroundColor: 'transparent', borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed' },
   chipText: { color: Colors.text, fontFamily: Fonts.sans, fontSize: 14, minWidth: 90, padding: 0 },
-  credit: { color: Colors.textTertiary, fontSize: 11, marginTop: Spacing.xs },
+  credit: { color: Colors.textTertiary, fontSize: 12, marginTop: Spacing.xs },
   empty: { fontFamily: Fonts.note, fontSize: 22, lineHeight: 26, color: Colors.textSecondary, transform: [{ rotate: '-1.5deg' }] },
   comment: { paddingVertical: Spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border, gap: 4 },
   commentHead: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm },
   commentName: { fontFamily: 'Figtree_700Bold', fontSize: 14 },
-  commentTime: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.textTertiary },
+  commentTime: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.textTertiary },
   flag: { marginLeft: 'auto' },
   failed: { fontSize: 13, color: Colors.text, backgroundColor: Colors.surfaceElevated, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, backgroundColor: Colors.surface },

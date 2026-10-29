@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { DarkColors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { DarkColors, Fonts, Spacing } from '@/constants/theme';
 import { KNOWN_SHARE } from '@/lib/dark-map';
 
 type Props = { words: string; songs: number; heard: number; bottom: number; onGo: () => void; onClose: () => void };
@@ -52,6 +52,6 @@ const styles = StyleSheet.create({
   words: { fontFamily: Fonts.mono, fontSize: 11, letterSpacing: 1.2, color: DarkColors.textSecondary },
   big: { fontFamily: Fonts.display, fontSize: 22, lineHeight: 28, color: DarkColors.text },
   body: { fontSize: 14, color: DarkColors.textSecondary },
-  go: { marginTop: Spacing.md, backgroundColor: DarkColors.accent, borderRadius: Radius.lg, alignItems: 'center', paddingVertical: Spacing.md },
+  go: { marginTop: Spacing.md, backgroundColor: DarkColors.accent, borderRadius: 10, alignItems: 'center', paddingVertical: Spacing.md },
   goText: { fontFamily: Fonts.monoMedium, fontSize: 13, letterSpacing: 1.2, color: DarkColors.accentText },
 });

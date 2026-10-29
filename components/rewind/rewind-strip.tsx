@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     height: HEIGHT,
     borderWidth: 1,
     borderColor: DarkColors.hairline,
-    borderRadius: Radius.lg,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   line: {

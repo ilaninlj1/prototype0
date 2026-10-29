@@ -23,7 +23,7 @@ import { DEFAULT_SWIPE_THRESHOLDS, resolveSwipeDirection, rotationForDrag, type 
 import { HeartBurst } from '@/components/heart-burst';
 import { LivePrint } from '@/components/print/live-print';
 import { PrintStill } from '@/components/print/print-still';
-import { DarkColors, Radius, Spacing } from '@/constants/theme';
+import { DarkColors, Spacing } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import { mixForDrag, shouldReportMix } from '@/lib/crossfade';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     right: Spacing.md,
     width: BADGE,
     height: BADGE,
-    borderRadius: Radius.sm,
+    borderRadius: 4,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: DarkColors.hairline,

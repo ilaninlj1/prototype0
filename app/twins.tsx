@@ -154,7 +154,7 @@ function JoinForm({ initial, onSaved }: { initial: MyProfile | null; onSaved: ()
       <ThemedText style={[Ui.label, styles.label]}>
         Name
       </ThemedText>
-      <TextInput value={name} onChangeText={setName} maxLength={30} placeholder="A nickname" placeholderTextColor={Colors.textTertiary} style={styles.input} />
+      <TextInput value={name} onChangeText={setName} maxLength={30} placeholder="A nickname" placeholderTextColor={Colors.textSecondary} style={styles.input} />
       <ThemedText type="caption" style={nameBad ? styles.error : styles.dim}>
         {nameBad ? 'Keep handles, links and numbers out of your name. That’s what waving is for.' : 'Every twin sees this, so a nickname is best.'}
       </ThemedText>
@@ -193,7 +193,7 @@ function JoinForm({ initial, onSaved }: { initial: MyProfile | null; onSaved: ()
                 autoCorrect={false}
                 maxLength={80}
                 placeholder="@username"
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor={Colors.textSecondary}
                 style={styles.input}
               />
               {handleBad && <ThemedText style={styles.error}>That doesn’t look like a username.</ThemedText>}
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   twin: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, borderWidth: 1, borderColor: Colors.hairline, borderRadius: Radius.sm, padding: Spacing.lg, marginTop: Spacing.sm },
   twinText: { flex: 1, gap: 2 },
   twinName: { fontFamily: 'Figtree_700Bold', fontSize: 17, lineHeight: 22 },
-  waved: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.highlight, marginTop: 2 },
+  waved: { fontFamily: Fonts.sansSemiBold, fontSize: 13, color: Colors.text, marginTop: 2 },
   percent: { fontFamily: Fonts.display, fontSize: 28, lineHeight: 32, color: Colors.signal },
   footer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.xl },
   link: { color: Colors.textSecondary, textDecorationLine: 'underline' },

@@ -94,9 +94,7 @@ export default function DropResultsScreen() {
             <View style={[styles.page, { width }]}>
               <DoubleTapLike track={dropToDiscoveryTracks(drop)[position]} style={styles.pressFill}>
               <Pressable style={styles.pressFill} onLongPress={() => (status.playing ? player.pause() : player.play())} delayLongPress={400}>
-              <ThemedView style={[styles.card, { width: cardWidth }]} backgroundColor="transparent">
-                <Image source={{ uri: artworkUrl(song.artworkUrl, 100) }} style={StyleSheet.absoluteFill} blurRadius={50} />
-                <View style={[StyleSheet.absoluteFill, styles.scrim]} />
+              <ThemedView style={[styles.card, { width: cardWidth }]} backgroundColor={Colors.surface}>
                 <ScrollView contentContainerStyle={styles.cardBody}>
                   <ThemedText style={styles.rank}>{rankLabel(rank)}</ThemedText>
                   <Image source={{ uri: artworkUrl(song.artworkUrl, 600) }} style={styles.art} />
@@ -126,7 +124,7 @@ export default function DropResultsScreen() {
                     {guess === position && <ThemedText style={styles.tag}>Your guess</ThemedText>}
                   </View>
                   <ThemedText>{liked ? 'You liked it' : 'You skipped it'}</ThemedText>
-                  <ThemedView style={styles.bar} backgroundColor={Colors.surfaceElevated}>
+                  <ThemedView style={styles.bar} backgroundColor={Colors.background}>
                     <ThemedView style={[styles.barFill, { width: `${Math.round(share * 100)}%` }]} backgroundColor={Colors.accent} />
                   </ThemedView>
                   <ThemedText type="caption">{results ? crowdLabel(r) : "Results when you're back online"}</ThemedText>
@@ -170,21 +168,20 @@ export default function DropResultsScreen() {
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: Colors.background },
   head: { paddingHorizontal: Spacing.lg, gap: Spacing.xs },
-  guess: { fontSize: 17, fontWeight: '700', color: Colors.signal },
+  guess: { fontSize: 17, fontWeight: '700', color: Colors.text },
   pager: { flexGrow: 1, marginVertical: Spacing.md },
   page: { alignItems: 'center' },
   pressFill: { flex: 1 },
-  scrim: { backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-  // Same as Home's revealed card: a thin outline, no fill.
-  card: { flex: 1, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.hairline, overflow: 'hidden' },
+  // A light grey card with the cover on it, the big round corners of Home's card.
+  card: { flex: 1, borderRadius: 28, overflow: 'hidden' },
   cardBody: { padding: Spacing.lg, gap: Spacing.xs },
   rank: { fontSize: 22, lineHeight: 28, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display },
-  art: { width: '100%', aspectRatio: 1, borderRadius: Radius.md, marginVertical: Spacing.sm },
+  art: { width: '100%', aspectRatio: 1, borderRadius: 20, marginVertical: Spacing.sm },
   dim: { color: Colors.textSecondary },
   count: { fontSize: 32, lineHeight: 38, fontWeight: '800', color: Colors.signal, fontFamily: Fonts.display, marginTop: Spacing.sm },
   links: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.xs, alignItems: 'center' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginVertical: Spacing.xs },
-  tag: { color: Colors.signal, fontWeight: '700' },
+  tag: { fontWeight: '700', color: Colors.accentText, backgroundColor: Colors.accent, borderRadius: 12, paddingHorizontal: Spacing.sm, paddingVertical: 2, overflow: 'hidden' },
   bar: { height: 6, borderRadius: Radius.pill, overflow: 'hidden', marginVertical: 4 },
   barFill: { height: 6 },
   ladder: { alignItems: 'center', gap: Spacing.xs },

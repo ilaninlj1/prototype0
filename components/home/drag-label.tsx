@@ -3,7 +3,7 @@ import Animated, { interpolate, useAnimatedStyle, type AnimatedStyle, type Share
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
-import { DarkColors, Fonts, Radius } from '@/constants/theme';
+import { DarkColors, Fonts } from '@/constants/theme';
 import { DEFAULT_SWIPE_THRESHOLDS } from '@/components/discovery/swipe-physics';
 
 const H = DEFAULT_SWIPE_THRESHOLDS.horizontal;
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: Radius.pill,
+    borderRadius: 8,
     backgroundColor: 'rgba(19, 33, 63, 0.7)',
     borderWidth: 1,
     borderColor: DarkColors.hairline,

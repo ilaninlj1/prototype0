@@ -18,7 +18,7 @@ export function Sticker({ label, tilt = -6 }: { label: string; tilt?: number }) 
       <Svg width={34} height={26} viewBox="0 0 34 26" style={styles.arrow}>
         <Path
           d="M31 3 C 24 5, 14 9, 6 19 M6 19 L 7.5 11.5 M6 19 L 13.5 17.8"
-          stroke={Colors.highlight}
+          stroke={Colors.text}
           strokeWidth={2.4}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -42,6 +42,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 6,
     borderBottomRightRadius: 1,
   },
-  text: { fontFamily: Fonts.marker, fontSize: 15, lineHeight: 21, color: Colors.accentText },
+  // Black marker on the gold scrap (11.6:1).
+  text: { fontFamily: Fonts.marker, fontSize: 15, lineHeight: 21, color: Colors.text },
   arrow: { marginTop: 2, marginRight: 30 },
 });

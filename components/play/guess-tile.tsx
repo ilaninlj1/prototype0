@@ -66,5 +66,5 @@ const styles = StyleSheet.create({
   label: { fontSize: 36, lineHeight: 40, fontWeight: '800' },
   art: { width: '70%', aspectRatio: 1, borderRadius: Radius.sm, marginBottom: 4 },
   title: { textAlign: 'center', fontSize: 14, lineHeight: 18 },
-  count: { color: Colors.signal, fontFamily: Fonts.display, fontWeight: '800', fontSize: 18 },
+  count: { color: Colors.text, fontFamily: Fonts.display, fontWeight: '800', fontSize: 18 },
 });
