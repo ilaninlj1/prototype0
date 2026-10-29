@@ -14,7 +14,7 @@ import { useHomeChromeVisible } from '@/hooks/use-home-chrome';
 import { tabBarScrollHidden } from '@/hooks/use-scroll-chrome';
 import { onDecodedNews } from '@/hooks/use-taste-decoded';
 import { FADE_MS, tabBarVisible } from '@/lib/home-chrome';
-import { tabBarScrollShare } from '@/lib/scroll-chrome';
+import { tabBarRoom, tabBarScrollShare } from '@/lib/scroll-chrome';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -31,8 +31,9 @@ const INDICATOR = 22;
 /**
  * Edge to edge under a thin rule; a short black bar springs to the active tab.
  * On Home it fades with Home's buttons (lib/home-chrome.ts); on the other tabs
- * it slides away while you scroll down a list (lib/scroll-chrome.ts). Either
- * way it keeps its height, so nothing above it moves.
+ * it slides away while you scroll down a list (lib/scroll-chrome.ts) and gives
+ * its room to the list, so you see more covers. On Home it keeps its height,
+ * so nothing above it moves.
  */
 export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) {
   const insets = useSafeAreaInsets();
@@ -62,7 +63,8 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
   const onHome = focusedName === 'index';
   const fade = useAnimatedStyle(() => {
     const away = tabBarScrollShare(onHome ? 'index' : 'other', tabBarScrollHidden.get());
-    return { opacity: opacity.get() * Math.min(1, Math.max(0, 1 - away * 1.2)), transform: [{ translateY: away * height.get() }] };
+    // The negative margin slides it down and hands its room to the screen above, which grows into it.
+    return { opacity: opacity.get() * Math.min(1, Math.max(0, 1 - away * 1.2)), marginBottom: tabBarRoom(height.get(), away) - height.get() };
   });
 
   // A save on Home lands on Library: the icon bumps, and a +N stays until you open it.

@@ -9,6 +9,7 @@ import {
   SCROLL_CHROME_START,
   scrollChromeStep,
   SHOW_AFTER_PX,
+  tabBarRoom,
   tabBarScrollShare,
   tooShortToHide,
   TOP_ZONE_PX,
@@ -92,4 +93,12 @@ test('Home owns the tab bar on Home; scrolling owns it everywhere else', () => {
   assert.equal(tabBarScrollShare('library', 1), 1);
   assert.equal(tabBarScrollShare('explore', 0.4), 0.4);
   assert.equal(tabBarScrollShare('play', 0), 0);
+});
+
+test('the tab bar gives its room to the list as it scrolls away, so you see more covers', () => {
+  assert.equal(tabBarRoom(80, 0), 80);
+  assert.equal(tabBarRoom(80, 1), 0);
+  assert.equal(tabBarRoom(80, 0.5), 40);
+  assert.equal(tabBarRoom(80, 1.04), 0); // spring overshoot never goes negative
+  assert.equal(tabBarRoom(80, -0.03), 80);
 });

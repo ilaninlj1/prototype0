@@ -61,6 +61,15 @@ export function tooShortToHide(contentHeight: number, viewportHeight: number): b
  * Home's own buttons layer owns the bar (lib/home-chrome.ts) and scrolling has no
  * say; on every other tab only scrolling does, so the two never fight.
  */
+/**
+ * How much room the tab bar keeps in the layout: all of it when up, none when scrolled away, so the
+ * list grows into the space and shows more covers instead of a blank strip (the Apple Music feel).
+ */
+export function tabBarRoom(height: number, away: number): number {
+  'worklet';
+  return height * (1 - Math.min(1, Math.max(0, away)));
+}
+
 export function tabBarScrollShare(focusedRoute: string, scrollHidden: number): number {
   'worklet';
   return focusedRoute === 'index' ? 0 : scrollHidden;
