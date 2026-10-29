@@ -65,7 +65,7 @@ function coverHue(h: number): number {
   return hue;
 }
 
-function hslToHex(h: number, s: number, l: number): string {
+export function hslToHex(h: number, s: number, l: number): string {
   const amplitude = s * Math.min(l, 1 - l);
   const channel = (n: number) => {
     const k = (n + h / 30) % 12;
@@ -73,6 +73,12 @@ function hslToHex(h: number, s: number, l: number): string {
     return Math.round(value * 255).toString(16).padStart(2, '0');
   };
   return `#${channel(0)}${channel(8)}${channel(4)}`;
+}
+
+/** A key's hue on the circle-of-fifths dial: warm for major (and unknown mode), blue-green for minor, never violet. */
+export function keyHue(key: number, mode: 0 | 1 | null): number {
+  const fifths = (key * 7) % 12;
+  return mode === 0 ? 172 + fifths * 4 : 2 + fifths * 5;
 }
 
 export function recipeFor(
@@ -89,8 +95,7 @@ export function recipeFor(
   let rings: Ring[];
 
   if (sound !== null && sound.key !== null) {
-    const fifths = (sound.key * 7) % 12;
-    const hue = sound.mode === 0 ? 172 + fifths * 4 : 2 + fifths * 5;
+    const hue = keyHue(sound.key, sound.mode);
     const tonic = hslToHex(hue, 0.62, 0.58 * brightness + 0.1);
     const third = hslToHex(hue, 0.5, 0.72);
     const pitches = sound.mode === null
