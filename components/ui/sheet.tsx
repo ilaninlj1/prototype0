@@ -29,12 +29,15 @@ export function BottomSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <LightRoom>
-        <Pressable style={styles.backdrop} onPress={onClose}>
-          <Pressable style={[styles.sheet, { maxHeight, paddingBottom: insets.bottom }]} onPress={(e) => e.stopPropagation()}>
+        {/* The backdrop is a sibling behind the sheet, not its parent: a Pressable wrapped around the sheet's
+            ScrollView took the touch on phones, so long sheets (Details) couldn't scroll. */}
+        <View style={styles.root}>
+          <Pressable style={[StyleSheet.absoluteFill, styles.backdrop]} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
+          <View style={[styles.sheet, { maxHeight, paddingBottom: insets.bottom }]}>
             <View style={styles.grabber} />
             {children}
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </LightRoom>
     </Modal>
   );
@@ -75,7 +78,8 @@ export const sheetStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.35)' },
+  root: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { backgroundColor: 'rgba(0, 0, 0, 0.35)' },
   sheet: {
     backgroundColor: Colors.background,
     borderTopLeftRadius: SHEET_RADIUS,
