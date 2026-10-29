@@ -7,6 +7,7 @@ import { BottomSheet, SheetHeader, sheetStyles } from '@/components/ui/sheet';
 import { Colors, Fonts, Spacing, TapTarget, Ui } from '@/constants/theme';
 import { tuneSummary } from '@/lib/home-copy';
 import type { Region } from '@/lib/discovery';
+import { saveBottlesOn, useBottlesOn } from '@/lib/bottles-api';
 import { setAllowAi, useAllowAi } from '@/lib/human-check-api';
 import type { NetworkTest } from '@/lib/feed-load';
 import type { PresetId } from '@/lib/pool-types';
@@ -66,6 +67,7 @@ export function TuneSheet({
     onOpenChange?.(open);
   };
   const allowAi = useAllowAi();
+  const bottlesOn = useBottlesOn() === true;
 
   function close() {
     setVisible(false);
@@ -151,10 +153,10 @@ export function TuneSheet({
             style={styles.moreRow}
             accessibilityRole="button"
             accessibilityState={{ expanded: more }}
-            accessibilityLabel="More settings: store region, AI-made music, test network">
+            accessibilityLabel="More settings: store region, AI-made music, Bottles, test network">
             <ThemedText style={styles.moreText}>More</ThemedText>
             <ThemedText style={styles.moreHint} numberOfLines={1}>
-              {region} store · AI {allowAi ? 'shown' : 'hidden'}
+              {region} store · AI {allowAi ? 'shown' : 'hidden'} · Bottles {bottlesOn ? 'on' : 'off'}
             </ThemedText>
             <Ionicons name={more ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.textSecondary} />
           </Pressable>
@@ -179,6 +181,22 @@ export function TuneSheet({
                 {allowAi
                   ? 'AI acts can show up. They’re labeled “AI-tagged” when revealed.'
                   : 'Skips artists that listeners have tagged as AI-made. Real people only.'}
+              </ThemedText>
+
+              <ThemedText style={sheetStyles.heading}>Bottles</ThemedText>
+              <Segment
+                options={[
+                  { key: 'off', label: 'Off' },
+                  { key: 'on', label: 'On' },
+                ]}
+                value={bottlesOn ? 'on' : 'off'}
+                onChange={(v) => saveBottlesOn(v === 'on')}
+                label="Bottles"
+              />
+              <ThemedText type="caption">
+                {bottlesOn
+                  ? 'Your saves float to strangers, blind, and theirs wash up for you. Only your city goes with them.'
+                  : 'Your saves stay with you, and no bottles wash up.'}
               </ThemedText>
 
               <ThemedText style={sheetStyles.heading}>Test network</ThemedText>

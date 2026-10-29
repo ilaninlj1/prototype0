@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { noteText } from '@/components/note-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Spacing, TapTarget, Ui } from '@/constants/theme';
+import { journeySummary } from '@/lib/bottle-journey';
+import type { Bottle } from '@/lib/bottle-rows';
 import { callLabel, callReceipt, type CalledShot } from '@/lib/called-shots';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { foundLine } from '@/lib/library';
@@ -21,10 +24,13 @@ type Props = {
   selecting?: boolean;
   onPress: () => void;
   onLongPress: () => void;
+  /** This song's bottle (lib/bottles-api.ts myBottles): a wave mark on the cover that opens its journey. */
+  bottle?: Bottle;
+  onBottle?: () => void;
 };
 
 /** A saved song in the Library grid: the cover, then the title, the artist and how the artist grew since you found them. */
-export function CoverCell({ track, listenersNow, today, call, onShare, playing, selected, selecting, onPress, onLongPress }: Props) {
+export function CoverCell({ track, listenersNow, today, call, onShare, playing, selected, selecting, onPress, onLongPress, bottle, onBottle }: Props) {
   const found = foundLine(track.artistListeners, listenersNow, track.likedAt, today);
   const receipt = call ? callReceipt(call, listenersNow) : null;
   const a11y = [track.trackName, track.artistName, found?.text, found?.change].filter(Boolean).join(', ');
@@ -45,6 +51,19 @@ export function CoverCell({ track, listenersNow, today, call, onShare, playing, 
             <View style={styles.called}>
               <ThemedText style={styles.calledText}>called it</ThemedText>
             </View>
+          )}
+          {bottle && onBottle && !selecting && (
+            <Pressable
+              onPress={onBottle}
+              hitSlop={8}
+              style={styles.wave}
+              accessibilityRole="button"
+              accessibilityLabel={`Bottle: ${journeySummary(bottle)}. Opens where it went.`}>
+              <Svg width={16} height={8} viewBox="0 0 16 8">
+                <Path d="M1 5 C3 1, 5 1, 7 4 S11 7, 15 3" stroke={Colors.accentText} strokeWidth={1.8} fill="none" strokeLinecap="round" />
+              </Svg>
+              {bottle.keeps > 0 && <ThemedText style={styles.waveCount}>{bottle.keeps + 1}</ThemedText>}
+            </Pressable>
           )}
           {(playing || selecting) && (
             <View style={[styles.badge, selected && styles.badgeOn]}>
@@ -96,6 +115,21 @@ const styles = StyleSheet.create({
   share: { ...Ui.outlineButton, minHeight: 36, alignSelf: 'flex-start', backgroundColor: Colors.accent, borderColor: Colors.accent, marginTop: Spacing.xs },
   shareLabel: { ...Ui.label, color: Colors.accentText },
   disabled: { opacity: 0.5 },
+  wave: {
+    position: 'absolute',
+    right: Spacing.sm,
+    bottom: Spacing.sm,
+    minWidth: 32,
+    height: 32,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: 16,
+    backgroundColor: Colors.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  waveCount: { fontSize: 12, fontWeight: '700', color: Colors.accentText },
   art: { aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: Colors.surface, marginBottom: Spacing.xs },
   artSelected: { borderWidth: 3, borderColor: Colors.accent },
   // A hand-placed gold scrap, black marker on it.

@@ -19,7 +19,10 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CreditLine } from '@/components/credits';
+import { JourneySheet } from '@/components/bottles/journey-sheet';
 import { CoverCell } from '@/components/discovery/cover-cell';
+import { useMyBottles } from '@/hooks/use-my-bottles';
+import type { Bottle } from '@/lib/bottle-rows';
 import { deleteLikes, onLikeChange } from '@/components/like-button';
 import { MiniPlayer } from '@/components/mini-player';
 import { NoteSheet } from '@/components/note-sheet';
@@ -88,6 +91,9 @@ export function LikedTracksScreen() {
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
   const [tracks, setTracks] = useState<DiscoveryTrack[]>([]);
+  // Bottles: which saves have travelled, and the one whose journey is open.
+  const bottlesByTrack = useMyBottles();
+  const [journey, setJourney] = useState<{ bottle: Bottle; title: string } | null>(null);
   // "Found at 98.6K · today" is checked against when the list last loaded.
   const [today, setToday] = useState(() => Date.now());
   const [deletedCount, setDeletedCount] = useState(0);
@@ -384,6 +390,11 @@ export function LikedTracksScreen() {
                     selected={selectedIds.has(track.id)}
                     onPress={() => (selectionMode ? toggleSelected(track) : togglePlay(track))}
                     onLongPress={() => handleLongPressRow(track)}
+                    bottle={bottlesByTrack.get(track.id)}
+                    onBottle={() => {
+                      const bottle = bottlesByTrack.get(track.id);
+                      if (bottle) setJourney({ bottle, title: track.trackName });
+                    }}
                   />
                 ))}
               </View>
@@ -503,6 +514,7 @@ export function LikedTracksScreen() {
       )}
 
       <NoteSheet track={noteTrack} onSave={saveNote} onClose={() => setNoteTrack(null)} />
+      <JourneySheet bottle={journey?.bottle ?? null} title={journey?.title ?? ''} onClose={() => setJourney(null)} />
 
       <Modal visible={fallbackText !== null} transparent animationType="fade" onRequestClose={dismissFallback}>
         <Pressable style={styles.backdrop} onPress={dismissFallback}>
