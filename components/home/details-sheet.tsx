@@ -34,7 +34,7 @@ type Props = {
 export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, onClose }: Props) {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { record } = useSound(visible ? track : null);
+  const { record, loading } = useSound(visible ? track : null);
   if (!track) return null;
   const described = listeners != null ? describeListeners(listeners) : null;
   const side = Math.min(width, 520) - Spacing.xl * 2;
@@ -120,7 +120,10 @@ export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, on
             <ThemedText style={styles.small}>Measured by ReccoBeats.</ThemedText>
           </>
         ) : (
-          <ThemedText style={styles.secondary}>No sound data for this song yet.</ThemedText>
+          // Three different answers on purpose: still looking, looked and found nothing, or never looked.
+          <ThemedText style={styles.secondary}>
+            {loading ? 'Measuring the sound…' : record?.status === 'unmatched' ? 'We couldn’t find this song to measure.' : 'No sound data for this song yet.'}
+          </ThemedText>
         )}
 
         <Pressable
