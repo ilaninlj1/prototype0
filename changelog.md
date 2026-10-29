@@ -6,6 +6,23 @@ staleness.
 
 Add new entries at the top, newest first.
 
+## [2026-10-28] Minimal UI phases 2 and 3: the Library finished, light sheets, the whole app light, hide-on-scroll
+The Library tab (`components/library/liked-tracks-screen.tsx`) has a top bar with the title, Look up (the full
+search, now `/search?q=`) and Pick, and a search over your saves ("Songs, artists or albums", `lib/library.ts`:
+title, artist or album, any case or accent), genre chips, the best find and calls card, and a two-column cover grid
+with "Found at 97.3K → now 98.6K" (or "· today") under each cover. Empty, it says "Nothing saved yet. Double-tap a
+song you love to keep it here." with Start listening. The weekly nudge opens `/library` directly; `/modal` still
+redirects. Details, Tune, the genre picker and Finds News share one light bottom sheet (`components/ui/sheet.tsx`);
+Details gained Listen on, a gem-to-popular meter, a Call it card and sound tiles; Tune a live summary and a folded
+More; the genre picker a count, Shuffle and a search. The note and Spotify sheets are light cards. Every other screen
+follows the light tokens: labels and eyebrows are sentence-case Figtree (the dark rooms keep mono uppercase through
+`DarkTypography` / `DarkUi`), corners are softer, small text passes 4.5:1, the games' blind card and every print stay
+dark, Run's setup, reveal and Past runs are light while its live screen stays black. Library, Play, You and search
+hide their top bar and the tab bar while you scroll down and bring them back on a short scroll up, the top or the
+end (`lib/scroll-chrome.ts`, `hooks/use-scroll-chrome.ts`, on the UI thread). Fixed on the way: `ThemedText` gave
+a style that named a Figtree weight file the type's 400; the Spotify and Last.fm icons were white on white; the feed
+panel was black text on near-black. Plan `docs/superpowers/plans/2026-10-28-minimal-ui-phases-2-3.md`.
+
 ## [2026-10-27] Run mode: tap to like that works, and the stride follows a walk-to-run switch
 Pocket taps did nothing on a phone, for three reasons. Taps were measured by the size of the acceleration, and a tap
 pushes an upright phone sideways, across gravity, where the size barely changes, so `spikes` now measures impulses as

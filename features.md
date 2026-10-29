@@ -16,6 +16,13 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-10-28] Minimal UI (phases 1 to 3 built, phase 4 left)
+The student's class UI change, built into the app: a light "Clean" look, Home's hiding buttons, the Library tab,
+light sheets, hide-on-scroll on the scrolling screens. Spec `docs/superpowers/specs/2026-10-21-minimal-ui-design.md`,
+plans `docs/superpowers/plans/2026-10-21-minimal-ui-phase-1.md` and `2026-10-28-minimal-ui-phases-2-3.md`. Left:
+phase 4, in-app playlists and Send to Spotify (the Library's "•••" menu and the toast's Send button wait for it), and
+swipe-down to close the sheets.
+
 ## [2026-10-22] Run mode
 Blind songs on a run, matched to your stride and steered toward an Easy, Steady or Push pace, with "your legs liked
 it" likes and a post-run reveal. Prototype 7 (device capability: accelerometer, GPS, keep-awake, haptics, lock screen
