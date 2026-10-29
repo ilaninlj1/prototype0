@@ -51,6 +51,11 @@ export function commit(o: Outbox): Outbox {
   return o.pending ? { pending: null, queued: [...o.queued, o.pending] } : o;
 }
 
+/** Straight to sending, past Undo: a bottle filtered out or unplayable before it ever showed. */
+export function enqueue(o: Outbox, item: OutboxItem): Outbox {
+  return { pending: o.pending, queued: [...o.queued, item] };
+}
+
 export function sent(o: Outbox, ids: string[]): Outbox {
   const done = new Set(ids);
   return { pending: o.pending, queued: o.queued.filter((i) => !done.has(i.id)) };

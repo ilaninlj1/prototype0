@@ -7,6 +7,7 @@ import {
   canLaunch,
   commit,
   EMPTY_OUTBOX,
+  enqueue,
   oldFinds,
   sent,
   stage,
@@ -127,4 +128,13 @@ test('oldFinds keeps 10 s+ feed likes, newest first, at most 30, skipping drop a
   const manyHistory = many.map((t, i) => like(t.id, 20_000, i));
   assert.equal(oldFinds(manyHistory, many).length, 30);
   assert.equal(oldFinds(manyHistory, many)[0].id, 139);
+});
+
+test('enqueue sends at once and leaves the undoable item alone', () => {
+  const o = enqueue(stage(EMPTY_OUTBOX, verdict('a')), verdict('known'));
+  assert.equal(o.pending?.id, 'a');
+  assert.deepEqual(
+    o.queued.map((i) => i.id),
+    ['known']
+  );
 });
