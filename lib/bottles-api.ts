@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react';
 
 import { ensureSession } from './auth';
 import type { BottleSeen } from './bottle-journey';
-import { placeFromGeocode, placeFromTimeZone } from './bottle-place';
+import { mayUseCity, placeFromGeocode, placeFromTimeZone } from './bottle-place';
 import { parseBottle, parseBottles, type Bottle, type Place } from './bottle-rows';
 import { EMPTY_OUTBOX, sent, type Outbox, type OutboxItem } from './bottles';
 import { parseArtistLookupResponse, type DiscoveryTrack, type Region } from './discovery';
@@ -28,6 +28,7 @@ const K = {
   seen: 'blindspotDiscovery:bottleSeen',
   fx: 'blindspotDiscovery:bottleLaunchFx',
   oldOffered: 'blindspotDiscovery:bottleOldOffered',
+  cityOk: 'blindspotDiscovery:bottleCityOk',
 };
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
@@ -76,8 +77,12 @@ export function useBottlesOn(): boolean | null | undefined {
 
 // ---------- where you are ----------
 
-/** The phone's place for a bottle hop: its city when location is allowed, otherwise the time-zone region. Cached a day. */
+/** "Use my city" (true) or "Not now" (false) on the first-time card. */
+export const saveCityOk = (ok: boolean) => writeJson(K.cityOk, ok);
+
+/** The phone's place for a bottle hop: its city when you said "Use my city", otherwise the time-zone region. Cached a day. */
 export async function currentPlace(ask: boolean): Promise<Place> {
+  if (!mayUseCity({ cityOk: await readJson<boolean>(K.cityOk, false), asking: ask })) return placeFromTimeZone(timeZone());
   const cached = await readJson<{ place: Place; at: number } | null>(K.place, null);
   if (cached && Date.now() - cached.at < PLACE_MAX_AGE_MS && (cached.place.exact || !ask)) return cached.place;
   const place = (await cityPlace(ask)) ?? placeFromTimeZone(timeZone());

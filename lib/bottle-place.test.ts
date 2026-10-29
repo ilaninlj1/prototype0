@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { placeFromGeocode, placeFromTimeZone, roundCoord } from './bottle-place.ts';
+import { mayUseCity, placeFromGeocode, placeFromTimeZone, roundCoord } from './bottle-place.ts';
 
 test('rounds to the nearest 0.5°', () => {
   assert.equal(roundCoord(32.78), 33);
@@ -49,4 +49,10 @@ test('South Africa and Mexico have their own regions', () => {
 test('a garbage time zone is somewhere on Earth', () => {
   assert.equal(placeFromTimeZone('Nowhere/Atlantis').city, 'Somewhere on Earth');
   assert.equal(placeFromTimeZone('').city, 'Somewhere on Earth');
+});
+
+test('the city is used only when you said "Use my city", even if location is allowed for Run', () => {
+  assert.equal(mayUseCity({ cityOk: false, asking: false }), false);
+  assert.equal(mayUseCity({ cityOk: true, asking: false }), true);
+  assert.equal(mayUseCity({ cityOk: false, asking: true }), true);
 });

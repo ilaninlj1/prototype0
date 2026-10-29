@@ -6,6 +6,14 @@ import type { Place } from './bottle-rows.ts';
 
 export const ROUND_DEG = 0.5;
 
+/**
+ * Your city goes on a bottle only when you said "Use my city" (or are answering that card now). Location
+ * allowed for Run mode is not a yes for Bottles.
+ */
+export function mayUseCity(i: { cityOk: boolean; asking: boolean }): boolean {
+  return i.cityOk || i.asking;
+}
+
 export function roundCoord(x: number): number {
   return Math.round(x / ROUND_DEG) * ROUND_DEG + 0; // + 0 turns -0 into 0
 }

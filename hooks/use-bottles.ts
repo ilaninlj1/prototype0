@@ -16,6 +16,7 @@ import {
   queueOutbox,
   resolveBottleTrack,
   saveBottlesOn,
+  saveCityOk,
   saveLaunchFxCount,
   saveOldFindsOffered,
   useBottlesOn,
@@ -194,6 +195,7 @@ export function useBottles(region: Region) {
   async function answerConsent(useCity: boolean, history: SwipeEntry[]) {
     saveBottlesOn(true);
     setAsk(null);
+    await saveCityOk(useCity);
     await currentPlace(useCity);
     if (await loadOldFindsOffered()) return;
     const finds = oldFinds(history, await loadLikedTracks());
