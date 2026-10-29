@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { DarkColors, Fonts, Radius, Spacing, TapTarget } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, TapTarget } from '@/constants/theme';
 import { runNative } from '@/lib/run-native';
 import { createMotionTracker } from '@/lib/run-steps';
 import type { RunProfile } from '@/lib/run-types';
@@ -86,17 +86,17 @@ export function KnockTester({ profile, onChange, onClose }: { profile: RunProfil
 }
 
 const styles = StyleSheet.create({
-  room: { ...StyleSheet.absoluteFill, backgroundColor: DarkColors.background, paddingHorizontal: Spacing.lg, gap: Spacing.md },
-  title: { fontFamily: Fonts.display, fontSize: 28, color: DarkColors.text },
-  line: { fontSize: 16, lineHeight: 22, color: DarkColors.textSecondary, textAlign: 'left' },
-  small: { fontSize: 13, color: DarkColors.textTertiary },
+  room: { ...StyleSheet.absoluteFill, backgroundColor: Colors.background, paddingHorizontal: Spacing.lg, gap: Spacing.md },
+  title: { fontFamily: Fonts.display, fontSize: 28, color: Colors.text },
+  line: { fontSize: 16, lineHeight: 22, color: Colors.textSecondary, textAlign: 'left' },
+  small: { fontSize: 13, color: Colors.textSecondary },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.xs },
-  count: { fontFamily: Fonts.display, fontSize: 96, lineHeight: 104, color: DarkColors.signal },
+  count: { fontFamily: Fonts.display, fontSize: 96, lineHeight: 104, color: Colors.signal },
   outline: {
-    minHeight: TapTarget, borderRadius: Radius.md, borderWidth: 1, borderColor: DarkColors.hairline, alignItems: 'center', justifyContent: 'center',
+    minHeight: TapTarget, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.hairline, alignItems: 'center', justifyContent: 'center',
   },
-  outlineText: { fontSize: 16, fontWeight: '600', color: DarkColors.text },
+  outlineText: { fontSize: 16, fontWeight: '600', color: Colors.text },
   footer: { flexDirection: 'row', justifyContent: 'space-between' },
   link: { minHeight: TapTarget, justifyContent: 'center' },
-  linkText: { fontSize: 15, color: DarkColors.text, textDecorationLine: 'underline' },
+  linkText: { fontSize: 15, color: Colors.text, textDecorationLine: 'underline' },
 });

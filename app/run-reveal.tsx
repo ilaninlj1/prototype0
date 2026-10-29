@@ -10,8 +10,7 @@ import { DarkRoom } from '@/components/dark-room';
 import { PaceLine } from '@/components/run/pace-line';
 import { RouteMap } from '@/components/run/route-map';
 import { ThemedText } from '@/components/themed-text';
-import { DarkColors, Fonts, Radius, Spacing, TapTarget } from '@/constants/theme';
-import { useLightStatusBar } from '@/hooks/use-light-status-bar';
+import { Colors, DarkColors, Fonts, Radius, Spacing, TapTarget } from '@/constants/theme';
 import { usePreviewWhileFocused } from '@/hooks/use-playback';
 import { GOAL_NAMES, learnEasyPace } from '@/lib/run-goal';
 import { formatClock, formatMiles, formatPace } from '@/lib/run-pace';
@@ -25,9 +24,11 @@ const TALK: { key: TalkAnswer; label: string }[] = [
   { key: 'no', label: 'No' },
 ];
 
-/** After a run: every song revealed, the pace line, the hardest-hitting song, then Songs and Route. */
+/**
+ * After a run: every song revealed, the pace line, the hardest-hitting song, then Songs and Route.
+ * A light screen like the rest of the app; the pace line and the route sit on dark tiles.
+ */
 export default function RunRevealScreen() {
-  useLightStatusBar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -51,11 +52,9 @@ export default function RunRevealScreen() {
 
   if (!run || !summary)
     return (
-      <DarkRoom>
-        <View style={[styles.room, { paddingTop: insets.top + Spacing.xl }]}>
-          <ThemedText style={styles.line}>{missing ? "This run isn't on your phone anymore." : 'Revealing your run…'}</ThemedText>
-        </View>
-      </DarkRoom>
+      <View style={[styles.room, { paddingTop: insets.top + Spacing.xl }]}>
+        <ThemedText style={styles.line}>{missing ? "This run isn't on your phone anymore." : 'Revealing your run…'}</ThemedText>
+      </View>
     );
 
   const update = (change: (r: RunRecord) => RunRecord) => {
@@ -99,14 +98,14 @@ export default function RunRevealScreen() {
   };
 
   return (
-    <DarkRoom>
+    <>
       <ScrollView style={styles.room} contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.sm, paddingBottom: insets.bottom + Spacing.xxl }]}>
         <View style={styles.header}>
           <ThemedText style={styles.eyebrow}>
             {day} {summary.walk ? 'walk' : 'run'} · revealed{run.simulated ? ' · simulated' : ''}
           </ThemedText>
           <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/play'))} style={styles.close} accessibilityRole="button" accessibilityLabel="Close">
-            <Ionicons name="close" size={26} color={DarkColors.text} />
+            <Ionicons name="close" size={26} color={Colors.text} />
           </Pressable>
         </View>
 
@@ -139,7 +138,11 @@ export default function RunRevealScreen() {
         </View>
 
         {run.played.length > 0 ? (
-          <PaceLine run={run} width={inner} height={210} hardest={hardest} selected={selected} onSelect={play} />
+          <DarkRoom>
+            <View style={styles.chartTile}>
+              <PaceLine run={run} width={inner - Spacing.md * 2} height={210} hardest={hardest} selected={selected} onSelect={play} />
+            </View>
+          </DarkRoom>
         ) : (
           <ThemedText style={styles.line}>No songs finished on this one.</ThemedText>
         )}
@@ -162,7 +165,7 @@ export default function RunRevealScreen() {
                   {featured === hardest ? ' · your fastest' : ` · mile ${mileAt(run.points, featuredSong.start).toFixed(1)}`}
                 </ThemedText>
               </View>
-              <Ionicons name={playing && selected === featured ? 'pause' : 'play'} size={22} color={DarkColors.text} />
+              <Ionicons name={playing && selected === featured ? 'pause' : 'play'} size={22} color={Colors.text} />
             </Pressable>
           </>
         ) : null}
@@ -206,7 +209,9 @@ export default function RunRevealScreen() {
           </View>
         ) : (
           <View style={{ gap: Spacing.sm }}>
-            <RouteMap run={run} width={inner} height={Math.round(inner * 1.05)} hardest={hardest} onSelect={play} />
+            <DarkRoom>
+              <RouteMap run={run} width={inner} height={Math.round(inner * 1.05)} hardest={hardest} onSelect={play} />
+            </DarkRoom>
             <ThemedText style={styles.small}>Only you see the map. Shared pictures never show your route.</ThemedText>
           </View>
         )}
@@ -215,7 +220,7 @@ export default function RunRevealScreen() {
           <ThemedText style={styles.linkText}>Past runs</ThemedText>
         </Pressable>
       </ScrollView>
-    </DarkRoom>
+    </>
   );
 }
 
@@ -231,50 +236,52 @@ function Stat({ value, label }: { value: string; label: string }) {
 function SegButton({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={[styles.segButton, on && styles.segOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
-      <ThemedText style={[styles.segText, on && { color: DarkColors.accentText }]}>{label}</ThemedText>
+      <ThemedText style={[styles.segText, on && { color: Colors.accentText }]}>{label}</ThemedText>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  room: { flex: 1, backgroundColor: DarkColors.background },
+  room: { flex: 1, backgroundColor: Colors.background },
+  // Sound and route art always sit on dark.
+  chartTile: { backgroundColor: DarkColors.background, borderRadius: 20, padding: Spacing.md },
   content: { paddingHorizontal: Spacing.lg, gap: Spacing.md, maxWidth: 520, width: '100%', alignSelf: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  eyebrow: { fontFamily: Fonts.monoMedium, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', color: DarkColors.textSecondary },
+  eyebrow: { fontFamily: Fonts.sansSemiBold, fontSize: 14, color: Colors.textSecondary },
   close: { width: TapTarget, height: TapTarget, alignItems: 'center', justifyContent: 'center', marginRight: -Spacing.sm },
-  talk: { backgroundColor: DarkColors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.sm },
-  talkTitle: { fontFamily: Fonts.displayBold, fontSize: 20, color: DarkColors.text },
+  talk: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.sm },
+  talkTitle: { fontFamily: Fonts.displayBold, fontSize: 20, color: Colors.text },
   talkRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs },
-  talkButton: { flex: 1, minHeight: TapTarget + 4, borderRadius: Radius.lg, backgroundColor: DarkColors.accent, alignItems: 'center', justifyContent: 'center' },
-  talkText: { fontSize: 16, fontWeight: '600', color: DarkColors.accentText },
+  talkButton: { flex: 1, minHeight: TapTarget + 4, borderRadius: (TapTarget + 4) / 2, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
+  talkText: { fontSize: 16, fontWeight: '600', color: Colors.accentText },
   skip: { alignSelf: 'center', minHeight: TapTarget, justifyContent: 'center' },
-  headline: { fontFamily: Fonts.display, fontSize: 30, lineHeight: 34, color: DarkColors.text, marginTop: Spacing.xs },
+  headline: { fontFamily: Fonts.display, fontSize: 30, lineHeight: 34, color: Colors.text, marginTop: Spacing.xs },
   stats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.sm },
-  statValue: { fontFamily: Fonts.monoMedium, fontSize: 20, color: DarkColors.text },
-  statLabel: { fontSize: 12, color: DarkColors.textSecondary },
-  line: { fontSize: 16, color: DarkColors.textSecondary },
-  small: { fontSize: 13, color: DarkColors.textTertiary },
-  muted: { fontSize: 14, color: DarkColors.textSecondary },
-  label: { fontFamily: Fonts.monoMedium, fontSize: 11, letterSpacing: 1.1, textTransform: 'uppercase', color: DarkColors.textSecondary },
-  hero: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, backgroundColor: DarkColors.surface, borderRadius: Radius.lg },
+  statValue: { fontFamily: Fonts.monoMedium, fontSize: 20, color: Colors.text },
+  statLabel: { fontSize: 12, color: Colors.textSecondary },
+  line: { fontSize: 16, color: Colors.textSecondary },
+  small: { fontSize: 13, color: Colors.textSecondary },
+  muted: { fontSize: 14, color: Colors.textSecondary },
+  label: { fontFamily: Fonts.sansSemiBold, fontSize: 14, color: Colors.textSecondary },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.lg },
   heroArt: { width: 64, height: 64, borderRadius: Radius.md },
-  heroTitle: { fontFamily: Fonts.displayBold, fontSize: 17, color: DarkColors.text },
-  heroPace: { fontFamily: Fonts.mono, fontSize: 13, color: DarkColors.signal, marginTop: 4 },
-  seg: { flexDirection: 'row', backgroundColor: DarkColors.surface, borderRadius: Radius.lg, padding: 3, marginTop: Spacing.md },
-  segButton: { flex: 1, minHeight: 38, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
-  segOn: { backgroundColor: DarkColors.accent },
-  segText: { fontSize: 15, fontWeight: '600', color: DarkColors.textSecondary },
-  song: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: DarkColors.border },
-  songOn: { backgroundColor: 'rgba(243,234,216,0.06)' },
+  heroTitle: { fontFamily: Fonts.displayBold, fontSize: 17, color: Colors.text },
+  heroPace: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, marginTop: 4 },
+  seg: { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: 22, padding: 3, marginTop: Spacing.md },
+  segButton: { flex: 1, minHeight: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  segOn: { backgroundColor: Colors.accent },
+  segText: { fontSize: 15, fontWeight: '600', color: Colors.textSecondary },
+  song: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  songOn: { backgroundColor: Colors.surface },
   art: { width: 40, height: 40, borderRadius: Radius.sm },
-  songTitle: { fontSize: 15, fontWeight: '600', color: DarkColors.text },
-  songSub: { fontSize: 12, color: DarkColors.textSecondary },
-  tag: { fontFamily: Fonts.mono, fontSize: 11, paddingHorizontal: 7, paddingVertical: 3, borderRadius: Radius.md, overflow: 'hidden' },
-  tagYou: { backgroundColor: DarkColors.signal, color: '#f3ead8' },
-  tagLegs: { borderWidth: 1, borderColor: DarkColors.highlight, minHeight: 32, justifyContent: 'center' },
-  tagLegsText: { fontFamily: Fonts.mono, fontSize: 11, color: DarkColors.highlight },
-  keepAll: { minHeight: 52, borderRadius: Radius.lg, backgroundColor: DarkColors.accent, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.md },
-  keepAllText: { fontSize: 16, fontWeight: '700', color: DarkColors.accentText },
+  songTitle: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  songSub: { fontSize: 12, color: Colors.textSecondary },
+  tag: { fontFamily: Fonts.sansSemiBold, fontSize: 12, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, overflow: 'hidden' },
+  tagYou: { backgroundColor: Colors.accent, color: Colors.accentText },
+  tagLegs: { borderWidth: 1, borderColor: Colors.text, minHeight: 32, justifyContent: 'center' },
+  tagLegsText: { fontFamily: Fonts.sansSemiBold, fontSize: 12, color: Colors.text },
+  keepAll: { minHeight: 52, borderRadius: 26, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.md },
+  keepAllText: { fontSize: 16, fontWeight: '700', color: Colors.accentText },
   link: { minHeight: TapTarget, justifyContent: 'center', alignSelf: 'center', marginTop: Spacing.lg },
-  linkText: { fontSize: 15, color: DarkColors.text, textDecorationLine: 'underline' },
+  linkText: { fontSize: 15, color: Colors.text, textDecorationLine: 'underline' },
 });

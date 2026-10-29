@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { DarkColors, Fonts, Radius, Spacing, TapTarget } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing, TapTarget } from '@/constants/theme';
 import { GOAL_NAMES } from '@/lib/run-goal';
 import { formatPace, MILE_M } from '@/lib/run-pace';
 import type { Goal, RunProfile, SongsMode } from '@/lib/run-types';
@@ -69,7 +69,7 @@ export function RunSetup({ profile, busy, problem, hasRuns, onStart, onKnock, on
             value={paceText}
             onChangeText={setPaceText}
             placeholder="10:30"
-            placeholderTextColor={DarkColors.textTertiary}
+            placeholderTextColor={Colors.textSecondary}
             keyboardType="numbers-and-punctuation"
             style={styles.paceInput}
             accessibilityLabel="Pace per mile, minutes and seconds"
@@ -132,37 +132,38 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
       style={[styles.chip, on && styles.chipOn]}
       accessibilityRole="button"
       accessibilityState={{ selected: on }}>
-      <ThemedText style={[styles.chipText, on && { color: DarkColors.accentText }]}>{label}</ThemedText>
+      <ThemedText style={[styles.chipText, on && { color: Colors.accentText }]}>{label}</ThemedText>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
-  label: { fontSize: 14, fontWeight: '600', color: DarkColors.textSecondary, marginBottom: Spacing.sm },
+  label: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary, marginBottom: Spacing.sm },
   chips: { flexDirection: 'row', gap: Spacing.sm },
   chip: {
-    flex: 1, minHeight: TapTarget + 4, borderRadius: Radius.lg, borderWidth: 1, borderColor: DarkColors.hairline,
+    flex: 1, minHeight: TapTarget + 4, borderRadius: (TapTarget + 4) / 2, borderWidth: 1, borderColor: Colors.surface, backgroundColor: Colors.surface,
     alignItems: 'center', justifyContent: 'center',
   },
-  chipOn: { backgroundColor: DarkColors.accent, borderColor: DarkColors.accent },
-  chipText: { fontSize: 16, fontWeight: '600', color: DarkColors.text },
-  line: { fontSize: 15, color: DarkColors.textSecondary, marginTop: Spacing.sm },
-  small: { fontSize: 13, color: DarkColors.textTertiary, marginTop: Spacing.xs },
+  chipOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  chipText: { fontSize: 16, fontWeight: '600', color: Colors.text },
+  line: { fontSize: 15, color: Colors.textSecondary, marginTop: Spacing.sm },
+  small: { fontSize: 13, color: Colors.textSecondary, marginTop: Spacing.xs },
   paceRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm },
   paceInput: {
-    minWidth: 96, minHeight: TapTarget, borderRadius: Radius.md, borderWidth: 1, borderColor: DarkColors.hairline,
-    color: DarkColors.text, fontFamily: Fonts.mono, fontSize: 22, paddingHorizontal: Spacing.md,
+    minWidth: 96, minHeight: TapTarget, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.hairline,
+    color: Colors.text, fontFamily: Fonts.mono, fontSize: 22, paddingHorizontal: Spacing.md,
   },
   link: { minHeight: TapTarget, justifyContent: 'center' },
-  linkText: { fontSize: 15, color: DarkColors.text, textDecorationLine: 'underline' },
+  linkText: { fontSize: 15, color: Colors.text, textDecorationLine: 'underline' },
   problem: { gap: Spacing.sm, marginBottom: Spacing.md },
   outline: {
-    minHeight: TapTarget, borderRadius: Radius.md, borderWidth: 1, borderColor: DarkColors.hairline,
+    minHeight: TapTarget, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.hairline,
     alignItems: 'center', justifyContent: 'center',
   },
-  outlineText: { fontSize: 16, fontWeight: '600', color: DarkColors.text },
-  go: { minHeight: 60, borderRadius: Radius.lg, backgroundColor: DarkColors.signal, alignItems: 'center', justifyContent: 'center' },
-  goText: { fontFamily: Fonts.display, fontSize: 20, color: '#f3ead8' },
+  outlineText: { fontSize: 16, fontWeight: '600', color: Colors.text },
+  // The one big button: black, like every main action.
+  go: { minHeight: 60, borderRadius: 30, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
+  goText: { fontFamily: Fonts.display, fontSize: 20, color: Colors.accentText },
   footer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.sm },
 });

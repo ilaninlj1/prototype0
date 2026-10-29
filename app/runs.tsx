@@ -4,10 +4,8 @@ import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DarkRoom } from '@/components/dark-room';
 import { ThemedText } from '@/components/themed-text';
-import { DarkColors, Fonts, Radius, Spacing, TapTarget } from '@/constants/theme';
-import { useLightStatusBar } from '@/hooks/use-light-status-bar';
+import { Colors, Fonts, Radius, Spacing, TapTarget } from '@/constants/theme';
 import { runCandidates } from '@/lib/pool';
 import { formatClock, formatMiles } from '@/lib/run-pace';
 import { summarize } from '@/lib/run-reveal';
@@ -17,7 +15,6 @@ import type { RunRecord } from '@/lib/run-types';
 
 /** Every run on this phone, newest first; each opens its reveal. */
 export default function RunsScreen() {
-  useLightStatusBar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [runs, setRuns] = useState<RunRecord[] | null>(null);
@@ -35,12 +32,11 @@ export default function RunsScreen() {
   };
 
   return (
-    <DarkRoom>
-      <ScrollView style={styles.room} contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.sm, paddingBottom: insets.bottom + Spacing.xl }]}>
+    <ScrollView style={styles.room} contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.sm, paddingBottom: insets.bottom + Spacing.xl }]}>
         <View style={styles.header}>
           <ThemedText style={styles.title}>Past runs</ThemedText>
           <Pressable onPress={() => router.back()} style={styles.close} accessibilityRole="button" accessibilityLabel="Close">
-            <Ionicons name="close" size={26} color={DarkColors.text} />
+            <Ionicons name="close" size={26} color={Colors.text} />
           </Pressable>
         </View>
         {runs && runs.length === 0 ? <ThemedText style={styles.line}>No runs yet. Your first one shows up here.</ThemedText> : null}
@@ -59,7 +55,7 @@ export default function RunsScreen() {
                   {formatMiles(s.distanceM)} · {formatClock(s.durationMs)} · {r.played.length} songs · {kept} kept
                 </ThemedText>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={DarkColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
             </Pressable>
           );
         })}
@@ -68,21 +64,20 @@ export default function RunsScreen() {
             <ThemedText style={styles.linkText}>Seed a sample run (dev)</ThemedText>
           </Pressable>
         ) : null}
-      </ScrollView>
-    </DarkRoom>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  room: { flex: 1, backgroundColor: DarkColors.background },
+  room: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: Spacing.lg, gap: Spacing.sm },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md },
-  title: { fontFamily: Fonts.display, fontSize: 30, color: DarkColors.text },
+  title: { fontFamily: Fonts.display, fontSize: 30, color: Colors.text },
   close: { width: TapTarget, height: TapTarget, alignItems: 'center', justifyContent: 'center', marginRight: -Spacing.sm },
-  line: { fontSize: 16, color: DarkColors.textSecondary },
-  row: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderRadius: Radius.lg, backgroundColor: DarkColors.surface },
-  rowTitle: { fontSize: 16, fontWeight: '600', color: DarkColors.text },
-  rowSub: { fontFamily: Fonts.mono, fontSize: 12, color: DarkColors.textSecondary, marginTop: 2 },
+  line: { fontSize: 16, color: Colors.textSecondary },
+  row: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderRadius: Radius.lg, backgroundColor: Colors.surface },
+  rowTitle: { fontSize: 16, fontWeight: '600', color: Colors.text },
+  rowSub: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
   link: { minHeight: TapTarget, justifyContent: 'center', alignSelf: 'center', marginTop: Spacing.lg },
-  linkText: { fontSize: 15, color: DarkColors.text, textDecorationLine: 'underline' },
+  linkText: { fontSize: 15, color: Colors.text, textDecorationLine: 'underline' },
 });

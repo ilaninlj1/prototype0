@@ -9,18 +9,18 @@ import { KnockTester } from '@/components/run/knock-tester';
 import { RunLive } from '@/components/run/run-live';
 import { RunSetup } from '@/components/run/run-setup';
 import { ThemedText } from '@/components/themed-text';
-import { DarkColors, Fonts, Spacing, TapTarget } from '@/constants/theme';
+import { Colors, Fonts, Spacing, TapTarget } from '@/constants/theme';
 import { useLightStatusBar } from '@/hooks/use-light-status-bar';
 import { useRunSession } from '@/hooks/use-run-session';
 import { loadRunProfile, loadRuns, saveRunProfile } from '@/lib/run-storage';
 import { EMPTY_PROFILE, type Goal, type RunProfile, type SongsMode } from '@/lib/run-types';
 
-/** Run mode: pick how hard and which songs, run with the phone away, then the reveal. */
+/** Run mode: pick how hard and which songs (a light screen), run with the phone away (the black live screen), then the reveal. */
 export default function RunScreen() {
-  useLightStatusBar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const run = useRunSession();
+  useLightStatusBar(run.state.phase === 'running');
   const [profile, setProfile] = useState<RunProfile>(EMPTY_PROFILE);
   const [hasRuns, setHasRuns] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -62,12 +62,11 @@ export default function RunScreen() {
     );
 
   return (
-    <DarkRoom>
-      <View style={[styles.room, { paddingTop: insets.top + Spacing.sm, paddingBottom: insets.bottom }]}>
+    <View style={[styles.room, { paddingTop: insets.top + Spacing.sm, paddingBottom: insets.bottom }]}>
         <View style={styles.header}>
           <ThemedText style={styles.title}>Run</ThemedText>
           <Pressable onPress={() => router.back()} style={styles.close} accessibilityRole="button" accessibilityLabel="Close">
-            <Ionicons name="close" size={26} color={DarkColors.text} />
+            <Ionicons name="close" size={26} color={Colors.text} />
           </Pressable>
         </View>
         <ThemedText style={styles.intro}>
@@ -83,15 +82,14 @@ export default function RunScreen() {
           onRuns={() => router.push('/runs')}
         />
         {knock ? <KnockTester profile={profile} onChange={changeProfile} onClose={() => setKnock(false)} /> : null}
-      </View>
-    </DarkRoom>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  room: { flex: 1, backgroundColor: DarkColors.background },
+  room: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg },
-  title: { fontFamily: Fonts.display, fontSize: 34, color: DarkColors.text },
+  title: { fontFamily: Fonts.display, fontSize: 34, color: Colors.text },
   close: { width: TapTarget, height: TapTarget, alignItems: 'center', justifyContent: 'center', marginRight: -Spacing.sm },
-  intro: { fontSize: 16, lineHeight: 22, color: DarkColors.textSecondary, paddingHorizontal: Spacing.lg, marginTop: Spacing.xs, marginBottom: Spacing.xl },
+  intro: { fontSize: 16, lineHeight: 22, color: Colors.textSecondary, paddingHorizontal: Spacing.lg, marginTop: Spacing.xs, marginBottom: Spacing.xl },
 });
