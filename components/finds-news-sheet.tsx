@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { MiniPlayer } from '@/components/mini-player';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
+import { BottomSheet, SheetHeader } from '@/components/ui/sheet';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import type { FindsNewsItem } from '@/lib/finds-news';
@@ -41,15 +42,9 @@ export function FindsNewsSheet({ visible, items, onClose }: FindsNewsSheetProps)
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <Pressable style={styles.backdrop} onPress={handleClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.header}>
-            <ThemedText style={Ui.label}>While you were gone</ThemedText>
-            <TouchableOpacity onPress={handleClose} style={Ui.textButton} hitSlop={8} accessibilityRole="button">
-              <ThemedText style={[Ui.label, styles.doneText]}>Done</ThemedText>
-            </TouchableOpacity>
-          </View>
+    <BottomSheet visible={visible} onClose={handleClose}>
+      <SheetHeader title="While you were gone" onDone={handleClose} />
+      <View style={styles.sheet}>
 
           <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
             {items.map((item) => {
@@ -69,7 +64,7 @@ export function FindsNewsSheet({ visible, items, onClose }: FindsNewsSheetProps)
                   <Ionicons
                     name={isPlaying ? 'pause' : 'play'}
                     size={20}
-                    color={isPlaying ? Colors.signal : Colors.textSecondary}
+                    color={Colors.text}
                   />
                 </TouchableOpacity>
               );
@@ -86,62 +81,46 @@ export function FindsNewsSheet({ visible, items, onClose }: FindsNewsSheetProps)
               />
             </View>
           )}
-        </Pressable>
-      </Pressable>
-    </Modal>
+      </View>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
   sheet: {
-    backgroundColor: Colors.background,
-    borderTopWidth: 1,
-    borderTopColor: Colors.hairline,
-    borderTopLeftRadius: Radius.md,
-    borderTopRightRadius: Radius.md,
-    padding: Spacing.xl,
-    paddingBottom: Spacing.xxl,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xl,
     gap: Spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  doneText: {
-    color: Colors.textSecondary,
   },
   list: {
-    maxHeight: 320,
+    maxHeight: 360,
   },
   listContent: {
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+    minHeight: 60,
     paddingVertical: Spacing.xs,
   },
   art: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.sm,
+    width: 52,
+    height: 52,
+    borderRadius: Radius.lg,
   },
   itemText: {
     flex: 1,
   },
   sentence: {
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 15,
+    lineHeight: 20,
     color: Colors.text,
   },
   playerWrap: {
     marginTop: Spacing.xs,
+    marginHorizontal: -Spacing.md,
   },
 });

@@ -18,13 +18,14 @@ type RegionToggleProps = {
  */
 export function RegionToggle({ region, onToggle }: RegionToggleProps) {
   return (
-    <TouchableOpacity onPress={onToggle} activeOpacity={0.6} style={Ui.outlineButton}>
+    <TouchableOpacity onPress={onToggle} activeOpacity={0.6} style={[Ui.outlineButton, styles.pill]} accessibilityRole="button" accessibilityLabel={`Store region ${region}. Tap to change`}>
       <ThemedText style={styles.text}>{region}</ThemedText>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
+  pill: { minHeight: 36, borderWidth: 0, backgroundColor: Colors.surface },
   text: {
     ...Ui.label,
     color: Colors.text,

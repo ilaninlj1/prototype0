@@ -59,8 +59,8 @@ export function HumanBadge({ artist }: { artist: string }) {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginTop: Spacing.xs, minHeight: 16 },
-  text: { fontFamily: Fonts.mono, fontSize: 11, lineHeight: 14, color: Colors.textSecondary, flexShrink: 1 },
-  ai: { color: Colors.highlight },
-  link: { textDecorationLine: 'underline', color: Colors.textTertiary },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginTop: Spacing.xs, minHeight: 18 },
+  text: { fontFamily: Fonts.sans, fontSize: 13, lineHeight: 17, color: Colors.textSecondary, flexShrink: 1 },
+  ai: { fontFamily: Fonts.sansSemiBold, color: Colors.text },
+  link: { textDecorationLine: 'underline', color: Colors.textSecondary },
 });

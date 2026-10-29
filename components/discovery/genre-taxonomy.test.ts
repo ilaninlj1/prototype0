@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildGenreSections, type GenreTaxonomy } from './genre-taxonomy.ts';
+import { buildGenreSections, pickableGenres, searchGenres, type GenreTaxonomy } from './genre-taxonomy.ts';
 
 const taxonomy: GenreTaxonomy = {
   Electronic: ['House', 'Techno'],
@@ -59,4 +59,13 @@ test('sections are sorted alphabetically by label', () => {
   );
   const labels = sections.map((s) => (s.type === 'leaf' ? s.genre : s.label));
   assert.deepEqual(labels, ['Country', 'Electronic']);
+});
+
+test('pickable genres list leaves, selectable group labels and children; search matches loosely', () => {
+  const sections = buildGenreSections(['Electronic', 'House', 'Techno', 'Country', 'Hip-Hop', 'Salsa'], [], taxonomy);
+  assert.deepEqual(pickableGenres(sections), ['Country', 'Electronic', 'House', 'Techno', 'Hip-Hop', 'Salsa']);
+  assert.deepEqual(searchGenres(sections, 'hiphop'), ['Hip-Hop']);
+  assert.deepEqual(searchGenres(sections, 'HOUSE'), ['House']);
+  assert.deepEqual(searchGenres(sections, 'o'), ['Country', 'Electronic', 'House', 'Techno', 'Hip-Hop']);
+  assert.deepEqual(searchGenres(sections, '  '), []);
 });

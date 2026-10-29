@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { AppleMusicLink, LastfmLink, SpotifyLink } from '@/components/credits';
+import { AppleMusicLink, CreditLine, LastfmLink, SpotifyLink } from '@/components/credits';
 import { CallButton } from '@/components/discovery/call-button';
 import { HumanBadge } from '@/components/human-badge';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
+import { BottomSheet, sheetStyles } from '@/components/ui/sheet';
+import { Colors, Fonts, Spacing, TapTarget, Typography, Ui } from '@/constants/theme';
 import { useSound } from '@/hooks/use-sound';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
+import { listenerMeter } from '@/lib/home-copy';
 import { describeSound } from '@/lib/sound';
+import { releaseLine } from '@/lib/song-age';
 
 type Props = {
   visible: boolean;
@@ -21,7 +24,11 @@ type Props = {
   onClose: () => void;
 };
 
-/** Everything about a revealed song that doesn't fit on the card: the big cover, links, Call it, how it sounds, comments. */
+/**
+ * Everything about a revealed song that doesn't fit under the card: the big
+ * cover, where to listen, how many people do, Call it, how it sounds,
+ * comments and the credits.
+ */
 export function DetailsSheet({ visible, track, listeners, onSave, onClose }: Props) {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -30,81 +37,115 @@ export function DetailsSheet({ visible, track, listeners, onSave, onClose }: Pro
   const described = listeners != null ? describeListeners(listeners) : null;
   const side = Math.min(width, 520) - Spacing.xl * 2;
   const sound = record?.status === 'measured' ? describeSound(record.features) : null;
+  const release = releaseLine(track.releaseDate, track.collectionName);
+  const meter = listeners != null ? listenerMeter(listeners) : null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-            <Image source={{ uri: artworkUrl(track.artworkUrl100, 600) }} style={[styles.cover, { width: side, height: side }]} />
-            <ThemedText type="subtitle">{track.trackName}</ThemedText>
-            <ThemedText style={styles.secondary}>{track.artistName}</ThemedText>
-            <HumanBadge artist={track.artistName} />
+    <BottomSheet visible={visible} onClose={onClose}>
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <Image source={{ uri: artworkUrl(track.artworkUrl100, 600) }} style={[styles.cover, { width: side, height: side }]} />
+        <ThemedText type="subtitle">{track.trackName}</ThemedText>
+        <ThemedText style={styles.secondary}>{release ? `${track.artistName} · ${release}` : track.artistName}</ThemedText>
+        <HumanBadge artist={track.artistName} />
 
-            <View style={styles.links}>
-              <AppleMusicLink trackId={track.id} url={track.trackViewUrl} />
-              <SpotifyLink artist={track.artistName} title={track.trackName} />
-              {described && <LastfmLink artist={track.artistName} />}
-            </View>
+        <ThemedText style={sheetStyles.heading}>Listen on</ThemedText>
+        <View style={styles.links}>
+          <AppleMusicLink trackId={track.id} url={track.trackViewUrl} />
+          <SpotifyLink artist={track.artistName} title={track.trackName} />
+          {described && <LastfmLink artist={track.artistName} />}
+        </View>
 
-            <ThemedText style={[Ui.label, styles.heading]}>Listeners</ThemedText>
-            <ThemedText style={styles.secondary}>
-              {described ? `${described.count} listeners · ${described.verdict}` : listeners === undefined ? 'Counting…' : 'Last.fm has no count for this artist yet.'}
+        <ThemedText style={sheetStyles.heading}>Listeners</ThemedText>
+        {described ? (
+          <>
+            <ThemedText style={styles.count}>
+              {described.count} <ThemedText style={styles.verdict}>· {described.verdict.replace(/\.$/, '')}</ThemedText>
             </ThemedText>
-            <View style={styles.callRow}>
-              <CallButton track={track} listeners={listeners} onSave={onSave} />
+            <View
+              style={styles.meter}
+              accessible
+              accessibilityRole="progressbar"
+              accessibilityLabel="How well-known, from hidden gem to popular"
+              accessibilityValue={{ min: 0, max: 100, now: Math.round((meter ?? 0) * 100) }}>
+              <View style={styles.meterTrack} />
+              <View style={[styles.meterDot, { left: `${Math.round((meter ?? 0) * 100)}%` }]} />
             </View>
-            <ThemedText type="caption">Call it: we’ll tell you if they blow up. 3 a week.</ThemedText>
+            <View style={styles.meterLabels}>
+              <ThemedText style={styles.small}>Hidden gem</ThemedText>
+              <ThemedText style={styles.small}>Popular</ThemedText>
+            </View>
+          </>
+        ) : (
+          <ThemedText style={styles.secondary}>{listeners === undefined ? 'Counting…' : 'Last.fm has no count for this artist yet.'}</ThemedText>
+        )}
 
-            <ThemedText style={[Ui.label, styles.heading]}>The sound</ThemedText>
-            {sound ? (
-              <>
-                {sound.map((line) => (
-                  <ThemedText key={line}>{line}</ThemedText>
-                ))}
-                <ThemedText style={styles.source}>Measured by ReccoBeats.</ThemedText>
-              </>
-            ) : (
-              <ThemedText style={styles.secondary}>No sound data for this song yet.</ThemedText>
-            )}
+        <View style={[sheetStyles.card, styles.callCard]}>
+          <ThemedText style={styles.callTitle}>Think they’ll blow up?</ThemedText>
+          <ThemedText style={styles.secondary}>Call it and we’ll tell you if they do. 3 calls a week.</ThemedText>
+          <View style={styles.callRow}>
+            <CallButton track={track} listeners={listeners} onSave={onSave} />
+          </View>
+        </View>
 
-            <Pressable
-              style={[Ui.outlineButton, styles.comments]}
-              onPress={() => {
-                onClose();
-                router.push({ pathname: '/comments', params: { trackId: String(track.id), title: track.trackName, artist: track.artistName } });
-              }}>
-              <Ionicons name="chatbubble-outline" size={18} color={Colors.text} />
-              <ThemedText style={Ui.label}>Comments</ThemedText>
-            </Pressable>
+        <ThemedText style={sheetStyles.heading}>The sound</ThemedText>
+        {sound ? (
+          <>
+            <View style={styles.tiles}>
+              {sound.map((line) => (
+                <View key={line} style={styles.tile}>
+                  <ThemedText style={styles.tileText}>{line}</ThemedText>
+                </View>
+              ))}
+            </View>
+            <ThemedText style={styles.small}>Measured by ReccoBeats.</ThemedText>
+          </>
+        ) : (
+          <ThemedText style={styles.secondary}>No sound data for this song yet.</ThemedText>
+        )}
 
-            <Pressable style={[Ui.textButton, styles.close]} onPress={onClose} accessibilityRole="button">
-              <ThemedText style={[Ui.label, styles.secondary]}>Close</ThemedText>
-            </Pressable>
-          </ScrollView>
+        <Pressable
+          style={[Ui.outlineButton, styles.comments]}
+          accessibilityRole="button"
+          onPress={() => {
+            onClose();
+            router.push({ pathname: '/comments', params: { trackId: String(track.id), title: track.trackName, artist: track.artistName } });
+          }}>
+          <Ionicons name="chatbubble-outline" size={18} color={Colors.text} />
+          <ThemedText style={Ui.label}>Comments</ThemedText>
         </Pressable>
-      </Pressable>
-    </Modal>
+
+        <View style={styles.credit}>
+          <CreditLine lastfm={!!described} />
+        </View>
+
+        <Pressable style={styles.close} onPress={onClose} accessibilityRole="button">
+          <ThemedText style={styles.closeText}>Close</ThemedText>
+        </Pressable>
+      </ScrollView>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-  sheet: {
-    maxHeight: '88%',
-    backgroundColor: Colors.background,
-    borderTopWidth: 1,
-    borderTopColor: Colors.hairline,
-    borderTopLeftRadius: Radius.md,
-    borderTopRightRadius: Radius.md,
-  },
-  body: { padding: Spacing.xl, paddingBottom: Spacing.xxl, gap: Spacing.xs },
-  cover: { borderRadius: Radius.sm, marginBottom: Spacing.md, alignSelf: 'center' },
-  secondary: { color: Colors.textSecondary },
-  links: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.md },
-  heading: { marginTop: Spacing.lg },
+  body: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, paddingBottom: Spacing.xl, gap: Spacing.xs },
+  cover: { borderRadius: 20, marginBottom: Spacing.md, alignSelf: 'center' },
+  secondary: { fontSize: 15, lineHeight: 21, color: Colors.textSecondary },
+  links: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  count: { fontFamily: Fonts.display, fontSize: 28, lineHeight: 34, color: Colors.text },
+  verdict: { fontFamily: Fonts.sans, fontSize: 15, color: Colors.textSecondary },
+  meter: { height: 14, justifyContent: 'center', marginTop: Spacing.xs },
+  meterTrack: { height: 4, borderRadius: 2, backgroundColor: Colors.surface },
+  meterDot: { position: 'absolute', width: 14, height: 14, borderRadius: 7, marginLeft: -7, backgroundColor: Colors.text },
+  meterLabels: { flexDirection: 'row', justifyContent: 'space-between' },
+  small: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
+  callCard: { marginTop: Spacing.lg },
+  callTitle: { fontFamily: Fonts.sansSemiBold, fontSize: 16, lineHeight: 21 },
   callRow: { flexDirection: 'row', marginTop: Spacing.xs },
-  source: { color: Colors.textTertiary, marginTop: Spacing.xs },
-  comments: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.lg },
-  close: { alignSelf: 'center', marginTop: Spacing.sm },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.xs },
+  tile: { backgroundColor: Colors.surface, borderRadius: 14, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  tileText: { fontFamily: Fonts.sansSemiBold, fontSize: 14, lineHeight: 18 },
+  comments: { alignSelf: 'flex-start', marginTop: Spacing.lg },
+  credit: { marginTop: Spacing.lg },
+  close: { alignSelf: 'center', minHeight: TapTarget, justifyContent: 'center', paddingHorizontal: Spacing.lg, marginTop: Spacing.sm },
+  closeText: { ...Typography.label, color: Colors.textSecondary },
 });

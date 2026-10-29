@@ -1,12 +1,14 @@
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { Linking, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 
+import { LightRoom } from '@/components/dark-room';
 import { ThemedText } from '@/components/themed-text';
-import { DarkColors, Radius, Spacing, DarkUi } from '@/constants/theme';
+import { Colors, Spacing, TapTarget, Ui } from '@/constants/theme';
 
 /**
  * Before the first Spotify songs come in: what they bring, what they don't touch, and the two
  * ways in. A file from exportify.app works for anyone; the login only for the test list.
+ * A light card even though it opens over Rewind's dark room, like every core-flow sheet.
  */
 export function SpotifySheet({
   visible,
@@ -21,9 +23,10 @@ export function SpotifySheet({
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <LightRoom>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <ThemedText style={DarkUi.label}>Spotify</ThemedText>
+          <ThemedText type="eyebrow">Spotify</ThemedText>
           <ThemedText type="subtitle">Bring in your Spotify songs</ThemedText>
           <ThemedText style={styles.text}>
             Every song you&apos;ve liked or added to a playlist, on the day you saved it. They stay apart from what you found
@@ -44,40 +47,53 @@ export function SpotifySheet({
             <ThemedText style={styles.small}>
               Files also unlock your Spotify stats on You, and Home stops showing you artists you already have.
             </ThemedText>
-            <TouchableOpacity onPress={onImport} style={[DarkUi.outlineButton, styles.button]}>
-              <Ionicons name="document-outline" size={16} color={DarkColors.text} />
-              <ThemedText style={DarkUi.label}>Import a file</ThemedText>
+            <TouchableOpacity onPress={onImport} style={[styles.button, styles.primary]} accessibilityRole="button">
+              <Ionicons name="document-outline" size={16} color={Colors.accentText} />
+              <ThemedText style={[Ui.label, styles.primaryText]}>Import a file</ThemedText>
             </TouchableOpacity>
           </View>
 
           <View style={styles.way}>
             <ThemedText style={styles.wayTitle}>Or log in · test list only</ThemedText>
             <ThemedText style={styles.small}>Spotify only lets 5 accounts on this app&apos;s test list log in.</ThemedText>
-            <TouchableOpacity onPress={onConnect} style={[DarkUi.outlineButton, styles.button]}>
-              <FontAwesome name="spotify" size={16} color={DarkColors.text} />
-              <ThemedText style={DarkUi.label}>Connect Spotify</ThemedText>
+            <TouchableOpacity onPress={onConnect} style={[styles.button, styles.secondaryButton]} accessibilityRole="button">
+              <FontAwesome name="spotify" size={16} color={Colors.text} />
+              <ThemedText style={Ui.label}>Connect Spotify</ThemedText>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={onClose} style={[DarkUi.textButton, styles.cancelRow]}>
-            <ThemedText style={[DarkUi.label, styles.cancel]}>Cancel</ThemedText>
+          <TouchableOpacity onPress={onClose} style={[Ui.textButton, styles.cancelRow]} accessibilityRole="button">
+            <ThemedText style={[Ui.label, styles.cancel]}>Cancel</ThemedText>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
+      </LightRoom>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.55)', padding: Spacing.lg },
-  sheet: { backgroundColor: DarkColors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.sm },
-  text: { fontSize: 15, lineHeight: 21 },
-  way: { gap: 6, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: DarkColors.rule },
-  wayTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
-  step: { fontSize: 14, lineHeight: 19, color: DarkColors.textSecondary },
-  linkText: { fontSize: 14, color: DarkColors.text, textDecorationLine: 'underline' },
-  small: { fontSize: 13, lineHeight: 18, color: DarkColors.textTertiary },
-  button: { alignSelf: 'flex-start', marginTop: Spacing.xs },
+  sheet: { backgroundColor: Colors.background, borderRadius: 28, padding: Spacing.xl, gap: Spacing.sm },
+  text: { fontSize: 15, lineHeight: 21, color: Colors.text },
+  way: { gap: 6, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.rule },
+  wayTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: Colors.text },
+  step: { fontSize: 14, lineHeight: 19, color: Colors.textSecondary },
+  linkText: { fontSize: 14, color: Colors.text, textDecorationLine: 'underline' },
+  small: { fontSize: 13, lineHeight: 18, color: Colors.textSecondary },
+  button: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: TapTarget,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: TapTarget / 2,
+    marginTop: Spacing.xs,
+  },
+  primary: { backgroundColor: Colors.accent },
+  primaryText: { color: Colors.accentText },
+  secondaryButton: { backgroundColor: Colors.surface },
   cancelRow: { alignSelf: 'flex-end' },
-  cancel: { color: DarkColors.textSecondary },
+  cancel: { color: Colors.textSecondary },
 });

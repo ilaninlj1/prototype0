@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, TapTarget, Ui } from '@/constants/theme';
+import { BottomSheet, SheetHeader, sheetStyles } from '@/components/ui/sheet';
+import { Colors, Fonts, Spacing, TapTarget, Ui } from '@/constants/theme';
+import { tuneSummary } from '@/lib/home-copy';
 import type { Region } from '@/lib/discovery';
 import { setAllowAi, useAllowAi } from '@/lib/human-check-api';
 import type { NetworkTest } from '@/lib/feed-load';
@@ -71,6 +72,10 @@ export function TuneSheet({
   }
 
 
+  const [more, setMore] = useState(false);
+  const sorted = isActive(soundFilter);
+  const summary = tuneSummary(PRESET_LABELS[preset], sorted ? describeFilter(soundFilter) : null);
+
   return (
     <>
       {trigger === 'icon' ? (
@@ -79,7 +84,7 @@ export function TuneSheet({
           activeOpacity={0.6}
           style={styles.iconTrigger}
           accessibilityRole="button"
-          accessibilityLabel={`Tune: ${PRESET_LABELS[preset]}`}>
+          accessibilityLabel={`Tune: ${summary}`}>
           <Ionicons name="options-outline" size={22} color={Colors.text} />
         </TouchableOpacity>
       ) : (
@@ -90,172 +95,177 @@ export function TuneSheet({
         </TouchableOpacity>
       )}
 
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-        <Pressable style={styles.backdrop} onPress={close}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-            <ThemedText style={Ui.label}>How well-known</ThemedText>
-            <PresetChips activePreset={preset} loading={presetLoading} onSelect={onSelectPreset} />
+      <BottomSheet visible={visible} onClose={close}>
+        <SheetHeader title="Tune" onDone={close} />
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <ThemedText style={styles.summary} accessibilityLiveRegion="polite">
+            {summary}
+          </ThemedText>
 
-            <ThemedText style={[Ui.label, styles.heading]}>
-              Next songs
-            </ThemedText>
-            <ThemedView style={styles.segment} backgroundColor="transparent">
-              {NEXT_MODES.map((o) => {
-                const active = nextMode === o.mode;
-                return (
-                  <TouchableOpacity key={o.mode} style={styles.segmentSlot} onPress={() => onSetNextMode(o.mode)} activeOpacity={0.7}>
-                    <ThemedView style={styles.segmentItem} backgroundColor={active ? Colors.accent : 'transparent'}>
-                      <ThemedText style={[Ui.label, { color: active ? Colors.accentText : Colors.textSecondary }]}>
-                        {o.label}
-                      </ThemedText>
-                    </ThemedView>
-                  </TouchableOpacity>
-                );
-              })}
-            </ThemedView>
-            <ThemedText type="caption">{NEXT_MODES.find((o) => o.mode === nextMode)?.hint}</ThemedText>
+          <ThemedText style={sheetStyles.heading}>How well-known</ThemedText>
+          <PresetChips activePreset={preset} loading={presetLoading} onSelect={onSelectPreset} />
 
-            <ThemedView style={styles.regionRow} backgroundColor="transparent">
-              <ThemedText style={Ui.label}>Store region</ThemedText>
-              <RegionToggle region={region} onToggle={onToggleRegion} />
-            </ThemedView>
+          <ThemedText style={sheetStyles.heading}>What plays next</ThemedText>
+          <Segment
+            options={NEXT_MODES.map((o) => ({ key: o.mode, label: o.label }))}
+            value={nextMode}
+            onChange={onSetNextMode}
+            label="What plays next"
+          />
+          <ThemedText type="caption">{NEXT_MODES.find((o) => o.mode === nextMode)?.hint}</ThemedText>
 
-            <ThemedText style={[Ui.label, styles.heading]}>
-              AI-made music
-            </ThemedText>
-            <ThemedView style={styles.segment} backgroundColor="transparent">
-              {[false, true].map((show) => {
-                const active = allowAi === show;
-                return (
-                  <TouchableOpacity key={String(show)} style={styles.segmentSlot} onPress={() => setAllowAi(show)} activeOpacity={0.7}>
-                    <ThemedView style={styles.segmentItem} backgroundColor={active ? Colors.accent : 'transparent'}>
-                      <ThemedText style={[Ui.label, { color: active ? Colors.accentText : Colors.textSecondary }]}>
-                        {show ? 'Show' : 'Hide'}
-                      </ThemedText>
-                    </ThemedView>
-                  </TouchableOpacity>
-                );
-              })}
-            </ThemedView>
-            <ThemedText type="caption">
-              {allowAi
-                ? 'AI acts can show up. They’re labeled “AI-tagged” when revealed.'
-                : 'Skips artists that listeners have tagged as AI-made. Real people only.'}
-            </ThemedText>
-
-            <ThemedText style={[Ui.label, styles.heading]}>Sound</ThemedText>
-            {DIMENSIONS.map((d) => (
-              <View key={d.key} style={styles.soundRow}>
-                <ThemedText style={styles.soundLabel}>{d.label}</ThemedText>
-                <ThemedView style={[styles.segment, styles.soundSegment]} backgroundColor="transparent">
-                  {(['low', 'any', 'high'] as Level[]).map((level) => {
-                    const active = soundFilter[d.key] === level;
-                    const word = level === 'low' ? d.low : level === 'high' ? d.high : 'Any';
-                    return (
-                      <TouchableOpacity
-                        key={level}
-                        style={styles.segmentSlot}
-                        onPress={() => onChangeSoundFilter({ ...soundFilter, [d.key]: level })}
-                        activeOpacity={0.7}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: active }}
-                        accessibilityLabel={`${d.label}: ${word}`}>
-                        <ThemedView style={styles.segmentItem} backgroundColor={active ? Colors.accent : 'transparent'}>
-                          <ThemedText
-                            style={[Ui.label, styles.soundWord, { color: active ? Colors.accentText : Colors.textSecondary }]}
-                            numberOfLines={1}
-                            adjustsFontSizeToFit
-                            minimumFontScale={0.7}>
-                            {word}
-                          </ThemedText>
-                        </ThemedView>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ThemedView>
+          <View style={styles.soundHead}>
+            <ThemedText style={sheetStyles.heading}>Sound</ThemedText>
+            {sorted && (
+              <Pressable
+                onPress={() => onChangeSoundFilter(Object.fromEntries(DIMENSIONS.map((d) => [d.key, 'any'])) as SoundFilter)}
+                style={styles.reset}
+                accessibilityRole="button"
+                accessibilityLabel="Reset sound to any">
+                <ThemedText style={styles.resetText}>Reset sound</ThemedText>
+              </Pressable>
+            )}
+          </View>
+          {DIMENSIONS.map((d) => (
+            <View key={d.key} style={styles.soundRow}>
+              <ThemedText style={styles.soundLabel}>{d.label}</ThemedText>
+              <View style={styles.soundSegment}>
+                <Segment
+                  options={(['low', 'any', 'high'] as Level[]).map((level) => ({ key: level, label: level === 'low' ? d.low : level === 'high' ? d.high : 'Any' }))}
+                  value={soundFilter[d.key]}
+                  onChange={(level) => onChangeSoundFilter({ ...soundFilter, [d.key]: level })}
+                  label={d.label}
+                  small
+                />
               </View>
-            ))}
-            <ThemedText type="caption">
-              {isActive(soundFilter)
-                ? `Only ${describeFilter(soundFilter)} songs, measured from how they sound. Stays on through genre jumps.`
-                : 'Pick how you want the next songs to sound. Measured by ReccoBeats, not by genre.'}
-            </ThemedText>
+            </View>
+          ))}
+          <ThemedText type="caption">
+            {sorted
+              ? `Only ${describeFilter(soundFilter)} songs, measured from how they sound. Stays on through genre jumps.`
+              : 'Pick how you want the next songs to sound. Measured by ReccoBeats, not by genre.'}
+          </ThemedText>
 
-            <ThemedText style={[Ui.label, styles.heading]}>Test network</ThemedText>
-            <ThemedView style={styles.segment} backgroundColor="transparent">
-              {(['off', 'slow', 'offline'] as NetworkTest[]).map((mode) => {
-                const active = networkTest === mode;
-                return (
-                  <TouchableOpacity key={mode} style={styles.segmentSlot} onPress={() => onChangeNetworkTest(mode)} activeOpacity={0.7} accessibilityRole="button" accessibilityState={{ selected: active }}>
-                    <ThemedView style={styles.segmentItem} backgroundColor={active ? Colors.accent : 'transparent'}>
-                      <ThemedText style={[Ui.label, { color: active ? Colors.accentText : Colors.textSecondary }]}>{mode === 'off' ? 'Off' : mode === 'slow' ? 'Slow' : 'Offline'}</ThemedText>
-                    </ThemedView>
-                  </TouchableOpacity>
-                );
-              })}
-            </ThemedView>
-            <ThemedText type="caption">
-              For trying the loading screens: makes loading new songs slow or fail on purpose. Songs already playing aren’t affected. Turns off when you close the app.
+          <Pressable
+            onPress={() => setMore((m) => !m)}
+            style={styles.moreRow}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: more }}
+            accessibilityLabel="More settings: store region, AI-made music, test network">
+            <ThemedText style={styles.moreText}>More</ThemedText>
+            <ThemedText style={styles.moreHint} numberOfLines={1}>
+              {region} store · AI {allowAi ? 'shown' : 'hidden'}
             </ThemedText>
-            </ScrollView>
+            <Ionicons name={more ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.textSecondary} />
           </Pressable>
-        </Pressable>
-      </Modal>
+          {more && (
+            <>
+              <View style={styles.regionRow}>
+                <ThemedText style={styles.rowLabel}>Store region</ThemedText>
+                <RegionToggle region={region} onToggle={onToggleRegion} />
+              </View>
+
+              <ThemedText style={sheetStyles.heading}>AI-made music</ThemedText>
+              <Segment
+                options={[
+                  { key: 'hide', label: 'Hide' },
+                  { key: 'show', label: 'Show' },
+                ]}
+                value={allowAi ? 'show' : 'hide'}
+                onChange={(v) => setAllowAi(v === 'show')}
+                label="AI-made music"
+              />
+              <ThemedText type="caption">
+                {allowAi
+                  ? 'AI acts can show up. They’re labeled “AI-tagged” when revealed.'
+                  : 'Skips artists that listeners have tagged as AI-made. Real people only.'}
+              </ThemedText>
+
+              <ThemedText style={sheetStyles.heading}>Test network</ThemedText>
+              <Segment
+                options={[
+                  { key: 'off', label: 'Off' },
+                  { key: 'slow', label: 'Slow' },
+                  { key: 'offline', label: 'Offline' },
+                ]}
+                value={networkTest}
+                onChange={(mode) => onChangeNetworkTest(mode as NetworkTest)}
+                label="Test network"
+              />
+              <ThemedText type="caption">
+                For trying the loading screens: makes loading new songs slow or fail on purpose. Songs already playing aren’t affected. Turns off when you close the app.
+              </ThemedText>
+            </>
+          )}
+        </ScrollView>
+      </BottomSheet>
     </>
+  );
+}
+
+/** A pill segmented control: grey track, the chosen option black. */
+function Segment<K extends string>({
+  options,
+  value,
+  onChange,
+  label,
+  small = false,
+}: {
+  options: { key: K; label: string }[];
+  value: K;
+  onChange: (key: K) => void;
+  label: string;
+  small?: boolean;
+}) {
+  return (
+    <View style={sheetStyles.segment} accessibilityRole="radiogroup" accessibilityLabel={label}>
+      {options.map((o) => {
+        const on = o.key === value;
+        return (
+          <Pressable
+            key={o.key}
+            onPress={() => onChange(o.key)}
+            style={[sheetStyles.segmentItem, on && sheetStyles.segmentOn]}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on, checked: on }}
+            accessibilityLabel={`${label}: ${o.label}`}>
+            <ThemedText
+              style={[sheetStyles.segmentText, small && styles.segmentSmall, on && sheetStyles.segmentTextOn]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}>
+              {o.label}
+            </ThemedText>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   iconTrigger: { width: TapTarget, height: TapTarget, borderRadius: TapTarget / 2, alignItems: 'center', justifyContent: 'center' },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  // Flat navy like every screen, set off by a thin rule instead of a raised box.
-  sheet: {
-    backgroundColor: Colors.background,
-    borderTopWidth: 1,
-    borderTopColor: Colors.hairline,
-    borderTopLeftRadius: Radius.md,
-    borderTopRightRadius: Radius.md,
-    maxHeight: '88%',
-  },
-  body: {
-    padding: Spacing.xl,
-    paddingBottom: Spacing.xxl,
-    gap: Spacing.sm,
-  },
+  body: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xxl, gap: Spacing.sm },
+  summary: { fontFamily: Fonts.sansSemiBold, fontSize: 17, lineHeight: 23, color: Colors.textSecondary },
+  soundHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  reset: { minHeight: 32, paddingHorizontal: Spacing.md, borderRadius: 16, justifyContent: 'center', backgroundColor: Colors.surface },
+  resetText: { fontFamily: Fonts.sansSemiBold, fontSize: 13, color: Colors.text },
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  soundLabel: { ...Ui.label, width: 72, color: Colors.textSecondary },
+  soundLabel: { fontFamily: Fonts.sansSemiBold, fontSize: 14, width: 72, color: Colors.textSecondary },
   soundSegment: { flex: 1 },
-  soundWord: { fontSize: 11, letterSpacing: 0.6 },
-  heading: {
-    marginTop: Spacing.lg,
-  },
-  // A thin outline around the options; the chosen one is filled cream.
-  segment: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: Colors.hairline,
-    borderRadius: Radius.sm,
-    padding: 2,
-  },
-  segmentSlot: {
-    flex: 1,
-  },
-  segmentItem: {
-    minHeight: TapTarget - 6,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: Radius.sm - 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  regionRow: {
-    marginTop: Spacing.lg,
+  segmentSmall: { fontSize: 13 },
+  moreRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    minHeight: TapTarget,
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.rule,
   },
+  moreText: { fontFamily: Fonts.sansSemiBold, fontSize: 15, color: Colors.text },
+  moreHint: { flex: 1, fontSize: 13, color: Colors.textSecondary, textAlign: 'right' },
+  regionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.sm },
+  rowLabel: { fontFamily: Fonts.sansSemiBold, fontSize: 15, color: Colors.text },
 });

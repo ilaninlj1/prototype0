@@ -41,26 +41,26 @@ export function isSlow(s: FeedLoad, now: number): boolean {
 
 /** What the panel in place of the card says, or null when there's nothing to say. */
 export function panel(s: FeedLoad, now: number): { title: string; body: string; actions: FeedAction[] } | null {
-  const name = s.phase === 'idle' ? '' : s.label.toUpperCase();
+  const name = s.phase === 'idle' ? '' : s.label;
   switch (s.phase) {
     case 'idle':
       return null;
     case 'waiting':
       return {
-        title: `FINDING SONGS · ${name}`,
+        title: `Finding songs · ${name}`,
         body: isSlow(s, now) ? 'Taking longer than usual. The music store is slow right now.' : '',
         actions: ['cancel'],
       };
     case 'failed':
       return s.reason === 'empty'
-        ? { title: `NO SONGS LEFT IN ${name}`, body: 'You’ve heard everything we have here for now.', actions: ['another'] }
+        ? { title: `No songs left in ${name}`, body: 'You’ve heard everything we have here for now.', actions: ['another'] }
         : {
-            title: 'COULDN’T LOAD SONGS',
+            title: 'Couldn’t load songs',
             body: s.attempt > 1 ? `Still not working after ${s.attempt} tries. Check your connection.` : 'Check your connection, then try again.',
             actions: ['retry', 'another'],
           };
     case 'stopped':
-      return { title: 'STOPPED', body: 'Nothing changed. Try again, or go somewhere else.', actions: ['retry', 'another'] };
+      return { title: 'Stopped', body: 'Nothing changed. Try again, or go somewhere else.', actions: ['retry', 'another'] };
   }
 }
 

@@ -105,3 +105,16 @@ export function buildGenreSections(
 
   return sections;
 }
+
+/** Every genre you can pick from the sections, in list order (groups first, then their children). */
+export function pickableGenres(sections: GenreSection[]): string[] {
+  return sections.flatMap((s) => (s.type === 'leaf' ? [s.genre] : [...(s.genre ? [s.genre] : []), ...s.children]));
+}
+
+/** The picker's search: pickable genres containing the typed text, any case, ignoring spaces and dashes ("hiphop" finds Hip-Hop). */
+export function searchGenres(sections: GenreSection[], query: string): string[] {
+  const squash = (t: string) => t.toLowerCase().replace(/[\s\-&]+/g, '');
+  const q = squash(query);
+  if (!q) return [];
+  return pickableGenres(sections).filter((g) => squash(g).includes(q));
+}

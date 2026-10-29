@@ -34,7 +34,7 @@ test('stop only stops a load in progress', () => {
 
 test('the panel says what is happening in plain words, with the right buttons', () => {
   const w = start(IDLE, 'Amapiano', 0);
-  assert.deepEqual(panel(w, 0), { title: 'FINDING SONGS · AMAPIANO', body: '', actions: ['cancel'] });
+  assert.deepEqual(panel(w, 0), { title: 'Finding songs · Amapiano', body: '', actions: ['cancel'] });
   assert.match(panel(w, SLOW_MS)!.body, /longer than usual/);
   const off = fail(w, 'offline');
   assert.deepEqual(panel(off, 0)!.actions, ['retry', 'another']);
@@ -42,7 +42,7 @@ test('the panel says what is happening in plain words, with the right buttons', 
   const again = fail(start(off, 'Amapiano', 1), 'offline');
   assert.match(panel(again, 1)!.body, /2 tries/);
   const empty = fail(w, 'empty');
-  assert.equal(panel(empty, 0)!.title, 'NO SONGS LEFT IN AMAPIANO');
+  assert.equal(panel(empty, 0)!.title, 'No songs left in Amapiano');
   assert.deepEqual(panel(empty, 0)!.actions, ['another']);
   assert.deepEqual(panel(stop(w), 0)!.actions, ['retry', 'another']);
   assert.equal(panel(IDLE, 0), null);

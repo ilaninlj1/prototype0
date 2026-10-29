@@ -5,7 +5,7 @@ import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, wi
 import Svg, { Circle } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing, Ui } from '@/constants/theme';
+import { Colors, Fonts, Spacing, Ui } from '@/constants/theme';
 import { panel, type FeedAction, type FeedLoad } from '@/lib/feed-load';
 
 const LABELS: Record<FeedAction, string> = { cancel: 'Cancel', retry: 'Try again', another: 'Another genre' };
@@ -32,14 +32,14 @@ export function FeedStatus({ load, onAction }: { load: FeedLoad; onAction: (acti
   }, [waiting, spin]);
   const ring = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.get()}deg` }] }));
 
-  const p = panel(load, now) ?? { title: 'FINDING SONGS', body: '', actions: [] as FeedAction[] };
+  const p = panel(load, now) ?? { title: 'Finding songs', body: '', actions: [] as FeedAction[] };
   const failed = load.phase === 'failed';
 
   return (
     <View style={styles.panel} accessibilityLiveRegion="polite">
       <Animated.View style={[styles.ring, waiting && ring]}>
         <Svg width={120} height={120}>
-          <Circle cx={60} cy={60} r={52} stroke={failed ? Colors.signal : Colors.textTertiary} strokeWidth={1.5} strokeDasharray={waiting ? '3 9' : undefined} fill="none" />
+          <Circle cx={60} cy={60} r={52} stroke={failed ? Colors.signal : Colors.textSecondary} strokeWidth={1.5} strokeDasharray={waiting ? '3 9' : undefined} fill="none" />
         </Svg>
       </Animated.View>
       <ThemedText style={styles.title}>{p.title}</ThemedText>
@@ -66,17 +66,18 @@ const styles = StyleSheet.create({
   panel: {
     flex: 1,
     alignSelf: 'stretch',
-    borderRadius: Radius.lg,
-    backgroundColor: '#0d1426',
+    // A light grey card in the blind card's place, with its big round corners.
+    borderRadius: 28,
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.xl,
     gap: Spacing.md,
   },
   ring: { width: 120, height: 120, marginBottom: Spacing.sm },
-  title: { fontFamily: Fonts.monoMedium, fontSize: 13, lineHeight: 18, letterSpacing: 1.5, color: Colors.text, textAlign: 'center' },
+  title: { fontFamily: Fonts.displayBold, fontSize: 21, lineHeight: 26, color: Colors.text, textAlign: 'center' },
   body: { color: Colors.textSecondary, textAlign: 'center', maxWidth: 280 },
   actions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
-  button: { ...Ui.outlineButton, flexDirection: 'row', gap: 6, height: 48, paddingHorizontal: Spacing.lg },
-  primary: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  button: { ...Ui.outlineButton, flexDirection: 'row', gap: 6, height: 48, paddingHorizontal: Spacing.lg, borderWidth: 0, backgroundColor: Colors.background },
+  primary: { backgroundColor: Colors.accent },
 });

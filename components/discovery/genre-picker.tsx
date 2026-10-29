@@ -2,18 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
-  Modal,
   Pressable,
   ScrollView,
   type ScrollViewInstance,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Radius, Spacing, TapTarget, Ui } from '@/constants/theme';
-import { buildGenreSections, type GenreSection } from './genre-taxonomy';
+import { BottomSheet, SheetHeader } from '@/components/ui/sheet';
+import { Colors, Fonts, Spacing, TapTarget, Ui } from '@/constants/theme';
+import { buildGenreSections, pickableGenres, searchGenres, type GenreSection } from './genre-taxonomy';
 
 type GenrePickerProps = {
   curatedGenres: string[];
@@ -51,6 +53,7 @@ export function GenrePicker({
     onOpenChange?.(open);
   };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
   const scrollRef = useRef<ScrollViewInstance>(null);
   const rowOffsets = useRef(new Map<string, number>());
   const scrolledForRef = useRef<string | null>(null);
@@ -62,6 +65,7 @@ export function GenrePicker({
 
   function close() {
     setVisible(false);
+    setQuery('');
   }
 
   function pick(genre: string) {
@@ -123,7 +127,8 @@ export function GenrePicker({
         <ThemedView
           style={[styles.leafRow, indented && styles.rowIndented, isCurrent && styles.rowCurrent]}
           backgroundColor={isCurrent ? Colors.accent : 'transparent'}>
-          <ThemedText style={[styles.rowText, isCurrent && styles.onCream]}>{genre}</ThemedText>
+          <ThemedText style={[styles.rowText, indented && styles.childText, isCurrent && styles.onCream]}>{genre}</ThemedText>
+          {isCurrent && <Ionicons name="checkmark" size={18} color={Colors.accentText} />}
         </ThemedView>
       </TouchableOpacity>
     );
@@ -144,8 +149,14 @@ export function GenrePicker({
             style={styles.groupLabelTap}>
             <ThemedText style={[styles.rowText, isCurrent && styles.onCream]}>{section.label}</ThemedText>
             </TouchableOpacity>
-          <TouchableOpacity onPress={() => toggleGroup(section.label)} activeOpacity={0.7} style={styles.chevronTap}>
-            <ThemedText style={[styles.chevron, isCurrent && styles.onCream]}>{isOpen ? '▾' : '▸'}</ThemedText>
+          <TouchableOpacity
+            onPress={() => toggleGroup(section.label)}
+            activeOpacity={0.7}
+            style={styles.chevronTap}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isOpen }}
+            accessibilityLabel={`${isOpen ? 'Hide' : 'Show'} ${section.label} styles`}>
+            <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={18} color={isCurrent ? Colors.accentText : Colors.textSecondary} />
           </TouchableOpacity>
         </ThemedView>
         {isOpen && section.children.map((child) => renderRow(child, true))}
@@ -162,21 +173,33 @@ export function GenrePicker({
         <Ionicons name="chevron-down" size={16} color={Colors.text} />
       </TouchableOpacity>
 
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-        <Pressable style={styles.backdrop} onPress={close}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <ScrollView ref={scrollRef} contentContainerStyle={styles.list}>
-              <TouchableOpacity onPress={explore} activeOpacity={0.6} style={[Ui.outlineButton, styles.exploreButton]}>
-                <Ionicons name="shuffle" size={14} color={Colors.text} />
-                <ThemedText style={Ui.label}>Explore somewhere new</ThemedText>
-              </TouchableOpacity>
-              {sections.map((section) =>
-                section.type === 'leaf' ? renderRow(section.genre, false) : renderGroup(section)
-              )}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <BottomSheet visible={visible} onClose={close} maxHeight="80%">
+        <SheetHeader title={`${pickableGenres(sections).length} genres`} onDone={close} />
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+          <TouchableOpacity onPress={explore} activeOpacity={0.7} style={styles.exploreButton} accessibilityRole="button">
+            <Ionicons name="shuffle" size={18} color={Colors.accentText} />
+            <ThemedText style={styles.exploreText}>Shuffle: explore somewhere new</ThemedText>
+          </TouchableOpacity>
+          <View style={styles.search}>
+            <Ionicons name="search" size={18} color={Colors.textSecondary} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Find a genre"
+              placeholderTextColor={Colors.textSecondary}
+              autoCorrect={false}
+              style={styles.searchInput}
+              accessibilityLabel="Find a genre"
+            />
+          </View>
+          {query.trim()
+            ? (() => {
+                const hits = searchGenres(sections, query);
+                return hits.length > 0 ? hits.map((g) => renderRow(g, false)) : <ThemedText style={styles.none}>No genre called “{query.trim()}”.</ThemedText>;
+              })()
+            : sections.map((section) => (section.type === 'leaf' ? renderRow(section.genre, false) : renderGroup(section)))}
+        </ScrollView>
+      </BottomSheet>
     </>
   );
 }
@@ -199,29 +222,35 @@ const styles = StyleSheet.create({
     color: Colors.text,
     flexShrink: 1,
   },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  // Same sheet as Tune: flat navy under a thin rule.
-  sheet: {
-    maxHeight: '70%',
-    backgroundColor: Colors.background,
-    borderTopWidth: 1,
-    borderTopColor: Colors.hairline,
-    borderTopLeftRadius: Radius.md,
-    borderTopRightRadius: Radius.md,
-    overflow: 'hidden',
-  },
   list: {
-    paddingVertical: Spacing.sm,
+    paddingBottom: Spacing.xl,
   },
   exploreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    minHeight: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.accent,
     marginHorizontal: Spacing.xl,
     marginTop: Spacing.sm,
-    marginBottom: Spacing.md,
   },
+  exploreText: { fontFamily: Fonts.sansSemiBold, fontSize: 16, color: Colors.accentText },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    minHeight: TapTarget,
+    borderRadius: TapTarget / 2,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.lg,
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  searchInput: { flex: 1, minHeight: TapTarget, color: Colors.text, fontFamily: Fonts.sans, fontSize: 16 },
+  none: { fontSize: 15, color: Colors.textSecondary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
   leafRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -232,10 +261,11 @@ const styles = StyleSheet.create({
   rowIndented: {
     paddingLeft: Spacing.xxl + Spacing.md,
   },
-  // The chosen genre is filled cream.
+  // The chosen genre is a black pill.
   rowCurrent: {
     marginHorizontal: Spacing.sm,
-    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.xl - Spacing.sm,
+    borderRadius: TapTarget / 2,
   },
   onCream: {
     color: Colors.accentText,
@@ -258,12 +288,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
-  chevron: {
-    color: Colors.textTertiary,
-    fontSize: 16,
-  },
   rowText: {
-    ...Ui.label,
-    fontSize: 13,
+    fontFamily: Fonts.sans,
+    fontSize: 17,
+    lineHeight: 22,
+    color: Colors.text,
+  },
+  childText: {
+    fontSize: 16,
+    color: Colors.text,
   },
 });

@@ -2,7 +2,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'rea
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Ui } from '@/constants/theme';
+import { Colors, Spacing, Ui } from '@/constants/theme';
 import type { PresetId } from '@/lib/pool-types';
 
 // Shortened from the full intent strings ("their best, unknown to you", …)
@@ -45,8 +45,8 @@ export function PresetChips({ activePreset, loading, onSelect }: PresetChipsProp
       {PRESET_ORDER.map((preset) => {
         const isActive = preset === activePreset;
         return (
-          <TouchableOpacity key={preset} onPress={() => onSelect(preset)} activeOpacity={0.7} disabled={loading}>
-            <ThemedView style={[styles.chip, isActive && styles.chipActive]} backgroundColor={isActive ? Colors.accent : 'transparent'}>
+          <TouchableOpacity key={preset} onPress={() => onSelect(preset)} activeOpacity={0.7} disabled={loading} accessibilityRole="button" accessibilityState={{ selected: isActive, busy: isActive && loading }}>
+            <ThemedView style={[styles.chip, isActive && styles.chipActive]} backgroundColor={isActive ? Colors.accent : Colors.surface}>
               {isActive && loading ? (
                 <ActivityIndicator size="small" color={Colors.accentText} />
               ) : (
@@ -71,18 +71,22 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingRight: Spacing.lg,
   },
-  // Thin cream outlines; the chosen one is filled cream.
+  // Grey pills; the chosen one is black.
   chip: {
-    ...Ui.outlineButton,
-    borderRadius: Radius.sm,
+    minHeight: 40,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
   },
   chipActive: {
-    borderColor: Colors.accent,
+    backgroundColor: Colors.accent,
   },
   textActive: {
     color: Colors.accentText,
   },
   textInactive: {
-    color: Colors.textSecondary,
+    color: Colors.text,
   },
 });
