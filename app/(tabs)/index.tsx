@@ -1317,7 +1317,7 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {!chrome.visible && (
+          {!chrome.visible && !bottles.ask && !bottles.keep && (
             <ThemedText style={styles.hint} pointerEvents="none">
               {revealedNow ? 'Double-tap to save · swipe for the next song' : 'Tap anywhere for buttons · swipe the card to choose'}
             </ThemedText>
