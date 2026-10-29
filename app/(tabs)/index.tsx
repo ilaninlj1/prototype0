@@ -1231,6 +1231,10 @@ export default function HomeScreen() {
                 heard={revealedNow ? revealHeard : 1}
                 takeLock={lock.take}
                 onSwipe={(d) => handleCardSwipe(d, currentTrack)}
+                onSwipeUp={() => {
+                  wake();
+                  setDetailsOpen(true);
+                }}
                 onSave={() => saveFromHome(currentTrack)}
                 onTap={chrome.toggleFromCard}
                 onRevealSettled={lock.release}
@@ -1319,7 +1323,7 @@ export default function HomeScreen() {
 
           {!chrome.visible && !bottles.ask && !bottles.keep && (
             <ThemedText style={styles.hint} pointerEvents="none">
-              {revealedNow ? 'Double-tap to save · swipe for the next song' : 'Tap anywhere for buttons · swipe the card to choose'}
+              {revealedNow ? 'Double-tap to save · swipe up for details' : 'Tap anywhere for buttons · swipe the card to choose'}
             </ThemedText>
           )}
         </>

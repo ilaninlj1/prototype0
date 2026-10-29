@@ -19,7 +19,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { COVER_BLUR } from '@/components/discovery/swipe-card';
-import { DEFAULT_SWIPE_THRESHOLDS, resolveSwipeDirection, rotationForDrag, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
+import { DEFAULT_SWIPE_THRESHOLDS, isSwipeUp, resolveSwipeDirection, rotationForDrag, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
 import { HeartBurst } from '@/components/heart-burst';
 import { LivePrint } from '@/components/print/live-print';
 import { PrintStill } from '@/components/print/print-still';
@@ -59,6 +59,8 @@ type Props = {
   takeLock: () => boolean;
   /** Once per committed swipe, blind or revealed. */
   onSwipe: (direction: SwipeDirection) => void;
+  /** Swipe up on a revealed card: Details. The card springs back. */
+  onSwipeUp?: () => void;
   onSave: () => void;
   /** A single tap: Home shows or hides its buttons (pause lives with them). */
   onTap: () => void;
@@ -75,7 +77,7 @@ type Props = {
  * the same frame.
  */
 export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCard(props, ref) {
-  const { track, size, recipe, revealed, restless, heard, takeLock, onSwipe, onSave, onTap, onRevealSettled, onMix, onCancelPeek } = props;
+  const { track, size, recipe, revealed, restless, heard, takeLock, onSwipe, onSwipeUp, onSave, onTap, onRevealSettled, onMix, onCancelPeek } = props;
   const { status } = usePlayback();
   const reduceMotion = useReducedMotion();
 
@@ -254,6 +256,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
         tx.set(withSpring(0));
         ty.set(withSpring(0));
         if (onCancelPeek) runOnJS(onCancelPeek)();
+        if (revealed && onSwipeUp && isSwipeUp(e.translationX, e.translationY)) runOnJS(onSwipeUp)();
       }
     });
   const tap = Gesture.Tap().onEnd((_e, ok) => {

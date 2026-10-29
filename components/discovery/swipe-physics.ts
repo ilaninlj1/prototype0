@@ -29,6 +29,19 @@ export function resolveSwipeDirection(
   return null;
 }
 
+/**
+ * A mostly upward drag past the vertical threshold. Home opens Details on it once a card is revealed (a blind card
+ * would give away who it is); it is never a commit direction, so the card always springs back.
+ */
+export function isSwipeUp(
+  translationX: number,
+  translationY: number,
+  thresholds: SwipeThresholds = { horizontal: 120, vertical: 120 }
+): boolean {
+  'worklet';
+  return translationY < -thresholds.vertical && -translationY > Math.abs(translationX);
+}
+
 /** Tilt angle in degrees for the Tinder-style rotation, proportional to horizontal drag. */
 export function rotationForDrag(translateX: number, cardWidth: number): number {
   'worklet';

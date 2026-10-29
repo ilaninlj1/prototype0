@@ -4,6 +4,7 @@ import {
   computeCardSize,
   MAX_CARD_HEIGHT,
   MAX_CARD_WIDTH,
+  isSwipeUp,
   resolveSwipeDirection,
   rotationForDrag,
   fitCardToWidth,
@@ -70,4 +71,16 @@ test('computeCardSize falls back to the max size for zero or negative available 
 test('fitCardToWidth: the card spans the full row width and fills the space down to the next row', () => {
   assert.deepEqual(fitCardToWidth({ width: 358, height: 600 }), { width: 358, height: 600 });
   assert.deepEqual(fitCardToWidth({ width: 358, height: 400 }), { width: 358, height: 400 });
+});
+
+test('a mostly upward drag past the threshold is a swipe up (Details on a revealed card)', () => {
+  assert.equal(isSwipeUp(0, -130), true);
+  assert.equal(isSwipeUp(40, -130), true);
+  assert.equal(isSwipeUp(0, -100), false); // not far enough
+  assert.equal(isSwipeUp(-150, -130), false); // more sideways than up: that's a skip
+  assert.equal(isSwipeUp(0, 130), false);
+});
+
+test('a swipe up never resolves to a commit direction, so it can only spring back', () => {
+  assert.equal(resolveSwipeDirection(0, -200), null);
 });
