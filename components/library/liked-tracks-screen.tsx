@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router/react-navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +23,8 @@ import { JourneySheet } from '@/components/bottles/journey-sheet';
 import { CoverCell } from '@/components/discovery/cover-cell';
 import { useMyBottles } from '@/hooks/use-my-bottles';
 import type { Bottle } from '@/lib/bottle-rows';
-import { deleteLikes, onLikeChange } from '@/components/like-button';
+import { deleteLikes, onLikeChange, saveLike } from '@/components/like-button';
+import { HeardList } from '@/components/library/heard-list';
 import { MiniPlayer } from '@/components/mini-player';
 import { NoteSheet } from '@/components/note-sheet';
 import { ThemedText } from '@/components/themed-text';
@@ -34,9 +35,10 @@ import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
 import { useScrollChrome } from '@/hooks/use-scroll-chrome';
 import { summarizeCalls } from '@/lib/called-shots';
-import { buildSpotifySearchUrl, likedGenres, summarizeFinds, type DiscoveryTrack } from '@/lib/discovery';
-import { appendExportBatch, loadLikedTracks, loadRecentlyDeleted, saveLikedTracks, setLikedNote } from '@/lib/discovery-storage';
-import { libraryView } from '@/lib/library';
+import { buildSpotifySearchUrl, likedGenres, summarizeFinds, type DiscoveryTrack, type SwipeEntry } from '@/lib/discovery';
+import { appendExportBatch, loadLikedTracks, loadRecentlyDeleted, loadSwipeHistory, saveLikedTracks, setLikedNote } from '@/lib/discovery-storage';
+import { heardSongs } from '@/lib/heard';
+import { libraryView, searchLibrary } from '@/lib/library';
 import { setNote } from '@/lib/saved-songs';
 import { requestSteer, type SteerRequest } from '@/lib/steer-request';
 
@@ -107,6 +109,9 @@ export function LikedTracksScreen() {
   const [query, setQuery] = useState('');
   const [typing, setTyping] = useState(false);
   const [genre, setGenre] = useState<string | null>(null);
+  // Hearted: what you saved. Heard: every song you swiped, to find one that's stuck in your head (lib/heard.ts).
+  const [view, setView] = useState<'hearted' | 'heard'>('hearted');
+  const [history, setHistory] = useState<SwipeEntry[]>([]);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [fallbackText, setFallbackText] = useState<string | null>(null);
@@ -129,8 +134,9 @@ export function LikedTracksScreen() {
   const listenersNow = useListenersNow([...tracks.map((t) => t.artistName), ...calls.map((c) => c.artistName)]);
 
   const reload = useCallback(async () => {
-    const [liked, deleted] = await Promise.all([loadLikedTracks(), loadRecentlyDeleted()]);
+    const [liked, deleted, heard] = await Promise.all([loadLikedTracks(), loadRecentlyDeleted(), loadSwipeHistory()]);
     setTracks(liked);
+    setHistory(heard);
     setDeletedCount(deleted.length);
     setToday(Date.now());
     setLoaded(true);
@@ -280,6 +286,15 @@ export function LikedTracksScreen() {
     }
   }
 
+  // Heard (above the loading return, so the hooks always run in the same order).
+  const heardAll = useMemo(() => heardSongs(history), [history]);
+  const likedIds = useMemo(() => new Set(tracks.map((t) => t.id)), [tracks]);
+  const heardShown = useMemo(() => {
+    if (!query.trim()) return heardAll;
+    const hits = new Set(searchLibrary(heardAll.map((h) => h.track), query).map((t) => t.id));
+    return heardAll.filter((h) => hits.has(h.track.id));
+  }, [heardAll, query]);
+
   if (!loaded || !callsLoaded) {
     return (
       <ThemedView style={styles.centered}>
@@ -289,6 +304,10 @@ export function LikedTracksScreen() {
   }
 
   const empty = tracks.length === 0;
+  async function toggleHeart(track: DiscoveryTrack, hearted: boolean) {
+    if (hearted) await deleteLikes([track.id]);
+    else await saveLike({ ...track, likedAt: Date.now() });
+  }
   const genres = likedGenres(tracks);
   const savedPlaying = tracks.find((t) => t.id === playingId) ?? null;
   function steerHome(request: SteerRequest) {
@@ -313,7 +332,38 @@ export function LikedTracksScreen() {
         {...chrome.scrollProps}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.content, { paddingTop: barHeight + Spacing.sm, paddingBottom: playerHeight + Spacing.xl + Spacing.lg }]}>
-        {empty ? (
+        {!selectionMode && (
+          <View style={styles.views} accessibilityRole="tablist">
+            {(['hearted', 'heard'] as const).map((v) => {
+              const on = view === v;
+              const count = v === 'hearted' ? tracks.length : heardAll.length;
+              return (
+                <Pressable
+                  key={v}
+                  onPress={() => setView(v)}
+                  style={[styles.viewPill, on && styles.viewPillOn]}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: on }}>
+                  <ThemedText style={[styles.viewText, on && styles.viewTextOn]}>
+                    {v === 'hearted' ? 'Hearted' : 'Heard'} · {count}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+        {view === 'heard' && !selectionMode ? (
+          <HeardList
+            songs={heardShown}
+            likedIds={likedIds}
+            liked={tracks}
+            playingId={playingId}
+            playing={status.playing}
+            now={today}
+            onPlay={togglePlay}
+            onHeart={(t, hearted) => void toggleHeart(t, hearted)}
+          />
+        ) : empty ? (
           <View style={styles.empty}>
             <ThemedText style={styles.emptyTitle}>Nothing saved yet.</ThemedText>
             <ThemedText style={styles.emptyText}>Double-tap a song you love to keep it here.</ThemedText>
@@ -573,6 +623,11 @@ const styles = StyleSheet.create({
   summaryTitle: { fontFamily: Fonts.sansSemiBold, fontSize: 16, lineHeight: 21, color: Colors.text },
   summaryLine: { fontSize: 14, lineHeight: 19, color: Colors.textSecondary },
   chipsRow: { marginHorizontal: -Spacing.lg, flexGrow: 0 },
+  views: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 22, backgroundColor: Colors.surface, alignSelf: 'flex-start', marginBottom: Spacing.md },
+  viewPill: { minHeight: 36, paddingHorizontal: Spacing.lg, borderRadius: 18, justifyContent: 'center' },
+  viewPillOn: { backgroundColor: Colors.accent },
+  viewText: { fontFamily: Fonts.sansSemiBold, fontSize: 14, color: Colors.text },
+  viewTextOn: { color: Colors.accentText },
   chips: { gap: Spacing.sm, paddingHorizontal: Spacing.lg },
   chip: { minHeight: 36, paddingHorizontal: Spacing.lg, borderRadius: 18, justifyContent: 'center', backgroundColor: Colors.surface },
   chipOn: { backgroundColor: Colors.accent },
