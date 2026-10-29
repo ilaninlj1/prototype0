@@ -127,11 +127,12 @@ export function Bars({ rows }: { rows: { label: string; share: number; count: nu
 
 // ---------- Share cards ----------
 
+// Light above the surface, darker the deeper it goes: greys, so black stays the only strong color.
 const LAYER = {
-  Famous: { width: '46%', bg: Colors.text, fg: Colors.accentText, note: '1M+' },
-  Known: { width: '66%', bg: '#2b4a7d', fg: Colors.text, note: '100K+' },
-  Deep: { width: '84%', bg: '#203a68', fg: Colors.text, note: '10K+' },
-  Buried: { width: '100%', bg: '#152a4f', fg: Colors.text, note: 'under 10K' },
+  Famous: { width: '46%', bg: Colors.surface, fg: Colors.text, note: '1M+' },
+  Known: { width: '66%', bg: '#D6D6D6', fg: Colors.text, note: '100K+' },
+  Deep: { width: '84%', bg: '#5C5C5C', fg: Colors.accentText, note: '10K+' },
+  Buried: { width: '100%', bg: Colors.text, fg: Colors.accentText, note: 'under 10K' },
 } as const;
 
 /** Your blind finds as an iceberg: famous above the water, buried at the bottom. */
@@ -279,8 +280,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: Colors.hairline,
+    backgroundColor: Colors.surface,
     borderRadius: Radius.round,
   },
   dot: { width: 8, height: 8, borderRadius: Radius.round, backgroundColor: Colors.signal },
@@ -290,10 +290,9 @@ const styles = StyleSheet.create({
   tile: {
     flex: 1,
     paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.hairline,
-    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
     gap: 2,
   },
   tileBig: { fontFamily: Fonts.display, fontSize: 28, lineHeight: 32, color: Colors.signal, fontVariant: ['tabular-nums'] },
@@ -302,7 +301,7 @@ const styles = StyleSheet.create({
   clock: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 48 },
   clockBar: { flex: 1, borderRadius: 2, backgroundColor: Colors.hairline },
   clockAxis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  axis: { ...Ui.label, fontSize: 9, color: Colors.textTertiary },
+  axis: { ...Ui.label, fontSize: 11, color: Colors.textSecondary },
 
   bars: { gap: 6 },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
@@ -324,11 +323,11 @@ const styles = StyleSheet.create({
   iceberg: { alignItems: 'center', gap: 4 },
   layerWrap: { width: '100%', alignItems: 'center', gap: 4 },
   layer: { borderRadius: Radius.sm, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.sm, alignItems: 'center', gap: 2 },
-  layerName: { ...Ui.label, fontSize: 10, letterSpacing: 0.8 },
+  layerName: { ...Ui.label, fontSize: 12 },
   layerArtists: { fontSize: 13, lineHeight: 17, fontWeight: '700', textAlign: 'center' },
   water: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, width: '100%', marginVertical: 2 },
   waterLine: { flex: 1, height: 1, backgroundColor: Colors.text, opacity: 0.6 },
-  waterText: { ...Ui.label, fontSize: 9, color: Colors.textSecondary },
+  waterText: { ...Ui.label, fontSize: 11, color: Colors.textSecondary },
 
   receipt: { padding: Spacing.lg, gap: 4, borderRadius: Radius.sm, backgroundColor: Colors.text, alignSelf: 'stretch' },
   receiptTitle: { fontFamily: Fonts.display, fontSize: 26, lineHeight: 30, color: Colors.accentText, textAlign: 'center' },
@@ -349,12 +348,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.signal,
     alignItems: 'center',
   },
-  posterEyebrow: { ...Ui.label, color: Colors.text, opacity: 0.85 },
+  posterEyebrow: { ...Ui.label, color: Colors.text },
   posterTitle: { fontFamily: Fonts.display, fontSize: 36, lineHeight: 40, color: Colors.text, letterSpacing: -0.5 },
   posterRule: { height: 2, width: '60%', backgroundColor: Colors.text, opacity: 0.7, marginVertical: 4 },
   posterRow: { color: Colors.text, textAlign: 'center' },
   posterHead: { fontFamily: Fonts.display, fontSize: 26, lineHeight: 31 },
   posterMid: { fontFamily: Fonts.displayBold, fontSize: 17, lineHeight: 23 },
   posterSmall: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
-  posterFoot: { fontSize: 11, lineHeight: 15, color: Colors.text, opacity: 0.85 },
+  posterFoot: { fontSize: 12, lineHeight: 16, color: Colors.text },
 });

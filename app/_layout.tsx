@@ -24,7 +24,7 @@ import 'react-native-reanimated';
 import { CreditLine } from '@/components/credits';
 import { SaveFlightLayer } from '@/components/save-flight';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Spacing } from '@/constants/theme';
 import { PlaybackProvider } from '@/hooks/use-playback';
 import { refreshDecodedNews } from '@/hooks/use-taste-decoded';
 import { startTwinSync } from '@/lib/twins-api';
@@ -39,7 +39,7 @@ const customTheme = {
     ...DefaultTheme.colors,
     primary: Colors.accent,
     background: Colors.background,
-    card: Colors.surface,
+    card: Colors.background,
     text: Colors.text,
     border: Colors.border,
   },
@@ -110,13 +110,16 @@ export default function RootLayout() {
         <PlaybackProvider>
           <Stack
             screenOptions={{
-              headerStyle: { backgroundColor: Colors.surface },
+              // White like every light screen, no shadow line, the title in Figtree.
+              headerStyle: { backgroundColor: Colors.background },
+              headerShadowVisible: false,
               headerTintColor: Colors.text,
+              headerTitleStyle: { fontFamily: Fonts.sansSemiBold, fontSize: 17 },
             }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             {/* The Liked list is the Library tab now; this route only redirects there. */}
             <Stack.Screen name="modal" options={{ headerShown: false, animation: 'none' }} />
-            <Stack.Screen name="export-history" options={{ presentation: 'modal', title: 'Export History' }} />
+            <Stack.Screen name="export-history" options={{ presentation: 'modal', title: 'Export history' }} />
             <Stack.Screen name="recently-deleted" options={{ presentation: 'modal', title: 'Recently deleted' }} />
             <Stack.Screen name="drop-play" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="edition" options={{ presentation: 'fullScreenModal', headerShown: false }} />

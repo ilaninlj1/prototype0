@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   chipText: {
-    letterSpacing: 0.6,
+    fontSize: 13,
   },
   chipActive: {
     backgroundColor: Colors.accent,
@@ -410,11 +410,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   labelText: {
-    fontFamily: Fonts.monoMedium,
-    fontSize: 11,
-    lineHeight: 16,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
+    fontFamily: Fonts.sansSemiBold,
+    fontSize: 13,
+    lineHeight: 17,
     color: Colors.textSecondary,
   },
   cover: {
@@ -458,6 +456,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.signal,
   },
   legend: {
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
   },
 });

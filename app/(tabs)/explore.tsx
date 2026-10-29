@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions, View, type ViewInstance } from 'react-native';
+import { StyleSheet, useWindowDimensions, View, type ViewInstance } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DecodedLine } from '@/components/decoded/decoded-line';
@@ -35,6 +36,7 @@ import { useArt } from '@/hooks/use-art';
 import { useEditions } from '@/hooks/use-editions';
 import { useListenersNow } from '@/hooks/use-listeners-now';
 import { usePlayback } from '@/hooks/use-playback';
+import { useScrollChrome } from '@/hooks/use-scroll-chrome';
 import { useTasteDecoded } from '@/hooks/use-taste-decoded';
 import {
   countSongsHeard,
@@ -114,6 +116,9 @@ export default function ProfileScreen() {
   const { player, status } = usePlayback();
   const [nowPlaying, setNowPlaying] = useState<DiscoveryTrack | null>(null);
   const [noteTrack, setNoteTrack] = useState<DiscoveryTrack | null>(null);
+  // The title and the Piece / Discoveries / Insights switch slide away while you scroll down, back on a short scroll up.
+  const chrome = useScrollChrome({ pinned: noteTrack !== null || zoomed });
+  const [barHeight, setBarHeight] = useState(insets.top + 112);
   useFocusEffect(
     useCallback(() => {
       return () => {
@@ -219,14 +224,11 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView
+      <Animated.ScrollView
+        {...chrome.scrollProps}
         scrollEnabled={!zoomed}
-        contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top, paddingBottom: nowPlaying ? 180 : 0 }]}>
+        contentContainerStyle={[styles.scrollContainer, { paddingTop: barHeight, paddingBottom: nowPlaying ? 180 : 0 }]}>
         <ThemedView style={styles.container}>
-          <ThemedText type="eyebrow">Blindspot · what you hear</ThemedText>
-          <ThemedText type="hero">Your ears</ThemedText>
-
-          <ViewSwitch view={view} onChange={setView} />
           {!loaded ? (
             <View style={styles.skeletons}>
               {[96, 220, 140].map((h, i) => (
@@ -515,7 +517,16 @@ export default function ProfileScreen() {
             Daily Drop votes are anonymous and tied only to a random device id.
           </ThemedText>
         </ThemedView>
-      </ScrollView>
+      </Animated.ScrollView>
+      <Animated.View
+        style={[styles.bar, { paddingTop: insets.top + Spacing.sm }, chrome.barStyle]}
+        onLayout={(e) => {
+          chrome.onBarLayout(e);
+          setBarHeight(e.nativeEvent.layout.height);
+        }}>
+        <ThemedText type="title">Your ears</ThemedText>
+        <ViewSwitch view={view} onChange={setView} />
+      </Animated.View>
       {/* Solid behind the status bar, so scrolled cards never run under the clock and the Dynamic Island. */}
       <View pointerEvents="none" style={[styles.statusShade, { height: insets.top }]} />
       {nowPlaying && (
@@ -536,10 +547,21 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   statusShade: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: Colors.background },
+  bar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.xs,
+  },
   skeletons: { gap: Spacing.lg, marginTop: Spacing.lg },
   skeleton: { borderRadius: 10, backgroundColor: Colors.surface, opacity: 0.6 },
   screen: {
     flex: 1,
+    backgroundColor: Colors.background,
   },
   // Pinned over the page, like the Liked screen's player.
   mini: {
@@ -604,7 +626,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 26,
   },
-  // Cream, not red: red is kept for the one big number at the top.
+  // Black, not red: red is kept for the one big number at the top.
   em: {
     fontSize: 18,
     fontWeight: '700',
@@ -634,7 +656,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.sm,
   },
-  // The one filled button on the page: cream with navy text, the app's main-action style.
+  // The one filled button on the page: a black pill, the app's main-action style.
   storyShare: {
     ...Ui.outlineButton,
     backgroundColor: Colors.accent,

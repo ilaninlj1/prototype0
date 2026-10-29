@@ -17,6 +17,7 @@ import { useArt } from '@/hooks/use-art';
 import { useEditions } from '@/hooks/use-editions';
 import { usePlayback } from '@/hooks/use-playback';
 import { artworkUrl } from '@/lib/discovery';
+import { cluesLine } from '@/lib/home-copy';
 import { PIECE, type Piece, type PieceMark } from '@/lib/piece';
 
 /** Your piece: the one in progress, or a finished one (?piece=N) to save or share. Tap a print to see its song. */
@@ -89,7 +90,7 @@ export default function ArtScreen() {
       <View style={styles.poster}>
         <PieceView piece={shown} width={width} onPressMark={setInspect} />
         <ThemedText style={styles.captionText}>
-          BLINDSPOT · NO. {shown.number} · {revealed.length} FOUND BLIND · {shown.marks.length - revealed.length} SKIPPED
+          Blindspot · No. {shown.number} · {revealed.length} found blind · {shown.marks.length - revealed.length} skipped
         </ThemedText>
       </View>
 
@@ -161,7 +162,7 @@ export default function ArtScreen() {
           {[...pieces].reverse().map((p) => (
             <Pressable key={p.number} onPress={() => setPieceNumber(p.number)} style={styles.past}>
               <PieceView piece={p} width={width} />
-              <ThemedText style={styles.captionText}>NO. {p.number}</ThemedText>
+              <ThemedText style={styles.captionText}>No. {p.number}</ThemedText>
             </Pressable>
           ))}
           {finished && (
@@ -205,7 +206,7 @@ function Inspect({ mark, onPlay, onClose }: { mark: PieceMark; onPlay: (url: str
         ) : (
           <ThemedText style={styles.dim}>Older print — song details weren’t kept.</ThemedText>
         )}
-        {!!mark.recipe.label && <ThemedText style={styles.captionText}>{mark.recipe.label}</ThemedText>}
+        {!!mark.recipe.label && <ThemedText style={styles.captionText}>{cluesLine(mark.recipe.label, null)}</ThemedText>}
       </View>
       <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">
         <Ionicons name="close" size={20} color={Colors.textSecondary} />
@@ -220,15 +221,14 @@ const styles = StyleSheet.create({
   back: { alignSelf: 'flex-start', marginBottom: Spacing.sm },
   dim: { color: Colors.textSecondary },
   poster: { paddingVertical: Spacing.md, marginTop: Spacing.lg, gap: Spacing.sm },
-  captionText: { fontFamily: Fonts.mono, fontSize: 10, letterSpacing: 1, color: Colors.textTertiary },
+  captionText: { fontSize: 12, lineHeight: 16, color: Colors.textSecondary },
   inspect: {
     flexDirection: 'row',
     gap: Spacing.md,
     alignItems: 'flex-start',
     padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.hairline,
-    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
   },
   inspectText: { flex: 1, gap: Spacing.xs },
   inspectHead: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },

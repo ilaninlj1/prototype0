@@ -11,7 +11,7 @@ import { HumanBadge } from '@/components/human-badge';
 import { LikeButton } from '@/components/like-button';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Spacing } from '@/constants/theme';
 import { usePlayback } from '@/hooks/use-playback';
 import { artworkUrl, describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 import { fetchArtistListeners } from '@/lib/pool';
@@ -234,31 +234,32 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
   center: { alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, gap: Spacing.lg },
   missing: { textAlign: 'center', color: Colors.textSecondary },
-  missingBack: { backgroundColor: Colors.accent, borderRadius: Radius.lg, paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl },
+  missingBack: { backgroundColor: Colors.accent, borderRadius: 24, paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl },
   missingBackText: { fontFamily: 'Figtree_700Bold', color: Colors.accentText },
-  scrim: { backgroundColor: 'rgba(19, 33, 63, 0.82)' },
+  // The cover's colors, barely: a white veil over its blur, so the page stays light and small grey text still reads.
+  scrim: { backgroundColor: 'rgba(255, 255, 255, 0.92)' },
   scroll: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl * 2, gap: Spacing.xs },
   back: { alignSelf: 'flex-start', marginBottom: Spacing.sm },
-  art: { width: '100%', aspectRatio: 1, borderRadius: Radius.lg, marginBottom: Spacing.lg },
+  art: { width: '100%', aspectRatio: 1, borderRadius: 20, marginBottom: Spacing.lg },
   artist: { fontSize: 17, color: Colors.textSecondary },
   actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.lg, marginTop: Spacing.lg },
-  play: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.accent, borderRadius: Radius.pill, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg },
+  play: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, backgroundColor: Colors.accent, borderRadius: 22, paddingHorizontal: Spacing.lg },
   chat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   stats: { flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.xl, gap: Spacing.sm },
   stat: { flex: 1 },
   statNum: { fontFamily: Fonts.display, fontSize: 28, lineHeight: 32, color: Colors.signal, letterSpacing: -0.8 },
-  statLabel: { fontSize: 9, letterSpacing: 1.2 },
+  statLabel: { fontSize: 12, lineHeight: 16 },
   explain: { fontFamily: Fonts.note, fontSize: 19, lineHeight: 22, color: Colors.textSecondary, marginTop: Spacing.sm, transform: [{ rotate: '-1deg' }] },
   section: { marginTop: Spacing.xl, gap: Spacing.xs },
   sectionTitle: { marginBottom: Spacing.xs },
   spinner: { alignSelf: 'flex-start' },
   body: { fontSize: 16, lineHeight: 23 },
-  em: { fontFamily: 'Figtree_700Bold', color: Colors.signal },
+  em: { fontFamily: 'Figtree_700Bold', color: Colors.text },
   small: { fontSize: 13, marginTop: Spacing.xs },
   line: { flexDirection: 'row', gap: Spacing.md, paddingVertical: 3 },
   lineLabel: { fontFamily: 'Figtree_600SemiBold', fontSize: 14, width: '42%' },
   lineValue: { flex: 1, fontSize: 14, color: Colors.textSecondary },
-  dim: { opacity: 0.7 },
-  source: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.textTertiary, marginTop: Spacing.xs },
+  dim: { color: Colors.textSecondary },
+  source: { fontSize: 12, lineHeight: 16, color: Colors.textSecondary, marginTop: Spacing.xs },
   links: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.xl },
 });

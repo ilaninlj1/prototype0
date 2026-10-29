@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { DarkMap } from '@/components/map/dark-map';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Spacing } from '@/constants/theme';
 import type { MapView } from '@/lib/dark-map';
 import { loadMapView } from '@/lib/dark-map-app';
 
@@ -38,8 +38,8 @@ export function DarkMapCard({ width, onOpen }: { width: number; onOpen: () => vo
         />
       </View>
       <View style={styles.row}>
-        <ThemedText style={styles.mono}>DARK MAP</ThemedText>
-        <ThemedText style={styles.mono}>{pct}% LIT</ThemedText>
+        <ThemedText style={styles.title}>Dark map</ThemedText>
+        <ThemedText style={styles.mono}>{pct}% lit</ThemedText>
       </View>
       <ThemedText style={styles.dim}>Everything still dark is your blind spot. Tap to open the map.</ThemedText>
     </Pressable>
@@ -47,8 +47,10 @@ export function DarkMapCard({ width, onOpen }: { width: number; onOpen: () => vo
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: Colors.hairline, marginBottom: Spacing.lg },
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
-  mono: { fontFamily: Fonts.mono, fontSize: 12, letterSpacing: 1.2, color: Colors.text },
+  // The map itself is a dark tile (sound art always sits on dark); its words sit under it on the grey card.
+  card: { borderRadius: 20, overflow: 'hidden', backgroundColor: Colors.surface, marginBottom: Spacing.lg },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
+  title: { fontFamily: Fonts.sansSemiBold, fontSize: 15, color: Colors.text },
+  mono: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
   dim: { fontSize: 13, color: Colors.textSecondary, paddingHorizontal: Spacing.md, paddingTop: Spacing.xs, paddingBottom: Spacing.md },
 });

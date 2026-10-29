@@ -88,7 +88,7 @@ function Cover(props: {
 function VoteButton({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: on }} style={[Ui.outlineButton, on && styles.voteOn]}>
-      <ThemedText style={styles.voteText}>{label}</ThemedText>
+      <ThemedText style={[styles.voteText, on && styles.voteTextOn]}>{label}</ThemedText>
     </Pressable>
   );
 }
@@ -107,6 +107,7 @@ const styles = StyleSheet.create({
   end: { ...Ui.label, color: Colors.textSecondary },
   based: { fontSize: 13, color: Colors.textTertiary },
   votes: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs },
-  voteOn: { backgroundColor: Colors.surfaceElevated, borderColor: Colors.text },
+  voteOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
   voteText: { ...Ui.label },
+  voteTextOn: { color: Colors.accentText },
 });

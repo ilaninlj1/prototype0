@@ -1,7 +1,7 @@
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Radius, Spacing, TapTarget, Ui } from '@/constants/theme';
+import { Colors, Fonts, Spacing, TapTarget } from '@/constants/theme';
 
 export type YouView = 'piece' | 'discoveries' | 'insights';
 
@@ -25,7 +25,7 @@ export function ViewSwitch({ view, onChange }: { view: YouView; onChange: (view:
             activeOpacity={0.7}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}>
-            <ThemedText style={[Ui.label, { color: active ? Colors.accentText : Colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+            <ThemedText style={[styles.label, { color: active ? Colors.accentText : Colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {v.label}
             </ThemedText>
           </TouchableOpacity>
@@ -35,8 +35,10 @@ export function ViewSwitch({ view, onChange }: { view: YouView; onChange: (view:
   );
 }
 
+// A grey pill track; the view you're on is a black pill.
 const styles = StyleSheet.create({
-  segment: { flexDirection: 'row', borderWidth: 1, borderColor: Colors.hairline, borderRadius: Radius.sm, padding: 2, marginTop: Spacing.sm },
-  item: { flex: 1, minHeight: TapTarget, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.sm - 1, paddingHorizontal: Spacing.xs },
+  segment: { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: TapTarget / 2, padding: 3, marginTop: Spacing.sm },
+  item: { flex: 1, minHeight: TapTarget - 6, alignItems: 'center', justifyContent: 'center', borderRadius: (TapTarget - 6) / 2, paddingHorizontal: Spacing.xs },
   active: { backgroundColor: Colors.accent },
+  label: { fontFamily: Fonts.sansSemiBold, fontSize: 14, lineHeight: 18 },
 });
