@@ -327,7 +327,11 @@ export function pickJumpGenre(
   allGenres: string[],
   history: SwipeEntry[]
 ): string {
-  const unexploredDiscovered = discoveredGenres.filter((g) => !genresHeard.has(g));
+  // Only genres the pool can serve (allGenres). Raw iTunes genres picked up through artist steering ("Holiday",
+  // "Vocal") have no catalog: they'd give zero songs, never get heard, and so stay "unexplored" and win every pick.
+  const servable = allGenres.length > 0 ? new Set(allGenres) : null;
+  const usable = (g: string) => !servable || servable.has(g);
+  const unexploredDiscovered = discoveredGenres.filter((g) => usable(g) && !genresHeard.has(g));
   if (unexploredDiscovered.length > 0) {
     return unexploredDiscovered[Math.floor(Math.random() * unexploredDiscovered.length)];
   }
@@ -337,7 +341,7 @@ export function pickJumpGenre(
     return unexploredBroad[Math.floor(Math.random() * unexploredBroad.length)];
   }
 
-  const pool = Array.from(new Set([...discoveredGenres, ...allGenres]));
+  const pool = Array.from(new Set([...discoveredGenres.filter(usable), ...allGenres]));
   if (pool.length === 0) {
     throw new Error('pickJumpGenre: no genres available');
   }

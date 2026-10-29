@@ -184,8 +184,26 @@ test('artworkUrl leaves an empty or non-matching URL unchanged', () => {
 });
 
 test('pickJumpGenre prefers an unexplored discovered genre', () => {
-  const genre = pickJumpGenre(['Rock', 'Jazz'], new Set(['Rock']), ['Rock', 'Pop'], []);
+  const genre = pickJumpGenre(['Rock', 'Jazz'], new Set(['Rock']), ['Rock', 'Pop', 'Jazz'], []);
   assert.equal(genre, 'Jazz');
+});
+
+// 2026-10-28: raw iTunes genres ("Holiday", "Christmas: Jazz", "Vocal") come in through artist steering and have no
+// catalog, so the pool serves nothing for them; since they can never be heard they stayed "unexplored" and were
+// picked first forever, by Shuffle, Another genre and every fallback, until the feed gave up ("No songs left").
+test('pickJumpGenre never picks a genre the pool cannot serve', () => {
+  for (let i = 0; i < 50; i++) {
+    const genre = pickJumpGenre(['Holiday', 'Christmas: Jazz', 'Vocal', 'Rock'], new Set(['Rock']), ['Rock', 'Pop', 'Soul'], []);
+    assert.ok(['Pop', 'Soul'].includes(genre), genre);
+  }
+});
+
+test('once every servable genre is heard, the least recent servable one comes back, never a raw iTunes genre', () => {
+  const history: SwipeEntry[] = [
+    { trackId: 1, artistId: 1, genre: 'Rock', action: 'skip', timestamp: 100 },
+    { trackId: 2, artistId: 1, genre: 'Pop', action: 'skip', timestamp: 50 },
+  ];
+  assert.equal(pickJumpGenre(['Holiday'], new Set(['Rock', 'Pop', 'Holiday']), ['Rock', 'Pop'], history), 'Pop');
 });
 
 test('pickJumpGenre falls back to allGenres when nothing discovered is unexplored', () => {
