@@ -25,7 +25,8 @@ export type ReleaseChecks = Record<number, ReleaseCheck>;
 
 export type FindsNewsItem = {
   id: string;
-  type: 'milestone' | 'release';
+  // 'bottle': a bottle you launched or kept travelled (lib/bottle-journey.ts bottleNews).
+  type: 'milestone' | 'release' | 'bottle';
   artistName: string;
   artistId: number;
   track: DiscoveryTrack;
@@ -51,6 +52,8 @@ export type BuildFindsNewsParams = {
   releaseChecks?: ReleaseChecks;
   listenersNow?: Record<string, number>;
   calls?: CalledShot[];
+  /** Bottle news, already worded; it sits after milestones and before releases. */
+  bottleItems?: FindsNewsItem[];
 };
 
 /**
@@ -63,6 +66,7 @@ export function buildFindsNews({
   releaseChecks = {},
   listenersNow = {},
   calls = [],
+  bottleItems = [],
 }: BuildFindsNewsParams): FindsNewsItem[] {
   const calledArtists = new Set(calls.map((c) => c.artistName));
   const calledTrackByArtist = new Map(calls.map((c) => [c.artistName, c.trackId]));
@@ -130,7 +134,7 @@ export function buildFindsNews({
     }
   }
 
-  const items = [...milestoneItems, ...releaseItems];
+  const items = [...milestoneItems, ...bottleItems, ...releaseItems];
   items.sort((a, b) => {
     if (a.called !== b.called) return a.called ? -1 : 1;
     return 0;
@@ -148,6 +152,7 @@ export function markNewsSeen(
 ): NewsSeenState {
   const next: NewsSeenState = { ...currentSeen };
   for (const item of items) {
+    if (item.type === 'bottle') continue; // bottles keep their own seen state (lib/bottles-api.ts updateSeen)
     const listeners = listenersNow[item.artistName] ?? item.track.artistListeners ?? next[item.artistName]?.listeners ?? 0;
     next[item.artistName] = {
       listeners,

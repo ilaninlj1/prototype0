@@ -180,3 +180,33 @@ test('markNewsSeen updates listener baseline and timestamp for seen items', () =
     'Mabe Fratti': { listeners: 50_000, seenAt: 99_999 },
   });
 });
+
+test('bottle items come after milestones and before releases, and markNewsSeen skips them', () => {
+  const t: DiscoveryTrack = {
+    id: 9,
+    trackName: 'Kaya',
+    artistId: 5,
+    artistName: 'Bob',
+    artworkUrl100: '',
+    primaryGenreName: 'reggae',
+    previewUrl: '',
+    trackViewUrl: '',
+    collectionName: null,
+    artistListeners: 4_800,
+    likedAt: 0,
+  };
+  const bottle = { id: 'bottle:b1:2', type: 'bottle' as const, artistName: 'Bob', artistId: 5, track: t, sentence: 'Your find “Kaya” washed up in Seoul and was kept · 3 people, 3 cities.', called: false };
+  const items = buildFindsNews({
+    likedTracks: [t],
+    newsSeen: {},
+    listenersNow: { Bob: 52_000 },
+    releaseChecks: { 5: { checkedAt: 1, releases: [{ collectionId: 3, collectionName: 'New', releaseDate: '2026-10-01T00:00:00Z' }] } },
+    bottleItems: [bottle],
+  });
+  assert.deepEqual(
+    items.map((i) => i.type),
+    ['milestone', 'bottle', 'release']
+  );
+  const seen = markNewsSeen({}, [bottle], {}, 5);
+  assert.deepEqual(seen, {});
+});
