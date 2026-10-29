@@ -1,5 +1,6 @@
 // ---------- Types ----------
 
+import type { Bottle } from './bottle-rows.ts';
 import type { PresetId } from './pool-types';
 import { releaseDay } from './song-age.ts';
 
@@ -26,8 +27,11 @@ export type DiscoveryTrack = {
   releaseDate?: string | null;
   // Set on songs Home served from a spot on the Dark Map (lib/pool.ts getTracksNear): their swipes are logged
   // with source 'map', so saves from the map can be compared with saves from genres. 'run' marks songs saved
-  // during or after a run (lib/run-*.ts), so the Library can tell run songs apart.
-  via?: 'map' | 'run';
+  // during or after a run (lib/run-*.ts), so the Library can tell run songs apart. 'bottle' marks a stranger's
+  // save that washed up on Home (lib/bottles.ts); bottleId and bottle (its chain, hidden until the verdict) go with it.
+  via?: 'map' | 'run' | 'bottle';
+  bottleId?: string;
+  bottle?: Bottle;
   // Optional solid-color fallback CardFace renders when artworkUrl100 is
   // empty, instead of a flat gray box — set by lib/pool.ts's stub (colored
   // per preset, so swapping presets is visually confirmable), left unset
@@ -95,8 +99,8 @@ export type SwipeEntry = {
   // dwelled" nor "how long listened" has a real endpoint yet.
   preset?: PresetId;
   // Set for Daily Drop swipes, so analysis can separate them from the feed, for songs served from the Dark Map,
-  // and for songs played in Run mode.
-  source?: 'drop' | 'map' | 'run';
+  // for songs played in Run mode, and for bottles (a stranger's save that washed up on Home).
+  source?: 'drop' | 'map' | 'run' | 'bottle';
   artistListeners?: number;
   trackRank?: number;
   dwellMs?: number;
