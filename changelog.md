@@ -6,6 +6,16 @@ staleness.
 
 Add new entries at the top, newest first.
 
+## [2026-10-28] Bottles: blind saves float to strangers
+A save on Home of a song you found blind and heard for 10 s or more floats to a stranger as a bottle. At most one card
+in five on someone else's Home is a bottle, blind like any card; the reveal says "Washed up from Lisbon" where the
+release line was. Keeping it shows "You're the 7th person to keep this. It's floating on.", the cities it passed
+through and its print: the song ringed by one ring per keeper, colored by the song that keeper saved just before.
+Five passes in a row sink it. The first save asks "Use my city" or "Not now" (a time-zone region instead), then offers
+to float up to 30 old blind finds. Finds News reports where your finds went; Library covers with a bottle get a wave
+mark that opens the journey; Tune → More → Bottles turns it off. Server `supabase/bottles.sql`, simulated in
+`supabase/bottles-sim.mjs` (40 checks).
+
 ## [2026-10-28] Minimal UI phases 2 and 3: the Library finished, light sheets, the whole app light, hide-on-scroll
 The Library tab (`components/library/liked-tracks-screen.tsx`) has a top bar with the title, Look up (the full
 search, now `/search?q=`) and Pick, and a search over your saves ("Songs, artists or albums", `lib/library.ts`:

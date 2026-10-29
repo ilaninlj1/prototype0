@@ -16,6 +16,14 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-10-28] Bottles (phase 1 built; The Sea and The Tide left)
+Every blind save floats to a stranger and washes up blind; keeping it carries it on, and its print grows a ring from
+each keeper's own last save. Spec `docs/superpowers/specs/2026-10-28-bottles-design.md`, plan
+`docs/superpowers/plans/2026-10-28-bottles-phase-1.md`. Needs `supabase/bottles.sql` run in the Supabase dashboard.
+Left: phase 2 The Sea (a dark globe of journeys), phase 3 The Tide (a chart of songs strangers kept blind, with
+bridges), Run's Keep as a launch point. Measure for the paper: bottle keep rate vs. normal save rate (swipes log
+`source: 'bottle'`).
+
 ## [2026-10-28] Minimal UI (phases 1 to 3 built, phase 4 left)
 The student's class UI change, built into the app: a light "Clean" look, Home's hiding buttons, the Library tab,
 light sheets, hide-on-scroll on the scrolling screens. Spec `docs/superpowers/specs/2026-10-21-minimal-ui-design.md`,
