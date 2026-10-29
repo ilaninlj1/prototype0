@@ -847,6 +847,27 @@ export function runCandidates(): RunCandidate[] {
   return (runPool = out);
 }
 
+let byIdIndex: Map<number, DiscoveryTrack> | null = null;
+
+/** A bundled catalog song by its iTunes track id, built once. Bottles resolve strangers' songs here first, with no network. */
+export function catalogTrackById(id: number): DiscoveryTrack | null {
+  if (!byIdIndex) {
+    byIdIndex = new Map();
+    for (const genreTag of Object.keys(CATALOG_LOADERS)) {
+      const catalog = loadCatalog(genreTag);
+      if (!catalog) continue;
+      const seeds = new Map((genresSeed[genreTag] ?? []).map((a) => [a.name, a]));
+      for (const [name, ac] of Object.entries(catalog)) {
+        const seed = seeds.get(name);
+        if (!seed || seed.itunesArtistId == null) continue;
+        for (const entry of [...ac.mixed, ...ac.hits, ...ac.deepCuts])
+          if (!byIdIndex.has(entry.itunesTrackId)) byIdIndex.set(entry.itunesTrackId, trackToDiscoveryTrack(catalogTrack(seed, ac, entry, 'M', genreTag)));
+      }
+    }
+  }
+  return byIdIndex.get(id) ?? null;
+}
+
 /**
  * Exported for scripts/test-pool.ts — the core selection logic
  * (getTracks() is this plus the leftover-cache/quick-fill split around
