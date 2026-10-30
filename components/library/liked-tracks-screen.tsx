@@ -567,8 +567,10 @@ export function LikedTracksScreen() {
       <JourneySheet bottle={journey?.bottle ?? null} title={journey?.title ?? ''} onClose={() => setJourney(null)} />
 
       <Modal visible={fallbackText !== null} transparent animationType="fade" onRequestClose={dismissFallback}>
-        <Pressable style={styles.backdrop} onPress={dismissFallback}>
-          <Pressable style={styles.fallbackSheet} onPress={(e) => e.stopPropagation()}>
+        {/* The backdrop sits behind the card, not around it, so the text can scroll on phones. */}
+        <View style={styles.modalRoot}>
+          <Pressable style={[StyleSheet.absoluteFill, styles.backdrop]} onPress={dismissFallback} accessibilityRole="button" accessibilityLabel="Close" />
+          <View style={styles.fallbackSheet}>
             <ThemedText type="defaultSemiBold">Sharing isn&apos;t available here. Select and copy instead:</ThemedText>
             <ScrollView style={styles.fallbackScroll}>
               <ThemedText selectable type="caption" style={styles.fallbackText}>
@@ -578,8 +580,8 @@ export function LikedTracksScreen() {
             <Pressable onPress={dismissFallback} style={styles.primary} accessibilityRole="button">
               <ThemedText style={styles.primaryText}>Done</ThemedText>
             </Pressable>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -667,7 +669,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
   },
   exploreLabel: { ...Ui.label, color: Colors.accentText, textAlign: 'center' },
-  backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.35)', padding: Spacing.xl },
+  modalRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
+  backdrop: { backgroundColor: 'rgba(0, 0, 0, 0.35)' },
   fallbackSheet: { backgroundColor: Colors.background, borderRadius: 28, padding: Spacing.xl, gap: Spacing.lg, maxHeight: '80%', width: '100%' },
   fallbackScroll: { maxHeight: 300 },
   fallbackText: { lineHeight: 20 },

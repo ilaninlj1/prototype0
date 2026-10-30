@@ -19,10 +19,13 @@ export function NoteSheet({ track, onSave, onClose }: Props) {
     <Modal visible={track !== null} transparent animationType="fade" onRequestClose={onClose}>
       <LightRoom>
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <Pressable style={styles.backdrop} onPress={onClose}>
+          {/* The backdrop sits behind the sheet, not around it, so it never takes a touch from the note's text box
+              (components/ui/sheet.tsx has the same fix). */}
+          <View style={styles.root}>
+            <Pressable style={[StyleSheet.absoluteFill, styles.backdrop]} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
             {/* Keyed by song, so the draft starts from that song's note each time. */}
             {track && <Editor key={track.id} track={track} onSave={onSave} onClose={onClose} />}
-          </Pressable>
+          </View>
         </KeyboardAvoidingView>
       </LightRoom>
     </Modal>
@@ -38,7 +41,7 @@ function Editor({ track, onSave, onClose }: Props & { track: DiscoveryTrack }) {
   }
 
   return (
-    <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+    <View style={styles.sheet}>
       <ThemedText style={styles.title}>Your note</ThemedText>
       <ThemedText style={styles.song} numberOfLines={1}>
         {track.trackName} · {track.artistName}
@@ -71,7 +74,7 @@ function Editor({ track, onSave, onClose }: Props & { track: DiscoveryTrack }) {
           </TouchableOpacity>
         </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -80,7 +83,8 @@ export const noteText = { fontFamily: Fonts.note, fontSize: 18, lineHeight: 21, 
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  backdrop: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.35)', padding: Spacing.xl },
+  root: { flex: 1, justifyContent: 'center', padding: Spacing.xl },
+  backdrop: { backgroundColor: 'rgba(0, 0, 0, 0.35)' },
   sheet: { backgroundColor: Colors.background, borderRadius: 28, padding: Spacing.xl, gap: Spacing.sm },
   title: { ...Typography.subtitle, color: Colors.text },
   song: { color: Colors.textSecondary, fontSize: 14, lineHeight: 18 },
