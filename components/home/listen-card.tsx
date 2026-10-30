@@ -59,6 +59,8 @@ type Props = {
   takeLock: () => boolean;
   /** Once per committed swipe, blind or revealed. */
   onSwipe: (direction: SwipeDirection) => void;
+  /** The moment the card starts flying off (before onSwipe, which waits for it to land), so the sea can pull back. */
+  onFling?: (direction: SwipeDirection) => void;
   /** Swipe up on a revealed card: Details. The card springs back. */
   onSwipeUp?: () => void;
   onSave: () => void;
@@ -77,7 +79,7 @@ type Props = {
  * the same frame.
  */
 export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCard(props, ref) {
-  const { track, size, recipe, revealed, restless, heard, takeLock, onSwipe, onSwipeUp, onSave, onTap, onRevealSettled, onMix, onCancelPeek } = props;
+  const { track, size, recipe, revealed, restless, heard, takeLock, onSwipe, onFling, onSwipeUp, onSave, onTap, onRevealSettled, onMix, onCancelPeek } = props;
   const { status } = usePlayback();
   const reduceMotion = useReducedMotion();
 
@@ -191,6 +193,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
       return;
     }
     exiting.set(true);
+    onFling?.(direction);
     if (direction !== 'left') onCancelPeek?.();
     if (direction === 'left') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const done = (finished?: boolean) => {

@@ -33,7 +33,7 @@ import { BottleAskCard } from '@/components/bottles/bottle-ask';
 import { KeepMoment } from '@/components/bottles/keep-moment';
 import { BottleOpening, type OpeningGeometry } from '@/components/bottles/bottle-opening';
 import { LaunchLight } from '@/components/bottles/launch-light';
-import { SEA_HEIGHT, SeaLine, seaX } from '@/components/bottles/sea-line';
+import { SEA_BASE, SEA_HEIGHT, SeaLine, seaX, type SeaWave } from '@/components/bottles/sea-line';
 import { songLight, useBottles } from '@/hooks/use-bottles';
 import { queueBottleNow, seaPosition } from '@/lib/bottle-countdown';
 import { revealLine } from '@/lib/bottle-journey';
@@ -111,6 +111,7 @@ import { soundLookup } from '@/lib/sound-lookup-app';
 import { loadSoundMap, mapPointOf, type MapPoint } from '@/lib/sound-map';
 import { restlessness, tasteDistance, TIER_LABEL, tierFor } from '@/lib/taste-distance';
 import { hideFromDiscovery, shouldSkip } from '@/lib/human-check-api';
+import { changeForSong, seaRhythm, type SeaChange } from '@/lib/sea-beat';
 import { takeSteerRequest } from '@/lib/steer-request';
 import { alreadyKnown, setKnownArtists } from '@/lib/known-artists';
 import { loadSpotifyLibrary } from '@/lib/spotify-api';
@@ -278,6 +279,15 @@ export default function HomeScreen() {
   // The revealed song's recipe, frozen when the swipe commits: the card, the flight and the mark all use it.
   const revealRecipeRef = useRef<PrintRecipe | null>(null);
   const [stamp, setStamp] = useState<Stamp | null>(null);
+  // The beat sea (lib/sea-beat.ts): a jump fires its tsunami as the card leaves; a jump or a steer also marks the
+  // song that arrives next, so it takes the tide that was set instead of rolling its own swell.
+  const [seaWave, setSeaWave] = useState<SeaWave>(null);
+  const seaPendingRef = useRef<{ kind: SeaChange; at: number } | null>(null);
+  const seaKeyRef = useRef(0);
+  function seaChange(kind: SeaChange) {
+    seaPendingRef.current = { kind, at: Date.now() };
+    if (kind === 'genre') setSeaWave({ key: ++seaKeyRef.current, kind: 'genre' });
+  }
   const [moreLike, setMoreLike] = useState<{ ids: Set<number>; label: string } | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [revealHeard, setRevealHeard] = useState(1);
@@ -303,6 +313,18 @@ export default function HomeScreen() {
 
   // The top card's sound and print. Cards underneath show their still print from the index.
   const { record: topSound } = useSound(currentTrack);
+  const seaRhythmNow = topSound ? seaRhythm(topSound.status === 'measured' ? topSound.features : null) : null;
+  const seaSongRef = useRef<number | null>(null);
+  useEffect(() => {
+    const id = currentTrack?.id ?? null;
+    if (id == null) return;
+    const had = seaSongRef.current;
+    seaSongRef.current = id;
+    if (had == null || had === id) return;
+    const how = changeForSong(seaPendingRef.current, Date.now());
+    seaPendingRef.current = null;
+    if (how === 'swell') setSeaWave({ key: ++seaKeyRef.current, kind: 'song' });
+  }, [currentTrack?.id]);
   const coverColors = useCoverColors(currentTrack?.artworkUrl100 ? [currentTrack.artworkUrl100] : []);
   const liveRecipe = useMemo(
     () =>
@@ -665,6 +687,7 @@ export default function HomeScreen() {
       markSwipe(currentTrack, 'skip');
     }
     forkPiece();
+    seaChange('steer');
     setStamp({ id: Date.now(), genre: deckLabel(next), fresh: false });
     const nextHistory = currentTrack && !wasRevealed ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
@@ -955,6 +978,7 @@ export default function HomeScreen() {
       markSwipe(currentTrack, 'skip');
     }
     forkPiece();
+    seaChange('steer');
     setStamp({ id: Date.now(), genre: words, fresh: false });
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
@@ -1073,6 +1097,7 @@ export default function HomeScreen() {
       markSwipe(currentTrack, 'skip');
     }
     forkPiece();
+    seaChange('genre');
     setStamp({ id: Date.now(), genre, fresh: !deriveGenresHeard(swipeHistory).has(genre) });
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
@@ -1091,6 +1116,7 @@ export default function HomeScreen() {
     const nextHistory = currentTrack ? await logSwipe(currentTrack, 'genre-jump') : swipeHistory;
     const nextGenresHeard = deriveGenresHeard(nextHistory);
     const target = pickJumpGenre(discoveredGenres, nextGenresHeard, GENRES, nextHistory);
+    seaChange('genre');
     setStamp({ id: Date.now(), genre: target, fresh: !heardBefore.has(target) });
     const nextSeen = currentTrack ? markArtistSeen(currentTrack) : seenArtists;
     await commitGenreJump(target, nextHistory, nextSeen);
@@ -1133,6 +1159,7 @@ export default function HomeScreen() {
     }
     setUndoSnapshot(null);
     undoingRef.current = undone?.id !== currentTrack?.id;
+    if (undoingRef.current) seaChange('steer');
     bottles.undo();
     setRevealTrack(snapshot.revealed?.track ?? null);
     revealIdRef.current = snapshot.revealed?.track.id ?? null;
@@ -1224,7 +1251,7 @@ export default function HomeScreen() {
   const cardTop = cardArea ? cardArea.y + (cardArea.height - (side + Spacing.xl + LISTEN_INFO_HEIGHT)) / 2 : 0;
   const frameW = frame.width || win.width;
   const frameH = frame.height || win.height - 72 - insets.bottom;
-  const seaSurfaceY = frameH + 4 - SEA_HEIGHT + 17;
+  const seaSurfaceY = frameH + 4 - SEA_HEIGHT + SEA_BASE;
   const openingGeometry: OpeningGeometry | null =
     cardArea && frameW > 0
       ? {
@@ -1255,7 +1282,17 @@ export default function HomeScreen() {
       onLayout={(e) => setFrame({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
       {/* Behind everything: a tap on empty space brings the buttons back. */}
       <Pressable style={StyleSheet.absoluteFill} onPress={wake} accessible={false} />
-      {frameW > 0 && <SeaLine width={frameW} incoming={seaBottle} outgoing={bottles.launchFx} />}
+      {frameW > 0 && (
+        <SeaLine
+          width={frameW}
+          incoming={seaBottle}
+          outgoing={bottles.launchFx}
+          rhythm={seaRhythmNow}
+          wave={seaWave}
+          songTime={status.currentTime}
+          playing={status.playing}
+        />
+      )}
 
       <ChromeFade visible={chrome.visible} alwaysShow={statusItem?.kind === 'failed'} style={styles.statusLine}>
         {statusItem && (
@@ -1342,6 +1379,9 @@ export default function HomeScreen() {
                 heard={revealedNow ? revealHeard : 1}
                 takeLock={lock.take}
                 onSwipe={(d) => handleCardSwipe(d, currentTrack)}
+                onFling={(d) => {
+                  if (d === 'down') seaChange('genre');
+                }}
                 onSwipeUp={() => {
                   wake();
                   setDetailsOpen(true);
