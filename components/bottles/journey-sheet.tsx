@@ -1,8 +1,9 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { BottomSheet, SheetHeader } from '@/components/ui/sheet';
-import { Colors, DarkColors, Spacing } from '@/constants/theme';
+import { Colors, DarkColors, Spacing, Ui } from '@/constants/theme';
 import { journeySummary } from '@/lib/bottle-journey';
 import type { Bottle } from '@/lib/bottle-rows';
 
@@ -17,6 +18,11 @@ function day(at: string): string {
 
 /** Where one bottle has been: its print, a one-line summary, and every stop with its city and day. */
 export function JourneySheet({ bottle, title, onClose }: { bottle: Bottle | null; title: string; onClose: () => void }) {
+  const router = useRouter();
+  function openSea(id: string) {
+    onClose();
+    router.push({ pathname: '/sea', params: { bottle: id } });
+  }
   return (
     <BottomSheet visible={!!bottle} onClose={onClose}>
       {bottle && (
@@ -30,6 +36,9 @@ export function JourneySheet({ bottle, title, onClose }: { bottle: Bottle | null
             <ThemedText type="caption" style={styles.center}>
               The middle is the song. Each ring is someone who kept it, drawn from the song they had saved just before.
             </ThemedText>
+            <Pressable onPress={() => openSea(bottle.id)} style={[Ui.outlineButton, styles.sea]} accessibilityRole="button">
+              <ThemedText style={Ui.label}>See it on the Sea</ThemedText>
+            </Pressable>
             <View style={styles.list}>
               {bottle.hops.map((h, i) => (
                 <View key={i} style={styles.hop} accessible accessibilityLabel={`${h.kind === 'launch' ? 'Found blind' : 'Kept'} in ${h.city}, ${day(h.at)}`}>
@@ -54,6 +63,7 @@ const styles = StyleSheet.create({
   tile: { alignSelf: 'center', width: PRINT, height: PRINT, borderRadius: 28, overflow: 'hidden', backgroundColor: DarkColors.background },
   summary: { fontSize: 17, fontWeight: '700', color: Colors.text, textAlign: 'center' },
   center: { textAlign: 'center' },
+  sea: { alignSelf: 'center' },
   list: { gap: Spacing.sm, marginTop: Spacing.sm },
   hop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.textTertiary },

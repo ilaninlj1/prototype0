@@ -130,6 +130,7 @@ export default function RootLayout() {
             <Stack.Screen name="decoded" options={{ headerShown: false }} />
             <Stack.Screen name="rewind" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="map" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+            <Stack.Screen name="sea" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="run" options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false }} />
             <Stack.Screen name="run-reveal" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="runs" options={{ presentation: 'fullScreenModal', headerShown: false }} />

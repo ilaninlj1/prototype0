@@ -22,7 +22,8 @@
     "build-sound-index": "node --experimental-strip-types scripts/build-sound-index.ts",
     "add-release-dates": "node --experimental-strip-types scripts/add-release-dates.ts",
     "build-sound-map": "node --experimental-strip-types scripts/build-sound-map.ts",
-    "measure-genre-sound": "node --experimental-strip-types scripts/measure-genre-sound.ts"
+    "measure-genre-sound": "node --experimental-strip-types scripts/measure-genre-sound.ts",
+    "build-sea-dots": "node --experimental-strip-types scripts/build-sea-dots.ts"
   },
   "dependencies": {
     "@expo-google-fonts/archivo": "^0.4.2",

@@ -15,6 +15,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { PieceView } from '@/components/print/piece-view';
 import { CalledItStory } from '@/components/you/called-it-story';
 import { DarkMapCard } from '@/components/you/dark-map-card';
+import { SeaCard } from '@/components/you/sea-card';
 import { ViewSwitch, type YouView } from '@/components/you/view-switch';
 import {
   Bars,
@@ -301,6 +302,7 @@ export default function ProfileScreen() {
           ) : finds.length === 0 ? (
             <>
               {view === 'discoveries' && <DarkMapCard width={width - 2 * Spacing.lg} onOpen={() => router.push('/map')} />}
+              {view === 'discoveries' && <SeaCard onOpen={() => router.push('/sea')} />}
               <ThemedText style={styles.dim}>
                 Nothing found yet. Double-tap a song on Home to save it, and your shape starts growing here.
               </ThemedText>
@@ -308,6 +310,7 @@ export default function ProfileScreen() {
           ) : view === 'discoveries' ? (
             <>
               <DarkMapCard width={width - 2 * Spacing.lg} onOpen={() => router.push('/map')} />
+              <SeaCard onOpen={() => router.push('/sea')} />
               <ThemedView style={styles.hero} backgroundColor="transparent">
                 <ThemedText style={styles.heroNumber}>{finds.length}</ThemedText>
                 <ThemedText style={styles.dim}>songs found blind{heard > 0 ? `, out of ${heard} you heard` : ''}.</ThemedText>
