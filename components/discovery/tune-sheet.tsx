@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -7,7 +7,7 @@ import { BottomSheet, SheetHeader, sheetStyles } from '@/components/ui/sheet';
 import { Colors, Fonts, Spacing, TapTarget, Ui } from '@/constants/theme';
 import { tuneSummary } from '@/lib/home-copy';
 import type { Region } from '@/lib/discovery';
-import { saveBottlesOn, useBottlesOn } from '@/lib/bottles-api';
+import { chooseCity, loadCityOk, saveBottlesOn, useBottlesOn } from '@/lib/bottles-api';
 import { setAllowAi, useAllowAi } from '@/lib/human-check-api';
 import type { NetworkTest } from '@/lib/feed-load';
 import type { PresetId } from '@/lib/pool-types';
@@ -67,7 +67,22 @@ export function TuneSheet({
     onOpenChange?.(open);
   };
   const allowAi = useAllowAi();
-  const bottlesOn = useBottlesOn() === true;
+  // undefined while storage loads: the switch shows neither side rather than a wrong Off.
+  const bottlesSetting = useBottlesOn();
+  const bottlesOn = bottlesSetting === true;
+  // Where your bottles say they're from. Turning Bottles on here skips Home's first-time card, so the choice lives here too.
+  const [cityOk, setCityOk] = useState<boolean | null>(null);
+  const [cityNote, setCityNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (visible) void loadCityOk().then(setCityOk);
+  }, [visible]);
+  async function pickPlace(useCity: boolean) {
+    setCityOk(useCity);
+    setCityNote(null);
+    const ok = await chooseCity(useCity);
+    setCityOk(ok);
+    if (useCity && !ok) setCityNote('Location is off for Blindspot, so your bottles say your time zone. You can turn it on in Settings.');
+  }
 
   function close() {
     setVisible(false);
@@ -156,7 +171,8 @@ export function TuneSheet({
             accessibilityLabel="More settings: store region, AI-made music, Bottles, test network">
             <ThemedText style={styles.moreText}>More</ThemedText>
             <ThemedText style={styles.moreHint} numberOfLines={1}>
-              {region} store · AI {allowAi ? 'shown' : 'hidden'} · Bottles {bottlesOn ? 'on' : 'off'}
+              {region} store · AI {allowAi ? 'shown' : 'hidden'}
+              {bottlesSetting === undefined ? '' : ` · Bottles ${bottlesOn ? 'on' : 'off'}`}
             </ThemedText>
             <Ionicons name={more ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.textSecondary} />
           </Pressable>
@@ -189,15 +205,34 @@ export function TuneSheet({
                   { key: 'off', label: 'Off' },
                   { key: 'on', label: 'On' },
                 ]}
-                value={bottlesOn ? 'on' : 'off'}
+                value={bottlesSetting === undefined ? null : bottlesOn ? 'on' : 'off'}
                 onChange={(v) => saveBottlesOn(v === 'on')}
                 label="Bottles"
               />
-              <ThemedText type="caption">
-                {bottlesOn
-                  ? 'Your saves float to strangers, blind, and theirs wash up for you. Only your city goes with them.'
-                  : 'Your saves stay with you, and no bottles wash up.'}
-              </ThemedText>
+              {bottlesSetting !== undefined && (
+                <ThemedText type="caption">
+                  {!bottlesOn
+                    ? 'Your saves stay with you, and no bottles wash up.'
+                    : cityOk
+                      ? 'Your saves float to strangers, blind, and theirs wash up for you. Only your city goes with them.'
+                      : 'Your saves float to strangers, blind, and theirs wash up for you. Only your part of the world goes with them.'}
+                </ThemedText>
+              )}
+              {bottlesOn && cityOk !== null && (
+                <>
+                  <Segment
+                    options={[
+                      { key: 'zone', label: 'From my time zone' },
+                      { key: 'city', label: 'From my city' },
+                    ]}
+                    value={cityOk ? 'city' : 'zone'}
+                    onChange={(v) => void pickPlace(v === 'city')}
+                    label="Where your bottles say they're from"
+                    small
+                  />
+                  {cityNote && <ThemedText type="caption">{cityNote}</ThemedText>}
+                </>
+              )}
 
               <ThemedText style={sheetStyles.heading}>Test network</ThemedText>
               <Segment
@@ -230,7 +265,8 @@ function Segment<K extends string>({
   small = false,
 }: {
   options: { key: K; label: string }[];
-  value: K;
+  /** null: nothing chosen yet (still loading). */
+  value: K | null;
   onChange: (key: K) => void;
   label: string;
   small?: boolean;

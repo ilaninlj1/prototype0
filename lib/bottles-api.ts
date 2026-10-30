@@ -79,6 +79,15 @@ export function useBottlesOn(): boolean | null | undefined {
 
 /** "Use my city" (true) or "Not now" (false) on the first-time card. */
 export const saveCityOk = (ok: boolean) => writeJson(K.cityOk, ok);
+export const loadCityOk = () => readJson<boolean>(K.cityOk, false);
+
+/** Tune's "From" switch. The city asks for location; refused (or no location here), it stays the time zone. */
+export async function chooseCity(useCity: boolean): Promise<boolean> {
+  await saveCityOk(useCity);
+  if (!useCity || (await currentPlace(true)).exact) return useCity;
+  await saveCityOk(false);
+  return false;
+}
 
 /** The phone's place for a bottle hop: its city when you said "Use my city", otherwise the time-zone region. Cached a day. */
 export async function currentPlace(ask: boolean): Promise<Place> {
