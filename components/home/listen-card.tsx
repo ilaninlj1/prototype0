@@ -69,6 +69,8 @@ type Props = {
   onRevealSettled: () => void;
   onMix?: (mix: number) => void;
   onCancelPeek?: () => void;
+  /** What the drag says, where this card's swipes mean something else (People). */
+  dragWords?: { left: string; right: string; down: string };
 };
 
 /**
@@ -79,7 +81,7 @@ type Props = {
  * the same frame.
  */
 export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCard(props, ref) {
-  const { track, size, recipe, revealed, restless, heard, takeLock, onSwipe, onFling, onSwipeUp, onSave, onTap, onRevealSettled, onMix, onCancelPeek } = props;
+  const { track, size, recipe, revealed, restless, heard, takeLock, onSwipe, onFling, onSwipeUp, onSave, onTap, onRevealSettled, onMix, onCancelPeek, dragWords } = props;
   const { status } = usePlayback();
   const reduceMotion = useReducedMotion();
 
@@ -329,7 +331,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
           )}
 
           <View style={[styles.progress, { width: size.width * progress }]} pointerEvents="none" />
-          <DragLabels tx={tx} ty={ty} revealed={revealed} />
+          <DragLabels tx={tx} ty={ty} revealed={revealed} words={dragWords} />
           {burst > 0 && <HeartBurst key={burst} size={120} />}
         </View>
       </GestureDetector>

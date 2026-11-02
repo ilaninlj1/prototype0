@@ -44,7 +44,7 @@ export function ActionRow({ mode, saved, disabled = false, onSkip, onJump, onMor
   );
 }
 
-function Button({
+export function Button({
   onPress,
   disabled,
   label,

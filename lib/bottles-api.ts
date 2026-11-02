@@ -168,21 +168,25 @@ export async function myBottles(since: string | null): Promise<Bottle[] | null> 
   return r.kind === 'ok' ? parseBottles(r.data) : null;
 }
 
-/** The bottle's song, from the bundled catalog or this phone's iTunes store. Null when it can't play here. */
+/** A song by id, from the bundled catalog or this phone's iTunes store. Null when it can't play here. */
+export async function resolveTrackById(trackId: number, region: Region): Promise<DiscoveryTrack | null> {
+  const known = catalogTrackById(trackId);
+  if (known) return known;
+  const url = `https://itunes.apple.com/lookup?id=${trackId}&country=${region}`;
+  const json = await pacedItunes(async () => {
+    try {
+      const res = await fetch(url);
+      return res.ok ? await res.json() : null;
+    } catch {
+      return null;
+    }
+  });
+  return parseArtistLookupResponse(json).find((t) => t.id === trackId) ?? null;
+}
+
+/** The bottle's song. Null when it can't play here. */
 export async function resolveBottleTrack(b: Bottle, region: Region): Promise<DiscoveryTrack | null> {
-  let track = catalogTrackById(b.trackId);
-  if (!track) {
-    const url = `https://itunes.apple.com/lookup?id=${b.trackId}&country=${region}`;
-    const json = await pacedItunes(async () => {
-      try {
-        const res = await fetch(url);
-        return res.ok ? await res.json() : null;
-      } catch {
-        return null;
-      }
-    });
-    track = parseArtistLookupResponse(json).find((t) => t.id === b.trackId) ?? null;
-  }
+  const track = await resolveTrackById(b.trackId, region);
   return track ? { ...track, via: 'bottle', bottleId: b.id, bottle: b } : null;
 }
 

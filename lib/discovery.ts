@@ -100,7 +100,7 @@ export type SwipeEntry = {
   preset?: PresetId;
   // Set for Daily Drop swipes, so analysis can separate them from the feed, for songs served from the Dark Map,
   // for songs played in Run mode, and for bottles (a stranger's save that washed up on Home).
-  source?: 'drop' | 'map' | 'run' | 'bottle';
+  source?: 'drop' | 'map' | 'run' | 'bottle' | 'people';
   artistListeners?: number;
   trackRank?: number;
   dwellMs?: number;

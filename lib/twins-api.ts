@@ -6,13 +6,15 @@ import type { DiscoveryTrack } from './discovery';
 import { loadDeviceId, loadLikedTracks } from './discovery-storage';
 import { normalizeArtist } from './human-check';
 import { lookupTracks } from './song-details';
+import type { Intent } from './people';
+import type { RingSeed } from './bottle-rows';
 import { rankTwins, type Platform, type Twin, type TwinRow } from './twins';
 
 const URL_ROOT = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 const JOINED = 'twins-joined-v1';
 
-async function api(
+export async function api(
   path: string,
   init: { method?: string; body?: unknown; prefer?: string; conflictOk?: boolean } = {}
 ): Promise<{ ok: boolean; data: any }> {
@@ -36,14 +38,23 @@ async function api(
     return { ok: false, data: null };
   }
 }
-const rpc = (fn: string, args: object = {}) => api(`rpc/${fn}`, { method: 'POST', body: args });
+export const rpc = (fn: string, args: object = {}) => api(`rpc/${fn}`, { method: 'POST', body: args });
 
-export type MyProfile = { name: string; handle: string | null; platform: Platform | null; adult: boolean };
+export type MyProfile = {
+  name: string;
+  handle: string | null;
+  platform: Platform | null;
+  adult: boolean;
+  intent?: Intent | null;
+  print?: RingSeed[];
+  /** When they agreed to People; null for an old Taste Twins profile, which hasn't. */
+  people_at?: string | null;
+};
 
 /** Your profile; null if you haven't joined; 'error' if we couldn't tell (offline). Never signs a visitor up. */
 export async function myProfile(): Promise<MyProfile | null | 'error'> {
   if (!(await hasStoredSession())) return null;
-  const get = () => api('twin_profiles?select=name,handle,platform,adult');
+  const get = () => api('twin_profiles?select=name,handle,platform,adult,intent,people_at');
   let r = await get();
   if (!r.ok || !Array.isArray(r.data)) return 'error';
   if (!r.data[0]) {
@@ -56,7 +67,14 @@ export async function myProfile(): Promise<MyProfile | null | 'error'> {
 
 /** Join, or update what you share. Uploads your saved songs the first time. */
 export async function saveProfile(p: MyProfile): Promise<boolean> {
-  const body = { name: p.name, handle: p.adult ? p.handle : null, platform: p.adult && p.handle ? p.platform : null, adult: p.adult };
+  const body = {
+    name: p.name,
+    handle: p.adult ? p.handle : null,
+    platform: p.adult && p.handle ? p.platform : null,
+    adult: p.adult,
+    intent: p.intent ?? null,
+    ...(p.print ? { print: p.print } : {}),
+  };
   const s = await ensureSession();
   if (!s) return false;
   const existing = await myProfile();

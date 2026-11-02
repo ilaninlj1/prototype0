@@ -13,20 +13,30 @@ const V = DEFAULT_SWIPE_THRESHOLDS.vertical;
  * What letting go would do, written on the card as you drag: fully shown at
  * the commit threshold. On a revealed card left and right both move on.
  */
-export function DragLabels({ tx, ty, revealed }: { tx: SharedValue<number>; ty: SharedValue<number>; revealed: boolean }) {
+export function DragLabels({
+  tx,
+  ty,
+  revealed,
+  words = { left: 'SKIP', right: 'MORE LIKE THIS', down: 'NEW GENRE' },
+}: {
+  tx: SharedValue<number>;
+  ty: SharedValue<number>;
+  revealed: boolean;
+  words?: { left: string; right: string; down: string };
+}) {
   const left = useAnimatedStyle(() => ({ opacity: ty.get() > Math.abs(tx.get()) ? 0 : interpolate(-tx.get(), [0, H], [0, 1], 'clamp') }));
   const right = useAnimatedStyle(() => ({ opacity: ty.get() > Math.abs(tx.get()) ? 0 : interpolate(tx.get(), [0, H], [0, 1], 'clamp') }));
   const down = useAnimatedStyle(() => ({ opacity: ty.get() > Math.abs(tx.get()) ? interpolate(ty.get(), [0, V], [0, 1], 'clamp') : 0 }));
   return (
     <>
       <Animated.View pointerEvents="none" style={[styles.wrap, styles.left, left]}>
-        <ThemedText style={styles.label}>{revealed ? 'NEXT' : 'SKIP'}</ThemedText>
+        <ThemedText style={styles.label}>{revealed ? 'NEXT' : words.left}</ThemedText>
       </Animated.View>
       <Animated.View pointerEvents="none" style={[styles.wrap, styles.right, right]}>
-        <ThemedText style={styles.label}>{revealed ? 'NEXT' : 'MORE LIKE THIS'}</ThemedText>
+        <ThemedText style={styles.label}>{revealed ? 'NEXT' : words.right}</ThemedText>
       </Animated.View>
       <Animated.View pointerEvents="none" style={[styles.wrap, styles.bottom, down]}>
-        <ThemedText style={styles.label}>NEW GENRE</ThemedText>
+        <ThemedText style={styles.label}>{words.down}</ThemedText>
       </Animated.View>
     </>
   );
