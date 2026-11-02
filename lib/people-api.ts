@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { hasStoredSession } from './auth';
+import { ensureSession, hasStoredSession } from './auth';
 import { resolveTrackById } from './bottles-api';
 import type { DiscoveryTrack } from './discovery';
 import { loadLikedTracks, loadRegion } from './discovery-storage';
@@ -79,7 +79,9 @@ export async function refreshPrint(): Promise<void> {
   const print = await myPrint();
   const sent = JSON.stringify(print);
   if ((await AsyncStorage.getItem(K.printSent)) === sent) return;
-  const r = await api('twin_profiles?select=user_id', { method: 'PATCH', body: { print }, prefer: 'return=minimal' });
+  const session = await ensureSession();
+  if (!session) return;
+  const r = await api(`twin_profiles?user_id=eq.${session.userId}`, { method: 'PATCH', body: { print }, prefer: 'return=minimal' });
   if (r.ok) await AsyncStorage.setItem(K.printSent, sent);
 }
 
