@@ -56,7 +56,8 @@ export function SongDeck({ deck, deckLoading, verdict, next }: Props) {
   }, [track?.id, lock]);
 
   function takeLock() {
-    if (!listening) {
+    // Hear a song before judging it. A revealed card is already judged, so it can always move on.
+    if (!listening && !revealed) {
       setListening(true);
       return false;
     }
@@ -81,10 +82,10 @@ export function SongDeck({ deck, deckLoading, verdict, next }: Props) {
     if (direction === 'right') {
       setHeard(status.duration > 0 ? Math.min(1, status.currentTime / (status.duration * 0.8)) : 0);
       setRevealedId(card.track.id);
-      const others = Math.max(0, card.heartedBy - 1);
+      const others = card.heartedBy;
       setHeart(others > 0
         ? `${others} other ${others === 1 ? 'person' : 'people'} here hearted this.`
-        : "You're the first to answer this one.");
+        : '');
       void verdict(card, true, heardMs, shownAt.current);
     } else {
       void verdict(card, false, heardMs, shownAt.current);

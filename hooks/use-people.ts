@@ -44,13 +44,16 @@ export function usePeople() {
     if (filling.current || deckRef.current.length > REFILL_AT) return;
     filling.current = true;
     const skip = new Set([...judged.current, ...deckRef.current.map((c) => c.track.id)]);
-    const more = await fetchDeck(DECK_SIZE, skip);
-    filling.current = false;
-    if (more) {
-      const have = new Set(deckRef.current.map((c) => c.track.id));
-      putDeck([...deckRef.current, ...more.filter((c) => !have.has(c.track.id) && !judged.current.has(c.track.id))]);
+    try {
+      const more = await fetchDeck(DECK_SIZE, skip);
+      if (more) {
+        const have = new Set(deckRef.current.map((c) => c.track.id));
+        putDeck([...deckRef.current, ...more.filter((c) => !have.has(c.track.id) && !judged.current.has(c.track.id))]);
+      }
+    } finally {
+      filling.current = false;
+      setDeckLoading(false);
     }
-    setDeckLoading(false);
   }, [putDeck]);
 
   const refreshPeople = useCallback(async () => {
