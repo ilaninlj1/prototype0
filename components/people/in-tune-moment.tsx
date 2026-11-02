@@ -42,7 +42,12 @@ function Ripple({ delay, skip }: { delay: number; skip: boolean }) {
  * Someone new is in tune with you: your print and theirs drift in from the edges and overlap,
  * a ripple runs out from where they meet, one haptic. Plays once per person.
  */
-export function InTuneMoment({ person, onClose, onWaved }: { person: Person; onClose: () => void; onWaved: () => void }) {
+export function InTuneMoment({ person, onClose, onWaved, example = false }: {
+  person: Person;
+  onClose: () => void;
+  onWaved: () => void;
+  example?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
@@ -71,6 +76,10 @@ export function InTuneMoment({ person, onClose, onWaved }: { person: Person; onC
   const words = reduceMotion ? 0 : MEET_MS;
 
   async function sayHi() {
+    if (example) {
+      onWaved();
+      return;
+    }
     if (await wave(person.row.person)) onWaved();
     else setNote('Couldn’t wave just now. Try again.');
   }
@@ -94,6 +103,9 @@ export function InTuneMoment({ person, onClose, onWaved }: { person: Person; onC
               In tune with {person.row.name}
             </ThemedText>
             <ThemedText style={[styles.center, styles.sentence]}>{chanceSentence(person.score.shared, person.score.expected)}</ThemedText>
+            {example && (
+              <ThemedText style={[styles.center, styles.sentence]}>This is an example. Maya isn&apos;t real.</ThemedText>
+            )}
             {!!note && <ThemedText style={styles.center}>{note}</ThemedText>}
           </Animated.View>
           <Animated.View entering={FadeIn.delay(words + 300).duration(300)} style={styles.actions}>

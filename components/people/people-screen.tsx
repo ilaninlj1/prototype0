@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +8,9 @@ import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing, Ui } from '@/constants/theme';
 import { usePeople } from '@/hooks/use-people';
+import type { Person } from '@/lib/people';
 import { leavePeople, loadDetails, type JoinDetails } from '@/lib/people-api';
+import { EXAMPLE_ID, examplePerson } from '@/lib/people-example';
 import { InTuneMoment } from './in-tune-moment';
 import { InTuneRow } from './in-tune-row';
 import { JoinFlow, YouForm } from './join-flow';
@@ -88,10 +90,12 @@ function EditPeople({ onClose, onChanged }: { onClose: () => void; onChanged: ()
 }
 
 export function PeopleScreen() {
+  const router = useRouter();
   const p = usePeople();
   const load = p.load;
   const insets = useSafeAreaInsets();
   const [editing, setEditing] = useState(false);
+  const [example, setExample] = useState<Person | null>(null);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -127,13 +131,24 @@ export function PeopleScreen() {
               <Ionicons name="settings-outline" size={24} color={Colors.text} />
             </Pressable>
           </View>
-          <InTuneRow people={p.people} progress={p.progress} />
+          <InTuneRow people={p.people} progress={p.progress} onExample={() => setExample(examplePerson())} />
           <SongDeck deck={p.deck} deckLoading={p.deckLoading} verdict={p.verdict} next={p.next} />
           {p.moment && (
             <InTuneMoment
               person={p.moment}
               onClose={p.closeMoment}
               onWaved={() => { p.closeMoment(); void p.refreshPeople(); }}
+            />
+          )}
+          {example && (
+            <InTuneMoment
+              person={example}
+              example
+              onClose={() => setExample(null)}
+              onWaved={() => {
+                setExample(null);
+                router.push({ pathname: '/person', params: { id: EXAMPLE_ID } });
+              }}
             />
           )}
         </>

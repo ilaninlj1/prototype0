@@ -16,6 +16,8 @@ import { usePlayback } from '@/hooks/use-playback';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
 import { chanceSentence, modeLabel, type Person } from '@/lib/people';
 import { cachedPerson, fetchPeople, fetchPersonSongs } from '@/lib/people-api';
+import { EXAMPLE_ID, examplePerson } from '@/lib/people-example';
+import { catalogTrackById } from '@/lib/pool';
 import { handleUrl, type Platform } from '@/lib/twins';
 import { block, fetchHandle, report, wave } from '@/lib/twins-api';
 
@@ -38,9 +40,15 @@ function PersonDetails({ id }: { id: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { player, status } = usePlayback();
-  const [person, setPerson] = useState<Person | null>(() => cachedPerson(id));
+  const example = id === EXAMPLE_ID;
+  const [person, setPerson] = useState<Person | null>(() => example ? examplePerson() : cachedPerson(id));
   const [loading, setLoading] = useState(!person);
-  const [songs, setSongs] = useState<{ shared: DiscoveryTrack[]; theirs: DiscoveryTrack[] } | null>(null);
+  const [songs, setSongs] = useState<{ shared: DiscoveryTrack[]; theirs: DiscoveryTrack[] } | null>(() => (
+    example && person ? {
+      shared: person.row.shared_tracks.map(catalogTrackById).filter((track): track is DiscoveryTrack => track !== null),
+      theirs: [],
+    } : null
+  ));
   const [contact, setContact] = useState<{ handle: string; platform: Platform } | null | undefined>(undefined);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [note, setNote] = useState('');
@@ -50,7 +58,7 @@ function PersonDetails({ id }: { id: string }) {
   const personId = person?.row.person;
 
   useEffect(() => {
-    if (cachedPerson(id)) return;
+    if (example || cachedPerson(id)) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -63,25 +71,33 @@ function PersonDetails({ id }: { id: string }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, example]);
 
   useEffect(() => {
-    if (!personId) return;
+    if (example || !personId) return;
     let cancelled = false;
     fetchPersonSongs(personId)
       .then((result) => { if (!cancelled) setSongs(result); })
       .catch(() => { if (!cancelled) setSongs({ shared: [], theirs: [] }); });
     return () => { cancelled = true; };
-  }, [personId, mutual]);
+  }, [personId, mutual, example]);
 
   useEffect(() => {
-    if (!mutual || !personId) return;
+    if (example || !mutual || !personId) return;
     let cancelled = false;
     fetchHandle(personId)
       .then((result) => { if (!cancelled) setContact(result); })
       .catch(() => { if (!cancelled) setContact(null); });
     return () => { cancelled = true; };
-  }, [mutual, personId]);
+  }, [mutual, personId, example]);
+
+  useEffect(() => {
+    if (!example || !person?.row.i_waved || mutual) return;
+    const reply = setTimeout(() => {
+      setPerson((current) => current ? { ...current, row: { ...current.row, they_waved: true } } : current);
+    }, 1500);
+    return () => clearTimeout(reply);
+  }, [example, person?.row.i_waved, mutual]);
 
   useFocusEffect(useCallback(() => () => player.pause(), [player]));
 
@@ -97,6 +113,10 @@ function PersonDetails({ id }: { id: string }) {
 
   async function sayHi() {
     if (!person || busy) return;
+    if (example) {
+      setPerson({ ...person, row: { ...person.row, i_waved: true } });
+      return;
+    }
     setBusy(true);
     if (await wave(id)) setPerson({ ...person, row: { ...person.row, i_waved: true } });
     else setNote('Couldn’t wave just now. Try again.');
@@ -104,7 +124,7 @@ function PersonDetails({ id }: { id: string }) {
   }
 
   function confirmBlock() {
-    if (!person) return;
+    if (example || !person) return;
     Alert.alert(`Block ${person.row.name}?`, 'They won’t see you and you won’t see them.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -119,7 +139,7 @@ function PersonDetails({ id }: { id: string }) {
   }
 
   async function sendReport(reason: string) {
-    if (busy) return;
+    if (example || busy) return;
     setBusy(true);
     setNote((await report(id, reason)) ? 'Reported. Thanks for telling us.' : 'Couldn’t report just now. Try again.');
     setBusy(false);
@@ -148,7 +168,7 @@ function PersonDetails({ id }: { id: string }) {
       </View>
     </View>
   );
-  const contactUrl = contact ? handleUrl(contact.platform, contact.handle) : null;
+  const contactUrl = !example && contact ? handleUrl(contact.platform, contact.handle) : null;
 
   return (
     <ScrollView
@@ -171,11 +191,14 @@ function PersonDetails({ id }: { id: string }) {
             <PersonPrint trackId={person.row.shared_tracks[0] ?? 0} rings={person.row.print} size={180} />
           </View>
           <ThemedText type="title" numberOfLines={2}>{person.row.name}</ThemedText>
+          {example && <ThemedText style={styles.dim}>This is an example. Maya isn&apos;t real.</ThemedText>}
           <View style={styles.mode}><ThemedText style={styles.modeText}>{modeLabel(person.row.mode)}</ThemedText></View>
           <ThemedText style={styles.dim}>{chanceSentence(person.score.shared, person.score.expected)}</ThemedText>
           <View style={styles.waveBox}>
             {mutual ? (
-              contact === undefined ? <ActivityIndicator color={Colors.text} /> : contact ? (
+              example ? (
+                <ThemedText selectable style={styles.contactText}>@maya.example on Instagram</ThemedText>
+              ) : contact === undefined ? <ActivityIndicator color={Colors.text} /> : contact ? (
                 <View style={styles.contact}>
                   <ThemedText selectable style={styles.contactText}>
                     {contactUrl ? `@${contact.handle} on ${PLATFORM_NAME[contact.platform]}` : contact.handle}
@@ -213,7 +236,7 @@ function PersonDetails({ id }: { id: string }) {
               {songs.shared.length === 0 && (
                 <ThemedText style={styles.dim}>Their songs didn’t load. Try again in a minute.</ThemedText>
               )}
-              {mutual && songs.theirs.length > 0 && (
+              {!example && mutual && songs.theirs.length > 0 && (
                 <>
                   <ThemedText type="eyebrow" style={styles.section}>What else they hearted</ThemedText>
                   {songs.theirs.map(songRow)}
@@ -221,29 +244,33 @@ function PersonDetails({ id }: { id: string }) {
               )}
             </>
           )}
-          <View style={styles.footer}>
-            <Pressable onPress={confirmBlock} accessibilityRole="button" style={Ui.textButton}>
-              <ThemedText style={styles.link}>Block</ThemedText>
-            </Pressable>
-            <Pressable onPress={() => setReporting(true)} accessibilityRole="button" style={Ui.textButton}>
-              <ThemedText style={styles.link}>Report</ThemedText>
-            </Pressable>
-          </View>
-          <BottomSheet visible={reporting} onClose={() => setReporting(false)}>
-            <SheetHeader title={`Report ${person.row.name}`} onDone={() => setReporting(false)} doneLabel="Cancel" />
-            <ScrollView contentContainerStyle={styles.reportOptions}>
-              {REPORTS.map((item) => (
-                <Pressable
-                  key={item.reason}
-                  onPress={() => { void sendReport(item.reason); }}
-                  disabled={busy}
-                  accessibilityRole="button"
-                  style={Ui.textButton}>
-                  <ThemedText>{item.label}</ThemedText>
+          {!example && (
+            <>
+              <View style={styles.footer}>
+                <Pressable onPress={confirmBlock} accessibilityRole="button" style={Ui.textButton}>
+                  <ThemedText style={styles.link}>Block</ThemedText>
                 </Pressable>
-              ))}
-            </ScrollView>
-          </BottomSheet>
+                <Pressable onPress={() => setReporting(true)} accessibilityRole="button" style={Ui.textButton}>
+                  <ThemedText style={styles.link}>Report</ThemedText>
+                </Pressable>
+              </View>
+              <BottomSheet visible={reporting} onClose={() => setReporting(false)}>
+                <SheetHeader title={`Report ${person.row.name}`} onDone={() => setReporting(false)} doneLabel="Cancel" />
+                <ScrollView contentContainerStyle={styles.reportOptions}>
+                  {REPORTS.map((item) => (
+                    <Pressable
+                      key={item.reason}
+                      onPress={() => { void sendReport(item.reason); }}
+                      disabled={busy}
+                      accessibilityRole="button"
+                      style={Ui.textButton}>
+                      <ThemedText>{item.label}</ThemedText>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </BottomSheet>
+            </>
+          )}
           <CreditLine lastfm={false} />
         </>
       )}

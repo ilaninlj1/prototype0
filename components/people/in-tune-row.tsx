@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, TapTarget } from '@/constants/theme';
 import { deckProgressLine, type Person } from '@/lib/people';
 import type { Progress } from '@/lib/people-api';
 import { PersonPrint } from './person-print';
@@ -10,7 +10,11 @@ import { PersonPrint } from './person-print';
 const PRINT = 56;
 
 /** Who you're in tune with, above the song. Nobody yet: how close you are. */
-export function InTuneRow({ people, progress }: { people: Person[]; progress: Progress | null }) {
+export function InTuneRow({ people, progress, onExample }: {
+  people: Person[];
+  progress: Progress | null;
+  onExample: () => void;
+}) {
   const router = useRouter();
   if (people.length === 0) {
     return (
@@ -21,6 +25,9 @@ export function InTuneRow({ people, progress }: { people: Person[]; progress: Pr
             {progress.members} {progress.members === 1 ? 'person' : 'people'} here
           </ThemedText>
         )}
+        <Pressable onPress={onExample} accessibilityRole="button" style={styles.example}>
+          <ThemedText style={styles.exampleText}>See an example</ThemedText>
+        </Pressable>
       </View>
     );
   }
@@ -58,4 +65,6 @@ const styles = StyleSheet.create({
   empty: { minHeight: PRINT + 19, justifyContent: 'center', alignItems: 'center', gap: 2, paddingHorizontal: Spacing.lg },
   emptyText: { fontWeight: '600', textAlign: 'center' },
   emptyCount: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
+  example: { minHeight: TapTarget, justifyContent: 'center', paddingHorizontal: Spacing.md },
+  exampleText: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary, textDecorationLine: 'underline' },
 });
