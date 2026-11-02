@@ -10,7 +10,6 @@ const MODES: readonly string[] = ['friends', 'dating', 'either'];
 
 const ADULT = 18;
 const MAX_RINGS = 12;
-const DEFAULT_MIN_SCORE = 1.25;
 
 /** One row of the database's my_people(). */
 export type PersonRow = {
@@ -19,16 +18,11 @@ export type PersonRow = {
   mode: Intent;
   shared_tracks: number[];
   both_rated: number;
-  they_hearted_i_rated: number;
-  i_hearted_they_rated: number;
-  my_hearts: number;
-  my_cards: number;
-  their_hearts: number;
-  their_cards: number;
+  /** How many shared hearts chance would give, from the server. */
+  expected: number;
   i_waved: boolean;
   they_waved: boolean;
   print: RingSeed[];
-  min_score: number;
 };
 
 export type Score = { shared: number; weighted: number; expected: number; score: number };
@@ -45,11 +39,6 @@ export function isAdult(year: number, month: number, now: Date): boolean {
   return months > ADULT * 12;
 }
 
-/** How often someone hearts a card in the deck. The +1 and +5 start a new member near one in five. */
-export function heartRate(hearts: number, cards: number): number {
-  return (hearts + 1) / (cards + 5);
-}
-
 /** A shared heart counts once on a million-listener artist, up to twice under a thousand. Unknown counts once. */
 export function rarityWeight(listeners: number | null | undefined): number {
   if (!listeners || listeners <= 0) return 1;
@@ -57,23 +46,12 @@ export function rarityWeight(listeners: number | null | undefined): number {
 }
 
 /**
- * Shared hearts against what chance would give. Chance takes the larger direction,
- * so one generous swiper can't make a match; the +1s pull small samples toward "unknown".
- * 1 means chance. Skips don't count at all: most songs get skipped, so two strangers
- * agree most of the time just by both skipping.
+ * The server decides who's in tune (supabase/people.sql people_overlap). This only ranks them:
+ * rare shared hearts count for more, which can't be part of the bar because the phone reports it.
  */
 export function matchScore(row: PersonRow, listenersOf: (trackId: number) => number | null | undefined): Score {
-  const expected = Math.max(
-    row.they_hearted_i_rated * heartRate(row.my_hearts, row.my_cards),
-    row.i_hearted_they_rated * heartRate(row.their_hearts, row.their_cards)
-  );
   const weighted = row.shared_tracks.reduce((sum, id) => sum + rarityWeight(listenersOf(id)), 0);
-  return { shared: row.shared_tracks.length, weighted, expected, score: (weighted + 1) / (expected + 1) };
-}
-
-/** The server holds back anyone under its overlap floors; this adds the score. A wave keeps someone on the list either way. */
-export function isInTune(row: PersonRow, score: Score): boolean {
-  return row.i_waved || row.they_waved || score.score >= row.min_score;
+  return { shared: row.shared_tracks.length, weighted, expected: row.expected, score: (weighted + 1) / (row.expected + 1) };
 }
 
 export function newlyInTune(known: Set<string>, ids: string[]): string[] {
@@ -132,24 +110,17 @@ function parsePerson(raw: any): PersonRow | null {
   if (!raw || typeof raw !== 'object') return null;
   if (typeof raw.person !== 'string' || !raw.person || typeof raw.name !== 'string' || !raw.name) return null;
   if (!MODES.includes(raw.mode) || !Array.isArray(raw.shared_tracks)) return null;
-  const counts = ['both_rated', 'they_hearted_i_rated', 'i_hearted_they_rated', 'my_hearts', 'my_cards', 'their_hearts', 'their_cards'] as const;
-  if (!counts.every((k) => isCount(raw[k]))) return null;
+  if (!isCount(raw.both_rated) || !isCount(raw.expected)) return null;
   return {
     person: raw.person,
     name: raw.name.slice(0, 30),
     mode: raw.mode,
     shared_tracks: raw.shared_tracks.filter(isTrackId),
     both_rated: raw.both_rated,
-    they_hearted_i_rated: raw.they_hearted_i_rated,
-    i_hearted_they_rated: raw.i_hearted_they_rated,
-    my_hearts: raw.my_hearts,
-    my_cards: raw.my_cards,
-    their_hearts: raw.their_hearts,
-    their_cards: raw.their_cards,
+    expected: raw.expected,
     i_waved: raw.i_waved === true,
     they_waved: raw.they_waved === true,
     print: (Array.isArray(raw.print) ? raw.print : []).slice(0, MAX_RINGS).map(parseRing).filter((r: RingSeed | null): r is RingSeed => r !== null),
-    min_score: isCount(raw.min_score) ? raw.min_score : DEFAULT_MIN_SCORE,
   };
 }
 

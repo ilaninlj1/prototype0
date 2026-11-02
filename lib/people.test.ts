@@ -4,9 +4,7 @@ import { test } from 'node:test';
 import {
   chanceSentence,
   deckProgressLine,
-  heartRate,
   isAdult,
-  isInTune,
   matchScore,
   newlyInTune,
   modeLabel,
@@ -24,16 +22,10 @@ const row = (over: Partial<PersonRow> = {}): PersonRow => ({
   mode: 'friends',
   shared_tracks: [1, 2, 3, 4, 5],
   both_rated: 20,
-  they_hearted_i_rated: 8,
-  i_hearted_they_rated: 8,
-  my_hearts: 5,
-  my_cards: 20,
-  their_hearts: 5,
-  their_cards: 20,
+  expected: 2,
   i_waved: false,
   they_waved: false,
   print: [],
-  min_score: 1.25,
   ...over,
 });
 const none = () => null;
@@ -55,12 +47,6 @@ test('age: nonsense dates do not pass', () => {
   assert.equal(isAdult(NaN, 1, now), false);
 });
 
-test('a new member starts near a one-in-five heart rate', () => {
-  assert.equal(heartRate(0, 0), 0.2);
-  assert.ok(Math.abs(heartRate(1, 5) - 0.2) < 1e-9);
-  assert.ok(heartRate(90, 100) > 0.85);
-});
-
 test('rare songs count up to double, and unknown ones count once', () => {
   assert.equal(rarityWeight(5_000_000), 1);
   assert.equal(rarityWeight(1_000_000), 1);
@@ -71,25 +57,11 @@ test('rare songs count up to double, and unknown ones count once', () => {
   assert.equal(rarityWeight(0), 1);
 });
 
-test('someone who hearts everything scores chance, not a match', () => {
-  const shared = Array.from({ length: 18 }, (_, i) => i);
-  const r = row({ shared_tracks: shared, they_hearted_i_rated: 20, i_hearted_they_rated: 18, my_hearts: 19, my_cards: 20, their_hearts: 5, their_cards: 20 });
-  const s = matchScore(r, none);
-  assert.ok(s.score < 1.25, `score ${s.score}`);
-  assert.equal(isInTune(r, s), false);
-});
-
-test('two picky people sharing hearts beat chance', () => {
-  const r = row();
-  const s = matchScore(r, none);
-  assert.ok(s.score >= 1.25, `score ${s.score}`);
-  assert.equal(isInTune(r, s), true);
-});
-
-test('the larger direction sets what chance would give', () => {
-  const generous = matchScore(row({ my_hearts: 18, my_cards: 20 }), none);
-  const picky = matchScore(row({ my_hearts: 2, my_cards: 20 }), none);
-  assert.ok(generous.expected > picky.expected);
+test('the score is shared hearts against what the server says chance would give', () => {
+  const s = matchScore(row({ expected: 2 }), none);
+  assert.equal(s.shared, 5);
+  assert.equal(s.expected, 2);
+  assert.equal(s.score, 2);
 });
 
 test('the same overlap on rare songs scores higher', () => {
@@ -100,22 +72,9 @@ test('the same overlap on rare songs scores higher', () => {
   assert.ok(Math.abs(rare.weighted - 10) < 1e-9);
 });
 
-test('the bar comes from the server, so it can be tuned without a new build', () => {
-  const r = row({ min_score: 3 });
-  assert.equal(isInTune(r, { ...matchScore(r, none), score: 2.9 }), false);
-  assert.equal(isInTune(r, { ...matchScore(r, none), score: 3 }), true);
-});
-
 test('only people who just crossed the bar get the moment', () => {
   assert.deepEqual(newlyInTune(new Set(['a']), ['a', 'b']), ['b']);
   assert.deepEqual(newlyInTune(new Set(['a', 'b']), ['a']), []);
-});
-
-test('a wave keeps someone on the list once the score drops', () => {
-  const low = row({ shared_tracks: [1], both_rated: 2, i_waved: true });
-  assert.equal(isInTune(low, { ...matchScore(low, none), score: 0.5 }), true);
-  const theirs = row({ shared_tracks: [1], both_rated: 2, they_waved: true });
-  assert.equal(isInTune(theirs, { ...matchScore(theirs, none), score: 0.5 }), true);
 });
 
 test('the sentence is plain and honest about small numbers', () => {
@@ -154,6 +113,7 @@ test('a server row with the wrong shape is dropped, not trusted', () => {
   assert.deepEqual(parsePeople([{ person: 'a' }]), []);
   assert.deepEqual(parsePeople([{ ...row(), mode: 'stalker' }]), []);
   assert.deepEqual(parsePeople([{ ...row(), shared_tracks: 'all' }]), []);
+  assert.deepEqual(parsePeople([{ ...row(), expected: 'lots' }]), []);
   const good = parsePeople([row(), { nonsense: true }]);
   assert.equal(good.length, 1);
   assert.equal(good[0].name, 'Maya');

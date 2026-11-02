@@ -14,6 +14,7 @@ import { useHomeChromeVisible } from '@/hooks/use-home-chrome';
 import { tabBarScrollHidden } from '@/hooks/use-scroll-chrome';
 import { onDecodedNews } from '@/hooks/use-taste-decoded';
 import { FADE_MS, tabBarVisible } from '@/lib/home-chrome';
+import { checkPeopleNews, onPeopleNews } from '@/lib/people-api';
 import { tabBarRoom, tabBarScrollShare } from '@/lib/scroll-chrome';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
@@ -22,6 +23,7 @@ type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>
 const ICONS: Record<string, { idle: keyof typeof Ionicons.glyphMap; active: keyof typeof Ionicons.glyphMap; label: string }> = {
   index: { idle: 'headset-outline', active: 'headset', label: 'Home' },
   play: { idle: 'game-controller-outline', active: 'game-controller', label: 'Play' },
+  people: { idle: 'people-outline', active: 'people', label: 'People' },
   library: { idle: 'albums-outline', active: 'albums', label: 'Library' },
   explore: { idle: 'ear-outline', active: 'ear', label: 'You' },
 };
@@ -95,10 +97,15 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
   if (focusedName === 'explore' && decodedNews) setDecodedNews(false);
   useEffect(() => onDecodedNews(() => setDecodedNews(true)), []);
 
+  const [peopleNews, setPeopleNews] = useState(false);
+  if (focusedName === 'people' && peopleNews) setPeopleNews(false);
+  useEffect(() => onPeopleNews(setPeopleNews), []);
+
   // Today's Daily Drop, not played yet: a dot on Play (it used to be a ring on Home).
   const daily = useDailyDrop();
   useEffect(() => {
     daily.refresh();
+    void checkPeopleNews();
     // Checked again on every tab change, the way the ring checked on Home's focus.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.index]);
@@ -127,7 +134,8 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
               <View style={styles.count}>
                 <ThemedText style={styles.countText}>+{newSaves}</ThemedText>
               </View>
-            ) : (route.name === 'explore' && decodedNews) || (route.name === 'play' && dropWaiting) ? (
+            ) : (route.name === 'explore' && decodedNews) || (route.name === 'play' && dropWaiting) ||
+                (route.name === 'people' && peopleNews) ? (
               !focused && <View style={styles.dot} />
             ) : null;
           return (

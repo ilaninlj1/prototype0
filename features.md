@@ -16,6 +16,14 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-11-02] People (phase 1 built)
+A fifth tab, Home · Play · People · Library · You, replaces Taste Twins: swipe songs other members hearted,
+meet through shared hearts, then wave to swap one handle. Includes neutral age gating, consent before upload,
+taste prints, the in-tune moment, profile editing, leaving, and block/report. Spec
+`docs/superpowers/specs/2026-11-02-people-design.md`. Needs `supabase/people.sql` run in the Supabase dashboard.
+Left: song-as-profile (the song you would play someone first), a wave after keeping a bottle, and chat only
+if testers want it.
+
 ## [2026-10-28] Bottles (phases 1 and 2 built; The Tide left)
 Every blind save floats to a stranger and washes up blind; keeping it carries it on, and its print grows a ring from
 each keeper's own last save. Spec `docs/superpowers/specs/2026-10-28-bottles-design.md`, plan

@@ -18,6 +18,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="people"
+        options={{
+          title: 'People',
+        }}
+      />
+      <Tabs.Screen
         name="library"
         options={{
           title: 'Library',
@@ -26,7 +32,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Profile',
+          title: 'You',
         }}
       />
     </Tabs>

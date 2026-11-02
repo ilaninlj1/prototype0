@@ -55,14 +55,18 @@ The student's idea: both people get the same cards, count agreement, and find th
 
 So only hearts count, and they're compared with chance:
 
-- For each person, `rate` is how often they heart a card in this deck, `(hearts + 1) / (cards + 5)`, so a new member starts near 20%.
-- `expected` is how many shared hearts chance would give: their hearts you've heard × your rate, and your hearts they've heard × their rate. Take the larger, so one generous swiper can't inflate a match.
-- `weighted` counts each shared heart as 1 for a million-listener artist up to 2 for under a thousand listeners. Rare overlaps mean more.
-- `score = (weighted + 1) / (expected + 1)`. 1 means chance. The +1s pull small samples toward "unknown".
+- `rate` is how likely you are to heart a song by chance: how often you heart cards that aren't this person's hearts, `(hearts + 1) / (cards + 5)`, so it starts near one in five. Measuring it on their own hearts would compare the match with itself, and in a small group that makes every score 1.
+- Two things override it. Hearting 60% or more of your cards means you aren't choosing, so your overall rate applies. And a Library holding x% of the catalog gets at least x%, so a script hearting every song scores chance.
+- `expected` is how many shared hearts chance would give: their hearts you've judged × your rate, and your hearts they've judged × their rate. Take the larger, so one generous swiper can't make a match.
+- `score = (shared + 1) / (expected + 1)`. 1 means chance. The +1s pull small samples toward "unknown".
 
-**In tune** needs at least 3 shared hearts, at least 15 songs you've both judged, and a score of at least 1.25.
+**In tune** needs at least 3 shared hearts, at least 15 songs you've both judged, and a score of at least 1.25. With nothing else to go on, that's about 4 hearts out of 15 songs. **The server decides this,** so no client can talk its way into a list, a wave or someone's songs. All the bars live in `people_settings` and can be tuned from the dashboard with no new build.
 
-All three live in the `people_settings` table so they can be tuned from the dashboard with no new build. The screen says it in one sentence: "You both hearted 5 of the same songs. Chance says about 2."
+Rare songs count more when ranking who's first: 1 for a million-listener artist, up to 2 under a thousand. That number can't be part of the bar, because the phone reports it and a phone can lie.
+
+The screen says it in one sentence: "You both hearted 5 of the same songs. Chance says about 2."
+
+**Known limit:** the deck shows which songs members hearted, so a determined script could heart exactly those directly and look like a match. It would get first names and shared songs and could wave ten times a day. It still can't get a handle without a wave back.
 
 These numbers are starting guesses. With 15 testers there isn't enough data to prove them, so the showcase is a pilot and the paper should say so. `people_shown` plus `twin_waves` gives the wave and wave-back rate by score, which is the student's iteration idea.
 

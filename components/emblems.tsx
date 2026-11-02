@@ -118,18 +118,6 @@ export function DjPicksEmblem({ size = 52 }: Props) {
   );
 }
 
-/** Taste Twins: two circles of taste, the overlap in red. */
-export function TasteTwinsEmblem({ size = 52 }: Props) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 64 64">
-      <Circle {...FILL} cx={24} cy={34} r={17} />
-      <Circle {...FILL} cx={40} cy={34} r={17} fillOpacity={0.85} />
-      <Path fill={RED} d="M32 19.2 A17 17 0 0 1 32 48.8 A17 17 0 0 1 32 19.2 Z" />
-      <Path {...LINE} d="M24 17 A17 17 0 1 0 24 51 M40 17 A17 17 0 1 1 40 51" opacity={0.5} />
-    </Svg>
-  );
-}
-
 /** Rewind: a cassette, its label in red. The reels are drawn apart so the Rewind page can spin them. */
 export function CassetteBody({ size = 52 }: Props) {
   return (

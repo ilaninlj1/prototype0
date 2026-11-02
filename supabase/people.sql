@@ -29,7 +29,10 @@ create table people_settings (
   id boolean primary key default true check (id),
   min_shared int not null default 3,
   min_rated int not null default 15,
-  min_score real not null default 1.25
+  min_score real not null default 1.25,
+  max_rate real not null default 0.6,
+  catalog_size int not null default 10889,
+  waves_per_day int not null default 10
 );
 insert into people_settings default values;
 
@@ -125,65 +128,74 @@ begin
   return true;
 end $$;
 
--- People past the overlap floors, plus anyone you've swapped a wave with. Raw counts;
--- lib/people.ts turns them into the score. Nothing here for anyone who isn't a member.
+-- How likely u is to heart a song by chance, when judging a match with p_other. Measured on cards
+-- that aren't p_other's hearts, or a small group would measure the match against itself; with nothing
+-- to go on, the +1 and +5 start near one in five. Two things override it: someone hearting most cards
+-- isn't choosing, and a huge Library (or a script hearting every song) is expected to overlap.
+create function people_rate(u uuid, p_other uuid) returns real
+language sql security definer set search_path = public stable as $$
+  with st as (select * from people_settings limit 1),
+  overall as (select (count(*) filter (where s.hearted) + 1.0) / (count(*) + 5.0) as rate from people_swipes s where s.user_id = u),
+  apart as (
+    select (count(*) filter (where s.hearted) + 1.0) / (count(*) + 5.0) as rate from people_swipes s
+    where s.user_id = u and not exists (select 1 from twin_likes l where l.user_id = p_other and l.track_id = s.track_id)
+  ),
+  library as (select count(*)::real / greatest((select catalog_size from st), 1) as rate from twin_likes l where l.user_id = u)
+  select greatest(case when overall.rate >= st.max_rate then overall.rate else apart.rate end, library.rate)::real
+  from st, overall, apart, library
+$$;
+
+-- The one definition of a pair's overlap, for you and p_person. Chance takes the larger direction,
+-- so one generous swiper can't make a match; the +1s pull small samples toward "unknown". Skips never count.
+create function people_overlap(p_person uuid) returns table (
+  shared_tracks bigint[], both_rated int, they_hearted_i_rated int, i_hearted_they_rated int, expected real, score real, in_tune boolean
+)
+language sql security definer set search_path = public stable as $$
+  with verdicts as (
+    select l.user_id, l.track_id, true as hearted from twin_likes l where l.user_id in (auth.uid(), p_person)
+    union all
+    select s.user_id, s.track_id, false from people_swipes s
+    where s.user_id in (auth.uid(), p_person)
+      and not exists (select 1 from twin_likes l where l.user_id = s.user_id and l.track_id = s.track_id)
+  ),
+  o as (
+    select count(*)::int as both_rated,
+      count(*) filter (where t.hearted)::int as they_hearted_i_rated,
+      count(*) filter (where m.hearted)::int as i_hearted_they_rated,
+      coalesce(array_agg(t.track_id) filter (where t.hearted and m.hearted), '{}') as shared_tracks
+    from verdicts t join verdicts m on m.track_id = t.track_id and m.user_id = auth.uid()
+    where t.user_id = p_person
+  ),
+  e as (
+    select greatest(o.they_hearted_i_rated * people_rate(auth.uid(), p_person), o.i_hearted_they_rated * people_rate(p_person, auth.uid()))::real as expected from o
+  ),
+  sc as (select ((coalesce(array_length(o.shared_tracks, 1), 0) + 1.0) / (e.expected + 1.0))::real as score from o, e)
+  select o.shared_tracks, o.both_rated, o.they_hearted_i_rated, o.i_hearted_they_rated, e.expected, sc.score,
+    coalesce(array_length(o.shared_tracks, 1), 0) >= st.min_shared and o.both_rated >= st.min_rated and sc.score >= st.min_score
+  from o, e, sc, (select * from people_settings limit 1) st
+$$;
+
+-- Who you're in tune with, plus anyone you've swapped a wave with. The server decides who that is;
+-- the phone only ranks them and words it. Nothing here for anyone who isn't a member.
 create function my_people() returns table (
-  person uuid, name text, mode text, shared_tracks bigint[], both_rated int,
-  they_hearted_i_rated int, i_hearted_they_rated int, my_hearts int, my_cards int, their_hearts int, their_cards int,
-  i_waved boolean, they_waved boolean, print jsonb, min_score real
+  person uuid, name text, mode text, shared_tracks bigint[], both_rated int, expected real,
+  i_waved boolean, they_waved boolean, print jsonb
 )
 language sql security definer set search_path = public stable as $$
   with me as (select user_id, intent from twin_profiles where user_id = auth.uid() and people_member(auth.uid())),
   others as (
     select p.user_id, p.name, p.print, people_mode(me.intent, p.intent) as mode from twin_profiles p, me
     where p.user_id <> me.user_id and people_member(p.user_id) and not twins_blocked(me.user_id, p.user_id)
-  ),
-  everyone as (select user_id from others union select user_id from me),
-  -- A current heart wins; a swipe with no heart behind it (a pass, or a heart taken off) is a pass.
-  verdicts as (
-    select l.user_id, l.track_id, true as hearted from twin_likes l where l.user_id in (select user_id from everyone)
-    union all
-    select s.user_id, s.track_id, false from people_swipes s
-    where s.user_id in (select user_id from everyone)
-      and not exists (select 1 from twin_likes l where l.user_id = s.user_id and l.track_id = s.track_id)
-  ),
-  overlap as (
-    select t.user_id,
-      count(*)::int as both_rated,
-      count(*) filter (where t.hearted)::int as they_hearted_i_rated,
-      count(*) filter (where m.hearted)::int as i_hearted_they_rated,
-      coalesce(array_agg(t.track_id) filter (where t.hearted and m.hearted), '{}') as shared_tracks
-    from verdicts t join verdicts m on m.track_id = t.track_id and m.user_id = auth.uid()
-    where t.user_id <> auth.uid()
-    group by t.user_id
-  ),
-  cards as (
-    select s.user_id, count(*)::int as cards, count(*) filter (where s.hearted)::int as hearts
-    from people_swipes s where s.user_id in (select user_id from everyone)
-    group by s.user_id
-  ),
-  waves as (
-    select o.user_id,
-      exists (select 1 from twin_waves w where w.from_user = auth.uid() and w.to_user = o.user_id) as i_waved,
-      exists (select 1 from twin_waves w where w.from_user = o.user_id and w.to_user = auth.uid()) as they_waved
-    from others o
   )
-  select o.user_id, o.name, coalesce(o.mode, 'friends'), coalesce(v.shared_tracks, '{}'), coalesce(v.both_rated, 0),
-    coalesce(v.they_hearted_i_rated, 0), coalesce(v.i_hearted_they_rated, 0),
-    coalesce(mine.hearts, 0), coalesce(mine.cards, 0), coalesce(theirs.hearts, 0), coalesce(theirs.cards, 0),
-    w.i_waved, w.they_waved, o.print, st.min_score
+  select o.user_id, o.name, coalesce(o.mode, 'friends'), v.shared_tracks, v.both_rated, v.expected, w.i_waved, w.they_waved, o.print
   from others o
-  cross join (select * from people_settings limit 1) st
-  join waves w on w.user_id = o.user_id
-  left join overlap v on v.user_id = o.user_id
-  left join cards mine on mine.user_id = auth.uid()
-  left join cards theirs on theirs.user_id = o.user_id
-  where w.i_waved or w.they_waved or (
-    o.mode is not null
-    and coalesce(array_length(v.shared_tracks, 1), 0) >= st.min_shared
-    and coalesce(v.both_rated, 0) >= st.min_rated
-  )
-  order by coalesce(array_length(v.shared_tracks, 1), 0) desc
+  cross join lateral people_overlap(o.user_id) v
+  cross join lateral (select
+      exists (select 1 from twin_waves x where x.from_user = auth.uid() and x.to_user = o.user_id) as i_waved,
+      exists (select 1 from twin_waves x where x.from_user = o.user_id and x.to_user = auth.uid()) as they_waved
+  ) w
+  where w.i_waved or w.they_waved or (o.mode is not null and v.in_tune)
+  order by v.score desc
   limit 20
 $$;
 
@@ -191,7 +203,11 @@ $$;
 create function person_songs(p_person uuid) returns table (track_id bigint, shared boolean)
 language sql security definer set search_path = public stable as $$
   with allowed as (
-    select people_member(auth.uid()) and people_member(p_person) and not twins_blocked(auth.uid(), p_person) as yes
+    select people_member(auth.uid()) and people_member(p_person) and not twins_blocked(auth.uid(), p_person)
+      and (
+        (select in_tune from people_overlap(p_person))
+        or exists (select 1 from twin_waves where (from_user = auth.uid() and to_user = p_person) or (from_user = p_person and to_user = auth.uid()))
+      ) as yes
   ),
   mutual as (
     select exists (select 1 from twin_waves where from_user = auth.uid() and to_user = p_person)
@@ -238,16 +254,17 @@ begin
   return true;
 end $$;
 
--- A wave needs both people in People, no block, and a real overlap (or their wave to answer).
+-- A wave needs both people in People, no block, and being in tune (or their wave to answer). Ten a day.
 create function people_can_wave(p_to uuid) returns boolean
 language sql security definer set search_path = public stable as $$
   select people_member(auth.uid()) and people_member(p_to) and auth.uid() <> p_to
     and not twins_blocked(auth.uid(), p_to)
     and people_mode((select intent from twin_profiles where user_id = auth.uid()), (select intent from twin_profiles where user_id = p_to)) is not null
+    and (select count(*) from twin_waves where from_user = auth.uid() and created_at > now() - interval '1 day')
+      < (select waves_per_day from people_settings limit 1)
     and (
       exists (select 1 from twin_waves where from_user = p_to and to_user = auth.uid())
-      or (select count(*) from twin_likes t join twin_likes m on m.track_id = t.track_id and m.user_id = auth.uid() where t.user_id = p_to)
-        >= (select min_shared from people_settings limit 1)
+      or (select in_tune from people_overlap(p_to))
     )
 $$;
 drop policy adult_waves on twin_waves;
@@ -325,7 +342,7 @@ begin
   return true;
 end $$;
 
-revoke execute on function people_mode(text, text), people_member(uuid), join_people(), people_deck(int),
+revoke execute on function people_mode(text, text), people_member(uuid), people_rate(uuid, uuid), people_overlap(uuid), join_people(), people_deck(int),
   people_swipe(bigint, boolean, text), my_people(), person_songs(uuid), people_progress(),
   people_log_shown(uuid, int, int, real), people_can_wave(uuid) from public, anon;
 grant execute on function join_people(), people_deck(int), people_swipe(bigint, boolean, text), my_people(),

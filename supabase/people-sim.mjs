@@ -162,7 +162,7 @@ const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 }
 
 // ---------- in tune ----------
-async function matched(db, a, b, { shared = 4, passes = 11 } = {}) {
+async function matched(db, a, b, { shared = 8, passes = 12 } = {}) {
   const hearts = range(1, shared);
   const rest = range(100, 99 + passes);
   await heartOnHome(db, b, [...hearts, ...rest]);
@@ -175,13 +175,13 @@ async function matched(db, a, b, { shared = 4, passes = 11 } = {}) {
   await join_(db, u[1], { intent: 'either', name: 'Bo' });
   await matched(db, u[0], u[1], { shared: 2, passes: 13 });
   check('2 shared hearts is under the floor', (await people(db, u[0])).length === 0);
+  await db.exec('update people_settings set min_score = 0.1');
   await swipe(db, u[0], 100, true);
   let r = (await people(db, u[0]))[0];
   check('3 shared and 15 rated is past it', r?.person === u[1], JSON.stringify(r));
-  check('the counts are right', r?.both_rated === 15 && r?.they_hearted_i_rated === 15 && r?.i_hearted_they_rated === 3 && r?.my_cards === 15 && r?.my_hearts === 3, JSON.stringify(r));
+  check('the counts are right', r?.both_rated === 15 && r?.shared_tracks?.length === 3 && r?.expected > 0, JSON.stringify(r));
   check('shared tracks are listed', r?.shared_tracks?.length === 3);
   check('dating + either reads dating', r?.mode === 'dating');
-  check('the bar comes through', Math.abs(r?.min_score - 1.25) < 0.001);
   const back = (await people(db, u[1]))[0];
   check('it\'s symmetric: they see you too', back?.person === u[0] && back?.mode === 'dating' && back?.shared_tracks?.length === 3, JSON.stringify(back));
   // Taking a heart off makes it a pass, and can drop you under the floor.
@@ -189,6 +189,42 @@ async function matched(db, a, b, { shared = 4, passes = 11 } = {}) {
   check('a heart taken off stops counting', (await people(db, u[0])).length === 0);
   await db.exec('update people_settings set min_shared = 2');
   check('settings tune the floor with no new build', (await people(db, u[0])).length === 1);
+}
+
+// ---------- chance: a match has to beat it, on the server ----------
+{
+  const { db, u } = await freshDb();
+  await db.exec('update people_settings set catalog_size = 100');
+  await join_(db, u[0], { name: 'Honest' });
+  await join_(db, u[1], { name: 'Target' });
+  await join_(db, u[2], { name: 'Script' });
+  await join_(db, u[3], { name: 'Yes' });
+  await heartOnHome(db, u[1], range(1, 20));
+  // Hearting every song directly, with no swipes at all, can't beat chance: the Library's size sets it.
+  await heartOnHome(db, u[2], range(1, 100));
+  check('hearting the whole catalog is not a match', (await people(db, u[2])).length === 0);
+  check('and doesn\'t list their names to the script', !(await people(db, u[2])).some((p) => p.person === u[1]));
+  check('and can\'t wave', await fails(() => as(db, u[2], 'insert into twin_waves (to_user) values ($1)', [u[1]])));
+  check('and can\'t read songs', (await as(db, u[2], 'select * from person_songs($1)', [u[1]])).length === 0);
+  // Saying yes to every card sets your rate near 1.
+  for (const t of range(1, 20)) await swipe(db, u[3], t, true);
+  check('hearting every card is not a match', (await people(db, u[3])).length === 0);
+  // Picky, and hearts land together: that's a match.
+  for (const t of range(1, 8)) await swipe(db, u[0], t, true);
+  for (const t of range(9, 20)) await swipe(db, u[0], t, false);
+  await db.exec('update people_settings set catalog_size = 10889');
+  const m = await people(db, u[0]);
+  check('a picky person who agrees is a match', m.some((p) => p.person === u[1]), JSON.stringify(m.map((p) => p.name)));
+}
+
+// ---------- the wave cap ----------
+{
+  const { db, u } = await freshDb();
+  await join_(db, u[0]);
+  await join_(db, u[1]);
+  await matched(db, u[0], u[1]);
+  await db.exec('update people_settings set waves_per_day = 0');
+  check('over the daily cap, no wave', await fails(() => as(db, u[0], 'insert into twin_waves (to_user) values ($1)', [u[1]])));
 }
 
 // ---------- waves, handles, songs ----------
@@ -204,7 +240,7 @@ async function matched(db, a, b, { shared = 4, passes = 11 } = {}) {
   await matched(db, u[0], u[1]);
   await heartOnHome(db, u[1], [999]);
   const songs = (user, who) => as(db, user, 'select * from person_songs($1)', [who]);
-  check('before a wave: only what you share', (await songs(u[0], u[1])).every((s) => s.shared) && (await songs(u[0], u[1])).length === 4);
+  check('before a wave: only what you share', (await songs(u[0], u[1])).every((s) => s.shared) && (await songs(u[0], u[1])).length === 8);
   const handle = (user, who) => as(db, user, 'select * from twin_handle($1)', [who]);
   check('no handle before anyone waves', (await handle(u[0], u[1])).length === 0);
   await wave(u[0], u[1]);
@@ -273,7 +309,7 @@ async function matched(db, a, b, { shared = 4, passes = 11 } = {}) {
   await as(db, u[0], 'select join_people()');
   await join_(db, u[1], { name: 'Bo' });
   await matched(db, u[0], u[1]);
-  const log = (score) => as(db, u[0], 'select people_log_shown($1, 4, 15, $2) as r', [u[1], score]);
+  const log = (score) => as(db, u[0], 'select people_log_shown($1, 8, 20, $2) as r', [u[1], score]);
   check('logging works', (await log(1.5))[0].r === true);
   await log(2);
   await log(1e9);
@@ -281,11 +317,11 @@ async function matched(db, a, b, { shared = 4, passes = 11 } = {}) {
   check('first score stays, latest updates, and it\'s clamped', Math.abs(shown.first_score - 1.5) < 0.01 && shown.score === 1000, JSON.stringify(shown));
   check('a stranger can\'t log', (await as(db, u[2], 'select people_log_shown($1, 1, 1, 1) as r', [u[1]]))[0].r === false);
   const p = (await as(db, u[0], 'select * from people_progress()'))[0];
-  check('progress counts', p.close === 1 && p.judged === 15 && p.members === 1, JSON.stringify(p));
+  check('progress counts', p.close === 1 && p.judged === 20 && p.members === 1, JSON.stringify(p));
   // A fresh account on the same phone takes everything back.
   const fresh = u[5];
   check('a new account claims the old one', (await as(db, fresh, 'select claim_twin_profile($1) as r', [device]))[0].r === true);
-  check('its swipes come along', (await db.query('select count(*)::int as n from people_swipes where user_id = $1', [fresh])).rows[0].n === 15);
+  check('its swipes come along', (await db.query('select count(*)::int as n from people_swipes where user_id = $1', [fresh])).rows[0].n === 20);
   check('the old id is gone from people_shown', (await db.query('select count(*)::int as n from people_shown where user_id = $1', [u[0]])).rows[0].n === 0);
   check('it still sees the match', (await people(db, fresh)).length === 1);
   await as(db, fresh, 'select leave_twins()');

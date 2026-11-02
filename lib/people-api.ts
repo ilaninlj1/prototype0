@@ -2,12 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { hasStoredSession } from './auth';
 import { resolveTrackById } from './bottles-api';
-import { DEFAULT_REGION, type DiscoveryTrack } from './discovery';
-import { loadLikedTracks } from './discovery-storage';
+import type { DiscoveryTrack } from './discovery';
+import { loadLikedTracks, loadRegion } from './discovery-storage';
 import { normalizeArtist } from './human-check';
 import { hideFromDiscovery } from './human-check-api';
 import {
-  isInTune,
   matchScore,
   parseDeck,
   parsePeople,
@@ -131,9 +130,10 @@ export async function fetchDeck(lim: number, skip: Set<number>): Promise<DeckCar
   const r = await rpc('people_deck', { lim });
   if (!r.ok) return null;
   const songs = parseDeck(r.data).filter((s) => !skip.has(s.trackId));
+  const region = await loadRegion();
   const cards = await Promise.all(
     songs.map(async (s): Promise<DeckCard | null> => {
-      const track = await resolveTrackById(s.trackId, DEFAULT_REGION);
+      const track = await resolveTrackById(s.trackId, region);
       return track?.previewUrl && !hideFromDiscovery(track.artistName) ? { track: { ...track, via: undefined }, heartedBy: s.heartedBy } : null;
     })
   );
@@ -158,11 +158,7 @@ export async function fetchPeople(): Promise<Person[] | null> {
   const r = await rpc('my_people');
   if (!r.ok) return null;
   const listeners = new Map((await loadLikedTracks()).map((t) => [t.id, t.artistListeners]));
-  const list = sortPeople(
-    parsePeople(r.data)
-      .map((row) => ({ row, score: matchScore(row, (id) => listeners.get(id)) }))
-      .filter((p) => isInTune(p.row, p.score))
-  );
+  const list = sortPeople(parsePeople(r.data).map((row) => ({ row, score: matchScore(row, (id) => listeners.get(id)) })));
   people.clear();
   list.forEach((p) => {
     people.set(p.row.person, p);

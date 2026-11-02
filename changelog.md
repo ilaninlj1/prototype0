@@ -6,6 +6,15 @@ staleness.
 
 Add new entries at the top, newest first.
 
+## [2026-11-02] People: song-first matching replaces Taste Twins
+Added People between Play and Library: a neutral age screen, consent, first name, intent and optional handle,
+then a tap-to-listen blind deck using Home’s card. Hearts reveal the song and its counts; passes move on without
+waiting for the network. In-tune prints open a person page with shared songs and waves; mutual waves reveal a
+handle and other hearted songs, with selectable Discord usernames. Settings edit membership or leave while
+keeping the local Library. Added wave news on the tab, block/report including “Might be under 18”, and region-aware
+deck resolution. Removed the Twins routes and Play card, preserving Library sync and Home behavior.
+Requires `supabase/people.sql` to be run in the dashboard; no server changes were applied here.
+
 ## [2026-10-28] Bottles: blind saves float to strangers
 A save on Home of a song you found blind and heard for 10 s or more floats to a stranger as a bottle. At most one card
 in five on someone else's Home is a bottle, blind like any card; the reveal says "Washed up from Lisbon" where the

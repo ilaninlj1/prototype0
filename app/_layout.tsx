@@ -137,8 +137,7 @@ export default function RootLayout() {
             <Stack.Screen name="spotify-auth" options={{ presentation: 'transparentModal', animation: 'none', headerShown: false }} />
             <Stack.Screen name="spotify-callback" options={{ headerShown: false }} />
             <Stack.Screen name="dj-picks" options={{ presentation: 'fullScreenModal', headerShown: false }} />
-            <Stack.Screen name="twins" options={{ headerShown: false }} />
-            <Stack.Screen name="twin" options={{ headerShown: false }} />
+            <Stack.Screen name="person" options={{ headerShown: false }} />
             <Stack.Screen name="songs" options={{ headerShown: false }} />
             <Stack.Screen name="comments" options={{ presentation: 'modal', headerShown: false }} />
             <Stack.Screen name="pack-send" options={{ presentation: 'fullScreenModal', headerShown: false }} />
