@@ -50,12 +50,13 @@ export function rankTwins(rows: TwinRow[], limit = 5): Twin[] {
     .slice(0, limit);
 }
 
-export type Platform = 'instagram' | 'snapchat' | 'tiktok';
+export type Platform = 'instagram' | 'snapchat' | 'tiktok' | 'discord';
 
 const PROFILE_PREFIX: Record<Platform, RegExp> = {
   instagram: /^(https?:\/\/)?(www\.)?instagram\.com\//i,
   snapchat: /^(https?:\/\/)?(www\.)?snapchat\.com\/add\//i,
   tiktok: /^(https?:\/\/)?(www\.)?tiktok\.com\/@?/i,
+  discord: /^(https?:\/\/)?(www\.)?discord\.(com|gg)\/(users\/)?/i,
 };
 
 /** The bare username, from "@maya", "maya" or a profile link; null if it can't be a username. */
@@ -64,7 +65,9 @@ export function cleanHandle(raw: string, platform: Platform): string | null {
   return /^[A-Za-z0-9._-]{1,30}$/.test(h) ? h : null;
 }
 
-export function handleUrl(platform: Platform, handle: string): string {
+/** Null for Discord: a username has no public link, so the screen shows it to copy instead. */
+export function handleUrl(platform: Platform, handle: string): string | null {
+  if (platform === 'discord') return null;
   if (platform === 'snapchat') return `https://snapchat.com/add/${handle}`;
   if (platform === 'tiktok') return `https://tiktok.com/@${handle}`;
   return `https://instagram.com/${handle}`;
