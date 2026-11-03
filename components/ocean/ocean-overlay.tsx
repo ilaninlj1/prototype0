@@ -246,14 +246,20 @@ export function OceanOverlay({
       axis.set(0);
       touch.set({ x: e.x, y: e.y, r: 90 });
     })
-    .onStart((e) => {
-      axis.set(Math.abs(e.translationX) > Math.abs(e.translationY) ? 1 : 2);
+    .onStart(() => {
       startX.set(nearestPlaceIndex(posX.get()));
       startY.set(nearestPlaceIndex(posY.get()));
       rising.set(false);
     })
     .onUpdate((e) => {
       touch.set({ x: e.x, y: e.y, r: 90 });
+      // Sideways or up and down is decided by the first real movement: at the start both can still read zero.
+      if (axis.get() === 0) {
+        const ax = Math.abs(e.translationX);
+        const ay = Math.abs(e.translationY);
+        if (ax < 4 && ay < 4) return;
+        axis.set(ax > ay ? 1 : 2);
+      }
       if (axis.get() === 1) {
         const from = startX.get();
         const next = from - e.translationX / Math.max(1, width);
@@ -275,6 +281,7 @@ export function OceanOverlay({
       posY.set(Math.max(Math.max(0, from - 1), Math.min(Math.min(3, from + 1), next)));
     })
     .onEnd((e) => {
+      if (axis.get() === 0) return;
       if (axis.get() === 1) {
         const moved = Math.abs(e.translationX) > width * 0.18 || Math.abs(e.velocityX) > 500;
         const target = moved ? waterDragResult(startX.get(), Math.sign(e.translationX)) : startX.get();
