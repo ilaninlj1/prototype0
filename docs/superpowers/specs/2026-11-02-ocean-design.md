@@ -8,6 +8,26 @@ Playable references, for feel and not for code (each is one web canvas with made
 - `docs/superpowers/specs/2026-11-02-ocean-mock.html`: the dive, the waters, the creatures, the depths.
 - `docs/superpowers/specs/2026-11-02-ocean-mock-personal.html`: day one against two different people, by day and night, with a creature explaining itself when tapped.
 
+## Biomes, depth and the graph (2026-11-03, the user's second look)
+
+The user: no wall or floor on the side; each biome gets life meant just for it, the way kelp is; different sliding parts at different depths; and a graph of where each fish has moved. They picked both graph lines and said start building. The specifics below are Claude's calls unless marked.
+
+**Biomes.** Nothing structural is shared. Sand only at the bottom of Buried (the user's).
+- Sunny reef: coral towers rising from the floor toward the light, with anemones. Songs you heard become coral on the towers. Clownfish nest in the anemones.
+- Kelp forest: kelp from floor to surface. Songs you heard become new stems in their color, so the forest thickens as you listen. Creatures weave between stems and pass behind the near ones.
+- Open blue: nothing solid, on purpose. Currents flow across as long ribbons; seaweed rafts drift. Songs you heard become rafts. Creatures ride the current together.
+- Midnight: glowing tendrils hang from above; vents smoke and whale bones lie on the floor. Songs you heard become glowing lanterns on tendrils, or tube worms on the floor. Creatures flash to find each other.
+
+**Depth while sliding.** Layers move at their own speed: faint far shapes slowest, then structures, then creatures, then blurry-looking things close by, fastest. And the floor runs like a real coast: the reef's is highest and Midnight's is a trench.
+
+**Fish that climb (graph line one).** Depth means how many people know a song, so across is sound and down is popularity. Every fourfold rise in the artist's listeners since you saved the song is one level up, so a fish can leave the level you found it in. It leaves a faint trail back to where you found it, and tapping it says "Found in Buried at 12K. Now 90K." Last.fm's count is per artist, so one artist's songs climb together. Songs with no listener count at save time don't climb. Most small artists barely move for months: expected, and it makes a climb a real moment.
+
+**Your path (graph line two).** A glowing line through the ocean of where you listened over time, from the swipe log, so it has data from day one.
+
+**The whole chart.** Pinching out, or a button, shows the entire ocean as one graph: every fish, every trail, your path, the waters and depths labeled. Tapping a fish explains it and tapping a place goes there. See an example shows a full one.
+
+**Dropped:** the reef wall, `restSpot` against it.
+
 ## Why
 
 The user finds Home's white empty and wants the app complete enough to show on a resume. They asked for an ocean under the water with fish, coral, sand, bubbles and sun glimmering, with swimming somewhere acting as a song filter. They liked all three first mocks and asked to make it "feel like an ecosystem". Then they said it's "supposed to present you, authenticity" and asked how to make each one personal, using logic.
