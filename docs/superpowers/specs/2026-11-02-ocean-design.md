@@ -1,5 +1,7 @@
 # The Ocean
 
+> **Revised 2026-11-03 after the user's first look on a phone.** Their decisions, which override anything below that disagrees: sand only at the bottom of Buried; no wild creatures, so an empty ocean is empty and See an example shows a grown one; creatures must not look alike or just swim; biomes must move smoothly. What that became: a reef wall runs down one side of each water, and coral grows on it; skips settle on the sea floor; every song gets its own body from its sound (`lib/ocean-anatomy.ts`) and eight kinds of creature instead of five (manta, eel and seahorse added); creatures wander and turn, do their own move now and then, dance when the playing song matches their tempo, glow when it matches their key, and swim with songs that sound alike; your newest find comes to greet you; biomes dissolve into each other with parallax, over one unbroken sea floor. Tapping a wild fish to filter went away with the wild fish.
+
 Home's blank white gets a living ocean underneath it. Swipe up from the water to go under. The ocean is a portrait of the person listening: everything in it comes from what they actually did. Where you swim decides what you swipe next.
 
 Playable references, for feel and not for code (each is one web canvas with made-up songs):
