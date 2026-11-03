@@ -147,7 +147,8 @@ export function towerRadius(i: number, world: number): number {
 export function anemoneSpots(row: number): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = [];
   TOWERS.forEach((t, i) => {
-    for (const y of [0.3, 0.62]) {
+    // Each tower at its own heights, or they line up in a grid.
+    for (const y of [0.24 + i * 0.09, 0.58 + i * 0.07]) {
       const world = row + y;
       if (towerRadius(i, world) <= 0.02) continue;
       const side = i === 1 ? -1 : 1;

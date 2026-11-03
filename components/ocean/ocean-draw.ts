@@ -377,8 +377,9 @@ function drawCreatures(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: numb
 function drawAnemone(c: SkCanvas, a: AnemoneData, t: number, lift: number) {
   'worklet';
   const b = Skia.PathBuilder.Make();
-  for (let i = 0; i < 13; i++) {
-    const spread = -2.5 + (i * 1.9) / 12 - 0.6;
+  // Tentacles all round the top, not a fan to one side.
+  for (let i = 0; i < 15; i++) {
+    const spread = -Math.PI + 0.25 + (i * (Math.PI - 0.5)) / 14;
     const sway = Math.sin(t * 1.2 + i * 0.7) * 0.22 * lift;
     const tipX = a.x + Math.cos(spread + sway) * a.size;
     const tipY = a.y + Math.sin(spread + sway) * a.size;
@@ -389,7 +390,7 @@ function drawAnemone(c: SkCanvas, a: AnemoneData, t: number, lift: number) {
   p.setAntiAlias(true);
   p.setStyle(PaintStyle.Stroke);
   p.setStrokeCap(StrokeCap.Round);
-  p.setStrokeWidth(a.size * 0.15);
+  p.setStrokeWidth(a.size * 0.13);
   p.setColor(a.color);
   c.drawPath(b.build(), p);
 }
@@ -573,8 +574,6 @@ function drawFar(c: SkCanvas, f: Frame, sceneY: number) {
     const y = sceneY - wrap(f.posY * h * 0.3, h);
     c.save();
     c.translate(dx * w * 0.12, y);
-    c.drawPicture(pic);
-    c.translate(0, h);
     c.drawPicture(pic);
     c.restore();
     c.restore();

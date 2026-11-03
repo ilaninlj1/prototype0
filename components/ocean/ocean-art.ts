@@ -159,7 +159,8 @@ export function anemonesFor(place: Place, width: number, height: number): Anemon
   if (place.water !== 'reef') return [];
   const row = DEPTHS.indexOf(place.depth);
   const k = width / 270;
-  return anemoneSpots(row).map((s) => ({ x: s.x * width, y: s.y * height, size: 15 * k, color: Skia.Color(toneAt('#f0d8de', 'reef', row)) }));
+  const tone = waterTone(place);
+  return anemoneSpots(row).map((s) => ({ x: s.x * width, y: s.y * height, size: 11 * k, color: Skia.Color(mixHex(toneAt('#f0d8de', 'reef', row), tone, 0.25)) }));
 }
 
 /** A clump of drifting seaweed, hanging its fronds under it. */
@@ -375,50 +376,41 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
   );
 }
 
-/** The far layer: faint shapes well behind everything, which barely move. Open blue has none, on purpose. */
+/** A tall soft shape that repeats exactly once per screen height, so sliding it down one screen looks the same. */
+function farColumn(x: number, half: number, sway: number, phase: number, height: number) {
+  const b = path();
+  const steps = 48;
+  const at = (i: number) => (i / steps) * height * 2;
+  const wobble = (y: number) => Math.sin((y / height) * TAU + phase) * sway;
+  b.moveTo(x - half + wobble(0), 0);
+  for (let i = 1; i <= steps; i++) b.lineTo(x - half + wobble(at(i)), at(i));
+  for (let i = steps; i >= 0; i--) b.lineTo(x + half + wobble(at(i)), at(i));
+  b.close();
+  return b.build();
+}
+
+/**
+ * The far layer: faint shapes well behind everything, which barely move. Two screens tall and drawn once, so nothing
+ * meets anything and no line can show. Open blue has none, on purpose.
+ */
 export function recordFar(water: Water, width: number, height: number): SkPicture | null {
   if (water === 'blue') return null;
   const k = width / 270;
   return createPicture(
     (c) => {
       const r = rng(water.length * 53);
-      const tone = fill(water === 'midnight' ? '#000000' : '#04283a', water === 'midnight' ? 0.28 : 0.1);
       if (water === 'reef') {
-        for (const fx of [0.3, 0.62, 1.02]) {
-          const b = path();
-          const half = (18 + r() * 14) * k;
-          b.moveTo(fx * width - half, -2);
-          b.cubicTo(fx * width - half * 1.2, height * 0.3, fx * width - half * 0.7, height * 0.7, fx * width - half, height + 2);
-          b.lineTo(fx * width + half, height + 2);
-          b.cubicTo(fx * width + half * 0.7, height * 0.7, fx * width + half * 1.2, height * 0.3, fx * width + half, -2);
-          b.close();
-          c.drawPath(b.build(), tone);
-        }
+        const tone = fill('#04283a', 0.08);
+        for (const fx of [0.3, 0.62, 1.02]) c.drawPath(farColumn(fx * width, (18 + r() * 14) * k, 9 * k, r() * TAU, height), tone);
       } else if (water === 'kelp') {
-        for (let i = 0; i < 12; i++) {
-          const x = r() * width * 1.1;
-          const b = path();
-          b.moveTo(x, -2);
-          b.cubicTo(x + 10 * k, height * 0.3, x - 10 * k, height * 0.7, x, height + 2);
-          c.drawPath(b.build(), line('#04283a', 2.2 * k, 0.12));
-        }
+        const tone = fill('#04283a', 0.12);
+        for (let i = 0; i < 12; i++) c.drawPath(farColumn(r() * width * 1.1, 1.2 * k, 8 * k, r() * TAU, height), tone);
       } else {
-        // The same width at top and bottom, so one screen's worth meets the next with no line across.
-        const soft = fill('#000000', 0.13);
-        for (let i = 0; i < 4; i++) {
-          const x = r() * width;
-          const half = (24 + r() * 16) * k;
-          const b = path();
-          b.moveTo(x - half, -2);
-          b.cubicTo(x - half * 0.6, height * 0.35, x - half * 1.2, height * 0.65, x - half, height + 2);
-          b.lineTo(x + half, height + 2);
-          b.cubicTo(x + half * 1.2, height * 0.65, x + half * 0.6, height * 0.35, x + half, -2);
-          b.close();
-          c.drawPath(b.build(), soft);
-        }
+        const tone = fill('#000000', 0.12);
+        for (let i = 0; i < 4; i++) c.drawPath(farColumn(r() * width, (24 + r() * 16) * k, 12 * k, r() * TAU, height), tone);
       }
     },
-    { width, height }
+    { width: width * 1.3, height: height * 2 }
   );
 }
 
