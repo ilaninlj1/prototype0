@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { flourish, restSpot, scatter, schoolOffset, stagePoses, swimPose, tempoMatches } from './ocean-motion.ts';
-import { seabedAt, wallAt } from './ocean-scene.ts';
+import { blink, currentDrift, flourish, homeAt, restSpot, scatter, schoolOffset, stagePoses, swimPose, tempoMatches } from './ocean-motion.ts';
+import { floorAt } from './ocean-scene.ts';
 
 const W = 390;
 const H = 844;
@@ -89,23 +89,47 @@ test('tempo matching: same, half and double within 4%, and nothing else', () => 
   assert.equal(tempoMatches(120, 0), false);
 });
 
-test('above the floor sleepers tuck against the wall, spread out and never in a pile', () => {
+test('above the floor sleepers hang spread out in the water, never in a pile', () => {
   const spots = Array.from({ length: 40 }, (_, i) => restSpot(i * 31 + 1, i, 40, 1, 1, W, H));
-  for (const s of spots) {
-    const edge = wallAt(1, 1 + s.y / H) * W;
-    assert.ok(s.x >= edge && s.x < edge + 30, `x ${s.x} edge ${edge}`);
-  }
-  assert.ok(Math.max(...spots.map((s) => s.y)) - Math.min(...spots.map((s) => s.y)) > H * 0.5);
-  assert.equal(new Set(spots.map((s) => Math.round(s.y))).size, 40);
+  assert.ok(Math.max(...spots.map((s) => s.x)) - Math.min(...spots.map((s) => s.x)) > W * 0.7);
+  for (const s of spots) assert.ok(s.y > H * 0.25 && s.y < H * 0.75);
+  assert.equal(new Set(spots.map((s) => Math.round(s.x))).size, 40);
 });
 
-test('on the floor they lie on the sand, across the screen', () => {
-  const spots = Array.from({ length: 12 }, (_, i) => restSpot(i * 31 + 1, i, 12, 2, 3, W, H));
-  for (const s of spots) {
-    const sand = H - seabedAt(s.x / W) * H;
-    assert.ok(s.y < sand && s.y > sand - 14, `${s.y} vs ${sand}`);
+test('on the floor they lie on the sand of their own biome', () => {
+  for (const col of [0, 3]) {
+    const spots = Array.from({ length: 12 }, (_, i) => restSpot(i * 31 + 1, i, 12, col, 3, W, H));
+    for (const s of spots) {
+      const sand = H - floorAt(col, s.x / W) * H;
+      assert.ok(s.y < sand && s.y > sand - 14, `${s.y} vs ${sand}`);
+    }
+    assert.ok(Math.max(...spots.map((s) => s.x)) - Math.min(...spots.map((s) => s.x)) > W * 0.5);
   }
-  assert.ok(Math.max(...spots.map((s) => s.x)) - Math.min(...spots.map((s) => s.x)) > W * 0.5);
+});
+
+test('a small reach keeps a creature close to home: clownfish stay by their anemone', () => {
+  const home = homeAt(0.5, 0.5);
+  let far = 0;
+  for (let t = 0; t < 300; t += 1) {
+    const p = swimPose({ ...fish, ...home, look: 'clown', reach: 0.25 }, t, W, H);
+    far = Math.max(far, Math.hypot(p.x - W * 0.5, p.y - H * 0.5));
+  }
+  assert.ok(far < W * 0.12, `${far}`);
+});
+
+test('everyone in Open blue rides the same current, and nobody elsewhere does', () => {
+  const m = { seed: 3, pace: 1, band: 0.5, x: 0.5, look: 'clown', awake: true, leader: -1, schoolIndex: 0, restI: 0, restN: 1 };
+  const blue = stagePoses([m], 2, 1, 40, W, H)[0];
+  const kelp = stagePoses([m], 1, 1, 40, W, H)[0];
+  const [dx] = currentDrift(kelp.x, 40, W);
+  assert.ok(Math.abs(blue.x - kelp.x - dx) < 1e-6);
+});
+
+test('in Midnight a creature flashes now and then, and partners flash together', () => {
+  let lit = 0;
+  for (let t = 0; t < 100; t += 0.05) if (blink(9, t) > 0) lit += 1;
+  assert.ok(lit > 0 && lit < 2000 * 0.3);
+  assert.equal(blink(9, 12.3), blink(9, 12.3));
 });
 
 test('the drawing and the tap test get the same answer, including sleepers and schools', () => {

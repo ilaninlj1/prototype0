@@ -13,7 +13,8 @@ const sound: SoundFeatures = { tempo: 110, key: 2, mode: 1, energy: 0.6, danceab
 function creature(i: number, over: Partial<Creature> = {}): Creature {
   return {
     trackId: i, artist: `a${i}`, kind: 'clown' as Kind, place: here, color: '#e8a33d', accent: '#3d8fe8', heard: 1, hurried: false, size: 1, vivid: 1,
-    likedAt: 1_000_000 - i, foundHour: 13, rare: false, first: false, school: null, seed: i * 17 + 3, anatomy: anatomyOf(null), sound: null, ...over,
+    likedAt: 1_000_000 - i, foundHour: 13, rare: false, first: false, school: null, seed: i * 17 + 3, anatomy: anatomyOf(null), sound: null,
+    foundRow: 0, climb: 0, foundListeners: null, nowListeners: null, ...over,
   };
 }
 function lifeWith(creatures: Creature[]): OceanLife {
@@ -78,4 +79,17 @@ test('a faster song has a quicker creature, within limits', () => {
   const m = castFor(here, lifeWith([creature(1, { sound: { ...sound, tempo: 170 } }), creature(2, { sound: { ...sound, tempo: 60 } })]), 13).members;
   assert.ok(m[0].pace > m[1].pace);
   assert.ok(m[0].pace <= 1.4 && m[1].pace >= 0.7);
+});
+
+test('on the reef a clownfish stays near an anemone; elsewhere and other kinds roam', () => {
+  const clown = castFor(here, lifeWith([creature(1, { kind: 'clown' })]), 13).members[0];
+  assert.ok(clown.reach < 0.5);
+  const darter = castFor(here, lifeWith([creature(1, { kind: 'darter' })]), 13).members[0];
+  assert.equal(darter.reach, 1);
+});
+
+test('a fish partway up a level swims nearer its top', () => {
+  const still = castFor(here, lifeWith([creature(1, { kind: 'darter' })]), 13).members[0];
+  const up = castFor(here, lifeWith([creature(1, { kind: 'darter', climb: 0.5 })]), 13).members[0];
+  assert.ok(up.band < still.band);
 });

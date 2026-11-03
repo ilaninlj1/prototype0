@@ -50,7 +50,8 @@ import { queueBottleNow, seaPosition } from '@/lib/bottle-countdown';
 import { revealLine } from '@/lib/bottle-journey';
 import type { FeedMode } from '@/lib/bottles';
 import { allDecks, deckCounts, deckLabel, nearestInDeck, oceanDeckLeft, pickDeck, type Deck } from '@/lib/decks';
-import { placeKey, placeLabel, type Place } from '@/lib/ocean-map';
+import { listeningPath } from '@/lib/ocean-chart';
+import { placeKey, placeLabel, waterOf, type Place } from '@/lib/ocean-map';
 import { dayMixAt, surfaceWater } from '@/lib/ocean-scene';
 import { CALM_RHYTHM, restingSea, type SeaState } from '@/lib/sea-beat';
 import { ThemedText } from '@/components/themed-text';
@@ -58,7 +59,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useHomeChrome } from '@/hooks/use-home-chrome';
 import { useMyBottles } from '@/hooks/use-my-bottles';
-import { oceanPlaceOf, useOceanData } from '@/hooks/use-ocean';
+import { oceanPlaceOf, oceanPlaceOfEntry, useOceanData } from '@/hooks/use-ocean';
 import { cluesLine } from '@/lib/home-copy';
 import { pickStatus, statusText, type StatusItem } from '@/lib/status-line';
 import { addToPiece, forkPiece, saveOnPiece, undoOnPiece, useArt } from '@/hooks/use-art';
@@ -1500,6 +1501,14 @@ export default function HomeScreen() {
     onPortrait: openPortrait,
     onOpenList: setOpenList,
     onExample: startExample,
+    listeningPath: () => {
+      const example = oceanExample?.input;
+      if (!example) return listeningPath(swipeHistory, oceanPlaceOfEntry);
+      return listeningPath(example.history, (e) => {
+        const sound = example.soundOf(e.trackId);
+        return sound ? { water: waterOf(sound), depth: example.depthOf(e) } : null;
+      });
+    },
   };
   function startExample() {
     const input = exampleInput(Date.now());

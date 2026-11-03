@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { allPlaces, DEPTHS, WATERS } from './ocean-map.ts';
-import { dayMixAt, gradientAt, hexToRgb, seabedAt, surfaceWater, wallAt, waterStops } from './ocean-scene.ts';
+import { TOWERS, anemoneSpots, dayMixAt, floorAt, floorLift, gradientAt, hexToRgb, seabedAt, surfaceWater, towerRadius, waterStops } from './ocean-scene.ts';
 
 const hue = (hex: string) => {
   const [r, g, b] = hexToRgb(hex).map((v) => v / 255);
@@ -75,13 +75,27 @@ test('the sea floor is one unbroken shape: it repeats across biomes with no jump
   }
 });
 
-test('the reef wall runs on unbroken as you sink, and stays at the side', () => {
-  for (let col = 0; col < 4; col++) {
-    for (let d = 0; d < 4; d += 0.002) {
-      const x = wallAt(col, d);
-      assert.ok(x > 0.03 && x < 0.21, `${col} ${d}: ${x}`);
-      assert.ok(Math.abs(x - wallAt(col, d + 0.002)) < 0.003, `a jump at ${d}`);
-    }
+test('the floor runs like a coast: shallow at the reef, a trench at Midnight, with no steps between', () => {
+  assert.ok(floorAt(0, 0.3) > floorAt(1, 0.3));
+  assert.ok(floorAt(1, 0.3) > floorAt(2, 0.3));
+  assert.ok(floorAt(2, 0.3) > floorAt(3, 0.3));
+  for (let c = 0; c < 3; c += 0.01) assert.ok(Math.abs(floorLift(c) - floorLift(c + 0.01)) < 0.002);
+  for (let x = 0; x < 1; x += 0.01) assert.ok(floorAt(3, x) >= 0.03, 'never under the screen');
+  assert.ok(floorAt(0, 0.25) < 0.5, 'the shallowest floor still leaves most of the screen for water');
+});
+
+test('reef towers grow from below: nothing above their tips, wider going down, no jumps', () => {
+  for (let i = 0; i < TOWERS.length; i++) {
+    assert.equal(towerRadius(i, TOWERS[i].tip - 0.1), 0);
+    assert.ok(towerRadius(i, 3.8) > towerRadius(i, TOWERS[i].tip + 0.1));
+    for (let d = TOWERS[i].tip + 0.05; d < 4; d += 0.002) assert.ok(Math.abs(towerRadius(i, d) - towerRadius(i, d + 0.002)) < 0.003);
   }
-  assert.notEqual(wallAt(0, 1), wallAt(1, 1));
+});
+
+test('anemones sit on the towers, inside the screen, and shallow levels have them too', () => {
+  for (let row = 0; row < 4; row++) {
+    const spots = anemoneSpots(row);
+    assert.ok(spots.length >= 1, `row ${row}`);
+    for (const s of spots) assert.ok(s.x > 0 && s.x < 1 && s.y > 0 && s.y < 1);
+  }
 });

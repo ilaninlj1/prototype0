@@ -51,7 +51,7 @@ export function exampleInput(now: number): OceanInput {
     if (i < 40) liked.push({
       id, trackName: title, artistId: entry.artistId, artistName: ARTISTS[artist],
       artworkUrl100: '', primaryGenreName: entry.genre, previewUrl: '', trackViewUrl: '', collectionName: null,
-      likedAt: at, foundBlind: true,
+      likedAt: at, foundBlind: true, artistListeners: 4000 + artist * 3000,
     });
   }
   history.sort((a, b) => a.timestamp - b.timestamp || a.trackId - b.trackId);
@@ -62,6 +62,11 @@ export function exampleInput(now: number): OceanInput {
     colorOf: (id) => {
       const sound = sounds.get(id);
       return sound ? hslToHex(keyHue(sound.key ?? 0, sound.mode), 0.62, 0.64) : '#b8c9cd';
+    },
+    // A few artists in this made-up history took off, so its graph has climbers.
+    listenersNowOf: (artist) => {
+      const i = ARTISTS.indexOf(artist);
+      return i % 3 === 0 ? (4000 + i * 3000) * (6 + i * 3) : 4000 + i * 3000;
     },
     accentOf: (id) => {
       const sound = sounds.get(id);

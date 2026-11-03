@@ -4,6 +4,8 @@
 import type { Kind, Place } from './ocean-map.ts';
 import { placeKey } from './ocean-map.ts';
 import { isAwake, type Creature, type OceanLife } from './ocean-person.ts';
+import { homeAt } from './ocean-motion.ts';
+import { anemoneSpots } from './ocean-scene.ts';
 import { soundDistance } from './sound-neighbors.ts';
 
 export type CastMember = {
@@ -15,6 +17,8 @@ export type CastMember = {
   pace: number;
   band: number;
   x: number;
+  /** How far it strays from home: a clownfish stays by its anemone. */
+  reach: number;
   scale: number;
   awake: boolean;
   /** The one it swims with: the first of its artist's songs here, or the song that sounds most like it; -1 if none. */
@@ -43,16 +47,22 @@ export function castFor(place: Place, life: OceanLife | null, hour: number): { m
   const kept = here.slice(0, MAX_ANIMATED);
   const hiddenCount = here.length - kept.length;
 
+  // On the reef, clownfish each nest in an anemone; there's room for all of them to share.
+  const nests = place.water === 'reef' ? anemoneSpots(['popular', 'deepcuts', 'gems', 'buried'].indexOf(place.depth)) : [];
   const members: CastMember[] = kept.map((c) => {
     const tempo = c.sound?.tempo ?? 100;
+    const nest = c.kind === 'clown' && nests.length ? homeAt(nests[c.seed % nests.length].x, nests[c.seed % nests.length].y) : null;
+    // A fish that climbed part of a level swims that much nearer the top of it.
+    const rise = c.climb - Math.floor(c.climb);
     return {
       key: `song:${c.trackId}`,
       look: c.kind,
       creature: c,
       seed: c.seed,
       pace: Math.max(0.7, Math.min(1.4, tempo / 110)),
-      band: unit(c.seed, 6),
-      x: unit(c.seed, 7),
+      band: nest?.band ?? unit(c.seed, 6) * (1 - rise),
+      x: nest?.x ?? unit(c.seed, 7),
+      reach: nest ? 0.25 : place.water === 'kelp' ? 0.8 : 1,
       scale: c.size,
       awake: isAwake(c, hour),
       leader: -1,

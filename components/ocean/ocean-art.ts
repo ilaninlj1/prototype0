@@ -1,5 +1,5 @@
-// The ocean's still art, recorded once as Skia pictures on the JS thread: each place's stretch of reef wall, its pale
-// flora and your coral, the sea floor's detail, and every creature's frames. The canvas's frame worklet only composes
+// The ocean's still art, recorded once as Skia pictures on the JS thread: what only each biome has, what your listening
+// grew there, the layers behind and in front of it, the sea floor's detail, and every creature's frames. The canvas's frame worklet only composes
 // these, so a frame stays cheap. Skia is only ever reached through lazySkia, so importing it here is safe on the web.
 
 import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, createPicture, type SkCanvas, type SkPaint, type SkPathBuilder, type SkPicture, type SkShader } from '@shopify/react-native-skia';
@@ -7,7 +7,7 @@ import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, createPicture, type S
 import type { Anatomy } from '@/lib/ocean-anatomy';
 import { DEPTHS, WATERS, type Depth, type Kind, type Place, type Water } from '@/lib/ocean-map';
 import type { CoralPiece, SandLife } from '@/lib/ocean-person';
-import { hexToRgb, mixRgb, seabedAt, wallAt, type Rgb } from '@/lib/ocean-scene';
+import { TOWERS, anemoneSpots, floorAt, hexToRgb, mixRgb, seabedAt, towerRadius, type Rgb } from '@/lib/ocean-scene';
 
 const TAU = Math.PI * 2;
 const CLIP_IN = 1;
@@ -109,7 +109,6 @@ function tubes(c: SkCanvas, x: number, y: number, color: string, lip: string, r:
   }
 }
 
-// Always darker than the water it stands in, so the wall still reads at depth.
 const ROCK: Record<Water, string> = { reef: '#b3a68f', kelp: '#4c5346', blue: '#2f4663', midnight: '#10142a' };
 const PALE = ['#e4eeee', '#dbe7e8', '#d3e0e2', '#d6e2e2', '#d8e4e5', '#e0eaeb'];
 const DEEP: number[] = [0, 0.3, 0.55, 0.72, 0.78];
@@ -125,124 +124,312 @@ function fadingDown(hexColor: string, water: Water, row: number, height: number)
   return Skia.Shader.MakeLinearGradient({ x: 0, y: 0 }, { x: 0, y: height }, [Skia.Color(toneAt(hexColor, water, row)), Skia.Color(toneAt(hexColor, water, row + 1))], [0, 1], TileMode.Clamp);
 }
 
-export type Weed = { x: number; top: number; base: number; width: number; phase: number; tall: boolean; amp: number };
+export type Weed = { x: number; top: number; base: number; width: number; phase: number; tall: boolean; amp: number; shader: SkShader; front: boolean };
+export type Anemone = { x: number; y: number; size: number; color: Float32Array };
+export type Raft = { sprite: SkPicture; x: number; y: number; speed: number; phase: number };
+export type Tendril = { x: number; length: number; phase: number; bead: Float32Array; lantern: Float32Array | null };
+export type Vent = { x: number; y: number };
+export type Trail = { x: number; y0: number; y1: number; color: string; seed: number };
 
-const WEED_TONE: Record<Water, string> = { reef: '#c9dcd2', kelp: '#b4bf8e', blue: '#b4c8d8', midnight: '#34506f' };
+/** How many of your songs get live, swaying growth in one place. The rest are still, behind them. */
+const LIVE_GROWTH = 8;
+const KELP_COLOR = '#b4bf8e';
 
-/**
- * The plants that sway live, so they can follow the beat. Kelp grows from the floor to the surface: the same stems at
- * every depth, drawn in stretches that meet, so you sink past them. Elsewhere it's a little seagrass on the reef wall.
- */
-export function weedsFor(place: Place, width: number, height: number): { weeds: Weed[]; shader: SkShader } {
+/** Kelp from the floor to the surface: the same stems at every depth, in stretches that meet, so you sink past them. */
+export function kelpFor(place: Place, width: number, height: number, songColors: { color: string; seed: number }[]): Weed[] {
   const row = DEPTHS.indexOf(place.depth);
-  const col = WATERS.indexOf(place.water);
   const k = width / 270;
   const out: Weed[] = [];
-  if (place.water === 'kelp') {
-    const r = rng(137);
-    for (let i = 0; i < 9; i++) {
-      const x = (0.26 + r() * 0.68) * width;
-      const phase = r() * 9;
-      const floor = height - seabedAt(x / width) * height + 8;
-      out.push({ x, top: row === 0 ? height * (0.16 + r() * 0.2) : 0, base: row === 3 ? floor : height, width: 3.4 * k, phase, tall: true, amp: 15 * k });
-      if (row !== 0) r();
-    }
-  } else {
-    const r = rng(211 + row * 41 + col * 13);
-    const n = place.water === 'midnight' ? 2 : 3;
-    for (let i = 0; i < n; i++) {
-      const yf = 0.18 + r() * 0.66;
-      const y = yf * height;
-      const x = wallAt(col, row + yf) * width + 3;
-      out.push({ x, top: y - (26 + r() * 30) * k, base: y, width: 2.2 * k, phase: r() * 9, tall: false, amp: 9 * k });
-    }
-  }
-  return { weeds: out, shader: fadingDown(WEED_TONE[place.water], place.water, row, height) };
+  const stem = (x: number, phase: number, tip: number, wide: number, color: string, front: boolean) => {
+    const floor = height - floorAt(1, x / width) * height + 8;
+    out.push({ x, top: row === 0 ? height * tip : 0, base: row === 3 ? floor : height, width: wide * k, phase, tall: true, amp: 15 * k, shader: fadingDown(color, 'kelp', row, height), front });
+  };
+  const r = rng(137);
+  for (let i = 0; i < 5; i++) stem((0.1 + r() * 0.8) * width, r() * 9, 0.14 + r() * 0.2, 3.4, KELP_COLOR, i % 2 === 0);
+  // Every song you heard here and let go adds a stem in its color, so the forest thickens as you listen.
+  songColors.slice(0, 10).forEach((s) => {
+    const f = rng(s.seed + 5);
+    stem((0.06 + f() * 0.88) * width, f() * 9, 0.1 + f() * 0.3, 2.6, s.color, f() < 0.35);
+  });
+  return out;
 }
 
-/** A stretch of reef wall, with its pale flora, the same for everyone. Above it, your coral in each song's color. */
-export function recordPlace(place: Place, width: number, height: number, coral: CoralPiece[], sand: SandLife | null): SkPicture {
+/** The reef's anemones in a level: they sway live, and clownfish nest in them. */
+export function anemonesFor(place: Place, width: number, height: number): Anemone[] {
+  if (place.water !== 'reef') return [];
+  const row = DEPTHS.indexOf(place.depth);
+  const k = width / 270;
+  return anemoneSpots(row).map((s) => ({ x: s.x * width, y: s.y * height, size: 15 * k, color: Skia.Color(toneAt('#f0d8de', 'reef', row)) }));
+}
+
+/** A clump of drifting seaweed, hanging its fronds under it. */
+export function recordRaft(color: string, k: number): SkPicture {
+  return createPicture(
+    (c) => {
+      const r = rng(hexToRgb(color)[0] * 31 + 7);
+      const frond = line(color, 1.5 * k, 0.9);
+      for (let i = 0; i < 7; i++) {
+        const b = path();
+        const x = (i - 3) * 4.5 * k;
+        b.moveTo(x, 0);
+        b.quadTo(x + (r() - 0.5) * 12 * k, 12 * k, x + (r() - 0.5) * 8 * k, (16 + r() * 16) * k);
+        c.drawPath(b.build(), frond);
+        oval(c, x + (r() - 0.5) * 6 * k, (7 + r() * 10) * k, 2 * k, 1.3 * k, fill(color, 0.9));
+      }
+      oval(c, 0, 0, 17 * k, 4 * k, fill(mixHex(color, '#1b2a33', 0.15)));
+    },
+    Skia.XYWHRect(-40 * k, -10 * k, 80 * k, 60 * k)
+  );
+}
+
+/** Open blue has nothing solid: just rafts drifting by. Pale ones near the top, and yours, wherever you heard them. */
+export function raftsFor(place: Place, width: number, height: number, coral: CoralPiece[], art: (color: string) => SkPicture): Raft[] {
+  if (place.water !== 'blue') return [];
+  const row = DEPTHS.indexOf(place.depth);
+  const out: Raft[] = [];
+  if (row === 0) {
+    const pale = toneAt('#d6e2d8', 'blue', 0);
+    out.push({ sprite: art(pale), x: 0.25, y: height * 0.17, speed: 4, phase: 1 });
+    out.push({ sprite: art(pale), x: 0.8, y: height * 0.28, speed: 3, phase: 4 });
+  }
+  coral.slice(0, LIVE_GROWTH).forEach((p) => {
+    const f = rng(p.seed + 9);
+    out.push({ sprite: art(p.color), x: f(), y: height * (0.15 + f() * 0.62), speed: 2.5 + f() * 3, phase: f() * 6 });
+  });
+  return out;
+}
+
+/** Midnight's glowing tendrils, hanging out of the dark above. Your songs here are lanterns on them. */
+export function tendrilsFor(place: Place, width: number, height: number, coral: CoralPiece[]): Tendril[] {
+  if (place.water !== 'midnight' || place.depth === 'buried') return [];
+  const row = DEPTHS.indexOf(place.depth);
+  const bead = Skia.Color('#8fe3ea');
+  const r = rng(61 + row * 17);
+  const out: Tendril[] = [];
+  for (let i = 0; i < 5; i++) out.push({ x: (0.06 + r() * 0.88) * width, length: height * (0.35 + r() * 0.5), phase: r() * 9, bead, lantern: null });
+  coral.slice(0, LIVE_GROWTH).forEach((p) => {
+    const f = rng(p.seed + 13);
+    out.push({ x: (0.05 + f() * 0.9) * width, length: height * (0.3 + f() * 0.5), phase: f() * 9, bead, lantern: Skia.Color(p.color) });
+  });
+  return out;
+}
+
+/** Smoke rises from Midnight's vents, on the floor of the trench. */
+export function ventsFor(place: Place, width: number, height: number): Vent[] {
+  if (place.water !== 'midnight' || place.depth !== 'buried') return [];
+  return [0.3, 0.68].map((fx) => ({ x: fx * width, y: height - floorAt(3, fx) * height - 26 * (width / 270) }));
+}
+
+function coralForm(c: SkCanvas, form: number, x: number, y: number, k: number, size: number, color: string, f: () => number, lean = 0) {
+  if (form === 0) branch(c, x, y, 22 * k * size, -Math.PI / 2 + lean, 4.5 * k * size, color, f, 4);
+  else if (form === 1) fan(c, x, y, 30 * k * size, color);
+  else brain(c, x, y, 20 * k * size, 14 * k * size, color, mixHex(color, '#1b2a33', 0.32));
+}
+
+function drawTowers(c: SkCanvas, place: Place, width: number, height: number, coral: CoralPiece[], k: number) {
+  const row = DEPTHS.indexOf(place.depth);
+  const rock = Skia.Paint();
+  rock.setAntiAlias(true);
+  rock.setShader(fadingDown(ROCK.reef, 'reef', row, height));
+  const rim = line(toneAt(mixHex(ROCK.reef, '#ffffff', 0.3), 'reef', row), 2 * k, 0.5);
+  const spots: { x: number; y: number; side: number }[] = [];
+  TOWERS.forEach((t, i) => {
+    const left: number[] = [];
+    const right: number[] = [];
+    let first = -1;
+    for (let y = -4; y <= height + 4; y += 4) {
+      const radius = towerRadius(i, row + y / height);
+      if (radius <= 0) continue;
+      if (first < 0) first = y;
+      left.push(t.cx * width - radius * width, y);
+      right.push(t.cx * width + radius * width, y);
+    }
+    if (left.length < 4) return;
+    const b = path();
+    b.moveTo(left[0], left[1]);
+    for (let j = 2; j < left.length; j += 2) b.lineTo(left[j], left[j + 1]);
+    for (let j = right.length - 2; j >= 0; j -= 2) b.lineTo(right[j], right[j + 1]);
+    b.close();
+    c.drawPath(b.build(), rock);
+    const edge = path();
+    edge.moveTo(right[0], right[1]);
+    for (let j = 2; j < right.length; j += 2) edge.lineTo(right[j], right[j + 1]);
+    c.drawPath(edge.build(), rim);
+    // Places on the tower for things to grow.
+    for (let y = Math.max(first + 20, height * 0.08); y < height * 0.92; y += height * 0.16) {
+      const radius = towerRadius(i, row + y / height);
+      if (radius > 0.02) spots.push({ x: t.cx * width + (i === 1 ? -radius : radius) * width, y, side: i === 1 ? -1 : 1 });
+    }
+  });
+  // The pale flora everyone starts with, then your coral in each song's color.
+  const r = rng(19 + row * 97);
+  spots.forEach((s, i) => {
+    if (i % 2 === 0) coralForm(c, (i / 2 + row) % 3, s.x, s.y, k, 0.8, toneAt(PALE[i % PALE.length], 'reef', row), r, s.side * 0.35);
+  });
+  coral.forEach((piece, i) => {
+    const f = rng(piece.seed + 3);
+    const s = spots.length ? spots[(i * 2 + 1) % spots.length] : { x: width * 0.3, y: height * 0.5, side: 1 };
+    const y = s.y + (f() - 0.5) * height * 0.1;
+    coralForm(c, piece.form, s.x + s.side * f() * 6 * k, y, k, piece.size, piece.color, f, s.side * 0.35);
+  });
+}
+
+function drawBones(c: SkCanvas, width: number, height: number, k: number) {
+  // A whale fall on the trench floor: a spine and its ribs.
+  const fx = 0.5;
+  const y = height - floorAt(3, fx) * height - 2;
+  const bone = line('#5b6d84', 2.4 * k, 0.75);
+  const spine = path();
+  spine.moveTo(width * 0.34, y);
+  spine.quadTo(width * 0.5, y - 5 * k, width * 0.62, y + 1 * k);
+  c.drawPath(spine.build(), bone);
+  for (let i = 0; i < 7; i++) {
+    const x = width * (0.37 + i * 0.035);
+    const b = path();
+    b.moveTo(x, y - 2 * k);
+    b.quadTo(x + 6 * k, y - 20 * k, x - 3 * k, y - (24 - i) * k);
+    c.drawPath(b.build(), bone);
+  }
+}
+
+function drawVent(c: SkCanvas, x: number, y: number, k: number) {
+  poly(c, [x - 11 * k, y + 28 * k, x - 4 * k, y, x + 4 * k, y, x + 11 * k, y + 28 * k], fill('#1b2038'));
+  oval(c, x, y, 4 * k, 1.6 * k, fill('#6fd2db', 0.55));
+}
+
+/** Everything still about a place: what only this biome has, and what your listening grew in it. */
+export function recordPlace(place: Place, width: number, height: number, coral: CoralPiece[], sand: SandLife | null, trails: Trail[]): SkPicture {
   const row = DEPTHS.indexOf(place.depth);
   const col = WATERS.indexOf(place.water);
   const k = width / 270;
-  const edge = (yf: number) => wallAt(col, row + yf) * width;
+  const floor = (x: number) => height - floorAt(col, x / width) * height + 3;
   return createPicture(
     (c) => {
-      const r = rng(19 + row * 97 + col * 31);
-      // The wall runs off the left edge, its shape depending only on depth, so stretches meet.
-      const wall = path();
-      wall.moveTo(-4, -2);
-      for (let y = -2; y <= height + 2; y += 5) wall.lineTo(edge(y / height), y);
-      wall.lineTo(-4, height + 2);
-      wall.close();
-      const rock = Skia.Paint();
-      rock.setAntiAlias(true);
-      rock.setShader(fadingDown(ROCK[place.water], place.water, row, height));
-      const wallShape = wall.build();
-      c.drawPath(wallShape, rock);
-      // A lit edge, and soft cracks, so it reads as rock.
-      const rim = path();
-      for (let y = -2; y <= height + 2; y += 5) {
-        if (y === -2) rim.moveTo(edge(y / height), y);
-        else rim.lineTo(edge(y / height), y);
+      if (place.water === 'reef') drawTowers(c, place, width, height, coral, k);
+      if (place.water === 'blue') {
+        // Your songs past what can drift live: small still tufts.
+        coral.slice(LIVE_GROWTH).forEach((p) => {
+          const f = rng(p.seed + 9);
+          oval(c, f() * width, height * (0.1 + f() * 0.75), 5 * k, 1.8 * k, fill(p.color, 0.7));
+        });
       }
-      c.drawPath(rim.build(), line(toneAt(mixHex(ROCK[place.water], '#ffffff', 0.3), place.water, row), 2 * k, 0.45));
-      c.save();
-      c.clipPath(wallShape, CLIP_IN, true);
-      const crack = line(mixHex(ROCK[place.water], '#1b2a33', 0.45), 1, 0.3);
-      for (let i = 0; i < 12; i++) {
-        const y = r() * height;
-        const b = path();
-        b.moveTo(-2, y);
-        b.quadTo(edge(y / height) * 0.5, y + (r() - 0.5) * 24 * k, edge(y / height) + 2, y + (r() - 0.5) * 12 * k);
-        c.drawPath(b.build(), crack);
+      if (place.water === 'midnight' && row === 3) {
+        drawBones(c, width, height, k);
+        for (const fx of [0.3, 0.68]) drawVent(c, fx * width, height - floorAt(3, fx) * height - 26 * k, k);
+        // Songs you heard here and let go: tube worms around the vents, each plume in its song's color.
+        coral.forEach((p) => {
+          const f = rng(p.seed + 3);
+          const x = (0.1 + f() * 0.8) * width;
+          const h = (14 + f() * 16) * k * p.size;
+          const base = floor(x) + 2;
+          c.drawLine(x, base, x, base - h, line('#e6e2d8', 2.2 * k));
+          oval(c, x, base - h, 4.2 * k, 4.2 * k, fill(p.color));
+          oval(c, x, base - h, 8 * k, 8 * k, fill(p.color, 0.18));
+        });
       }
-      c.restore();
-
-      // Pale flora growing out of the wall. Only your listening adds color. On the sea floor it's on the sand instead.
-      const pale = (i: number) => paled(PALE[i % PALE.length], place);
-      // A little shelf of rock for something to grow on, so nothing floats off the wall.
-      const shelf = (x: number, y: number, reach: number) => oval(c, x + reach * 0.3, y + 3 * k, reach, 5.5 * k, fill(toneAt(ROCK[place.water], place.water, row)));
-      const floor = (x: number) => height - seabedAt(x / width) * height + 4;
-      const count = place.water === 'reef' ? 5 : place.water === 'kelp' ? 2 : place.water === 'blue' ? 2 : 2;
-      for (let i = 0; i < count; i++) {
-        const yf = (i + 0.2 + r() * 0.6) / count;
-        const y = yf * height;
-        const onFloor = row === 3;
-        const x = onFloor ? (0.3 + r() * 0.62) * width : edge(yf) - 2;
-        const base = onFloor ? floor(x) : y;
-        const form = (i + col) % 4;
-        const lean = onFloor ? 0 : 0.3;
-        if (!onFloor) shelf(x, base, 30 * k);
-        if (form === 0) branch(c, x, base, 24 * k, -Math.PI / 2 + lean, 5 * k, pale(i), r, 4);
-        else if (form === 1) fan(c, x + (onFloor ? 0 : 14 * k), base, 30 * k, pale(i));
-        else if (form === 2) brain(c, x + (onFloor ? 0 : 12 * k), base, 20 * k, 14 * k, pale(i), mixHex(pale(i), '#70868a', 0.3));
-        else tubes(c, x, base, pale(i), mixHex(pale(i), '#ffffff', 0.5), r);
+      if (place.water === 'kelp' && row === 3) {
+        // Where the kelp holds on, on the floor.
+        const r = rng(137);
+        for (let i = 0; i < 5; i++) {
+          const x = (0.1 + r() * 0.8) * width;
+          r();
+          r();
+          oval(c, x, floor(x) + 1, 9 * k, 5 * k, fill(toneAt(ROCK.kelp, 'kelp', 3)));
+        }
       }
-
-      // Your coral, in each song's color.
-      for (const piece of coral) {
-        const f = rng(piece.seed + 3);
-        const yf = 0.08 + f() * 0.84;
-        const onFloor = row === 3;
-        const x = onFloor ? (0.26 + f() * 0.68) * width : edge(yf) - 2;
-        const y = onFloor ? floor(x) + 2 : yf * height;
-        const lean = onFloor ? (f() - 0.5) * 0.4 : 0.3;
-        const shift = onFloor ? 0 : 12 * k * piece.size;
-        if (!onFloor) shelf(x, y, 28 * k * piece.size);
-        if (piece.form === 0) branch(c, x, y, 22 * k * piece.size, -Math.PI / 2 + lean, 4.5 * k * piece.size, piece.color, f, 4);
-        else if (piece.form === 1) fan(c, x + shift, y, 30 * k * piece.size, piece.color);
-        else brain(c, x + shift, y, 20 * k * piece.size, 14 * k * piece.size, piece.color, mixHex(piece.color, '#1b2a33', 0.32));
+      if (place.water === 'reef' && row === 3) {
+        // Coral rubble where the towers meet the sand.
+        const r = rng(71);
+        for (let i = 0; i < 14; i++) {
+          const x = r() * width;
+          oval(c, x, floor(x) + 2, (3 + r() * 5) * k, (2 + r() * 2) * k, fill(toneAt('#cfc3ab', 'reef', 3), 0.8));
+        }
       }
-
       // What you heard and let go settles on the sea floor, one colored speck per song.
       if (row === 3)
         for (const speck of sand?.specks ?? []) {
           const f = rng(speck.seed + 11);
           const x = f() * width;
-          const y = floor(x) + 4 + f() * (height - floor(x) - 6);
+          const y = floor(x) + 4 + f() * Math.max(2, height - floor(x) - 6);
           oval(c, x, y, 0.9 + f() * 0.8, 0.9 + f() * 0.8, fill(speck.color, 0.78));
         }
+      // A faint trail back to where you found each fish that has climbed.
+      for (const t of trails) {
+        const dot = fill(t.color, 0.42);
+        for (let y = Math.max(t.y0, -4); y <= Math.min(t.y1, height + 4); y += 7 * k) {
+          oval(c, t.x + Math.sin(((row * height + y) / height) * 2.4 + t.seed) * 10 * k, y, 1.1 * k, 1.1 * k, dot);
+        }
+      }
+    },
+    { width, height }
+  );
+}
+
+/** The far layer: faint shapes well behind everything, which barely move. Open blue has none, on purpose. */
+export function recordFar(water: Water, width: number, height: number): SkPicture | null {
+  if (water === 'blue') return null;
+  const k = width / 270;
+  return createPicture(
+    (c) => {
+      const r = rng(water.length * 53);
+      const tone = fill(water === 'midnight' ? '#000000' : '#04283a', water === 'midnight' ? 0.28 : 0.1);
+      if (water === 'reef') {
+        for (const fx of [0.3, 0.62, 1.02]) {
+          const b = path();
+          const half = (18 + r() * 14) * k;
+          b.moveTo(fx * width - half, -2);
+          b.cubicTo(fx * width - half * 1.2, height * 0.3, fx * width - half * 0.7, height * 0.7, fx * width - half, height + 2);
+          b.lineTo(fx * width + half, height + 2);
+          b.cubicTo(fx * width + half * 0.7, height * 0.7, fx * width + half * 1.2, height * 0.3, fx * width + half, -2);
+          b.close();
+          c.drawPath(b.build(), tone);
+        }
+      } else if (water === 'kelp') {
+        for (let i = 0; i < 12; i++) {
+          const x = r() * width * 1.1;
+          const b = path();
+          b.moveTo(x, -2);
+          b.cubicTo(x + 10 * k, height * 0.3, x - 10 * k, height * 0.7, x, height + 2);
+          c.drawPath(b.build(), line('#04283a', 2.2 * k, 0.12));
+        }
+      } else {
+        for (let i = 0; i < 5; i++) {
+          const x = r() * width;
+          poly(c, [x - 34 * k, -2, x + 34 * k, -2, x + 22 * k, height + 2, x - 22 * k, height + 2], tone);
+        }
+      }
+    },
+    { width, height }
+  );
+}
+
+/** The near layer: big soft shapes right by you, which sweep past fastest. Layered strokes stand in for being out of focus. */
+export function recordNear(water: Water, width: number, height: number): SkPicture | null {
+  if (water !== 'kelp' && water !== 'reef') return null;
+  const k = width / 270;
+  const soft = (c: SkCanvas, b: SkPathBuilder, wide: number) => {
+    const shape = b.build();
+    for (const [w, a] of [[1.6, 0.07], [1.25, 0.1], [1, 0.14]] as const) c.drawPath(shape, line('#032430', wide * w, a));
+  };
+  return createPicture(
+    (c) => {
+      if (water === 'kelp') {
+        const a = path();
+        a.moveTo(width * 1.02, height * 1.02);
+        a.cubicTo(width * 0.9, height * 0.72, width * 1.04, height * 0.5, width * 0.93, height * 0.28);
+        soft(c, a, 15 * k);
+        const b = path();
+        b.moveTo(-width * 0.03, height * 0.75);
+        b.cubicTo(width * 0.06, height * 0.6, -width * 0.02, height * 0.46, width * 0.04, height * 0.34);
+        soft(c, b, 13 * k);
+      } else {
+        const a = path();
+        a.moveTo(width * 1.04, height * 0.96);
+        a.quadTo(width * 0.9, height * 0.84, width * 0.86, height * 0.7);
+        a.moveTo(width * 0.94, height * 0.84);
+        a.quadTo(width * 0.84, height * 0.82, width * 0.78, height * 0.76);
+        soft(c, a, 15 * k);
+      }
     },
     { width, height }
   );
@@ -526,7 +713,7 @@ export function recordHalo(color: string): SkPicture {
   );
 }
 
-/** A bottle resting on the wall or the sand, glowing with its song's light. */
+/** A bottle hanging in the water or lying on the sand, glowing with its song's light. */
 export function recordBottle(color: string): SkPicture {
   return createPicture(
     (c) => {

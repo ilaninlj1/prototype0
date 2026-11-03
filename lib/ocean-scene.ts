@@ -111,11 +111,48 @@ export function seabedAt(x: number): number {
   return 0.14 + 0.05 * Math.sin(tau * x) + 0.03 * Math.sin(2 * tau * x + 1) + 0.012 * Math.sin(6 * tau * x + 2);
 }
 
-/**
- * How far the reef wall reaches into the screen, as a share of its width. world is depth in screen heights, 0 at the
- * surface and 4 on the sea floor. It only depends on the depth, so the wall runs on unbroken as you sink.
- */
-export function wallAt(col: number, world: number): number {
+/** The coast: the reef's floor is shallowest, Midnight's is a trench. Fractions of the screen, for any point between biomes. */
+export function floorLift(col: number): number {
   'worklet';
-  return 0.12 + 0.045 * Math.sin(world * 3.7 + col * 1.9) + 0.02 * Math.sin(world * 9.3 + col) + 0.008 * Math.sin(world * 23 + col * 3);
+  const lifts = [0.14, 0.07, 0, -0.06];
+  const c = col < 0 ? 0 : col > 3 ? 3 : col;
+  const i = Math.min(2, Math.floor(c));
+  return lifts[i] + (lifts[i + 1] - lifts[i]) * (c - i);
+}
+
+/** The sea floor under one biome, as a share of the screen's height. */
+export function floorAt(col: number, x: number): number {
+  'worklet';
+  const y = seabedAt(x) + floorLift(col);
+  return y < 0.03 ? 0.03 : y;
+}
+
+/** The reef's coral towers: center across, and how far down from the surface each tip starts, in screen heights. */
+export const TOWERS = [
+  { cx: 0.14, tip: 0.42 },
+  { cx: 0.86, tip: 0.6 },
+  { cx: 0.5, tip: 1.45 },
+];
+
+/** A tower's half width at a depth, as a share of the screen's width: 0 above its tip, knobbly, wider toward the floor. */
+export function towerRadius(i: number, world: number): number {
+  const tip = TOWERS[i].tip;
+  if (world <= tip) return 0;
+  const grown = Math.min(1, (world - tip) / 1.4);
+  const round = Math.min(1, (world - tip) / 0.06);
+  return Math.sqrt(round) * (0.035 + 0.075 * Math.sqrt(grown)) + 0.008 * Math.sin(world * 17 + i * 2) + 0.005 * Math.sin(world * 41 + i);
+}
+
+/** Where anemones grow on the reef's towers in a level, as shares of the screen. Clownfish nest in them. */
+export function anemoneSpots(row: number): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [];
+  TOWERS.forEach((t, i) => {
+    for (const y of [0.3, 0.62]) {
+      const world = row + y;
+      if (towerRadius(i, world) <= 0.02) continue;
+      const side = i === 1 ? -1 : 1;
+      out.push({ x: t.cx + side * towerRadius(i, world), y });
+    }
+  });
+  return out;
 }

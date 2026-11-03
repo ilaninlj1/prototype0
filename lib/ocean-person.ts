@@ -5,8 +5,9 @@ import { FULL_LISTEN_MS } from './dark-map.ts';
 import { MIN_SAVES, tasteDistance, tierFor } from './taste-distance.ts';
 import { soundDistance } from './sound-neighbors.ts';
 import { anatomyLines, anatomyOf, type Anatomy } from './ocean-anatomy.ts';
+import { climbLevels, climbedRow, compactCount } from './ocean-climb.ts';
 import {
-  allPlaces, driftWater, placeKey, speciesOf, waterOf, WATER_INFO, WATERS,
+  allPlaces, DEPTH_INFO, DEPTHS, driftWater, placeKey, speciesOf, waterOf, WATER_INFO, WATERS,
   type Depth, type Kind, type Place, type Water,
 } from './ocean-map.ts';
 
@@ -26,6 +27,12 @@ export type Creature = {
   accent: string;
   anatomy: Anatomy;
   sound: SoundFeatures | null;
+  /** The level you found it at (0 Popular to 3 Buried). `place` is where it swims now. */
+  foundRow: number;
+  /** Levels climbed since, as its artist gained listeners. */
+  climb: number;
+  foundListeners: number | null;
+  nowListeners: number | null;
 };
 export type CoralPiece = { trackId: number; place: Place; color: string; form: 0 | 1 | 2; size: number; seed: number };
 export type SandLife = { rise: number; specks: { color: string; seed: number }[] };
@@ -40,6 +47,8 @@ export type OceanInput = {
   colorOf: (id: number) => string;
   /** A second color from the song's print; its main color when not given. */
   accentOf?: (id: number) => string;
+  /** Today's listeners for an artist, when known. Without it nothing climbs. */
+  listenersNowOf?: (artist: string) => number | null;
   now: number;
 };
 
@@ -138,13 +147,19 @@ export function buildOcean(input: OceanInput): OceanLife {
     const heard = record?.heard ?? 0.5;
     const hurried = heard < 0.5;
     const ageSize = 0.75 + 1.05 * (1 - Math.exp(-(likedAt === null ? 0 : monthsHeld(likedAt, now)) / 4));
-    const place = home(track.id, track);
+    const found = home(track.id, track);
+    const foundRow = DEPTHS.indexOf(found.place.depth);
+    const foundListeners = track.artistListeners ?? null;
+    const nowListeners = input.listenersNowOf?.(track.artistName) ?? null;
+    const climb = climbLevels(foundListeners, nowListeners);
+    const place = places[placeKey({ water: found.place.water, depth: DEPTHS[climbedRow(foundRow, climb).row] })];
     const creature: Creature = {
       trackId: track.id, artist: track.artistName, kind: s ? speciesOf(s) : 'drifter', place: place.place,
       color: colorOf(track.id), heard, hurried, size: hurried ? Math.min(0.9, ageSize) : ageSize,
       vivid: 0.25 + 0.75 * heard, likedAt, foundHour: likedAt === null ? null : new Date(likedAt).getHours(),
       rare: s !== null && likedAt !== null && wasRare(s, previous), first: false, school: null, seed: seedOf(track.id),
       accent: (input.accentOf ?? colorOf)(track.id), anatomy: anatomyOf(s), sound: s,
+      foundRow, climb, foundListeners, nowListeners,
     };
     place.creatures.push(creature);
     all.push(creature);
@@ -226,6 +241,12 @@ export function whyLines(c: Creature, now: number): string[] {
     lines.push(reason[c.kind]);
   }
   lines.push(...anatomyLines(c.anatomy));
+  if (c.foundListeners != null && c.nowListeners != null) {
+    const at = `Found in ${DEPTH_INFO[DEPTHS[c.foundRow]].name} at ${compactCount(c.foundListeners)}.`;
+    const nowRow = DEPTHS.indexOf(c.place.depth);
+    if (nowRow < c.foundRow) lines.push(`${at} Now ${compactCount(c.nowListeners)}, so it has climbed to ${DEPTH_INFO[c.place.depth].name}.`);
+    else if (c.climb > 0) lines.push(`${at} Now ${compactCount(c.nowListeners)}, so it has swum up a little.`);
+  }
   if (c.hurried) lines.push('Small and faint because you only listened briefly.');
   else {
     if (c.likedAt !== null) {
@@ -263,6 +284,8 @@ export function portrait(life: OceanLife, now: number): string[] {
   }
   const unvisited = waters.find((w) => w.heard === 0);
   if (unvisited) lines.push(`You have not heard a song from ${WATER_INFO[unvisited.water].name} yet.`);
+  const climber = creatures.filter((c) => c.climb > 0).sort((a, b) => b.climb - a.climb)[0];
+  if (climber && climber.foundListeners != null && climber.nowListeners != null) lines.push(`Your biggest climber went from ${compactCount(climber.foundListeners)} listeners to ${compactCount(climber.nowListeners)}.`);
   if (life.oldest?.likedAt !== null && life.oldest?.likedAt !== undefined) lines.push(`Your oldest find is ${ageWords(life.oldest.likedAt, now)} old.`);
   return lines;
 }

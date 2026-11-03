@@ -15,10 +15,12 @@ import Animated, {
 
 import { oceanDive, oceanReduced, oceanTravel, onDiveSettled, settleDiveTo, surfaceNow, useDivePan } from '@/components/ocean/dive-gesture';
 import type { OceanBottle } from '@/components/ocean/ocean-canvas';
+import { OceanChart } from '@/components/ocean/ocean-chart';
 import { OceanUi } from '@/components/ocean/ocean-ui';
 import { lazySkia } from '@/components/print/lazy-skia';
 import { useScreenReader } from '@/hooks/use-screen-reader';
 import { castFor } from '@/lib/ocean-cast';
+import type { PathPoint } from '@/lib/ocean-chart';
 import { depthDragResult, nearestPlaceIndex, settleDive, showsAt, waterDragResult } from '@/lib/ocean-dive';
 import { hitMember } from '@/lib/ocean-hit';
 import { DEPTHS, WATERS, WATER_INFO, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
@@ -46,6 +48,7 @@ export type OceanHandlers = {
   onPortrait: () => void;
   onOpenList: (place: Place) => void;
   onExample: () => void;
+  listeningPath: () => PathPoint[];
 };
 
 export const OceanOverlay = memo(function OceanOverlay({
@@ -117,6 +120,7 @@ export const OceanOverlay = memo(function OceanOverlay({
   const drawMs = useSharedValue(0);
   const metering = useSharedValue(false);
   const [meter, setMeter] = useState<string | null>(null);
+  const [chart, setChart] = useState<PathPoint[] | null>(null);
   if (Platform.OS === 'web') (globalThis as { __ocean?: unknown }).__ocean = { posX, posY, dive: oceanDive };
 
   // The scene only loads once Home has settled, so Home's first moments stay quick.
@@ -276,6 +280,9 @@ export const OceanOverlay = memo(function OceanOverlay({
     wake() {
       handlers.current?.onWake();
     },
+    openChart() {
+      setChart(handlers.current?.listeningPath() ?? []);
+    },
   }));
 
   // One finger: sideways changes water, up sinks, down rises, and down from Popular brings you to the surface.
@@ -286,6 +293,7 @@ export const OceanOverlay = memo(function OceanOverlay({
   const underGesture = useMemo(() => {
     const swim = Gesture.Pan()
       .minDistance(12)
+      .maxPointers(1)
       .onBegin(() => {
         axis.set(0);
       })
@@ -364,7 +372,11 @@ export const OceanOverlay = memo(function OceanOverlay({
       .onFinalize(() => {
         touchPower.set(withTiming(0, { duration: 420 }));
       });
-    return Gesture.Exclusive(swim, tap);
+    // Pinching in pulls back to see the whole ocean as one graph.
+    const pinch = Gesture.Pinch().onEnd((e) => {
+      if (e.scale < 0.82) runOnJS(js.openChart)();
+    });
+    return Gesture.Simultaneous(pinch, Gesture.Exclusive(swim, tap));
     // The shared values never change, and js reads everything else when it fires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height, reduced]);
@@ -447,9 +459,23 @@ export const OceanOverlay = memo(function OceanOverlay({
             onPortrait={() => handlers.current?.onPortrait()}
             onOpenList={() => handlers.current?.onOpenList(place)}
             onExample={() => handlers.current?.onExample()}
+            onChart={js.openChart}
             onToggleMeter={toggleMeter}
           />
         </Animated.View>
+      )}
+      {under && chart && (
+        <OceanChart
+          life={life}
+          path={chart}
+          hour={hour}
+          onPickCreature={(c) => handlers.current?.onTapCreature(c, false)}
+          onPickPlace={(p) => {
+            setChart(null);
+            jumpTo(p, false);
+          }}
+          onClose={() => setChart(null)}
+        />
       )}
     </>
   );

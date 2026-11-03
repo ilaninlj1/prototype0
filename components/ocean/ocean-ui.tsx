@@ -24,6 +24,7 @@ export function OceanUi({
   onPortrait,
   onOpenList,
   onExample,
+  onChart,
   onToggleMeter,
 }: {
   place: Place;
@@ -41,6 +42,7 @@ export function OceanUi({
   onPortrait: () => void;
   onOpenList: () => void;
   onExample: () => void;
+  onChart: () => void;
   /** Holding the pill shows the frame rate, to measure smoothness on a real phone. */
   onToggleMeter: () => void;
 }) {
@@ -123,6 +125,9 @@ export function OceanUi({
           <Pressable onPress={onPortrait} style={styles.plain} accessibilityRole="button">
             <ThemedText style={styles.plainText}>Your ocean</ThemedText>
           </Pressable>
+          <Pressable onPress={onChart} style={styles.plain} accessibilityRole="button">
+            <ThemedText style={styles.plainText}>See it all</ThemedText>
+          </Pressable>
           {allCount > 0 && (
             <Pressable onPress={onOpenList} style={styles.plain} accessibilityRole="button">
               <ThemedText style={styles.plainText}>All {allCount} here</ThemedText>
@@ -173,7 +178,7 @@ const styles = StyleSheet.create({
   swipe: { alignSelf: 'stretch', maxWidth: 340, width: '100%', backgroundColor: Colors.text, borderRadius: 26, height: 52, alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.45 },
   swipeText: { fontSize: 16, lineHeight: 21, fontWeight: '700', color: Colors.accentText },
-  row: { flexDirection: 'row', gap: Spacing.sm },
+  row: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm },
   plain: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: 20, height: 40, paddingHorizontal: 16 },
   plainText: { fontSize: 14, lineHeight: 19, fontWeight: '600', color: Colors.text },
 });

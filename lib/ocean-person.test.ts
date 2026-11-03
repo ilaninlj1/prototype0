@@ -318,3 +318,25 @@ test('building 5000 swipes and 500 saves stays quick enough to build between swi
   assert.equal(life.heardTotal, 5000);
   assert.ok(elapsed < 250, `Build took ${elapsed.toFixed(2)} ms`);
 });
+
+const risen = (extra: Partial<OceanInput>) => buildOcean(input({ history: [swipe(1)], liked: [track(1, { artistListeners: 10_000 })], depthOf: () => 'buried', ...extra }));
+
+test('a fish climbs as its artist gains listeners: every fourfold rise is one level', () => {
+  const c = Object.values(risen({ listenersNowOf: () => 90_000 }).places).flatMap((p) => p.creatures)[0];
+  assert.equal(c.foundRow, 3);
+  assert.ok(c.climb > 1.5 && c.climb < 1.6);
+  assert.equal(c.place.depth, 'gems');
+  assert.ok(whyLines(c, NOW).includes('Found in Buried at 10K. Now 90K, so it has climbed to Hidden gems.'));
+});
+
+test('a fish with no count, or whose artist has not grown, stays where you found it', () => {
+  const only = (extra: Partial<OceanInput>) => Object.values(risen(extra).places).flatMap((p) => p.creatures)[0];
+  assert.equal(only({}).place.depth, 'buried');
+  assert.equal(only({ listenersNowOf: () => null }).climb, 0);
+  assert.equal(only({ listenersNowOf: () => 9_000 }).place.depth, 'buried');
+  assert.equal(only({ listenersNowOf: () => 10_500 }).climb, 0);
+});
+
+test('the portrait names your biggest climber', () => {
+  assert.ok(portrait(risen({ listenersNowOf: () => 90_000 }), NOW).includes('Your biggest climber went from 10K listeners to 90K.'));
+});

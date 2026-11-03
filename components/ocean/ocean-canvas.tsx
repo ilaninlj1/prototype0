@@ -2,7 +2,7 @@ import { Canvas, Picture, createPicture, type SkPicture } from '@shopify/react-n
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAnimatedReaction, useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 
-import { mixHex, recordBottle, recordCreature, recordFloorDetail, recordHalo, recordPlace, songPalette, weedsFor } from '@/components/ocean/ocean-art';
+import { anemonesFor, kelpFor, mixHex, raftsFor, recordBottle, recordCreature, recordFar, recordFloorDetail, recordHalo, recordNear, recordPlace, recordRaft, songPalette, tendrilsFor, ventsFor, type Trail } from '@/components/ocean/ocean-art';
 import { drawOcean, type Stage, type StageMember, type StopRow } from '@/components/ocean/ocean-draw';
 import { anatomyKey } from '@/lib/ocean-anatomy';
 import { castFor } from '@/lib/ocean-cast';
@@ -54,6 +54,7 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
   const sprites = useRef(new Map<string, SkPicture[]>());
   const halos = useRef(new Map<string, SkPicture>());
   const bottleArt = useRef(new Map<string, SkPicture>());
+  const raftArt = useRef(new Map<string, SkPicture>());
 
   // Moving to the next water loads the one beyond it only once the move has settled, so it can't hitch the glide.
   const col = WATERS.indexOf(place.water);
@@ -68,19 +69,37 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
   }, [col, loadedCol]);
 
   const hourKey = Math.floor(hour);
+  const nearArt = useMemo(() => WATERS.map((w) => recordNear(w, width, height)), [width, height]);
+  const farArt = useMemo(() => WATERS.map((w) => recordFar(w, width, height)), [width, height]);
   const stages = useMemo(() => {
     const out: Stage[] = [];
     for (let c = Math.max(0, loadedCol - 1); c <= Math.min(3, loadedCol + 1); c++) {
       const water = WATERS[c];
       const sand = floorSand(life, water);
+      const hereCoral = (key: string) => life?.places[key]?.coral ?? [];
+      // Kelp stems run the whole depth, so every song you heard in this water adds one to every level.
+      const stems = DEPTHS.flatMap((d) => hereCoral(placeKey({ water, depth: d }))).map((p) => ({ color: p.color, seed: p.seed }));
+      // A climbed fish's trail runs back down through every level it passed.
+      const climbers = Object.values(life?.places ?? {}).flatMap((p) => (p.place.water === water ? p.creatures.filter((m) => m.climb > 0) : []));
+      const trailsIn = (row: number): Trail[] =>
+        climbers.flatMap((m) => {
+          const nowRow = DEPTHS.indexOf(m.place.depth);
+          if (row < nowRow || row > m.foundRow) return [];
+          const cast = castFor(m.place, life, hour).members.find((x) => x.creature.trackId === m.trackId);
+          if (!cast) return [];
+          const home = (0.18 + 0.64 * cast.x) * width;
+          const y = (0.2 + 0.52 * Math.max(0, Math.min(1, cast.band))) * height;
+          return [{ x: home, y0: row === nowRow ? y : 0, y1: row === m.foundRow ? y : height, color: m.color, seed: m.seed % 7 }];
+        });
       DEPTHS.forEach((depth, row) => {
         const here: Place = { water, depth };
         const key = placeKey(here);
         const lives = life?.places[key];
-        const signature = `${width}x${height}|${(lives?.coral ?? []).map((p) => p.trackId).join()}|${row === 3 ? sand.specks.length : 0}`;
+        const trails = trailsIn(row);
+        const signature = `${width}x${height}|${(lives?.coral ?? []).map((p) => p.trackId).join()}|${row === 3 ? sand.specks.length : 0}|${trails.map((t) => `${t.y0.toFixed(0)}:${t.y1.toFixed(0)}`).join()}`;
         let cached = pictures.current.get(key);
         if (!cached || cached.signature !== signature) {
-          cached = { signature, picture: recordPlace(here, width, height, lives?.coral ?? [], row === 3 ? sand : null) };
+          cached = { signature, picture: recordPlace(here, width, height, lives?.coral ?? [], row === 3 ? sand : null, trails) };
           pictures.current.set(key, cached);
         }
         const members: StageMember[] = castFor(here, life, hour).members.map((m) => {
@@ -106,6 +125,7 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
             band: m.band,
             x: m.x,
             scale: m.scale,
+            reach: m.reach,
             awake: m.awake,
             leader: m.leader,
             schoolIndex: m.schoolIndex,
@@ -119,13 +139,24 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
           };
         });
         const hereBottles = bottles.filter((b) => placeKey(b.place) === key);
-        const { weeds, shader } = weedsFor(here, width, height);
         out.push({
           col: c,
           row,
           picture: cached.picture,
-          weeds,
-          weedShader: shader,
+          near: nearArt[c],
+          weeds: water === 'kelp' ? kelpFor(here, width, height, stems) : [],
+          anemones: anemonesFor(here, width, height),
+          rafts: raftsFor(here, width, height, lives?.coral ?? [], (color) => {
+            let art = raftArt.current.get(color);
+            if (!art) {
+              art = recordRaft(color, width / 270);
+              raftArt.current.set(color, art);
+            }
+            return art;
+          }),
+          ribbons: water === 'blue',
+          tendrils: tendrilsFor(here, width, height, lives?.coral ?? []),
+          vents: ventsFor(here, width, height),
           members,
           bottles: hereBottles.map((b, i) => {
             let art = bottleArt.current.get(b.color);
@@ -200,6 +231,7 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
       floorBot,
       rises,
       floorDetail,
+      far: farArt,
     };
     const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const result = createPicture(
@@ -210,7 +242,7 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
     );
     drawMs.set((typeof performance !== 'undefined' ? performance.now() : Date.now()) - started);
     return result;
-  }, [width, height, travel, surfaceY, night, warm, stops, restStops, stages, floorTop, floorBot, rises, floorDetail]);
+  }, [width, height, travel, surfaceY, night, warm, stops, restStops, stages, floorTop, floorBot, rises, floorDetail, farArt]);
 
   return (
     <Canvas style={{ width, height }} pointerEvents="none">
