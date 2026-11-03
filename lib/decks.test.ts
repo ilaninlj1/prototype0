@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 
 import { allDecks, deckCounts, deckKey, deckLabel, deckMatches, pickDeck, SOUND_DECKS, soundTiles, TEMPO_BANDS, type Deck, type DeckCandidate } from './decks.ts';
+import { nearestInDeck } from './decks.ts';
 import type { DiscoveryTrack } from './discovery.ts';
 import type { Depth, Species } from './ocean-map.ts';
 import { describeSound, type SoundFeatures } from './sound.ts';
@@ -243,4 +244,16 @@ test('catalog depths survive the run/deck pool and saved-track lookup', async (t
     assert.equal(depthOfTrack({ ...track(-1), artistListeners: 100_000, trackRank: 3 }), 'gems');
     assert.equal(depthOfTrack({ ...track(-1), artistListeners: 100_001, trackRank: 4 }), 'deepcuts');
   });
+});
+
+test('nearestInDeck: More like this never leaves the deck, for a sound deck or an ocean deck', () => {
+  const quiet = { tempo: 100, key: 0, mode: 1 as const, energy: 0.2, danceability: 0.5, acousticness: 0.1, instrumentalness: 0, speechiness: 0.05, liveness: 0.1, valence: 0.5, loudness: -12 };
+  const loud = { ...quiet, energy: 0.9, loudness: -4 };
+  const candidate = (id: number, sound: typeof quiet, depth: 'popular' | 'buried') => ({ track: { id, artistName: `a${id}` } as never, artist: `a${id}`, sound, depth });
+  const pool = [candidate(1, quiet, 'popular'), candidate(2, loud, 'popular'), candidate(3, quiet, 'buried'), candidate(4, { ...quiet, energy: 0.25 }, 'popular')];
+  const o = { heard: new Set<number>(), keep: () => true, n: 3, rand: () => 0.5 };
+  const ids = (d: Parameters<typeof nearestInDeck>[1]) => nearestInDeck(pool, d, loud, 'x', o).map((t) => t.id).sort();
+  assert.deepEqual(ids({ kind: 'sound', id: 'quiet' }), [1, 3, 4]);
+  assert.deepEqual(ids({ kind: 'ocean', water: 'reef', depth: 'buried' }), [3]);
+  assert.deepEqual(nearestInDeck(pool, { kind: 'ocean', water: 'reef', depth: 'buried' }, null, 'x', o).map((t) => t.id), [3]);
 });

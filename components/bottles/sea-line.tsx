@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
+  runOnJS,
   type SharedValue,
   useAnimatedProps,
   useAnimatedStyle,
@@ -12,10 +14,12 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+
+import { settleDiveTo, useDivePan } from '@/components/ocean/dive-gesture';
 
 import { DarkColors } from '@/constants/theme';
-import { CALM_RHYTHM, SEA_BASE, SEA_TALL, SPLASH_AT, crestOf, restingSea, seaY, startWave, stepSea, swellFront, type Rhythm, type SeaState } from '@/lib/sea-beat';
+import { CALM_RHYTHM, SEA_BASE, SEA_TALL, SPLASH_AT, crestOf, seaY, startWave, stepSea, swellFront, type Rhythm, type SeaState } from '@/lib/sea-beat';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -29,9 +33,13 @@ const STEP = 6;
 /** The back swell trails the surface by this many samples, so the surface is sampled that far past the left edge. */
 const LAG = 7;
 const FIRST_X = -STEP * (LAG + 1);
-const INK = DarkColors.background;
 const DROPS = [0, 1, 2, 3, 4, 5];
 const NONE = 'M0 0';
+const GRABBER = 36;
+/** How far either side of the middle a tap still counts as the grabber. */
+const GRABBER_REACH = 44;
+/** The touch strip starts this far above the resting surface, so a crest is still inside it. */
+const STRIP_ABOVE = 20;
 
 export type SeaBottle = { key: string; color: string; position: number } | null;
 /** A song change that rolls water in: a next song's swell, or a new genre's tsunami (lib/sea-beat.ts). */
@@ -53,7 +61,7 @@ function linePath(ys: number[], shift: number, scale: number, dy: number): strin
 }
 
 /** The break's spray: a few drops thrown up off the left edge as the crest hits it. */
-function Drop({ i, sea }: { i: number; sea: SharedValue<SeaState> }) {
+function Drop({ i, sea, color }: { i: number; sea: SharedValue<SeaState>; color: string }) {
   const props = useAnimatedProps(() => {
     const s = sea.get();
     const tau = s.kind === 2 ? s.since - SPLASH_AT : -1;
@@ -62,7 +70,7 @@ function Drop({ i, sea }: { i: number; sea: SharedValue<SeaState> }) {
     const vy = -(0.1 + 0.022 * ((i * 3) % 5));
     return { cx: 4 + 5 * i + vx * tau, cy: SEA_BASE - 10 + vy * tau + 0.00035 * tau * tau, opacity: 0.5 * (1 - tau / 560) };
   });
-  return <AnimatedCircle animatedProps={props} r={1.4 + (i % 3) * 0.4} fill={INK} />;
+  return <AnimatedCircle animatedProps={props} r={1.4 + (i % 3) * 0.4} fill={color} />;
 }
 
 function BottleGlyph({ color }: { color: string }) {
@@ -77,15 +85,28 @@ function BottleGlyph({ color }: { color: string }) {
   );
 }
 
+/** The water's colors at the surface: its shallows, where it reaches by the bottom of the phone, and foam's tint. */
+export type SeaWater = { top: string; low: string; foam: string };
+
+// Light on the water: fixed spots that twinkle in turn, and bubbles that rise and wobble. One path each, so it stays light.
+const GLINTS = Array.from({ length: 9 }, (_, i) => ({ x: (i * 0.137 + 0.06) % 1, y: 12 + ((i * 29) % 58), speed: 0.7 + (i % 4) * 0.28, phase: i * 2.1, size: 2.4 + (i % 3) * 1.2 }));
+const BUBBLES = Array.from({ length: 7 }, (_, i) => ({ x: (i * 0.173 + 0.09) % 1, speed: 0.05 + (i % 3) * 0.018, phase: (i * 0.37) % 1, r: 1 + (i % 3) * 0.7, wobble: i * 1.9 }));
+
 /**
- * The sea along the bottom of Home. It keeps the playing song's beat (a crest every two beats, a lift on each one,
+ * The sea along the bottom of Home, real water from the surface to the bottom of the phone. Swipe up from it to go
+ * under: the grabber on its crest and the tab bar both start the dive. It keeps the playing song's beat (a crest every two beats, a lift on each one,
  * bigger for louder songs), and how the song changed decides how the water changes: a next song rolls one swell in,
  * a new genre is a mini tsunami, anything else (steering, a deck, the dark, Undo) retunes it slowly as a tide.
  * Bottles (lib/bottle-countdown.ts) ride it: a stranger's coming a step closer each song, and `outgoing` sails one of
- * yours off to the right when a save floats. It never takes a touch.
+ * yours off to the right when a save floats. Bottles and the water's drawing take no touches; the strip along the
+ * surface does.
  */
 export function SeaLine({
+  sea,
   width,
+  below,
+  water,
+  onTapWater,
   incoming,
   outgoing,
   rhythm,
@@ -93,7 +114,13 @@ export function SeaLine({
   songTime,
   playing,
 }: {
+  /** The surface, owned by Home so the ocean's canvas can draw the same wave while you dive. */
+  sea: SharedValue<SeaState>;
   width: number;
+  /** How far the phone's bottom edge is below Home's old bottom: the tab bar's height, since the water runs behind it. */
+  below: number;
+  water: SeaWater;
+  onTapWater: () => void;
   incoming: SeaBottle;
   outgoing: { key: number; color: string } | null;
   /** The playing song's rhythm; null while its sound is still being looked up (the sea keeps what it has). */
@@ -104,16 +131,18 @@ export function SeaLine({
   playing: boolean;
 }) {
   const reduceMotion = useReducedMotion();
-  const sea = useSharedValue<SeaState>(restingSea(CALM_RHYTHM));
   const target = useSharedValue<Rhythm>(CALM_RHYTHM);
   const queued = useSharedValue(0);
   const clock = useSharedValue(0);
   const playingNow = useSharedValue(0);
   const beatMix = useSharedValue(0);
+  const lightClock = useSharedValue(0);
+  const bottom = SEA_TALL - 4 + below;
 
   useFrameCallback((f) => {
     if (reduceMotion) return;
     const dt = Math.min(64, f.timeSincePreviousFrame ?? 16);
+    lightClock.set(lightClock.get() + dt / 1000);
     let s = sea.get();
     if (queued.get()) {
       s = startWave(s, queued.get() === 2 ? 'genre' : 'song');
@@ -151,9 +180,38 @@ export function SeaLine({
     return out;
   });
   const front = useAnimatedProps(() => ({ d: linePath(ys.get(), 0, 1, 0) }));
-  const body = useAnimatedProps(() => ({ d: `${linePath(ys.get(), 0, 1, 0)}L${width + STEP} ${SEA_TALL} L${-STEP} ${SEA_TALL} Z` }));
-  // A fainter swell behind, trailing the surface a little to the right.
-  const back = useAnimatedProps(() => ({ d: linePath(ys.get(), LAG, 0.6, 5) }));
+  const body = useAnimatedProps(() => ({ d: `${linePath(ys.get(), 0, 1, 0)}L${width + STEP} ${bottom} L${-STEP} ${bottom} Z` }));
+  // A paler swell behind, trailing the surface a little to the right.
+  const back = useAnimatedProps(() => ({ d: `${linePath(ys.get(), LAG, 0.6, -5)}L${width + STEP} ${bottom} L${-STEP} ${bottom} Z` }));
+  const glints = useAnimatedProps(() => {
+    const t = lightClock.get();
+    let d = '';
+    for (const g of GLINTS) {
+      const v = Math.pow(Math.max(0, Math.sin(t * g.speed + g.phase)), 5);
+      if (v < 0.05) continue;
+      const x = g.x * width + Math.sin(t * 0.3 + g.phase) * 8;
+      const y = SEA_BASE + g.y;
+      const l = g.size * v;
+      d += `M${x - l} ${y}L${x + l} ${y}M${x} ${y - l}L${x} ${y + l}`;
+    }
+    return { d: d || NONE };
+  });
+  const bubbles = useAnimatedProps(() => {
+    const t = lightClock.get();
+    const y0 = SEA_BASE + 6;
+    let d = '';
+    for (const b of BUBBLES) {
+      const f = (t * b.speed + b.phase) % 1;
+      const y = bottom + 6 - f * (bottom - y0);
+      const x = b.x * width + Math.sin(t * 1.4 + b.wobble) * 5;
+      d += `M${x - b.r} ${y}a${b.r} ${b.r} 0 1 0 ${b.r * 2} 0a${b.r} ${b.r} 0 1 0 ${-b.r * 2} 0`;
+    }
+    return { d };
+  });
+  const grabberStyle = useAnimatedStyle(() => {
+    const s = sea.get();
+    return { transform: [{ translateX: width / 2 - GRABBER / 2 }, { translateY: seaY(width / 2, s, width) + 6 }] };
+  });
 
   // Foam: a thin line riding a swell's front, or the tsunami's white cap.
   const foam = useAnimatedProps(() => {
@@ -226,18 +284,53 @@ export function SeaLine({
   }, [outgoing, width, ox, oShown, reduceMotion]);
   const sailing = useAnimatedStyle(() => ({ opacity: oShown.get(), transform: float(ox.get(), sea.get()) }));
 
+  // A tap near the grabber goes under; anywhere else on the water wakes the buttons, like any empty space on Home.
+  const divePan = useDivePan();
+  const tap = Gesture.Tap()
+    .maxDistance(12)
+    .onEnd((e, ok) => {
+      if (!ok) return;
+      if (Math.abs(e.x - width / 2) <= GRABBER_REACH) settleDiveTo(1);
+      else runOnJS(onTapWater)();
+    });
+  const gesture = Gesture.Exclusive(divePan, tap);
+
   return (
-    <View style={styles.sea} pointerEvents="none">
-      <Svg width={width} height={SEA_TALL}>
-        <AnimatedPath animatedProps={body} fill={INK} fillOpacity={0.04} />
-        <AnimatedPath animatedProps={back} fill="none" stroke={INK} strokeOpacity={0.12} strokeWidth={1.3} />
-        <AnimatedPath animatedProps={front} fill="none" stroke={INK} strokeOpacity={0.3} strokeWidth={1.5} />
-        <AnimatedPath animatedProps={foam} fill="none" stroke={INK} strokeWidth={1.2} strokeLinecap="round" strokeDasharray="1 3.5" />
-        <AnimatedPath animatedProps={curl} fill="none" stroke={INK} strokeWidth={1.5} strokeLinecap="round" />
+    <View style={[styles.sea, { height: bottom }]} pointerEvents="box-none">
+      <Svg width={width} height={bottom} pointerEvents="none">
+        <Defs>
+          <LinearGradient id="seaWater" x1="0" y1={SEA_BASE - 12} x2="0" y2={bottom} gradientUnits="userSpaceOnUse">
+            <Stop offset="0" stopColor={water.top} />
+            <Stop offset="1" stopColor={water.low} />
+          </LinearGradient>
+          <LinearGradient id="seaMist" x1="0" y1="0" x2="0" y2={SEA_BASE + 6} gradientUnits="userSpaceOnUse">
+            <Stop offset="0" stopColor={water.top} stopOpacity="0" />
+            <Stop offset="1" stopColor={water.top} stopOpacity="0.2" />
+          </LinearGradient>
+        </Defs>
+        <Rect x={0} y={0} width={width} height={SEA_BASE + 6} fill="url(#seaMist)" />
+        <AnimatedPath animatedProps={back} fill={water.top} fillOpacity={0.45} />
+        <AnimatedPath animatedProps={body} fill="url(#seaWater)" />
+        <AnimatedPath animatedProps={bubbles} fill="none" stroke="#ffffff" strokeOpacity={0.6} strokeWidth={0.9} />
+        <AnimatedPath animatedProps={glints} fill="none" stroke="#ffffff" strokeOpacity={0.85} strokeWidth={1} strokeLinecap="round" />
+        <AnimatedPath animatedProps={front} fill="none" stroke="#ffffff" strokeOpacity={0.9} strokeWidth={1.6} />
+        <AnimatedPath animatedProps={foam} fill="none" stroke={water.foam} strokeWidth={1.2} strokeLinecap="round" strokeDasharray="1 3.5" />
+        <AnimatedPath animatedProps={curl} fill="none" stroke={water.foam} strokeWidth={1.5} strokeLinecap="round" />
         {DROPS.map((i) => (
-          <Drop key={i} i={i} sea={sea} />
+          <Drop key={i} i={i} sea={sea} color={water.foam} />
         ))}
       </Svg>
+      <GestureDetector gesture={gesture}>
+        <View style={[styles.strip, { top: SEA_BASE - STRIP_ABOVE }]} />
+      </GestureDetector>
+      <Animated.View
+        style={[styles.grabber, grabberStyle]}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel="Go under the water"
+        onAccessibilityTap={() => settleDiveTo(1)}
+        pointerEvents="none"
+      />
       {incoming && (
         <Animated.View style={[styles.bottle, riding]}>
           <BottleGlyph color={incoming.color} />
@@ -253,6 +346,8 @@ export function SeaLine({
 }
 
 const styles = StyleSheet.create({
-  sea: { position: 'absolute', left: 0, right: 0, bottom: -4, height: SEA_TALL },
+  sea: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  strip: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  grabber: { position: 'absolute', left: 0, top: 0, width: GRABBER, height: 4, borderRadius: 2, backgroundColor: '#ffffff', shadowColor: '#06222b', shadowOpacity: 0.25, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
   bottle: { position: 'absolute', left: 0, top: 0, width: BOTTLE, height: BOTTLE },
 });

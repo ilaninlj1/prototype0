@@ -29,7 +29,7 @@ export type DiscoveryTrack = {
   // with source 'map', so saves from the map can be compared with saves from genres. 'run' marks songs saved
   // during or after a run (lib/run-*.ts), so the Library can tell run songs apart. 'bottle' marks a stranger's
   // save that washed up on Home (lib/bottles.ts); bottleId and bottle (its chain, hidden until the verdict) go with it.
-  via?: 'map' | 'run' | 'bottle';
+  via?: 'map' | 'run' | 'bottle' | 'ocean';
   bottleId?: string;
   bottle?: Bottle;
   // Optional solid-color fallback CardFace renders when artworkUrl100 is
@@ -50,6 +50,8 @@ export type DiscoveryTrack = {
   // Liked tracks only: when the like happened. artistListeners on a liked
   // track is the count at that moment, i.e. what you "found them at".
   likedAt?: number;
+  // Remembers a blind find even when Undo removes its swipe entry.
+  foundBlind?: boolean;
   // Liked tracks only: the listener's own line about the song, e.g. "the bass at 0:40".
   note?: string;
 };
@@ -100,7 +102,7 @@ export type SwipeEntry = {
   preset?: PresetId;
   // Set for Daily Drop swipes, so analysis can separate them from the feed, for songs served from the Dark Map,
   // for songs played in Run mode, and for bottles (a stranger's save that washed up on Home).
-  source?: 'drop' | 'map' | 'run' | 'bottle' | 'people';
+  source?: 'drop' | 'map' | 'run' | 'bottle' | 'people' | 'ocean';
   artistListeners?: number;
   trackRank?: number;
   dwellMs?: number;

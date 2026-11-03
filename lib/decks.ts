@@ -149,6 +149,22 @@ export function pickDeck(
   return out;
 }
 
+/**
+ * More like this while in a deck: the songs in the deck that sound closest to this one, so the filter stays real. With
+ * no sound to compare, any songs in the deck.
+ */
+export function nearestInDeck(
+  pool: DeckCandidate[],
+  d: Deck,
+  sound: SoundFeatures | null,
+  artist: string,
+  o: { heard: Set<number>; keep: (artist: string) => boolean; n: number; rand: () => number }
+): DiscoveryTrack[] {
+  if (!sound || d.kind === 'like') return pickDeck(pool, d, o);
+  const open = pool.filter((c) => !o.heard.has(c.track.id) && o.keep(c.artist) && deckMatches(d, c.sound, c.depth));
+  return pickNeighbors(sound, artist, open.map((c) => ({ item: c.track, artist: c.artist, sound: c.sound })), o.n);
+}
+
 /** How many unheard songs each deck has left, by deckKey. */
 export function deckCounts(pool: DeckCandidate[], decks: Deck[], heard: Set<number>): Map<string, number> {
   const counts = new Map(decks.map((d) => [deckKey(d), 0]));

@@ -3,9 +3,11 @@ import * as Haptics from 'expo-haptics';
 import type { Tabs } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { type LayoutChangeEvent, Pressable, StyleSheet, View, type ViewInstance } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { oceanDive, onDiveSettled, setOceanTabBarHeight, useDivePan, useOceanInk } from '@/components/ocean/dive-gesture';
 import { onSaveLanded, setSaveTabTarget } from '@/components/save-flight';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
@@ -14,10 +16,17 @@ import { useHomeChromeVisible } from '@/hooks/use-home-chrome';
 import { tabBarScrollHidden } from '@/hooks/use-scroll-chrome';
 import { onDecodedNews } from '@/hooks/use-taste-decoded';
 import { FADE_MS, tabBarVisible } from '@/lib/home-chrome';
+import { showsAt } from '@/lib/ocean-dive';
 import { checkPeopleNews, onPeopleNews } from '@/lib/people-api';
 import { tabBarRoom, tabBarScrollShare } from '@/lib/scroll-chrome';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
+
+// Over Home's water the bar has no background of its own, so it needs ink that reads on the water.
+const WATER_INK = {
+  dark: { active: '#06222b', idle: 'rgba(4,30,40,0.74)', indicator: '#06222b' },
+  light: { active: '#ffffff', idle: 'rgba(255,255,255,0.78)', indicator: '#ffffff' },
+};
 
 // Outline when idle, filled when active — one icon family, two states.
 const ICONS: Record<string, { idle: keyof typeof Ionicons.glyphMap; active: keyof typeof Ionicons.glyphMap; label: string }> = {
@@ -34,8 +43,9 @@ const INDICATOR = 22;
  * Edge to edge under a thin rule; a short black bar springs to the active tab.
  * On Home it fades with Home's buttons (lib/home-chrome.ts); on the other tabs
  * it slides away while you scroll down a list (lib/scroll-chrome.ts) and gives
- * its room to the list, so you see more covers. On Home it keeps its height,
- * so nothing above it moves.
+ * its room to the list, so you see more covers. On Home it keeps its height
+ * and floats on the water, which runs behind it to the bottom of the phone:
+ * a tap still switches tabs, and a drag up dives (components/ocean/dive-gesture.ts).
  */
 export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) {
   const insets = useSafeAreaInsets();
@@ -65,9 +75,19 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
   const onHome = focusedName === 'index';
   const fade = useAnimatedStyle(() => {
     const away = tabBarScrollShare(onHome ? 'index' : 'other', tabBarScrollHidden.get());
+    const diving = onHome ? showsAt(oceanDive.get()).tabBar : 1;
     // The negative margin slides it down and hands its room to the screen above, which grows into it.
-    return { opacity: opacity.get() * Math.min(1, Math.max(0, 1 - away * 1.2)), marginBottom: tabBarRoom(height.get(), away) - height.get() };
+    return {
+      opacity: opacity.get() * diving * Math.min(1, Math.max(0, 1 - away * 1.2)),
+      marginBottom: tabBarRoom(height.get(), away) - height.get(),
+      // On Home the screen reaches behind the bar, so the water can run to the bottom of the phone.
+      marginTop: onHome ? -height.get() : 0,
+    };
   });
+  const divePan = useDivePan(onHome);
+  const waterInk = WATER_INK[useOceanInk()];
+  const [under, setUnder] = useState(false);
+  useEffect(() => onDiveSettled(setUnder), []);
 
   // A save on Home lands on Library: the icon bumps, and a +N stays until you open it.
   const libraryRef = useRef<ViewInstance>(null);
@@ -115,19 +135,23 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
     setTabWidth(e.nativeEvent.layout.width / state.routes.length);
   }
 
-  return (
+  const usable = shown && !(onHome && under);
+  const bar = (
     <Animated.View
-      onLayout={(e) => height.set(e.nativeEvent.layout.height)}
-      style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, Spacing.md) }, fade]}
-      pointerEvents={shown ? 'auto' : 'none'}
-      accessibilityElementsHidden={!shown}
-      importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'}>
+      onLayout={(e) => {
+        height.set(e.nativeEvent.layout.height);
+        setOceanTabBarHeight(e.nativeEvent.layout.height);
+      }}
+      style={[styles.wrap, onHome && styles.wrapOnWater, { paddingBottom: Math.max(insets.bottom, Spacing.md) }, fade]}
+      pointerEvents={usable ? 'auto' : 'none'}
+      accessibilityElementsHidden={!usable}
+      importantForAccessibility={usable ? 'auto' : 'no-hide-descendants'}>
       <View style={styles.bar} onLayout={onLayout}>
-        {tabWidth > 0 && <Animated.View style={[styles.indicator, indicator]} />}
+        {tabWidth > 0 && <Animated.View style={[styles.indicator, onHome && { backgroundColor: waterInk.indicator }, indicator]} />}
         {state.routes.map((route, i) => {
           const focused = state.index === i;
           const icon = ICONS[route.name] ?? { idle: 'ellipse-outline', active: 'ellipse', label: route.name };
-          const color = focused ? Colors.text : Colors.textSecondary;
+          const color = onHome ? (focused ? waterInk.active : waterInk.idle) : focused ? Colors.text : Colors.textSecondary;
           const glyph = <Ionicons name={focused ? icon.active : icon.idle} size={24} color={color} />;
           const badge =
             route.name === 'library' && newSaves > 0 && !focused ? (
@@ -168,10 +192,12 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
       </View>
     </Animated.View>
   );
+  return <GestureDetector gesture={divePan}>{bar}</GestureDetector>;
 }
 
 const styles = StyleSheet.create({
   wrap: { backgroundColor: Colors.background, borderTopWidth: 1, borderTopColor: Colors.rule },
+  wrapOnWater: { backgroundColor: 'transparent', borderTopColor: 'transparent' },
   bar: {
     flexDirection: 'row',
     paddingTop: Spacing.md,

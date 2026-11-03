@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, useWindowDimensions, View, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -34,15 +35,23 @@ import { KeepMoment } from '@/components/bottles/keep-moment';
 import { BottleOpening, type OpeningGeometry } from '@/components/bottles/bottle-opening';
 import { LaunchLight } from '@/components/bottles/launch-light';
 import { SEA_BASE, SEA_HEIGHT, SeaLine, seaX, type SeaWave } from '@/components/bottles/sea-line';
+import { settleDiveTo, oceanDive, oceanTravel, oceanReduced, setOceanInk, useOceanTabBarHeight } from '@/components/ocean/dive-gesture';
+import type { OceanBottle } from '@/components/ocean/ocean-canvas';
+import { OceanOverlay, type OceanFilter } from '@/components/ocean/ocean-overlay';
+import type { Creature } from '@/lib/ocean-person';
 import { songLight, useBottles } from '@/hooks/use-bottles';
 import { queueBottleNow, seaPosition } from '@/lib/bottle-countdown';
 import { revealLine } from '@/lib/bottle-journey';
 import type { FeedMode } from '@/lib/bottles';
-import { allDecks, deckCounts, deckLabel, pickDeck, type Deck } from '@/lib/decks';
+import { allDecks, deckCounts, deckLabel, nearestInDeck, oceanDeckLeft, pickDeck, type Deck } from '@/lib/decks';
+import type { Place, Species } from '@/lib/ocean-map';
+import { dayMixAt, surfaceWater } from '@/lib/ocean-scene';
+import { CALM_RHYTHM, restingSea, type SeaState } from '@/lib/sea-beat';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useHomeChrome } from '@/hooks/use-home-chrome';
+import { useOcean } from '@/hooks/use-ocean';
 import { cluesLine } from '@/lib/home-copy';
 import { pickStatus, statusText, type StatusItem } from '@/lib/status-line';
 import { addToPiece, forkPiece, saveOnPiece, undoOnPiece, useArt } from '@/hooks/use-art';
@@ -199,6 +208,21 @@ export default function HomeScreen() {
     deckRef.current = next;
     setDeckState(next);
   }
+  // The ocean: Home's water, where it's from, and whether you're under it.
+  const oceanSea = useSharedValue<SeaState>(restingSea(CALM_RHYTHM));
+  const tabBarHeight = useOceanTabBarHeight();
+  const [oceanHour, setOceanHour] = useState(localHour);
+  const restPlace: Place = deck?.kind === 'ocean' ? { water: deck.water, depth: deck.depth } : REST_PLACE;
+  const seaWater = surfaceWater(restPlace.water, restPlace.depth, dayMixAt(oceanHour));
+  useEffect(() => setOceanInk(seaWater.ink), [seaWater.ink]);
+  const [underWater, setUnderWater] = useState(false);
+  const underSinceRef = useRef<number | null>(null);
+  const oceanSpot = useSharedValue(0);
+  const slide = useAnimatedStyle(() => ({
+    transform: [{ translateY: oceanReduced.get() ? 0 : -oceanDive.get() * oceanTravel.get() }],
+  }));
+  // The species you narrowed to ran out, so the filter widened to the whole place.
+  const [deckWidened, setDeckWidened] = useState(false);
   // The MAP button's share, recomputed each time Home is focused.
   const [litShare, setLitShare] = useState<number | null>(null);
 
@@ -627,7 +651,8 @@ export default function HomeScreen() {
   }
   const incoming = bottles.incoming;
   useEffect(() => {
-    if (!incoming || !queueBottleNow(incoming.stepsLeft)) return;
+    // Bottles wait outside a deck: a filter means only those songs.
+    if (!incoming || !queueBottleNow(incoming.stepsLeft) || deckRef.current) return;
     setQueue((q) => (q.length > 0 && !q.some((t) => t.id === incoming.track.id) ? [q[0], incoming.track, ...q.slice(1)] : q));
   }, [incoming, queue.length]);
 
@@ -668,10 +693,17 @@ export default function HomeScreen() {
 
   // A sound deck's next songs: unheard, any genre, one per artist. When it runs dry, back to the genre.
   async function deckTracks(history: SwipeEntry[], excludeArtists: Set<string>, activePreset: PresetId, genre: string): Promise<DiscoveryTrack[]> {
-    const d = deckRef.current;
+    let d = deckRef.current;
     const keep = (a: string) => !excludeArtists.has(a) && !hideFromDiscovery(a) && !alreadyKnown(a);
-    const picked = d ? pickDeck(deckPool(), d, { heard: heardIds(history), keep, n: deckSize, rand: Math.random }) : [];
-    if (picked.length > 0) return picked;
+    const heard = heardIds(history);
+    // Too few of that kind left here: let go of the kind and keep the place, and say so on the status line.
+    if (d?.kind === 'ocean' && d.species && oceanDeckLeft(deckPool(), d, heard, keep).artists < 3) {
+      d = { kind: 'ocean', water: d.water, depth: d.depth };
+      setDeck(d);
+      setDeckWidened(true);
+    }
+    const picked = d ? pickDeck(deckPool(), d, { heard, keep, n: deckSize, rand: Math.random }) : [];
+    if (picked.length > 0) return d?.kind === 'ocean' ? picked.map((t) => ({ ...t, via: 'ocean' as const })) : picked;
     setDeck(null);
     return (await getTracks(activePreset, genre, excludeArtists)).map(trackToDiscoveryTrack);
   }
@@ -700,6 +732,7 @@ export default function HomeScreen() {
     if (under !== strategy) setStrategy(under);
     if (nextMode === 'artist') setNextMode('genre');
     setDeck(next);
+    setDeckWidened(false);
     setQueue([]);
     await runRefill([], under, nextHistory, discoveredGenres, region, preset, nextSeen);
   }
@@ -753,7 +786,7 @@ export default function HomeScreen() {
       preset,
       artistListeners: track.artistListeners,
       trackRank: track.trackRank,
-      ...(track.via === 'map' ? { source: 'map' as const } : track.via === 'bottle' ? { source: 'bottle' as const } : {}),
+      ...(track.via === 'map' ? { source: 'map' as const } : track.via === 'bottle' ? { source: 'bottle' as const } : track.via === 'ocean' ? { source: 'ocean' as const } : {}),
       ...(isSteer
         ? {}
         : {
@@ -874,6 +907,22 @@ export default function HomeScreen() {
   // More like this: the bundled catalog's nearest songs in sound go next, no network (lib/pool.ts nearestBySound).
   function steerToNeighbors(track: DiscoveryTrack) {
     const sound = topSound?.status === 'measured' ? topSound.features : null;
+    // In a deck, More like this stays inside it, or the filter isn't real.
+    const inDeck = deckRef.current;
+    if (inDeck) {
+      const near = nearestInDeck(deckPool(), inDeck, sound, track.artistName, {
+        heard: heardIds(swipeHistory).add(track.id),
+        keep: (a) => !seenArtists.has(a) && !hideFromDiscovery(a) && !alreadyKnown(a),
+        n: 3,
+        rand: Math.random,
+      }).map((t) => (inDeck.kind === 'ocean' ? { ...t, via: 'ocean' as const } : t));
+      if (near.length) {
+        const rest = queue.slice(1).filter((t) => !near.some((n) => n.id === t.id));
+        setQueue([queue[0], ...near, ...rest]);
+        setMoreLike({ ids: new Set(near.map((t) => t.id)), label: sound ? moreLikeLabel(sound) : deckLabel(inDeck) });
+      } else setMoreLike(null);
+      return;
+    }
     // In the dark, the next songs come from beside this one on the map, from any genre, as the map serves them.
     const map = mapFocusRef.current ? loadSoundMap() : null;
     const here = map ? mapPointOf(map, track.id) : null;
@@ -902,7 +951,8 @@ export default function HomeScreen() {
   async function handleSave(track: DiscoveryTrack) {
     const likedAt = Date.now();
     await logSwipe(track, 'like');
-    await saveLike({ ...track, likedAt });
+    // foundBlind outlives the entry above, which Undo can rewind while the save stays.
+    await saveLike({ ...track, likedAt, foundBlind: true });
   }
 
   async function handleRevealDone() {
@@ -1198,7 +1248,7 @@ export default function HomeScreen() {
   const [toast, setToast] = useState(false);
   const [toastFloating, setToastFloating] = useState(false);
   const chrome = useHomeChrome({
-    songsDecided: swipeHistory.length,
+    songsDecided: new Set(swipeHistory.map((e) => e.trackId)).size,
     clipEnded: hasEnded,
     feedStatusUp: !currentTrack,
     sheetOpen: detailsOpen || newsSheetVisible || tuneOpen || genreOpen,
@@ -1206,6 +1256,26 @@ export default function HomeScreen() {
   const { wake } = chrome;
   // Coming back to Home brings them back for a moment.
   useFocusEffect(wake);
+  useFocusEffect(useCallback(() => setOceanHour(localHour()), []));
+  const oceanLife = useOcean(swipeHistory);
+  const onUnderChange = useCallback(
+    (nowUnder: boolean) => {
+      setUnderWater(nowUnder);
+      if (nowUnder) underSinceRef.current ??= Date.now();
+      else {
+        // Time under the water isn't time spent deciding on this card.
+        if (underSinceRef.current != null) cardShownAtRef.current += Date.now() - underSinceRef.current;
+        underSinceRef.current = null;
+        wake();
+      }
+    },
+    [wake]
+  );
+  const noteOceanPlace = useCallback(() => {}, []);
+  const noteCreature = useCallback((_c: Creature) => {}, []);
+  const noteBottle = useCallback((_b: OceanBottle) => {}, []);
+  const openPortrait = useCallback(() => {}, []);
+  const openList = useCallback((_p: Place) => {}, []);
 
   if (!hydrated) {
     return (
@@ -1238,7 +1308,7 @@ export default function HomeScreen() {
     editionReady: editionReady ?? null,
     newsCount: news.length,
     mapWords: mapFocus ? mapFocus.words : null,
-    deckLabel: deck ? deckLabel(deck) : null,
+    deckLabel: deck ? (deckWidened ? `${deckLabel(deck)}, every kind now` : deckLabel(deck)) : null,
     moreLabel: !!moreLike && !!currentTrack && moreLike.ids.has(currentTrack.id) ? moreLike.label : null,
     sortedText:
       isActive(soundFilter) && strategy.type === 'genre'
@@ -1276,15 +1346,37 @@ export default function HomeScreen() {
 
   const revealedNow = !!currentTrack && revealTrack?.id === currentTrack.id;
 
+  const oceanSongsLeft = (place: Place, species: Species | null) =>
+    oceanDeckLeft(
+      deckPool(),
+      { kind: 'ocean', water: place.water, depth: place.depth, ...(species ? { species } : {}) },
+      heardIds(swipeHistory),
+      (a) => !hideFromDiscovery(a) && !alreadyKnown(a)
+    ).songs;
+  function swipeThisPlace({ place, species }: OceanFilter) {
+    settleDiveTo(0);
+    void startDeck({ kind: 'ocean', water: place.water, depth: place.depth, ...(species ? { species } : {}) });
+  }
+
   return (
+    <View style={styles.oceanRoot}>
+      <Animated.View
+        style={[StyleSheet.absoluteFill, slide]}
+        pointerEvents={underWater ? 'none' : 'box-none'}
+        accessibilityElementsHidden={underWater}
+        importantForAccessibility={underWater ? 'no-hide-descendants' : 'auto'}>
     <ThemedView
-      style={[styles.container, { paddingTop: insets.top + Spacing.sm }]}
+      style={[styles.container, { paddingTop: insets.top + Spacing.sm, marginBottom: tabBarHeight }]}
       onLayout={(e) => setFrame({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
       {/* Behind everything: a tap on empty space brings the buttons back. */}
       <Pressable style={StyleSheet.absoluteFill} onPress={wake} accessible={false} />
       {frameW > 0 && (
         <SeaLine
+          sea={oceanSea}
           width={frameW}
+          below={tabBarHeight}
+          water={seaWater}
+          onTapWater={wake}
           incoming={seaBottle}
           outgoing={bottles.launchFx}
           rhythm={seaRhythmNow}
@@ -1540,13 +1632,46 @@ export default function HomeScreen() {
         }}
       />
     </ThemedView>
+      </Animated.View>
+      <OceanOverlay
+        sea={oceanSea}
+        width={frameW}
+        height={frameH + tabBarHeight}
+        surfaceY={seaSurfaceY}
+        floor={tabBarHeight}
+        focused={isFocused}
+        rest={restPlace}
+        hour={oceanHour}
+        life={oceanLife}
+        bottles={NO_BOTTLES}
+        spotlight={oceanSpot}
+        activePlace={deck?.kind === 'ocean' ? restPlace : null}
+        songsLeft={oceanSongsLeft}
+        onSwipeHere={swipeThisPlace}
+        onWake={wake}
+        onUnderChange={onUnderChange}
+        onPlaceChange={noteOceanPlace}
+        onTapCreature={noteCreature}
+        onTapBottle={noteBottle}
+        onPortrait={openPortrait}
+        onOpenList={openList}
+      />
+    </View>
   );
 }
+
+const REST_PLACE: Place = { water: 'reef', depth: 'popular' };
+const NO_BOTTLES: OceanBottle[] = [];
+const localHour = () => {
+  const d = new Date();
+  return d.getHours() + d.getMinutes() / 60;
+};
 
 // The mockup's card: a 340pt square at most.
 const CARD_MAX = 340;
 
 const styles = StyleSheet.create({
+  oceanRoot: { flex: 1, backgroundColor: Colors.background },
   container: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
