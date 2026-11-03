@@ -14,7 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { oceanDive, oceanReduced, oceanTravel, onDiveSettled, settleDiveTo, surfaceNow, useDivePan } from '@/components/ocean/dive-gesture';
-import type { OceanBottle } from '@/components/ocean/ocean-canvas';
+import { MAX_BOTTLES, type OceanBottle } from '@/components/ocean/ocean-canvas';
 import { OceanChart } from '@/components/ocean/ocean-chart';
 import { OceanUi } from '@/components/ocean/ocean-ui';
 import { lazySkia } from '@/components/print/lazy-skia';
@@ -24,7 +24,7 @@ import type { PathPoint } from '@/lib/ocean-chart';
 import { depthDragResult, nearestPlaceIndex, settleDive, showsAt, waterDragResult } from '@/lib/ocean-dive';
 import { hitMember } from '@/lib/ocean-hit';
 import { DEPTHS, WATERS, WATER_INFO, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
-import { restSpot, stagePoses } from '@/lib/ocean-motion';
+import { bottleSpot, stagePoses } from '@/lib/ocean-motion';
 import type { Creature, OceanLife } from '@/lib/ocean-person';
 import type { SeaState } from '@/lib/sea-beat';
 
@@ -271,9 +271,9 @@ export const OceanOverlay = memo(function OceanOverlay({
         handlers.current?.onTapCreature(members[i].creature, members[i].soundAlike);
         return;
       }
-      const here = n.bottles.filter((b) => placeKey(b.place) === placeKey(n.place));
+      const here = row === 0 ? n.bottles.filter((b) => b.place.water === n.place.water).slice(0, MAX_BOTTLES) : [];
       for (let b = 0; b < here.length; b++) {
-        const spot = restSpot(here[b].seed, b, here.length, col, row, n.width, n.height);
+        const spot = bottleSpot(b, here.length, n.width, n.height);
         if (Math.hypot(spot.x - x, spot.y - y) < 30) return handlers.current?.onTapBottle(here[b]);
       }
     },

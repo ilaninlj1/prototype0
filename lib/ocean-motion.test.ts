@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { blink, currentDrift, flourish, homeAt, restSpot, scatter, schoolOffset, stagePoses, swimPose, tempoMatches } from './ocean-motion.ts';
+import { blink, bottleSpot, currentDrift, flourish, homeAt, restSpot, separation, scatter, schoolOffset, stagePoses, swimPose, tempoMatches } from './ocean-motion.ts';
 import { floorAt } from './ocean-scene.ts';
 
 const W = 390;
@@ -158,4 +158,20 @@ test('scatter pushes away inside its reach and is nothing outside it', () => {
   assert.equal(dy, 0);
   assert.ok(scatter(110, 200, 100, 200, 90)[0] > dx);
   assert.ok(scatter(100, 200, 100, 200, 90)[0] > 0);
+});
+
+test('bottles float in a line near the top, spread across the screen', () => {
+  const spots = Array.from({ length: 10 }, (_, i) => bottleSpot(i, 10, W, H));
+  for (const s of spots) assert.ok(s.y > H * 0.15 && s.y < H * 0.24);
+  assert.ok(spots[9].x - spots[0].x > W * 0.6);
+  assert.equal(new Set(spots.map((s) => Math.round(s.x))).size, 10);
+});
+
+test('creatures too close push apart, equally and smoothly, and not at all past their reach', () => {
+  assert.deepEqual(separation(0, 0, 100, 0, 40), [0, 0]);
+  const [near] = separation(10, 0, 0, 0, 40);
+  const [nearer] = separation(5, 0, 0, 0, 40);
+  assert.ok(nearer > near && near > 0);
+  assert.ok(separation(0, 0, 0, 0, 40)[0] > 0, 'two in the very same spot still separate');
+  assert.ok(separation(39.9, 0, 0, 0, 40)[0] < 0.01, 'it fades out, with no jump at the edge');
 });

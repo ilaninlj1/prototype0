@@ -7,7 +7,7 @@ import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, createPicture, type S
 import type { Anatomy } from '@/lib/ocean-anatomy';
 import { DEPTHS, WATERS, type Depth, type Kind, type Place, type Water } from '@/lib/ocean-map';
 import type { CoralPiece, SandLife } from '@/lib/ocean-person';
-import { TOWERS, anemoneSpots, floorAt, hexToRgb, mixRgb, seabedAt, towerRadius, type Rgb } from '@/lib/ocean-scene';
+import { TOWERS, anemoneSpots, floorAt, hexToRgb, mixRgb, seabedAt, towerRadius, waterStops, type Rgb } from '@/lib/ocean-scene';
 
 const TAU = Math.PI * 2;
 const CLIP_IN = 1;
@@ -227,21 +227,28 @@ function coralForm(c: SkCanvas, form: number, x: number, y: number, k: number, s
   else brain(c, x, y, 20 * k * size, 14 * k * size, color, mixHex(color, '#1b2a33', 0.32));
 }
 
-function drawTowers(c: SkCanvas, place: Place, width: number, height: number, coral: CoralPiece[], k: number) {
+/** The water's color in a place, which distant things fade toward. */
+export function waterTone(place: Place): string {
+  return waterStops(place.water, place.depth, { night: 0, warm: 0 }).mid;
+}
+
+/** How much of the reef draws at once in a place: the newest, and enough to look like a reef without crowding. */
+const REEF_PIECES = 20;
+
+/**
+ * The reef: there's no rock. Faint outlines of towers rise from below, and the coral is what you listened to, so a reef
+ * only grows where you've been. Coral sits back in the water's color, so the creatures stay in front.
+ */
+function drawReef(c: SkCanvas, place: Place, width: number, height: number, coral: CoralPiece[], k: number) {
   const row = DEPTHS.indexOf(place.depth);
-  const rock = Skia.Paint();
-  rock.setAntiAlias(true);
-  rock.setShader(fadingDown(ROCK.reef, 'reef', row, height));
-  const rim = line(toneAt(mixHex(ROCK.reef, '#ffffff', 0.3), 'reef', row), 2 * k, 0.5);
-  const spots: { x: number; y: number; side: number }[] = [];
+  const tone = waterTone(place);
+  const ghost = fill(mixHex(tone, '#ffffff', 0.16), 0.42);
   TOWERS.forEach((t, i) => {
     const left: number[] = [];
     const right: number[] = [];
-    let first = -1;
     for (let y = -4; y <= height + 4; y += 4) {
       const radius = towerRadius(i, row + y / height);
       if (radius <= 0) continue;
-      if (first < 0) first = y;
       left.push(t.cx * width - radius * width, y);
       right.push(t.cx * width + radius * width, y);
     }
@@ -251,40 +258,30 @@ function drawTowers(c: SkCanvas, place: Place, width: number, height: number, co
     for (let j = 2; j < left.length; j += 2) b.lineTo(left[j], left[j + 1]);
     for (let j = right.length - 2; j >= 0; j -= 2) b.lineTo(right[j], right[j + 1]);
     b.close();
-    c.drawPath(b.build(), rock);
-    // Lumps of old coral all over it, so it reads as something grown and not a pillar.
-    const lump = rng(41 + i * 13 + row * 7);
-    const light = fill(toneAt(mixHex(ROCK.reef, '#ffffff', 0.22), 'reef', row), 0.55);
-    const dark = fill(toneAt(mixHex(ROCK.reef, '#3a3428', 0.35), 'reef', row), 0.5);
-    for (let n = 0; n < 34; n++) {
-      const y = lump() * height;
-      const radius = towerRadius(i, row + y / height);
-      if (radius <= 0.012) continue;
-      const x = t.cx * width + (lump() * 2 - 1) * radius * width * 0.92;
-      const size = (2.5 + lump() * 6) * k;
-      oval(c, x, y, size, size * 0.8, n % 3 === 0 ? dark : light);
-    }
-    const edge = path();
-    edge.moveTo(right[0], right[1]);
-    for (let j = 2; j < right.length; j += 2) edge.lineTo(right[j], right[j + 1]);
-    c.drawPath(edge.build(), rim);
-    // Places on the tower for things to grow.
-    for (let y = Math.max(first + 20, height * 0.08) + i * height * 0.055; y < height * 0.92; y += height * (0.14 + i * 0.025)) {
-      const radius = towerRadius(i, row + y / height);
-      if (radius > 0.02) spots.push({ x: t.cx * width + (i === 1 ? -radius : radius) * width, y, side: i === 1 ? -1 : 1 });
-    }
+    c.drawPath(b.build(), ghost);
   });
-  // The pale flora everyone starts with, then your coral in each song's color.
+  // A little pale growth on each outline, the same for everyone.
   const r = rng(19 + row * 97);
-  spots.forEach((s, i) => {
-    if (i % 2 === 0) coralForm(c, (i / 2 + row) % 3, s.x, s.y, k, 0.8, toneAt(PALE[i % PALE.length], 'reef', row), r, s.side * 0.35);
-  });
-  coral.forEach((piece, i) => {
+  const place3 = (f: () => number, tower: number, yf: number) => {
+    const radius = towerRadius(tower, row + yf);
+    return radius > 0.015 ? { x: (TOWERS[tower].cx + (f() * 2 - 1) * radius * 0.85) * width, y: yf * height } : null;
+  };
+  for (let i = 0; i < 4; i++) {
+    const at = place3(r, i % 3, 0.15 + r() * 0.7);
+    if (at) coralForm(c, i % 3, at.x, at.y, k, 0.55, mixHex(toneAt(PALE[i], 'reef', row), tone, 0.3), r, 0);
+  }
+  // Your coral, packed onto the towers, lower pieces in front.
+  const spots = coral.slice(0, REEF_PIECES).flatMap((piece) => {
     const f = rng(piece.seed + 3);
-    const s = spots.length ? spots[(i * 2 + 1) % spots.length] : { x: width * 0.3, y: height * 0.5, side: 1 };
-    const y = s.y + (f() - 0.5) * height * 0.1;
-    coralForm(c, piece.form, s.x + s.side * f() * 6 * k, y, k, piece.size, piece.color, f, s.side * 0.35);
+    for (let tries = 0; tries < 4; tries++) {
+      const at = place3(f, (piece.seed + tries) % 3, 0.06 + f() * 0.88);
+      if (at) return [{ piece, f, ...at }];
+    }
+    return [];
   });
+  spots.sort((a, b) => a.y - b.y);
+  const sink = 0.26 + [0, 0.08, 0.16, 0.22][row];
+  for (const s of spots) coralForm(c, s.piece.form, s.x, s.y, k, 0.62 * s.piece.size, mixHex(s.piece.color, tone, sink), s.f, (s.f() - 0.5) * 0.5);
 }
 
 function drawBones(c: SkCanvas, width: number, height: number, k: number) {
@@ -318,7 +315,7 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
   const floor = (x: number) => height - floorAt(col, x / width) * height + 3;
   return createPicture(
     (c) => {
-      if (place.water === 'reef') drawTowers(c, place, width, height, coral, k);
+      if (place.water === 'reef') drawReef(c, place, width, height, coral, k);
       if (place.water === 'blue') {
         // Your songs past what can drift live: small still tufts.
         coral.slice(LIVE_GROWTH).forEach((p) => {
@@ -406,9 +403,18 @@ export function recordFar(water: Water, width: number, height: number): SkPictur
           c.drawPath(b.build(), line('#04283a', 2.2 * k, 0.12));
         }
       } else {
-        for (let i = 0; i < 5; i++) {
+        // The same width at top and bottom, so one screen's worth meets the next with no line across.
+        const soft = fill('#000000', 0.13);
+        for (let i = 0; i < 4; i++) {
           const x = r() * width;
-          poly(c, [x - 34 * k, -2, x + 34 * k, -2, x + 22 * k, height + 2, x - 22 * k, height + 2], tone);
+          const half = (24 + r() * 16) * k;
+          const b = path();
+          b.moveTo(x - half, -2);
+          b.cubicTo(x - half * 0.6, height * 0.35, x - half * 1.2, height * 0.65, x - half, height + 2);
+          b.lineTo(x + half, height + 2);
+          b.cubicTo(x + half * 1.2, height * 0.65, x + half * 0.6, height * 0.35, x + half, -2);
+          b.close();
+          c.drawPath(b.build(), soft);
         }
       }
     },
@@ -418,31 +424,22 @@ export function recordFar(water: Water, width: number, height: number): SkPictur
 
 /** The near layer: big soft shapes right by you, which sweep past fastest. Layered strokes stand in for being out of focus. */
 export function recordNear(water: Water, width: number, height: number): SkPicture | null {
-  if (water !== 'kelp' && water !== 'reef') return null;
+  if (water !== 'kelp') return null;
   const k = width / 270;
   const soft = (c: SkCanvas, b: SkPathBuilder, wide: number) => {
     const shape = b.build();
-    for (const [w, a] of [[1.6, 0.07], [1.25, 0.1], [1, 0.14]] as const) c.drawPath(shape, line('#032430', wide * w, a));
+    for (const [w, a] of [[1.6, 0.04], [1.25, 0.06], [1, 0.08]] as const) c.drawPath(shape, line('#032430', wide * w, a));
   };
   return createPicture(
     (c) => {
-      if (water === 'kelp') {
-        const a = path();
-        a.moveTo(width * 1.02, height * 1.02);
-        a.cubicTo(width * 0.9, height * 0.72, width * 1.04, height * 0.5, width * 0.93, height * 0.28);
-        soft(c, a, 15 * k);
-        const b = path();
-        b.moveTo(-width * 0.03, height * 0.75);
-        b.cubicTo(width * 0.06, height * 0.6, -width * 0.02, height * 0.46, width * 0.04, height * 0.34);
-        soft(c, b, 13 * k);
-      } else {
-        const a = path();
-        a.moveTo(width * 1.04, height * 0.96);
-        a.quadTo(width * 0.9, height * 0.84, width * 0.86, height * 0.7);
-        a.moveTo(width * 0.94, height * 0.84);
-        a.quadTo(width * 0.84, height * 0.82, width * 0.78, height * 0.76);
-        soft(c, a, 15 * k);
-      }
+      const a = path();
+      a.moveTo(width * 1.02, height * 1.02);
+      a.cubicTo(width * 0.9, height * 0.72, width * 1.04, height * 0.5, width * 0.93, height * 0.28);
+      soft(c, a, 13 * k);
+      const b = path();
+      b.moveTo(-width * 0.03, height * 0.75);
+      b.cubicTo(width * 0.06, height * 0.6, -width * 0.02, height * 0.46, width * 0.04, height * 0.34);
+      soft(c, b, 11 * k);
     },
     { width, height }
   );
@@ -476,72 +473,132 @@ export function recordFloorDetail(width: number, height: number): SkPicture {
 
 /* ---------- creatures ---------- */
 
-export type SpritePalette = { body: string; dark: string; light: string; accent: string };
+export type SpritePalette = { body: string; back: string; belly: string; fin: string; accent: string };
 
-/** A song's creature: its print's colors, as vivid as you listened. */
-export function songPalette(color: string, accent: string, vivid: number): SpritePalette {
+/** How far each level's creatures sink into the water's color, and how much haze a far one adds. */
+const LEVEL_HAZE = [0, 0.1, 0.22, 0.32];
+const Z_HAZE = [0.2, 0.08, 0];
+
+/**
+ * A song's creature: its print's colors, as vivid as you listened, and tinted by the water around it so it sits in the
+ * scene. Darker on top and lighter underneath, the way real fish are.
+ */
+export function songPalette(color: string, accent: string, vivid: number, tone: string, row: number, z: number): SpritePalette {
   const pale = '#c9d9de';
-  const body = mixHex(pale, color, Math.min(1, vivid * 1.05));
-  return { body, dark: mixHex(body, '#14303d', 0.3), light: mixHex(body, '#ffffff', 0.6), accent: mixHex(pale, accent, Math.min(1, vivid * 1.05)) };
+  const haze = LEVEL_HAZE[row] + Z_HAZE[z];
+  const body = mixHex(mixHex(pale, color, Math.min(1, vivid * 1.05)), tone, haze);
+  return {
+    body,
+    back: mixHex(body, '#0c2733', 0.34),
+    belly: mixHex(body, '#ffffff', 0.42),
+    fin: mixHex(body, '#0c2733', 0.18),
+    accent: mixHex(mixHex(pale, accent, Math.min(1, vivid * 1.05)), tone, haze),
+  };
 }
 
-const eye = (c: SkCanvas, x: number, y: number, r = 1.5) => {
-  oval(c, x, y, r, r, fill('#ffffff'));
-  oval(c, x + 0.3, y, r * 0.6, r * 0.6, fill('#111111'));
+/** A small dark eye with one point of light. */
+const eye = (c: SkCanvas, x: number, y: number, r = 1.2) => {
+  oval(c, x, y, r, r, fill('#0b1a22'));
+  oval(c, x + r * 0.3, y - r * 0.3, r * 0.3, r * 0.3, fill('#ffffff', 0.85));
 };
+
+/** A shape shaded down its height, dark back to light belly. */
+function countershaded(top: number, bottom: number, p: SpritePalette, alpha = 1): SkPaint {
+  const paint = Skia.Paint();
+  paint.setAntiAlias(true);
+  paint.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: top }, { x: 0, y: bottom }, [Skia.Color(p.back), Skia.Color(p.body), Skia.Color(p.belly)], [0, 0.5, 1], TileMode.Clamp));
+  paint.setAlphaf(alpha);
+  return paint;
+}
+
+/** A line that narrows along its length, for tails and long bodies. */
+function taper(c: SkCanvas, pts: number[], from: number, to: number, color: string, alpha = 1) {
+  const n = pts.length / 2 - 1;
+  for (let i = 0; i < n; i++) {
+    const g = i / Math.max(1, n - 1);
+    c.drawLine(pts[i * 2], pts[i * 2 + 1], pts[i * 2 + 2], pts[i * 2 + 3], line(color, from + (to - from) * g, alpha));
+  }
+}
 
 function tailFin(c: SkCanvas, x: number, a: Anatomy, p: SpritePalette, w: number, size: number) {
   const s = size * (0.8 + a.fin * 0.3);
   const lift = w * s * 0.5;
-  const paint = fill(p.dark);
-  if (a.tail === 'fork') poly(c, [x + 1, 0, x - s, -s * 0.85 + lift, x - s * 0.55, lift, x - s, s * 0.85 + lift], paint);
-  else if (a.tail === 'round') {
-    const b = path();
-    b.moveTo(x + 1, 0);
-    b.quadTo(x - s * 1.3, -s * 0.9 + lift, x - s, lift);
-    b.quadTo(x - s * 1.3, s * 0.9 + lift, x + 1, 0);
-    c.drawPath(b.build(), paint);
-  } else poly(c, [x + 1, 0, x - s, -s * 0.6 + lift, x - s * 1.15, lift, x - s, s * 0.6 + lift], paint);
+  const paint = fill(p.fin, 0.92);
+  const b = path();
+  b.moveTo(x + 1.5, 0);
+  if (a.tail === 'fork') {
+    b.quadTo(x - s * 0.5, -s * 0.2 + lift, x - s, -s * 0.85 + lift);
+    b.quadTo(x - s * 0.62, lift, x - s, s * 0.85 + lift);
+    b.quadTo(x - s * 0.5, s * 0.2 + lift, x + 1.5, 0);
+  } else if (a.tail === 'round') {
+    b.quadTo(x - s * 1.25, -s * 0.95 + lift, x - s, lift);
+    b.quadTo(x - s * 1.25, s * 0.95 + lift, x + 1.5, 0);
+  } else {
+    b.quadTo(x - s * 0.7, -s * 0.5 + lift, x - s * 1.1, lift);
+    b.quadTo(x - s * 0.7, s * 0.5 + lift, x + 1.5, 0);
+  }
+  c.drawPath(b.build(), paint);
 }
 
-/** A fish's markings, clipped to its body. */
-function markings(c: SkCanvas, a: Anatomy, p: SpritePalette, L: number, H: number) {
+function fishShape(L: number, H: number) {
   const b = path();
-  b.addOval(Skia.XYWHRect(-L, -H, L * 2, H * 2));
+  b.moveTo(L, 0);
+  b.cubicTo(L * 0.62, -H * 1.12, -L * 0.3, -H * 1.04, -L, -H * 0.1);
+  b.lineTo(-L, H * 0.1);
+  b.cubicTo(-L * 0.3, H * 1.04, L * 0.62, H * 1.12, L, 0);
+  b.close();
+  return b.build();
+}
+
+/** A fish's markings, kept inside its body. */
+function markings(c: SkCanvas, a: Anatomy, p: SpritePalette, shape: ReturnType<typeof fishShape>, L: number, H: number) {
   c.save();
-  c.clipPath(b.build(), CLIP_IN, true);
-  const mark = fill(p.accent);
+  c.clipPath(shape, CLIP_IN, true);
+  const mark = fill(p.accent, 0.9);
   if (a.pattern === 'stripes') {
     const n = Math.max(1, a.marks);
-    const gap = (L * 1.5) / (n + 1);
-    for (let i = 1; i <= n; i++) c.drawRect(Skia.XYWHRect(-L * 0.75 + gap * i - 1.4, -H, 2.8, H * 2), mark);
+    const gap = (L * 1.4) / (n + 1);
+    for (let i = 1; i <= n; i++) {
+      const b = path();
+      const x = -L * 0.7 + gap * i;
+      b.moveTo(x, -H * 1.1);
+      b.quadTo(x + L * 0.1, 0, x, H * 1.1);
+      c.drawPath(b.build(), line(p.accent, Math.max(1.4, L * 0.16), 0.9));
+    }
   } else if (a.pattern === 'spots') {
     const f = rng(a.marks * 31 + 7);
-    for (let i = 0; i < 4 + a.marks * 2; i++) oval(c, (f() * 1.6 - 0.8) * L, (f() * 1.5 - 0.75) * H, 1.2, 1.2, mark);
+    for (let i = 0; i < 4 + a.marks * 2; i++) oval(c, (f() * 1.5 - 0.8) * L, (f() * 1.1 - 0.75) * H, 0.9, 0.9, mark);
   } else if (a.pattern === 'lines') {
-    const glow = line(p.accent, 0.9);
-    for (let i = 0; i < 2 + (a.marks % 2); i++) c.drawLine(-L, -H * 0.4 + i * H * 0.42, L, -H * 0.4 + i * H * 0.42, glow);
+    const glow = line(p.accent, 0.8, 0.95);
+    for (let i = 0; i < 2 + (a.marks % 2); i++) c.drawLine(-L, -H * 0.42 + i * H * 0.42, L, -H * 0.42 + i * H * 0.42, glow);
   } else if (a.pattern === 'band') {
-    c.drawRect(Skia.XYWHRect(-L * 0.2, -H, L * 0.5, H * 2), mark);
+    c.drawRect(Skia.XYWHRect(-L * 0.15, -H * 1.1, L * 0.42, H * 2.2), mark);
   }
-  oval(c, -L * 0.05, H * 0.55, L * 0.72, H * 0.42, fill(p.light, 0.55));
   c.restore();
 }
 
 function fish(c: SkCanvas, a: Anatomy, p: SpritePalette, w: number, L0: number, H0: number, swing: number) {
   const L = L0 * a.length;
   const H = H0 * a.depth;
-  tailFin(c, -L + 1, a, p, w, L0 * 0.68);
-  // Top and bottom fins, bigger on brighter songs.
+  tailFin(c, -L + 1, a, p, w, L0 * 0.62);
   const f = a.fin;
-  poly(c, [-L * 0.5, -H * 0.8, -L * 0.1 + swing, -H - 5 * f, L * 0.45, -H * 0.72], fill(p.dark));
-  poly(c, [-L * 0.3, H * 0.8, -L * 0.1 - swing, H + 3.6 * f, L * 0.3, H * 0.74], fill(p.dark));
-  oval(c, 0, 0, L, H, fill(p.body));
-  markings(c, a, p, L, H);
+  const top = path();
+  top.moveTo(-L * 0.5, -H * 0.82);
+  top.quadTo(-L * 0.15 + swing, -H - 5.5 * f, L * 0.38, -H * 0.8);
+  top.close();
+  c.drawPath(top.build(), fill(p.fin, 0.9));
+  const low = path();
+  low.moveTo(-L * 0.3, H * 0.84);
+  low.quadTo(-L * 0.1 - swing, H + 3.4 * f, L * 0.22, H * 0.8);
+  low.close();
+  c.drawPath(low.build(), fill(p.fin, 0.8));
+  const shape = fishShape(L, H);
+  c.drawPath(shape, countershaded(-H, H, p));
+  markings(c, a, p, shape, L, H);
   // The side fin beats.
-  oval(c, L * 0.12, H * 0.25, 3.4 * f, 1.8, fill(p.dark), 0.5 + swing * 0.4);
-  eye(c, L * 0.62, -H * 0.24, Math.max(1, H0 * 0.2));
-  if (a.voice) oval(c, L * 0.95, H * 0.16, 1.4, 1.4, fill('#14202a', 0.8));
+  oval(c, L * 0.1, H * 0.22, 3 * f, 1.5, fill(p.fin, 0.85), 0.5 + swing * 0.4);
+  eye(c, L * 0.6, -H * 0.22, Math.max(0.9, H0 * 0.16));
+  if (a.voice) oval(c, L * 0.9, H * 0.14, 1, 1, fill('#0b1a22', 0.75));
 }
 
 const FRAMES = 6;
@@ -565,63 +622,43 @@ export function recordCreature(kind: Kind, a: Anatomy, p: SpritePalette): SkPict
 }
 
 function drawKind(c: SkCanvas, kind: Kind, a: Anatomy, w: number, swing: number, p: SpritePalette) {
-  const body = fill(p.body);
-  const dark = fill(p.dark);
-  const light = fill(p.light);
   switch (kind) {
     case 'clown':
-      fish(c, a, p, w, 12, 7.5, swing);
+      fish(c, a, p, w, 11, 7, swing);
       break;
     case 'darter':
-      fish(c, a, p, w, 11, 3.6, swing);
+      fish(c, a, p, w, 12, 3.6, swing);
       break;
     case 'drifter': {
+      const shape = fishShape(10, 3.2);
       tailFin(c, -9, a, p, w, 5);
-      oval(c, 0, 0, 10, 3.2, body);
-      c.drawRect(Skia.XYWHRect(-7, -2.4, 14, 1.2), dark);
-      eye(c, 7, -0.6, 1);
+      c.drawPath(shape, countershaded(-3.2, 3.2, p));
+      eye(c, 6.5, -0.6, 0.9);
       break;
     }
     case 'turtle': {
       const f = swing * 0.55;
-      const flipper = fill(mixHex(p.dark, '#3f6650', 0.25));
-      oval(c, 8, -8, 8 * a.fin, 3, flipper, -0.8 + f);
-      oval(c, 8, 8, 8 * a.fin, 3, flipper, 0.8 - f);
-      oval(c, -11, -6, 5, 2.4, flipper, 0.7 - f * 0.5);
-      oval(c, -11, 6, 5, 2.4, flipper, -0.7 + f * 0.5);
-      oval(c, 14, 0, 5, 3.6, flipper);
-      const L = 13 * a.length;
-      oval(c, 0, 0, L, 10 * a.depth, dark);
-      oval(c, 0, 0, L - 2.5, (10 - 2) * a.depth, body);
-      // The shell's plates are its key.
-      const plate = line(p.accent, 1.1);
-      const n = 1 + Math.max(1, a.marks);
-      for (let i = 1; i < n + 1; i++) c.drawLine(-L * 0.8 + (i * L * 1.6) / (n + 1), -6.5 * a.depth, -L * 0.8 + (i * L * 1.6) / (n + 1), 6.5 * a.depth, plate);
-      c.drawLine(-L * 0.75, 0, L * 0.75, 0, plate);
-      eye(c, 15.5, -1.2, 1);
+      const flipper = fill(p.fin);
+      oval(c, 7, -7.5, 7.5 * a.fin, 2.4, flipper, -0.8 + f);
+      oval(c, 7, 7.5, 7.5 * a.fin, 2.4, flipper, 0.8 - f);
+      oval(c, -9.5, -5, 4.2, 1.9, flipper, 0.7 - f * 0.5);
+      oval(c, -9.5, 5, 4.2, 1.9, flipper, -0.7 + f * 0.5);
+      oval(c, 12.5, 0, 4, 2.9, fill(p.fin));
+      const L = 11 * a.length;
+      const R = 8.5 * a.depth;
+      oval(c, 0, 0, L, R, countershaded(-R, R, p));
+      // The shell's plates are its key: a row of soft scutes, not a grid.
+      const n = 2 + Math.max(1, a.marks);
+      for (let i = 0; i < n; i++) oval(c, -L * 0.62 + (i * L * 1.24) / Math.max(1, n - 1), 0, L / (n + 0.6), R * 0.46, fill(p.accent, 0.75));
+      eye(c, 13.6, -1, 0.8);
       break;
     }
     case 'jelly': {
       const squeeze = 1 + swing * 0.08;
-      const glow = Skia.Paint();
-      glow.setAntiAlias(true);
-      const c0 = Skia.Color(p.light);
-      c0[3] = 0.4;
-      const c1 = Skia.Color(p.light);
-      c1[3] = 0;
-      glow.setShader(Skia.Shader.MakeRadialGradient({ x: 0, y: -2 }, 24, [c0, c1], [0, 1], TileMode.Clamp));
-      c.drawCircle(0, -2, 24, glow);
-      const R = 11 * a.depth;
-      const bell = path();
-      bell.addArc(Skia.XYWHRect(-R * squeeze, -R / squeeze, 2 * R * squeeze, (2 * R) / squeeze), 180, 180);
-      bell.close();
-      c.drawPath(bell.build(), fill(p.body, 0.88));
-      // A rim in the second color, and strands from the song's key.
-      const rim = path();
-      rim.addArc(Skia.XYWHRect(-R * squeeze * 0.7, (-R / squeeze) * 0.7, 1.4 * R * squeeze, (1.4 * R) / squeeze), 200, 140);
-      c.drawPath(rim.build(), line(p.accent, 1.2, 0.8));
-      const strand = line(p.body, 1.1, 0.72);
-      const len = 16 + a.fin * 8;
+      const R = 9.5 * a.depth;
+      // Long thin strands from the song's key, and two thicker arms.
+      const strand = line(p.body, 0.8, 0.55);
+      const len = 13 + a.fin * 6;
       for (let i = 0; i < a.strands; i++) {
         const x = -R * 0.8 + (i * R * 1.6) / Math.max(1, a.strands - 1);
         const b = path();
@@ -629,100 +666,114 @@ function drawKind(c: SkCanvas, kind: Kind, a: Anatomy, w: number, swing: number,
         b.cubicTo(x + swing * 2, len * 0.4, x - swing * 3, len * 0.7, x + swing * 2, len + (i % 2) * 4);
         c.drawPath(b.build(), strand);
       }
+      for (const side of [-1, 1]) {
+        const b = path();
+        b.moveTo(side * R * 0.25, 0);
+        b.cubicTo(side * R * 0.4 + swing * 2, len * 0.3, side * R * 0.1 - swing * 2, len * 0.45, side * R * 0.3 + swing, len * 0.62);
+        c.drawPath(b.build(), line(p.accent, 1.6, 0.6));
+      }
+      const bell = path();
+      bell.addArc(Skia.XYWHRect(-R * squeeze, -R / squeeze, 2 * R * squeeze, (2 * R) / squeeze), 180, 180);
+      bell.close();
+      const glass = Skia.Paint();
+      glass.setAntiAlias(true);
+      glass.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: -R }, { x: 0, y: 0 }, [Skia.Color(p.belly), Skia.Color(p.body)], [0, 1], TileMode.Clamp));
+      glass.setAlphaf(0.86);
+      c.drawPath(bell.build(), glass);
       break;
     }
     case 'puffer': {
-      const spike = fill(p.dark);
+      const R = 9.5;
+      const spike = line(p.back, 0.9, 0.9);
       for (let i = 0; i < a.spines; i++) {
         const t = (i * TAU) / a.spines;
-        poly(c, [Math.cos(t - 0.2) * 9.5, Math.sin(t - 0.2) * 9.5, Math.cos(t) * 13.5, Math.sin(t) * 13.5, Math.cos(t + 0.2) * 9.5, Math.sin(t + 0.2) * 9.5], spike);
+        c.drawLine(Math.cos(t) * R * 0.92, Math.sin(t) * R * 0.92, Math.cos(t) * (R + 2.6), Math.sin(t) * (R + 2.6), spike);
       }
-      tailFin(c, -10, a, p, w, 5);
-      oval(c, 0, 0, 11, 10, body);
-      markings(c, a, p, 11, 10);
-      eye(c, 5, -3, 1.8);
-      if (a.voice) oval(c, 10, 1, 1.5, 1.5, fill('#14202a', 0.8));
+      tailFin(c, -R + 1, a, p, w, 4.5);
+      oval(c, 0, 0, R * 1.04, R, countershaded(-R, R, p));
+      oval(c, 2.5, -R * 0.1, 3 * a.fin, 1.5, fill(p.fin, 0.85), 0.5 + swing * 0.4);
+      eye(c, 5, -3, 1.3);
+      if (a.voice) oval(c, 9, 1, 1, 1, fill('#0b1a22', 0.75));
       break;
     }
     case 'manta': {
-      // Wings that really flap; the second color runs along their backs.
-      const flap = swing * 7;
-      const L = 15 * a.length;
+      // Wings that really flap; the second color runs down its back.
+      const flap = swing * 6;
+      const L = 12.5 * a.length;
       const wing = (side: number) => {
-        const tipY = side * (17 + a.fin * 6) + flap * side * 0.5;
+        const tipY = side * (14 + a.fin * 5) + flap * side * 0.5;
         const b = path();
         b.moveTo(L * 0.6, side * 1);
         b.quadTo(L * 0.25, tipY * 0.8, -L * 0.25, tipY);
         b.quadTo(-L * 0.3, tipY * 0.4, -L * 0.7, side * 2);
         b.close();
-        c.drawPath(b.build(), fill(p.body));
+        c.drawPath(b.build(), countershaded(side < 0 ? tipY : 0, side < 0 ? 0 : tipY, p));
       };
       wing(-1);
       wing(1);
-      const tail = path();
-      tail.moveTo(-L * 0.7, 0);
-      tail.quadTo(-L * 1.4, swing * 5, -L * 2.2, -swing * 6);
-      c.drawPath(tail.build(), line(p.dark, 1.2));
-      oval(c, 0, 0, L * 0.75, 5.5, fill(p.dark));
-      for (let i = 0; i < Math.max(1, a.marks); i++) oval(c, -L * 0.4 + i * 5, 0, 1.5, 1.5, fill(p.accent));
-      poly(c, [L * 0.55, -3, L * 0.95, -5, L * 0.72, -1], fill(p.dark));
-      poly(c, [L * 0.55, 3, L * 0.95, 5, L * 0.72, 1], fill(p.dark));
+      taper(c, [-L * 0.7, 0, -L * 1.1, swing * 2, -L * 1.5, swing * 4, -L * 1.9, swing * 2, -L * 2.2, -swing * 4], 1.3, 0.5, p.back);
+      oval(c, 0, 0, L * 0.72, 4.5, fill(p.back));
+      for (let i = 0; i < Math.max(1, a.marks); i++) oval(c, -L * 0.36 + i * 4.5, 0, 1.2, 1.2, fill(p.accent));
+      eye(c, L * 0.5, -2.8, 0.8);
       break;
     }
     case 'seahorse': {
-      // Upright, with its tail curled and a little fin fluttering.
-      const b = path();
-      b.moveTo(1, -12);
-      b.cubicTo(7 * a.depth, -7, 7 * a.depth, 3, 2, 8);
-      b.cubicTo(-1, 13, -5 + swing, 16, -2 + swing, 19);
-      b.cubicTo(1 + swing, 21, 4 + swing, 18, 1 + swing, 16);
-      c.drawPath(b.build(), line(p.body, 5 * a.depth));
-      oval(c, 3, -14, 4.6, 3.6, body, 0.2);
-      poly(c, [6, -15, 12, -14, 7, -12], fill(p.dark));
-      for (let i = 0; i < 3; i++) poly(c, [-1 + i * 2, -17.5, i * 2, -21 - (i % 2) * 1.5, 1 + i * 2, -17], fill(p.accent));
-      poly(c, [-2, -6, -8 - swing * 2.5 * a.fin, -2, -2, 2], fill(p.dark, 0.85));
-      for (let i = 0; i < Math.max(1, a.marks); i++) c.drawLine(0, -6 + i * 5, 5 * a.depth, -5 + i * 5, line(p.accent, 1));
-      eye(c, 4, -15, 1.1);
+      // Upright, thick at the chest and narrowing to a curled tail.
+      const d = a.depth;
+      const spine = [1, -11, 3.6 * d, -7, 4.4 * d, -3, 3.4 * d, 1, 1.6, 5, 0, 9, -1.4 + swing, 13, -1.6 + swing, 16, 0 + swing, 18, 2.2 + swing, 17.4, 2 + swing, 15];
+      taper(c, spine, 5 * d, 1, p.body);
+      taper(c, [2, -10, 5 * d, -6, 5.6 * d, -2, 4.6 * d, 2], 1.3, 0.8, p.belly, 0.75);
+      oval(c, 3, -13, 3.8, 2.9, fill(p.body), 0.2);
+      taper(c, [5.6, -13.4, 8.4, -13, 10.6, -12.4], 1.6, 1, p.body);
+      for (let i = 0; i < 3; i++) c.drawLine(-0.6 + i * 1.7, -15.2, -0.2 + i * 1.7, -17.6 - (i % 2) * 1.2, line(p.accent, 1));
+      const finS = path();
+      finS.moveTo(-1.5, -6);
+      finS.quadTo(-7 - swing * 2.2 * a.fin, -2, -1.5, 2);
+      finS.close();
+      c.drawPath(finS.build(), fill(p.fin, 0.8));
+      for (let i = 0; i < Math.max(1, a.marks); i++) c.drawLine(0.6, -5 + i * 4, 4.4 * d, -4 + i * 4, line(p.accent, 0.9, 0.9));
+      eye(c, 4, -13.6, 0.85);
       break;
     }
     case 'eel': {
-      // A long body in a wave, always open-mouthed: eels are the songs that talk.
-      const L = 26 * a.length;
-      const b = path();
-      for (let i = 0; i <= 12; i++) {
-        const f = i / 12;
+      // A long body in a wave, thick at the head and narrowing to nothing: eels are the songs that talk.
+      const L = 20 * a.length;
+      const pts: number[] = [];
+      const top: number[] = [];
+      for (let i = 0; i <= 14; i++) {
+        const f = i / 14;
         const x = L * 0.7 - f * L * 1.9;
-        const y = Math.sin(f * 6 + swing * 2.4) * (2 + f * 5);
-        if (i === 0) b.moveTo(x, y);
-        else b.lineTo(x, y);
+        const y = Math.sin(f * 6 + swing * 2.4) * (1.5 + f * 4.5);
+        pts.push(x, y);
+        top.push(x, y - (1.5 - f));
       }
-      const spine = b.build();
-      c.drawPath(spine, line(p.body, 5 * a.depth));
-      c.drawPath(spine, line(p.accent, 1.1));
-      oval(c, L * 0.75, Math.sin(swing * 2.4) * 2, 6.5, 3.8 * a.depth, body);
-      oval(c, L * 0.75 + 5, Math.sin(swing * 2.4) * 2 + 1, 1.8, 1.8, fill('#14202a', 0.85));
-      eye(c, L * 0.75 + 1.5, Math.sin(swing * 2.4) * 2 - 1.6, 1.1);
+      taper(c, pts, 4.2 * a.depth, 0.9, p.body);
+      taper(c, top, 1.1, 0.4, p.accent, 0.9);
+      const hy = Math.sin(swing * 2.4) * 1.5;
+      oval(c, L * 0.74, hy, 5.2, 2.9 * a.depth, fill(p.body));
+      oval(c, L * 0.74 + 4, hy + 0.9, 1.1, 1.1, fill('#0b1a22', 0.8));
+      eye(c, L * 0.74 + 1.4, hy - 1.1, 0.85);
       break;
     }
   }
-  void light;
 }
 
-/** A soft ring of light around a creature, for the night, the deep, and a song in the same key. */
-export function recordHalo(color: string): SkPicture {
+/** The soft light around a creature. Bright is a reason to look (same key, its big move); faint is just the deep. */
+export function recordHalo(color: string, bright: boolean): SkPicture {
+  const R = bright ? 30 : 19;
   return createPicture(
     (c) => {
       const p = Skia.Paint();
       p.setAntiAlias(true);
       p.setBlendMode(BlendMode.Screen);
       const c0 = Skia.Color(color);
-      c0[3] = 0.5;
+      c0[3] = bright ? 0.6 : 0.2;
       const c1 = Skia.Color(color);
       c1[3] = 0;
-      p.setShader(Skia.Shader.MakeRadialGradient({ x: 0, y: 0 }, 30, [c0, c1], [0, 1], TileMode.Clamp));
-      c.drawCircle(0, 0, 30, p);
+      p.setShader(Skia.Shader.MakeRadialGradient({ x: 0, y: 0 }, R, [c0, c1], [0, 1], TileMode.Clamp));
+      c.drawCircle(0, 0, R, p);
     },
-    Skia.XYWHRect(-30, -30, 60, 60)
+    Skia.XYWHRect(-R, -R, R * 2, R * 2)
   );
 }
 

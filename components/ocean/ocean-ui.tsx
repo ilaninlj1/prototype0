@@ -90,14 +90,14 @@ export function OceanUi({
         </Pressable>
       )}
 
-      <View style={styles.depths} pointerEvents="box-none">
+      <View style={styles.depths}>
         {DEPTHS.map((d) => {
           const here = d === place.depth;
           return (
             <Pressable
               key={d}
               onPress={() => onDepth(d)}
-              hitSlop={6}
+              hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
               style={[styles.depth, here && styles.depthHere]}
               accessibilityRole="button"
               accessibilityState={{ selected: here }}
@@ -169,16 +169,17 @@ const styles = StyleSheet.create({
   },
   arrowLeft: { left: Spacing.sm },
   arrowRight: { right: Spacing.sm },
-  depths: { position: 'absolute', right: Spacing.sm, top: '52%', alignItems: 'flex-end', gap: 4 },
-  depth: { paddingVertical: 4, paddingHorizontal: 9, borderRadius: 12, minHeight: 26, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.42)' },
-  depthHere: { backgroundColor: '#ffffff' },
+  // One solid control, so it reads over any water and doesn't look like four loose labels.
+  depths: { position: 'absolute', right: Spacing.sm, top: '52%', padding: 3, gap: 1, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.94)', shadowColor: '#04222d', shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  depth: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 13, justifyContent: 'center' },
+  depthHere: { backgroundColor: Colors.text },
   depthText: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: Colors.text },
-  depthTextHere: { fontWeight: '700' },
+  depthTextHere: { fontWeight: '700', color: Colors.accentText },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg },
-  swipe: { alignSelf: 'stretch', maxWidth: 340, width: '100%', backgroundColor: Colors.text, borderRadius: 26, height: 52, alignItems: 'center', justifyContent: 'center' },
+  swipe: { alignSelf: 'stretch', maxWidth: 340, width: '100%', backgroundColor: Colors.text, borderRadius: 26, height: 48, alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.45 },
   swipeText: { fontSize: 16, lineHeight: 21, fontWeight: '700', color: Colors.accentText },
   row: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm },
-  plain: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: 20, height: 40, paddingHorizontal: 16 },
+  plain: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 19, height: 38, paddingHorizontal: 14 },
   plainText: { fontSize: 14, lineHeight: 19, fontWeight: '600', color: Colors.text },
 });

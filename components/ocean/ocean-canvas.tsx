@@ -2,12 +2,12 @@ import { Canvas, Picture, createPicture, type SkPicture } from '@shopify/react-n
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAnimatedReaction, useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 
-import { anemonesFor, kelpFor, mixHex, raftsFor, recordBottle, recordCreature, recordFar, recordFloorDetail, recordHalo, recordNear, recordPlace, recordRaft, songPalette, tendrilsFor, ventsFor, type Trail } from '@/components/ocean/ocean-art';
+import { anemonesFor, kelpFor, mixHex, raftsFor, recordBottle, waterTone, recordCreature, recordFar, recordFloorDetail, recordHalo, recordNear, recordPlace, recordRaft, songPalette, tendrilsFor, ventsFor, type Trail } from '@/components/ocean/ocean-art';
 import { drawOcean, type Stage, type StageMember, type StopRow } from '@/components/ocean/ocean-draw';
 import { anatomyKey } from '@/lib/ocean-anatomy';
 import { castFor } from '@/lib/ocean-cast';
 import { DEPTHS, WATERS, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
-import { restSpot } from '@/lib/ocean-motion';
+import { bottleSpot } from '@/lib/ocean-motion';
 import { floorSand, type OceanLife } from '@/lib/ocean-person';
 import { SAND, dayMixAt, hexToRgb, waterStops, type Rgb } from '@/lib/ocean-scene';
 import type { SeaState } from '@/lib/sea-beat';
@@ -44,6 +44,7 @@ const rows = (w: Water, d: Depth, hour: number): StopRow => {
   return { top: hexToRgb(s.top), mid: hexToRgb(s.mid), bot: hexToRgb(s.bot), ray: s.ray };
 };
 const vividBucket = (v: number) => Math.round(v * 4) / 4;
+export const MAX_BOTTLES = 10;
 /** How far down the sand is dimmed: Buried is dark, because almost nobody has heard these. */
 const FLOOR_DIM = 0.86;
 const ABYSS: Record<Water, string> = { reef: '#04203a', kelp: '#04221f', blue: '#041a40', midnight: '#020818' };
@@ -52,7 +53,7 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
   // Pictures are expensive to record and cheap to draw, so each is kept until its look actually changes.
   const pictures = useRef(new Map<string, { signature: string; picture: SkPicture }>());
   const sprites = useRef(new Map<string, SkPicture[]>());
-  const halos = useRef(new Map<string, SkPicture>());
+  const halos = useRef(new Map<string, { faint: SkPicture; bright: SkPicture }>());
   const bottleArt = useRef(new Map<string, SkPicture>());
   const raftArt = useRef(new Map<string, SkPicture>());
 
@@ -105,21 +106,24 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
         const members: StageMember[] = castFor(here, life, hour).members.map((m) => {
           const a = m.creature;
           const bucket = vividBucket(a.vivid);
-          const spriteKey = `${m.look}|${a.color}|${a.accent}|${bucket}|${anatomyKey(a.anatomy)}`;
+          const spriteKey = `${m.look}|${a.color}|${a.accent}|${bucket}|${anatomyKey(a.anatomy)}|${key}|${m.z}`;
           let frames = sprites.current.get(spriteKey);
           if (!frames) {
-            frames = recordCreature(m.look, a.anatomy, songPalette(a.color, a.accent, bucket));
+            frames = recordCreature(m.look, a.anatomy, songPalette(a.color, a.accent, bucket, waterTone(here), row, m.z));
             sprites.current.set(spriteKey, frames);
           }
           let halo = halos.current.get(a.color);
           if (!halo) {
-            halo = recordHalo(mixHex(a.color, '#ffffff', 0.25));
+            const light = mixHex(a.color, '#ffffff', 0.25);
+            halo = { faint: recordHalo(light, false), bright: recordHalo(light, true) };
             halos.current.set(a.color, halo);
           }
           return {
             look: m.look,
             frames,
-            halo,
+            faint: halo.faint,
+            bright: halo.bright,
+            z: m.z,
             seed: m.seed,
             pace: m.pace,
             band: m.band,
@@ -138,7 +142,8 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
             big: m.look === 'manta' || (m.scale >= 1.5 && m.look !== 'jelly'),
           };
         });
-        const hereBottles = bottles.filter((b) => placeKey(b.place) === key);
+        // Bottles float, so a water's bottles all bob near the top of its Popular level.
+        const hereBottles = row === 0 ? bottles.filter((b) => b.place.water === water).slice(0, MAX_BOTTLES) : [];
         out.push({
           col: c,
           row,
@@ -158,13 +163,14 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
           tendrils: tendrilsFor(here, width, height, lives?.coral ?? []),
           vents: ventsFor(here, width, height),
           members,
+          order: members.map((_, i) => i).sort((a, b) => members[a].z - members[b].z || a - b),
           bottles: hereBottles.map((b, i) => {
             let art = bottleArt.current.get(b.color);
             if (!art) {
               art = recordBottle(b.color);
               bottleArt.current.set(b.color, art);
             }
-            const spot = restSpot(b.seed, i, hereBottles.length, c, row, width, height);
+            const spot = bottleSpot(i, hereBottles.length, width, height);
             return { sprite: art, x: spot.x, y: spot.y };
           }),
         });

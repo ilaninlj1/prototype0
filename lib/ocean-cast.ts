@@ -19,6 +19,8 @@ export type CastMember = {
   x: number;
   /** How far it strays from home: a clownfish stays by its anemone. */
   reach: number;
+  /** 0 far, 1 middle, 2 near: far ones sit hazier and behind. From the song alone, so it never changes. */
+  z: number;
   scale: number;
   awake: boolean;
   /** The one it swims with: the first of its artist's songs here, or the song that sounds most like it; -1 if none. */
@@ -32,7 +34,7 @@ export type CastMember = {
   songKey: number;
 };
 
-export const MAX_ANIMATED = 40;
+export const MAX_ANIMATED = 30;
 /** Closer than this in sound and two songs swim together. Songs this near are in the closest tenth of a listener's saves. */
 export const SOUND_ALIKE = 0.09;
 
@@ -49,8 +51,11 @@ export function castFor(place: Place, life: OceanLife | null, hour: number): { m
 
   // On the reef, clownfish each nest in an anemone; there's room for all of them to share.
   const nests = place.water === 'reef' ? anemoneSpots(['popular', 'deepcuts', 'gems', 'buried'].indexOf(place.depth)) : [];
-  const members: CastMember[] = kept.map((c) => {
+  // Homes spread evenly over the water by each one's place in the order you found them, not at random, so they don't
+  // land on each other and a new find doesn't move anyone else's.
+  const members: CastMember[] = kept.map((c, index) => {
     const tempo = c.sound?.tempo ?? 100;
+    const nth = kept.length - 1 - index;
     const nest = c.kind === 'clown' && nests.length ? homeAt(nests[c.seed % nests.length].x, nests[c.seed % nests.length].y) : null;
     // A fish that climbed part of a level swims that much nearer the top of it.
     const rise = c.climb - Math.floor(c.climb);
@@ -60,9 +65,10 @@ export function castFor(place: Place, life: OceanLife | null, hour: number): { m
       creature: c,
       seed: c.seed,
       pace: Math.max(0.7, Math.min(1.4, tempo / 110)),
-      band: nest?.band ?? unit(c.seed, 6) * (1 - rise),
-      x: nest?.x ?? unit(c.seed, 7),
+      band: nest?.band ?? ((nth * 0.5698403 + 0.31) % 1) * (1 - rise),
+      x: nest?.x ?? (nth * 0.7548777 + 0.17) % 1,
       reach: nest ? 0.25 : place.water === 'kelp' ? 0.8 : 1,
+      z: Math.floor(unit(c.seed, 13) * 3),
       scale: c.size,
       awake: isAwake(c, hour),
       leader: -1,

@@ -33,7 +33,7 @@ test('never more than the cap move at once, newest first, and the rest are count
   const { members, hiddenCount } = castFor(here, lifeWith(Array.from({ length: 63 }, (_, i) => creature(i))), 13);
   assert.equal(members.length, MAX_ANIMATED);
   assert.equal(members[0].creature.trackId, 0);
-  assert.equal(hiddenCount, 23);
+  assert.equal(hiddenCount, 33);
 });
 
 test('the same input gives the same stage', () => {
@@ -92,4 +92,20 @@ test('a fish partway up a level swims nearer its top', () => {
   const still = castFor(here, lifeWith([creature(1, { kind: 'darter' })]), 13).members[0];
   const up = castFor(here, lifeWith([creature(1, { kind: 'darter', climb: 0.5 })]), 13).members[0];
   assert.ok(up.band < still.band);
+});
+
+test('homes spread over the water: no two start on top of each other, and a new find moves nobody else', () => {
+  const list = Array.from({ length: 20 }, (_, i) => creature(i, { kind: 'darter' }));
+  const m = castFor(here, lifeWith(list), 13).members;
+  let closest = Infinity;
+  for (let i = 0; i < m.length; i++) for (let j = i + 1; j < m.length; j++) closest = Math.min(closest, Math.hypot(m[i].x - m[j].x, m[i].band - m[j].band));
+  assert.ok(closest > 0.08, `closest ${closest}`);
+  const withNew = castFor(here, lifeWith([creature(99, { kind: 'darter' }), ...list]), 13).members;
+  assert.deepEqual([withNew[1].x, withNew[1].band], [m[0].x, m[0].band]);
+});
+
+test('each song keeps its own depth in the picture', () => {
+  const a = castFor(here, lifeWith([creature(1)]), 13).members[0].z;
+  assert.ok([0, 1, 2].includes(a));
+  assert.equal(castFor(here, lifeWith([creature(1), creature(2)]), 13).members[0].z, a);
 });

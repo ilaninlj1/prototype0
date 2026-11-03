@@ -8,7 +8,7 @@
 
 import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, type SkCanvas, type SkPicture, type SkShader } from '@shopify/react-native-skia';
 
-import { blink, scatter, stagePoses, tempoMatches, type StagedMover } from '@/lib/ocean-motion';
+import { blink, scatter, separation, stagePoses, tempoMatches, type StagedMover } from '@/lib/ocean-motion';
 import { floorLift, seabedAt, type Rgb } from '@/lib/ocean-scene';
 import { SEA_BASE, seaY, type SeaState } from '@/lib/sea-beat';
 
@@ -22,7 +22,7 @@ export type AnemoneData = { x: number; y: number; size: number; color: Float32Ar
 export type RaftData = { sprite: SkPicture; x: number; y: number; speed: number; phase: number };
 export type TendrilData = { x: number; length: number; phase: number; bead: Float32Array; lantern: Float32Array | null };
 export type VentData = { x: number; y: number };
-export type StageMember = StagedMover & { frames: SkPicture[]; halo: SkPicture; scale: number; rare: boolean; trackId: number; tempo: number; songKey: number; big: boolean };
+export type StageMember = StagedMover & { frames: SkPicture[]; faint: SkPicture; bright: SkPicture; scale: number; rare: boolean; trackId: number; tempo: number; songKey: number; big: boolean; z: number };
 export type Stage = {
   col: number;
   row: number;
@@ -35,6 +35,8 @@ export type Stage = {
   tendrils: TendrilData[];
   vents: VentData[];
   members: StageMember[];
+  /** Indexes into members, far ones first, so nearer creatures draw in front. */
+  order: number[];
   bottles: { sprite: SkPicture; x: number; y: number }[];
 };
 
@@ -261,7 +263,9 @@ function drawWeed(c: SkCanvas, weed: WeedData, paint: ReturnType<typeof Skia.Pai
       c.save();
       c.translate(x + side * 6, y);
       c.rotate(side * (0.5 + Math.sin(t + y * 0.01) * 0.15) * 57.3, 0, 0);
-      c.drawOval(Skia.XYWHRect(-7, -2.8, 14, 5.6), leaf);
+      // Leaves vary along the stem, rather than repeating one size.
+      const size = 0.75 + 0.35 * Math.sin(y * 0.031 + weed.phase);
+      c.drawOval(Skia.XYWHRect(-7 * size, -2.8 * size, 14 * size, 5.6 * size), leaf);
       c.restore();
     }
   }
@@ -294,8 +298,23 @@ function drawCreatures(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: numb
     }
   }
 
-  const glowing = f.night > 0.4 || stage.row >= 2;
+  // Nothing sits on top of anything else: anyone too close nudges apart.
   for (let i = 0; i < members.length; i++) {
+    for (let j = i + 1; j < members.length; j++) {
+      if (members[j].leader === i || members[i].leader === j || (members[i].leader >= 0 && members[i].leader === members[j].leader)) continue;
+      const reach = 21 * k * (members[i].scale + members[j].scale) * 0.5;
+      const push = separation(poses[i].x, poses[i].y, poses[j].x, poses[j].y, reach);
+      if (push[0] === 0 && push[1] === 0) continue;
+      poses[i].x += push[0];
+      poses[i].y += push[1];
+      poses[j].x -= push[0];
+      poses[j].y -= push[1];
+    }
+  }
+
+  const deep = f.night > 0.4 || stage.row >= 2;
+  for (let n = 0; n < stage.order.length; n++) {
+    const i = stage.order[n];
     const m = members[i];
     const pose = poses[i];
     const dancing = !!f.song && m.awake && tempoMatches(m.tempo, f.song.tempo);
@@ -304,7 +323,8 @@ function drawCreatures(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: numb
     const frame = Math.max(0, Math.min(m.frames.length - 1, Math.floor(((tail + 1) / 2) * m.frames.length)));
     let x = pose.x;
     let y = pose.y - (dancing ? pulse * 6 * k : 0);
-    let s = k * m.scale * pose.puff * (dancing ? 1 + 0.07 * pulse : 1);
+    // Far ones a little smaller, near ones a little larger.
+    let s = k * m.scale * pose.puff * (dancing ? 1 + 0.07 * pulse : 1) * (0.88 + m.z * 0.12);
     const lit = f.spotId !== 0 && m.trackId === f.spotId;
     // In Midnight they flash to find each other.
     const flashing = stage.col === 3 && m.awake && blink(m.leader >= 0 ? members[m.leader].seed : m.seed, t) > 0.2;
@@ -318,10 +338,12 @@ function drawCreatures(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: numb
     c.translate(x, y);
     const turn = pose.tilt + pose.spin;
     if (turn !== 0) c.rotate(turn * 57.3, 0, 0);
-    if (glowing || lit || inKey || flashing || pose.flash > 0.2) {
+    // A bright glow always means something: its key, its big move, a flash, the song it's playing. Faint is just the deep.
+    const bright = lit || inKey || flashing || pose.flash > 0.2;
+    if (bright || deep) {
       c.save();
-      c.scale(flashing ? s * 1.5 : s, flashing ? s * 1.5 : s);
-      c.drawPicture(m.halo);
+      c.scale(s, s);
+      c.drawPicture(bright ? m.bright : m.faint);
       c.restore();
     }
     c.scale(face * s, s);
@@ -514,8 +536,10 @@ function drawStage(c: SkCanvas, f: Frame, stage: Stage, dx: number, oy: number, 
   for (let i = 0; i < stage.bottles.length; i++) {
     const b = stage.bottles[i];
     c.save();
-    c.translate(b.x, b.y);
-    c.scale(k * 0.8, k * 0.8);
+    // Bottles float: they bob and rock a little.
+    c.translate(b.x, b.y + Math.sin(t * 0.7 + i * 1.7) * 3 * k);
+    c.rotate(Math.sin(t * 0.5 + i) * 7, 0, 0);
+    c.scale(k * 0.55, k * 0.55);
     c.drawPicture(b.sprite);
     c.restore();
   }

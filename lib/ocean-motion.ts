@@ -77,12 +77,12 @@ export function swimPose(m: Mover, t: number, w: number, h: number): Pose {
       // Dash and pause: its pace surges and stalls.
       const u = t * 0.22 * p + 0.55 * Math.sin(t * 0.9 * p + ph);
       const c = Math.cos(u + ph);
-      return { x: hx + Math.sin(u + ph) * w * 0.34 * r, y: hy + Math.sin(u * 0.7 + ph2) * 54 * r, face: faceOf(c), tail: Math.sin(t * 11 + ph), tilt: Math.cos(u * 0.7 + ph2) * 0.1 * (c >= 0 ? 1 : -1), spin: 0, puff: 1, flash: fl };
+      return { x: hx + Math.sin(u + ph) * w * 0.22 * r, y: hy + Math.sin(u * 0.7 + ph2) * 38 * r, face: faceOf(c), tail: Math.sin(t * 11 + ph), tilt: Math.cos(u * 0.7 + ph2) * 0.1 * (c >= 0 ? 1 : -1), spin: 0, puff: 1, flash: fl };
     }
     case 'turtle': {
       const u = t * 0.07 * p;
       const c = Math.cos(u + ph);
-      return { x: hx + Math.sin(u + ph) * w * 0.32 * r, y: hy + Math.sin(u * 0.8 + ph2) * 62 * r, face: faceOf(c), tail: Math.sin(t * 2.2 + ph), tilt: Math.cos(u * 0.8 + ph2) * 0.12 * (c >= 0 ? 1 : -1), spin: fl > 0 ? TAU * ((1 - Math.cos(Math.PI * fl)) / 2) * 0 : 0, puff: 1, flash: fl };
+      return { x: hx + Math.sin(u + ph) * w * 0.2 * r, y: hy + Math.sin(u * 0.8 + ph2) * 42 * r, face: faceOf(c), tail: Math.sin(t * 2.2 + ph), tilt: Math.cos(u * 0.8 + ph2) * 0.12 * (c >= 0 ? 1 : -1), spin: fl > 0 ? TAU * ((1 - Math.cos(Math.PI * fl)) / 2) * 0 : 0, puff: 1, flash: fl };
     }
     case 'jelly': {
       const pulse = Math.sin(t * 1.3 * p + ph);
@@ -91,13 +91,13 @@ export function swimPose(m: Mover, t: number, w: number, h: number): Pose {
     case 'puffer': {
       const u = t * 0.12 * p;
       const c = Math.cos(u + ph);
-      return { x: hx + Math.sin(u + ph) * w * 0.16 * r, y: hy + Math.sin(u * 1.4 + ph2) * 34 * r, face: faceOf(c), tail: Math.sin(t * 5 + ph), tilt: 0, spin: 0, puff: 1 + 0.55 * fl, flash: fl };
+      return { x: hx + Math.sin(u + ph) * w * 0.1 * r, y: hy + Math.sin(u * 1.4 + ph2) * 24 * r, face: faceOf(c), tail: Math.sin(t * 5 + ph), tilt: 0, spin: 0, puff: 1 + 0.55 * fl, flash: fl };
     }
     case 'manta': {
       // A wide figure of eight, and now and then a full loop.
       const u = t * 0.09 * p;
       const c = Math.cos(u + ph);
-      return { x: hx + Math.sin(u + ph) * w * 0.34 * r, y: hy + Math.sin(2 * (u + ph)) * 58 * r, face: faceOf(c), tail: Math.sin(t * 1.6 + ph), tilt: Math.cos(2 * (u + ph)) * 0.18 * (c >= 0 ? 1 : -1), spin: fl > 0 ? TAU * (1 - Math.cos((Math.PI * fl) / 2)) : 0, puff: 1, flash: fl };
+      return { x: hx + Math.sin(u + ph) * w * 0.24 * r, y: hy + Math.sin(2 * (u + ph)) * 40 * r, face: faceOf(c), tail: Math.sin(t * 1.6 + ph), tilt: Math.cos(2 * (u + ph)) * 0.18 * (c >= 0 ? 1 : -1), spin: fl > 0 ? TAU * (1 - Math.cos((Math.PI * fl) / 2)) : 0, puff: 1, flash: fl };
     }
     case 'seahorse': {
       return { x: hx + Math.sin(t * 0.09 + ph) * 18, y: hy + Math.sin(t * 0.5 * p + ph2) * 14, face: Math.sin(t * 0.05 + ph) >= 0 ? 1 : -1, tail: Math.sin(t * 3 * p + ph), tilt: Math.sin(t * 0.5 + ph) * 0.08 + fl * 0.3, spin: 0, puff: 1, flash: fl };
@@ -105,13 +105,13 @@ export function swimPose(m: Mover, t: number, w: number, h: number): Pose {
     case 'eel': {
       const u = t * 0.13 * p;
       const c = Math.cos(u + ph);
-      return { x: hx + Math.sin(u + ph) * w * 0.3 * r, y: hy + Math.sin(u * 1.7 + ph2) * 30 * r, face: faceOf(c), tail: Math.sin(t * 4 + ph), tilt: 0, spin: 0, puff: 1, flash: fl };
+      return { x: hx + Math.sin(u + ph) * w * 0.18 * r, y: hy + Math.sin(u * 1.7 + ph2) * 22 * r, face: faceOf(c), tail: Math.sin(t * 4 + ph), tilt: 0, spin: 0, puff: 1, flash: fl };
     }
     default: {
       // Clownfish and drifters potter about, and sometimes turn a roll.
       const u = t * 0.16 * p;
       const c = Math.cos(u + ph);
-      return { x: hx + Math.sin(u + ph) * w * 0.24 * r, y: hy + Math.sin(u * 1.3 + ph2) * 46 * r, face: faceOf(c), tail: Math.sin(t * 9 * p + ph), tilt: Math.cos(u * 1.3 + ph2) * 0.08 * (c >= 0 ? 1 : -1), spin: fl > 0 ? TAU * (1 - Math.cos((Math.PI * fl) / 2)) : 0, puff: 1, flash: fl };
+      return { x: hx + Math.sin(u + ph) * w * 0.14 * r, y: hy + Math.sin(u * 1.3 + ph2) * 30 * r, face: faceOf(c), tail: Math.sin(t * 9 * p + ph), tilt: Math.cos(u * 1.3 + ph2) * 0.08 * (c >= 0 ? 1 : -1), spin: fl > 0 ? TAU * (1 - Math.cos((Math.PI * fl) / 2)) : 0, puff: 1, flash: fl };
     }
   }
 }
@@ -127,6 +127,25 @@ export function restSpot(seed: number, i: number, n: number, col: number, row: n
   const fx = 0.08 + (slot + jitter) * 0.84;
   if (row >= 3) return { x: fx * w, y: h - floorAt(col, fx) * h - 5 - unit(seed, 3) * 6 };
   return { x: fx * w, y: (0.3 + unit(seed, 3) * 0.42) * h };
+}
+
+/** Bottles float, so they all bob along near the top of Popular, spread in a loose line. */
+export function bottleSpot(i: number, n: number, w: number, h: number): { x: number; y: number } {
+  'worklet';
+  return { x: (0.08 + ((i + 0.5) / Math.max(1, n)) * 0.84) * w, y: (0.17 + ((i % 3) / 2) * 0.05) * h };
+}
+
+/** Two creatures closer than this push each other apart, so nothing sits on top of anything else. Nothing outside it. */
+export function separation(ax: number, ay: number, bx: number, by: number, reach: number): [number, number] {
+  'worklet';
+  const dx = ax - bx;
+  const dy = ay - by;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d >= reach) return [0, 0];
+  const f = 1 - d / reach;
+  const push = f * f * reach * 0.5;
+  if (d < 0.001) return [push, 0];
+  return [(dx / d) * push, (dy / d) * push];
 }
 
 /** In Open blue everyone rides the same current: a slow shared drift and swell, so they move as one. */
