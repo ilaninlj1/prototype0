@@ -125,7 +125,7 @@ export function moonAt(hour: number, width: number, horizon: number): SkyBody {
   const t = ((h - 20.4 + 24) % 24) / 9.2;
   const a = Math.PI * t;
   const k = width / 390;
-  return { x: width / 2 - k * (60 * Math.cos(a) + 125 * Math.sin(a)), y: horizon - (horizon - 32) * Math.pow(Math.max(0, Math.sin(a)), 0.35), up: t < 1.04, low: 0 };
+  return { x: width / 2 - k * (60 * Math.cos(a) + 125 * Math.sin(a)), y: horizon - (horizon - 32) * Math.pow(Math.max(0, Math.sin(a)), 0.15), up: t < 1.04, low: 0 };
 }
 
 /** Makes `c` no brighter than `most` of `than`. */

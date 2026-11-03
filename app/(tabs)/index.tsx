@@ -1584,7 +1584,7 @@ export default function HomeScreen() {
           playing={status.playing}
         />
       )}
-      {frameW > 0 && <SeaGlitter width={frameW} height={frameH + tabBarHeight} surfaceY={seaSurfaceY} look={skyLook} hour={hourNow} active={isFocused} />}
+      {frameW > 0 && <SeaGlitter width={frameW} height={frameH + 6} surfaceY={seaSurfaceY} look={skyLook} hour={hourNow} active={isFocused} />}
 
       <ChromeFade visible={chrome.visible} alwaysShow={statusItem?.kind === 'failed'} style={styles.statusLine}>
         {statusItem && (

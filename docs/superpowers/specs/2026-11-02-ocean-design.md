@@ -36,7 +36,7 @@ The answer this design commits to: **the song decides what it is, and you decide
 
 ## Goals
 
-- Home's card, words and buttons stay exactly where they are. The white stays white. The water is the only new thing on Home.
+- Home's card, words and buttons stay exactly where they are. The white stays white. The water is the only new thing on Home. (Changed 2026-11-03: the user asked for a sky on Home. See `2026-11-03-home-sky-design.md`.)
 - Swiping up from the water takes you under, and the water follows the finger the whole way.
 - Two people's oceans look different, and the same song looks different in each.
 - Every visible trait of a song's creature has one cause, and the app can say it in a sentence.

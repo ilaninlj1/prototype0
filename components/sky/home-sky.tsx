@@ -72,7 +72,8 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
   const colors = useMemo(() => islandColors(look), [look]);
   const veil = useMemo(() => wordsVeil(look, wordsDark), [look, wordsDark]);
   const night = look.day.night;
-  const starAmount = Math.max(0, Math.min(1, (night - 0.45) / 0.5)) * (1 - weather.dark * 0.8);
+  // Stars and the moon sit over the sky's canvas, so cloud thins them instead of covering them.
+  const starAmount = Math.max(0, Math.min(1, (night - 0.45) / 0.5)) * (1 - weather.dark * 0.8) * Math.max(0, 1 - weather.cover * 1.1);
 
   const lookFrom = useSharedValue(vector);
   const lookTo = useSharedValue(vector);
@@ -181,7 +182,7 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
   const zen = toHex(look.zen);
   const mid = toHex(look.mid);
   const hor = toHex(look.hor);
-  const moonVis = moon.up ? Math.max(0, Math.min(1, (night - 0.3) / 0.5)) * (1 - weather.dark * 0.6) : 0;
+  const moonVis = moon.up ? Math.max(0, Math.min(1, (night - 0.3) / 0.5)) * (1 - weather.dark * 0.6) * (1 - weather.cover * 0.5) : 0;
   const islandLeft = width * 0.45 - ISLAND_WIDTH / 2;
 
   return (
