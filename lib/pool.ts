@@ -56,7 +56,8 @@ import { shuffle } from './taste-test.ts';
 import { soundFor } from './sound-index.ts';
 import { pickSorted, type SoundFilter } from './sound-filter.ts';
 import { pickNeighbors, type Candidate } from './sound-neighbors.ts';
-import type { RunCandidate } from './run-songs.ts';
+import type { RunCandidate as BaseRunCandidate } from './run-songs.ts';
+import { depthOfBands, depthOfLiveTrack, type Depth } from './ocean-map.ts';
 import { loadSoundMap, pickNear, type MapPoint } from './sound-map.ts';
 import { releaseDay } from './song-age.ts';
 import type { SoundFeatures } from './sound.ts';
@@ -824,6 +825,7 @@ export function getTracksNear(point: MapPoint, n: number, heard: Set<number>, ex
  * Run mode's pool (lib/run-songs.ts): every catalog song with a measured tempo, once per iTunes id, any genre and
  * popularity. Built on first use and cached; the caller filters out heard, known and AI artists.
  */
+type RunCandidate = BaseRunCandidate & { depth: Depth };
 let runPool: RunCandidate[] | null = null;
 export function runCandidates(): RunCandidate[] {
   if (runPool) return runPool;
@@ -841,7 +843,8 @@ export function runCandidates(): RunCandidate[] {
         const sound = soundFor(entry.itunesTrackId);
         if (!sound || !(sound.tempo > 0)) continue;
         seen.add(entry.itunesTrackId);
-        out.push({ track: trackToDiscoveryTrack(catalogTrack(seed, ac, entry, 'M', genreTag)), tempo: sound.tempo, energy: sound.energy, artist: name });
+        const track = catalogTrack(seed, ac, entry, 'M', genreTag);
+        out.push({ track: trackToDiscoveryTrack(track), tempo: sound.tempo, energy: sound.energy, artist: name, depth: depthOfBands(track.source.artistBand, track.source.songBand) });
       }
     }
   }
@@ -850,16 +853,16 @@ export function runCandidates(): RunCandidate[] {
 
 let deckPoolCache: DeckCandidate[] | null = null;
 
-/** Every measured catalog song, any genre, for the sound decks (lib/decks.ts pickDeck). */
+/** Every measured catalog song, any genre, for sound and ocean decks (lib/decks.ts pickDeck). */
 export function deckPool(): DeckCandidate[] {
   deckPoolCache ??= runCandidates().flatMap((c) => {
     const sound = soundFor(c.track.id);
-    return sound ? [{ track: c.track, artist: c.artist, sound }] : [];
+    return sound ? [{ track: c.track, artist: c.artist, sound, depth: c.depth }] : [];
   });
   return deckPoolCache;
 }
 
-let byIdIndex: Map<number, DiscoveryTrack> | null = null;
+let byIdIndex: Map<number, { track: DiscoveryTrack; depth: Depth }> | null = null;
 
 /** A bundled catalog song by its iTunes track id, built once. Bottles resolve strangers' songs here first, with no network. */
 export function catalogTrackById(id: number): DiscoveryTrack | null {
@@ -872,12 +875,21 @@ export function catalogTrackById(id: number): DiscoveryTrack | null {
       for (const [name, ac] of Object.entries(catalog)) {
         const seed = seeds.get(name);
         if (!seed || seed.itunesArtistId == null) continue;
-        for (const entry of [...ac.mixed, ...ac.hits, ...ac.deepCuts])
-          if (!byIdIndex.has(entry.itunesTrackId)) byIdIndex.set(entry.itunesTrackId, trackToDiscoveryTrack(catalogTrack(seed, ac, entry, 'M', genreTag)));
+        for (const entry of [...ac.mixed, ...ac.hits, ...ac.deepCuts]) {
+          if (byIdIndex.has(entry.itunesTrackId)) continue;
+          const track = catalogTrack(seed, ac, entry, 'M', genreTag);
+          byIdIndex.set(entry.itunesTrackId, { track: trackToDiscoveryTrack(track), depth: depthOfBands(track.source.artistBand, track.source.songBand) });
+        }
       }
     }
   }
-  return byIdIndex.get(id) ?? null;
+  return byIdIndex.get(id)?.track ?? null;
+}
+
+/** Catalog bands win even when a saved song has no popularity data. Only unknown ids use live bands. */
+export function depthOfTrack(t: DiscoveryTrack): Depth {
+  catalogTrackById(t.id); // Build the shared index once, including unmeasured and mixed-only songs.
+  return byIdIndex!.get(t.id)?.depth ?? depthOfLiveTrack(t);
 }
 
 /**

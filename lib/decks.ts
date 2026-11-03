@@ -5,6 +5,7 @@
 import { pickNeighbors } from './sound-neighbors.ts';
 import { keyLabel, type SoundFeatures } from './sound.ts';
 import type { DiscoveryTrack } from './discovery.ts';
+import { placeKey, placeLabel, SPECIES_INFO, speciesOf, waterOf, type Depth, type Species, type Water } from './ocean-map.ts';
 
 export type SoundDeckId = 'quiet' | 'medium' | 'loud' | 'slow' | 'mid' | 'fast' | 'instrumental' | 'talky' | 'acoustic' | 'electronic' | 'danceable' | 'bright' | 'moody';
 
@@ -12,7 +13,8 @@ export type Deck =
   | { kind: 'sound'; id: SoundDeckId }
   | { kind: 'key'; key: number; mode: 0 | 1 }
   | { kind: 'tempo'; lo: number; hi: number }
-  | { kind: 'like'; trackId: number; label: string; sound: SoundFeatures };
+  | { kind: 'like'; trackId: number; label: string; sound: SoundFeatures }
+  | { kind: 'ocean'; water: Water; depth: Depth; species?: Species };
 
 const isLoud = (s: SoundFeatures) => s.energy >= 0.7 && s.loudness >= -8; // lib/sound.ts describeSound's rule
 
@@ -65,6 +67,8 @@ export function deckKey(d: Deck): string {
       return `tempo:${d.lo}-${d.hi}`;
     case 'like':
       return `like:${d.trackId}`;
+    case 'ocean':
+      return `ocean:${placeKey(d)}${d.species ? `:${d.species}` : ''}`;
   }
 }
 
@@ -78,10 +82,12 @@ export function deckLabel(d: Deck): string {
       return `${d.lo}–${d.hi} BPM`;
     case 'like':
       return `Like “${d.label}”`;
+    case 'ocean':
+      return d.species ? `${SPECIES_INFO[d.species].means} songs in ${placeLabel(d)}` : placeLabel(d);
   }
 }
 
-export function deckMatches(d: Deck, s: SoundFeatures): boolean {
+export function deckMatches(d: Deck, s: SoundFeatures, depth?: Depth): boolean {
   switch (d.kind) {
     case 'sound':
       return SOUND_BY_ID.get(d.id)?.test(s) ?? false;
@@ -91,6 +97,8 @@ export function deckMatches(d: Deck, s: SoundFeatures): boolean {
       return s.tempo >= d.lo && s.tempo < d.hi;
     case 'like':
       return true; // ranked by closeness instead (pickDeck)
+    case 'ocean':
+      return depth === d.depth && waterOf(s) === d.water && (!d.species || speciesOf(s) === d.species);
   }
 }
 
@@ -115,7 +123,7 @@ export function soundTiles(f: SoundFeatures): { label: string; deck: Deck }[] {
   return tiles;
 }
 
-export type DeckCandidate = { track: DiscoveryTrack; artist: string; sound: SoundFeatures };
+export type DeckCandidate = { track: DiscoveryTrack; artist: string; sound: SoundFeatures; depth: Depth };
 
 /** The next songs for a deck: unheard, kept artists only, one per artist, shuffled (a like deck goes closest first). */
 export function pickDeck(
@@ -125,7 +133,7 @@ export function pickDeck(
 ): DiscoveryTrack[] {
   const open = pool.filter((c) => !o.heard.has(c.track.id) && o.keep(c.artist) && (d.kind !== 'like' || c.track.id !== d.trackId));
   if (d.kind === 'like') return pickNeighbors(d.sound, '', open.map((c) => ({ item: c.track, artist: c.artist, sound: c.sound })), o.n);
-  const matching = open.filter((c) => deckMatches(d, c.sound));
+  const matching = open.filter((c) => deckMatches(d, c.sound, c.depth));
   for (let i = matching.length - 1; i > 0; i--) {
     const j = Math.floor(o.rand() * (i + 1));
     [matching[i], matching[j]] = [matching[j], matching[i]];
@@ -146,7 +154,19 @@ export function deckCounts(pool: DeckCandidate[], decks: Deck[], heard: Set<numb
   const counts = new Map(decks.map((d) => [deckKey(d), 0]));
   for (const c of pool) {
     if (heard.has(c.track.id)) continue;
-    for (const d of decks) if (deckMatches(d, c.sound)) counts.set(deckKey(d), counts.get(deckKey(d))! + 1);
+    for (const d of decks) if (deckMatches(d, c.sound, c.depth)) counts.set(deckKey(d), counts.get(deckKey(d))! + 1);
   }
   return counts;
+}
+
+/** Unheard songs and distinct kept artists left in a place, including its optional species filter. */
+export function oceanDeckLeft(pool: DeckCandidate[], deck: Extract<Deck, { kind: 'ocean' }>, heard: Set<number>, keep: (artist: string) => boolean): { songs: number; artists: number } {
+  let songs = 0;
+  const artists = new Set<string>();
+  for (const c of pool) {
+    if (heard.has(c.track.id) || !keep(c.artist) || !deckMatches(deck, c.sound, c.depth)) continue;
+    songs++;
+    artists.add(c.artist);
+  }
+  return { songs, artists: artists.size };
 }

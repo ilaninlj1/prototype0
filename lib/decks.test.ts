@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { test } from 'node:test';
 
 import { allDecks, deckCounts, deckKey, deckLabel, deckMatches, pickDeck, SOUND_DECKS, soundTiles, TEMPO_BANDS, type Deck, type DeckCandidate } from './decks.ts';
 import type { DiscoveryTrack } from './discovery.ts';
+import type { Depth, Species } from './ocean-map.ts';
 import { describeSound, type SoundFeatures } from './sound.ts';
 
 const f = (over: Partial<SoundFeatures> = {}): SoundFeatures => ({
@@ -73,7 +75,7 @@ const track = (id: number): DiscoveryTrack => ({
   trackViewUrl: '',
   collectionName: null,
 });
-const cand = (id: number, artist: string, sound: SoundFeatures): DeckCandidate => ({ track: track(id), artist, sound });
+const cand = (id: number, artist: string, sound: SoundFeatures, depth: Depth = 'popular'): DeckCandidate => ({ track: track(id), artist, sound, depth });
 
 test('a deck skips songs you heard, artists you excluded, and repeats no artist', () => {
   const quiet: Deck = { kind: 'sound', id: 'quiet' };
@@ -107,4 +109,138 @@ test('the page lists every sound, all 24 keys and every tempo band, each once', 
   const decks = allDecks();
   assert.equal(decks.length, SOUND_DECKS.length + 24 + TEMPO_BANDS.length);
   assert.equal(new Set(decks.map(deckKey)).size, decks.length);
+});
+
+test('an ocean deck stays in its water and depth, with one unheard song per kept artist', () => {
+  const ocean: Deck = { kind: 'ocean', water: 'midnight', depth: 'buried' };
+  const dark = f({ valence: 0.2 });
+  const pool = [
+    cand(1, 'a', dark, 'buried'), cand(2, 'a', dark, 'buried'),
+    cand(3, 'b', dark, 'gems'), cand(4, 'c', f(), 'buried'),
+    cand(5, 'heard', dark, 'buried'), cand(6, 'excluded', dark, 'buried'),
+    cand(7, 'd', dark, 'buried'),
+  ];
+  const picked = pickDeck(pool, ocean, { heard: new Set([5]), keep: (a) => a !== 'excluded', n: 10, rand: () => 0.99 });
+  assert.deepEqual(picked.map((t) => t.id), [1, 7]);
+});
+
+test('an ocean species filter picks only that first-match species', () => {
+  const ocean: Deck = { kind: 'ocean', water: 'midnight', depth: 'buried', species: 'darter' };
+  const pool = [
+    cand(1, 'fast', f({ valence: 0.2, tempo: 125 }), 'buried'),
+    cand(2, 'loud', f({ valence: 0.2, tempo: 125, energy: 0.88 }), 'buried'),
+    cand(3, 'quiet', f({ valence: 0.2, tempo: 125, energy: 0.39 }), 'buried'),
+    cand(4, 'slow', f({ valence: 0.2, tempo: 94 }), 'buried'),
+    cand(5, 'in-between', f({ valence: 0.2 }), 'buried'),
+    cand(6, 'wrong-depth', f({ valence: 0.2, tempo: 125 }), 'popular'),
+  ];
+  assert.deepEqual(pickDeck(pool, ocean, { heard: new Set(), keep: () => true, n: 10, rand: () => 0.99 }).map((t) => t.id), [1]);
+});
+
+test('an instrumental acoustic song never matches a kelp ocean deck', () => {
+  const s = f({ instrumentalness: 0.6, acousticness: 0.9 });
+  assert.equal(deckMatches({ kind: 'ocean', water: 'kelp', depth: 'popular' }, s, 'popular'), false);
+  assert.equal(deckMatches({ kind: 'ocean', water: 'blue', depth: 'popular' }, s, 'popular'), true);
+  assert.equal(deckMatches({ kind: 'sound', id: 'acoustic' }, s), true);
+});
+
+test('ocean matching requires the candidate depth', () => {
+  const ocean: Deck = { kind: 'ocean', water: 'reef', depth: 'popular' };
+  assert.equal(deckMatches(ocean, f()), false);
+  assert.equal(deckMatches(ocean, f(), 'buried'), false);
+  assert.equal(deckMatches(ocean, f(), 'popular'), true);
+});
+
+test('ocean labels describe the place and optional species in plain words', () => {
+  const ocean: Deck = { kind: 'ocean', water: 'midnight', depth: 'buried' };
+  assert.equal(deckLabel(ocean), 'Midnight · Buried');
+  const labels: [Species, string][] = [
+    ['jelly', 'Quiet'], ['turtle', 'Slow'], ['puffer', 'Loud'], ['darter', 'Fast'], ['clown', 'In between'],
+  ];
+  for (const [species, label] of labels) assert.equal(deckLabel({ ...ocean, species }), `${label} songs in Midnight · Buried`);
+});
+
+test('ocean keys distinguish water, depth and species from every existing deck', () => {
+  const ocean: Deck = { kind: 'ocean', water: 'midnight', depth: 'buried' };
+  const keys = [
+    deckKey(ocean), deckKey({ ...ocean, water: 'blue' }), deckKey({ ...ocean, depth: 'gems' }),
+    deckKey({ ...ocean, species: 'darter' }), deckKey({ ...ocean, species: 'puffer' }),
+    ...allDecks().map(deckKey),
+  ];
+  assert.equal(new Set(keys).size, keys.length);
+  assert.equal(deckKey({ ...ocean }), deckKey(ocean));
+});
+
+test('deck counts honor ocean depth and species', () => {
+  const ocean: Deck = { kind: 'ocean', water: 'reef', depth: 'gems' };
+  const fast: Deck = { ...ocean, species: 'darter' };
+  const pool = [
+    cand(1, 'a', f(), 'gems'), cand(2, 'b', f({ tempo: 125 }), 'gems'),
+    cand(3, 'c', f({ tempo: 125 }), 'popular'), cand(4, 'd', f({ tempo: 125 }), 'gems'),
+  ];
+  const counts = deckCounts(pool, [ocean, fast], new Set([4]));
+  assert.equal(counts.get(deckKey(ocean)), 2);
+  assert.equal(counts.get(deckKey(fast)), 1);
+});
+
+test('ocean remaining counts separate songs from artists after all filters', async () => {
+  const { oceanDeckLeft } = await import('./decks.ts');
+  const ocean: Deck = { kind: 'ocean', water: 'reef', depth: 'gems' };
+  const pool = [
+    cand(1, 'a', f({ tempo: 125 }), 'gems'), cand(2, 'a', f({ tempo: 125 }), 'gems'),
+    cand(3, 'b', f(), 'gems'), cand(4, 'heard', f(), 'gems'),
+    cand(5, 'excluded', f(), 'gems'), cand(6, 'wrong-depth', f(), 'popular'),
+    cand(7, 'wrong-water', f({ acousticness: 0.9 }), 'gems'),
+  ];
+  const heard = new Set([4]);
+  const keep = (artist: string) => artist !== 'excluded';
+  assert.deepEqual(oceanDeckLeft(pool, ocean, heard, keep), { songs: 3, artists: 2 });
+  assert.deepEqual(oceanDeckLeft(pool, { ...ocean, species: 'darter' }, heard, keep), { songs: 2, artists: 1 });
+  assert.deepEqual(oceanDeckLeft([], ocean, heard, keep), { songs: 0, artists: 0 });
+});
+
+test('catalog depths survive the run/deck pool and saved-track lookup', async (t) => {
+  // Metro's bundled JSON require, backed by real catalog files in Node.
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'require');
+  Object.defineProperty(globalThis, 'require', { value: createRequire(import.meta.url), configurable: true });
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'require', previous);
+    else Reflect.deleteProperty(globalThis, 'require');
+  });
+  const { catalogTrackById, deckPool, depthOfTrack, runCandidates } = await import('./pool.ts');
+
+  await t.test('catalog lookup uses band and rank even without sound data or saved popularity', () => {
+    // Pop: Rihanna hit/deep cut, Sterling Knight hit/mixed-only track.
+    const examples: [number, Depth][] = [[1441154439, 'popular'], [1443061969, 'deepcuts'], [1440624405, 'gems'], [1440624406, 'buried']];
+    for (const [id, depth] of examples) {
+      assert.ok(catalogTrackById(id));
+      assert.equal(depthOfTrack(track(id)), depth);
+    }
+  });
+
+  await t.test('genre-relative catalog bands beat the live listener cutoff', () => {
+    const known = catalogTrackById(6787082268)!; // Uncle Waffles, popular in Amapiano at 58,881 listeners.
+    assert.ok(known.artistListeners! <= 100_000);
+    assert.equal(depthOfTrack(known), 'popular');
+    assert.equal(depthOfTrack({ ...known, artistListeners: 1, trackRank: 100 }), 'popular');
+  });
+
+  await t.test('every measured deck candidate carries the same depth as its saved track', () => {
+    const candidates = runCandidates();
+    const pool = deckPool();
+    assert.ok(pool.length > 0);
+    assert.equal(pool.length, candidates.length);
+    assert.equal(new Set(pool.map((c) => c.track.id)).size, pool.length);
+    for (let i = 0; i < pool.length; i++) {
+      assert.equal(pool[i].depth, depthOfTrack(pool[i].track));
+      assert.equal(pool[i].depth, candidates[i].depth);
+    }
+  });
+
+  await t.test('songs outside the catalog use live bands and default unknowns to Popular', () => {
+    assert.equal(catalogTrackById(-1), null);
+    assert.equal(depthOfTrack(track(-1)), 'popular');
+    assert.equal(depthOfTrack({ ...track(-1), artistListeners: 100_000, trackRank: 3 }), 'gems');
+    assert.equal(depthOfTrack({ ...track(-1), artistListeners: 100_001, trackRank: 4 }), 'deepcuts');
+  });
 });
