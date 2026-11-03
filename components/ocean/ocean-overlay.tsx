@@ -24,8 +24,9 @@ import { castFor } from '@/lib/ocean-cast';
 import type { PathPoint } from '@/lib/ocean-chart';
 import { depthDragResult, nearestPlaceIndex, settleDive, showsAt, waterDragResult } from '@/lib/ocean-dive';
 import { hitMember } from '@/lib/ocean-hit';
+import { hitLandmark, landmarkSpot, landmarksAt } from '@/lib/ocean-landmarks';
 import { DEPTHS, WATERS, WATER_INFO, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
-import { MAX_BOTTLES, bottleSpot, stagePoses } from '@/lib/ocean-motion';
+import { MAX_BOTTLES, bottleSpot, squidPose, stagePoses, subPose } from '@/lib/ocean-motion';
 import type { Creature, OceanLife } from '@/lib/ocean-person';
 import { DIVE_IN_AT, DIVE_OUT_AT, NO_SPLASH, POWER_SETTLES_AT, smoothSpeed, splashOver, splashPower, type Splash } from '@/lib/ocean-splash';
 import type { SeaState } from '@/lib/sea-beat';
@@ -123,6 +124,13 @@ export const OceanOverlay = memo(function OceanOverlay({
   const metering = useSharedValue(false);
   const [meter, setMeter] = useState<string | null>(null);
   const [chart, setChart] = useState<PathPoint[] | null>(null);
+  // The line a landmark says when tapped, for a few seconds.
+  const [found, setFound] = useState<string | null>(null);
+  useEffect(() => {
+    if (!found) return;
+    const t = setTimeout(() => setFound(null), 5000);
+    return () => clearTimeout(t);
+  }, [found]);
   const splash = useSharedValue<Splash>(NO_SPLASH);
   const lastDive = useSharedValue(0);
   const diveSpeed = useSharedValue(0);
@@ -304,6 +312,15 @@ export const OceanOverlay = memo(function OceanOverlay({
         const spot = bottleSpot(b, here.length, n.width, n.height);
         if (Math.hypot(spot.x - x, spot.y - y) < 30) return handlers.current?.onTapBottle(here[b]);
       }
+      // Things to find, wherever they are right now.
+      const list = landmarksAt(n.place);
+      const spots = list.map((l) => {
+        if (l.kind === 'sub') return subPose(clock.get(), n.width, n.height, l.fx, l.fy ?? 0.4);
+        if (l.kind === 'squid') return squidPose(clock.get(), n.width, n.height, l.fx, l.fy ?? 0.4);
+        return landmarkSpot(l, n.width, n.height);
+      });
+      const hit = hitLandmark(x, y, list, spots, n.width / 270);
+      if (hit) setFound(hit.note);
     },
     wake() {
       handlers.current?.onWake();
@@ -437,7 +454,7 @@ export const OceanOverlay = memo(function OceanOverlay({
         ? "You haven't been here yet"
         : `${WATER_INFO[place.water].caption} · You've heard them all`;
   const empty = (life?.total ?? 0) === 0;
-  const hint = notice ?? (empty ? 'Nothing lives here yet. Save a song blind and it hatches here.' : !here?.creatures.length ? 'None of your songs live here yet.' : hintSeen ? null : 'Tap a creature to see why it looks like that.');
+  const hint = found ?? notice ?? (empty ? 'Nothing lives here yet. Save a song blind and it hatches here.' : !here?.creatures.length ? 'None of your songs live here yet.' : hintSeen ? null : 'Tap a creature to see why it looks like that.');
 
   return (
     <>

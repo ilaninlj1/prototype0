@@ -137,6 +137,25 @@ export function bubbleProgress(i: number, t: number, beat: number): number {
   return v - Math.floor(v);
 }
 
+/** The tiny submarine, puttering slowly back and forth. It turns around at each end. */
+export function subPose(t: number, w: number, h: number, fx: number, fy: number): Pose {
+  'worklet';
+  const u = t * 0.05;
+  const c = Math.cos(u);
+  return { x: fx * w + Math.sin(u) * w * 0.3, y: fy * h + Math.sin(t * 0.4) * 7, face: faceOf(c), tail: Math.sin(t * 7), tilt: Math.sin(t * 0.4) * 0.03, spin: 0, puff: 1, flash: 0 };
+}
+
+/** The squid moves the way squid do: a squeeze and a push up, then a slow sink. */
+export function squidPose(t: number, w: number, h: number, fx: number, fy: number): Pose {
+  'worklet';
+  const cycle = 5;
+  const p = (t % cycle) / cycle;
+  // A quick push for the first fifth of each cycle, drifting back down over the rest.
+  const lift = p < 0.2 ? Math.sin((p / 0.2) * (Math.PI / 2)) : 1 - (p - 0.2) / 0.8;
+  const squeeze = p < 0.2 ? Math.sin((p / 0.2) * Math.PI) : 0;
+  return { x: fx * w + Math.sin(t * 0.07) * w * 0.14, y: fy * h - lift * 46, face: 1, tail: squeeze * 2 - 1, tilt: Math.sin(t * 0.07) * 0.14, spin: 0, puff: 1, flash: 0 };
+}
+
 export const MAX_BOTTLES = 10;
 
 /** Bottles float, so they all bob along near the top of Popular, spread in a loose line. */

@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   soundSlider: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 16, backgroundColor: Colors.text },
   soundWord: { alignItems: 'center', justifyContent: 'center' },
   soundText: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: Colors.text },
-  soundLight: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  soundLight: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   soundTextOn: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: Colors.accentText },
   // One solid control, so it reads over any water and doesn't look like four loose labels.
   depths: { position: 'absolute', right: Spacing.sm, top: '52%', padding: 3, gap: 1, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.94)', shadowColor: '#04222d', shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },

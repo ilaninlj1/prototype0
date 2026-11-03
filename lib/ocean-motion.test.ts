@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { blink, bottleSpot, bubbleProgress, currentDrift, flourish, homeAt, restSpot, separation, scatter, schoolOffset, stagePoses, swimPose, tempoMatches } from './ocean-motion.ts';
+import { blink, bottleSpot, bubbleProgress, currentDrift, squidPose, subPose, flourish, homeAt, restSpot, separation, scatter, schoolOffset, stagePoses, swimPose, tempoMatches } from './ocean-motion.ts';
 import { floorAt } from './ocean-scene.ts';
 
 const W = 390;
@@ -198,4 +198,22 @@ test('bubbles rise at their own speeds from their own starts', () => {
     const p = bubbleProgress(i, 77, 0.5);
     assert.ok(p >= 0 && p < 1);
   }
+});
+
+test('the submarine putters back and forth and turns around, staying on screen', () => {
+  const faces = new Set<number>();
+  for (let t = 0; t < 400; t += 3) {
+    const p = subPose(t, W, H, 0.5, 0.42);
+    assert.ok(p.x > 0 && p.x < W);
+    faces.add(Math.sign(p.face));
+  }
+  assert.ok(faces.has(1) && faces.has(-1));
+});
+
+test('the squid pushes up quickly and sinks back slowly', () => {
+  const start = squidPose(0, W, H, 0.6, 0.42).y;
+  const pushed = squidPose(1, W, H, 0.6, 0.42).y;
+  const sinking = squidPose(3, W, H, 0.6, 0.42).y;
+  assert.ok(pushed < start - 30, `pushed ${pushed} from ${start}`);
+  assert.ok(sinking > pushed && sinking < start);
 });

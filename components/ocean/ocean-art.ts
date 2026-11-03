@@ -5,6 +5,7 @@
 import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, createPicture, type SkCanvas, type SkPaint, type SkPathBuilder, type SkPicture, type SkShader } from '@shopify/react-native-skia';
 
 import type { Anatomy } from '@/lib/ocean-anatomy';
+import { landmarkSpot, landmarksAt } from '@/lib/ocean-landmarks';
 import { DEPTHS, WATERS, type Depth, type Kind, type Place, type Water } from '@/lib/ocean-map';
 import type { CoralPiece, SandLife } from '@/lib/ocean-person';
 import { TOWERS, anemoneSpots, floorAt, hexToRgb, mixRgb, seabedAt, towerRadius, waterStops, type Rgb } from '@/lib/ocean-scene';
@@ -314,6 +315,272 @@ function drawVent(c: SkCanvas, x: number, y: number, k: number) {
   oval(c, x, y, 4 * k, 1.6 * k, fill('#6fd2db', 0.55));
 }
 
+/* ---------- landmarks ---------- */
+
+/** Scenery colors sit back in the water, so your songs keep all the color. */
+function sunk(hexColor: string, place: Place, amount = 0.28): string {
+  return mixHex(toneAt(hexColor, place.water, DEPTHS.indexOf(place.depth)), waterTone(place), amount);
+}
+
+function drawChest(c: SkCanvas, x: number, y: number, k: number, place: Place) {
+  const wood = sunk('#8a6236', place);
+  const dark = sunk('#4d3519', place);
+  const metal = sunk('#c9a24a', place, 0.18);
+  c.save();
+  c.translate(x, y + 4 * k);
+  c.rotate(-6, 0, 0);
+  c.scale(k, k);
+  // The lid, thrown open behind the box, and a little gold still catching the light.
+  const lid = path();
+  lid.moveTo(-18, -14);
+  lid.quadTo(-16, -33, 2, -35);
+  lid.lineTo(19, -34);
+  lid.quadTo(14, -22, 18, -15);
+  lid.close();
+  c.drawPath(lid.build(), fill(dark));
+  oval(c, 0, -14, 17, 3, fill(sunk('#d9b655', place, 0.12)));
+  c.drawRRect(Skia.RRectXY(Skia.XYWHRect(-19, -14, 38, 19), 2, 2), fill(wood));
+  for (const lx of [-12, 12]) c.drawRect(Skia.XYWHRect(lx - 1.5, -14, 3, 19), fill(metal));
+  c.drawLine(-19, -5, 19, -5, line(dark, 0.8));
+  c.drawRect(Skia.XYWHRect(-2.5, -14, 5, 6), fill(metal));
+  c.restore();
+}
+
+/** One link of chain: open on one side when it's the one that snapped. */
+function chainLink(c: SkCanvas, x: number, y: number, k: number, tone: string, flat: boolean, broken = false) {
+  const rx = (flat ? 2.2 : 3.2) * k;
+  const ry = 5 * k;
+  if (broken) {
+    const b = path();
+    b.addArc(Skia.XYWHRect(x - rx, y - ry, rx * 2, ry * 2), 300, 300);
+    c.drawPath(b.build(), line(tone, 1.5 * k));
+    return;
+  }
+  c.drawOval(Skia.XYWHRect(x - rx, y - ry, rx * 2, ry * 2), line(tone, 1.5 * k));
+}
+
+function drawBoat(c: SkCanvas, x: number, y: number, k: number, place: Place) {
+  // A rowboat seen from underneath, against the light.
+  const hull = sunk('#2c3a34', place, 0.05);
+  c.save();
+  c.translate(x, y);
+  c.scale(k, k);
+  const b = path();
+  b.moveTo(-52, 0);
+  b.quadTo(-20, -15, 44, -9);
+  b.quadTo(56, -2, 56, 0);
+  b.quadTo(56, 2, 44, 9);
+  b.quadTo(-20, 15, -52, 0);
+  b.close();
+  c.drawPath(b.build(), fill(hull, 0.82));
+  c.drawLine(-44, 0, 50, 0, line(mixHex(hull, '#ffffff', 0.12), 1.2, 0.8));
+  for (const px of [-22, 2, 26]) c.drawLine(px, -10, px, 10, line(mixHex(hull, '#ffffff', 0.08), 0.8, 0.55));
+  c.restore();
+}
+
+/** The chain from the boat, straight down through Popular, ending in Deep cuts at the link that snapped. */
+function drawChain(c: SkCanvas, place: Place, fx: number, width: number, height: number, k: number) {
+  const row = DEPTHS.indexOf(place.depth);
+  const tone = sunk('#5d6358', place, 0.15);
+  const x = fx * width;
+  const step = height / 64;
+  const from = row === 0 ? 0.17 * height : 0;
+  const to = row === 0 ? height : 0.42 * height;
+  let i = Math.ceil(from / step);
+  for (; i * step <= to; i++) {
+    const y = i * step;
+    const last = row === 1 && (i + 1) * step > to;
+    chainLink(c, x + Math.sin(y * 0.02) * 2 * k, y, k, tone, i % 2 === 0, last);
+  }
+}
+
+function drawAnchor(c: SkCanvas, x: number, y: number, k: number, place: Place) {
+  const iron = sunk('#5f5a4f', place, 0.1);
+  c.save();
+  c.translate(x, y + 2 * k);
+  c.rotate(24, 0, 0);
+  c.scale(k, k);
+  const beam = line(iron, 4.2);
+  c.drawLine(0, 4, 0, -38, beam);
+  c.drawLine(-11, -29, 11, -29, line(iron, 3.2));
+  c.drawOval(Skia.XYWHRect(-3.8, -47, 7.6, 8.4), line(iron, 2.4));
+  const arms = path();
+  arms.moveTo(-20, -8);
+  arms.quadTo(-16, 6, 0, 6);
+  arms.quadTo(16, 6, 20, -8);
+  c.drawPath(arms.build(), line(iron, 4.2));
+  poly(c, [-20, -14, -25, -3, -14, -5], fill(iron));
+  poly(c, [20, -14, 25, -3, 14, -5], fill(iron));
+  c.restore();
+  // The bit of chain still on it, trailing across the sand to where it snapped.
+  const tone = sunk('#5d6358', place, 0.15);
+  const ringX = x + Math.sin((24 * Math.PI) / 180) * 45 * k;
+  const ringY = y - Math.cos((24 * Math.PI) / 180) * 41 * k;
+  for (let i = 0; i < 7; i++) {
+    const g = i / 6;
+    const lx = ringX + (5 + i * 7) * k;
+    const ly = ringY + g * g * 42 * k;
+    chainLink(c, lx, ly, k * 0.9, tone, i % 2 === 0, i === 6);
+  }
+}
+
+function drawWreck(c: SkCanvas, x: number, y: number, k: number, place: Place) {
+  const hull = sunk('#55687a', place, 0.08);
+  const shade = mixHex(hull, '#050c18', 0.35);
+  const lit = mixHex(hull, '#ffffff', 0.12);
+  c.save();
+  c.translate(x, y + 7 * k);
+  c.rotate(-9, 0, 0);
+  c.scale(k, k);
+  // The mast, snapped and leaning, behind the hull.
+  c.drawLine(-16, -30, -28, -86, line(shade, 3.4));
+  c.drawLine(-37, -71, -13, -66, line(shade, 2.2));
+  c.drawLine(24, -30, 30, -58, line(shade, 3));
+  // A hull broken off at the stern, its planks showing.
+  const b = path();
+  b.moveTo(-78, -30);
+  b.quadTo(-70, 2, -38, 8);
+  b.lineTo(46, 8);
+  b.lineTo(58, -8);
+  b.lineTo(50, -14);
+  b.lineTo(61, -22);
+  b.lineTo(54, -33);
+  b.lineTo(-34, -33);
+  b.close();
+  const shape = b.build();
+  c.drawPath(shape, fill(hull));
+  c.save();
+  c.clipPath(shape, CLIP_IN, true);
+  for (const py of [-25, -17, -9, -1]) c.drawLine(-80, py, 64, py + 2, line(shade, 0.9, 0.8));
+  c.drawLine(-80, -33, 64, -32, line(lit, 2.2, 0.7));
+  c.restore();
+  // Portholes, and the deck's dark opening.
+  for (const px of [-48, -28, -8, 12, 32]) {
+    oval(c, px, -20, 3.4, 3.4, fill(shade));
+    oval(c, px - 0.8, -20.8, 1, 1, fill(lit, 0.8));
+  }
+  c.restore();
+}
+
+/** The little things lying about on a floor: shells and starfish, muted like everything else. */
+function star(c: SkCanvas, x: number, y: number, s: number, color: string) {
+  const b = path();
+  for (let i = 0; i < 10; i++) {
+    const a = (i * Math.PI) / 5 - Math.PI / 2 + 0.3;
+    const rr = i % 2 ? s * 0.42 : s;
+    const px = x + Math.cos(a) * rr;
+    const py = y + Math.sin(a) * rr;
+    if (i === 0) b.moveTo(px, py);
+    else b.lineTo(px, py);
+  }
+  b.close();
+  c.drawPath(b.build(), fill(color));
+}
+
+function drawShells(c: SkCanvas, place: Place, width: number, height: number, k: number, seed: number, floor: (x: number) => number) {
+  const r = rng(seed);
+  for (let i = 0; i < 5; i++) {
+    const x = (0.08 + r() * 0.84) * width;
+    const y = floor(x) + (2 + r() * 8) * k;
+    if (i % 2 === 0) {
+      c.save();
+      c.translate(x, y);
+      c.rotate(r() * 72, 0, 0);
+      c.scale(k, k);
+      star(c, 0, 0, 5.5, sunk('#c97a6b', place, 0.2));
+      c.restore();
+    } else {
+      c.save();
+      c.translate(x, y);
+      c.scale(k, k);
+      fan(c, 0, 2, 5, sunk('#d9cfbe', place, 0.15));
+      c.restore();
+    }
+  }
+}
+
+/** The tiny submarine, faded yellow, with its light on. */
+export function recordSub(place: Place, k: number): SkPicture {
+  return createPicture(
+    (c) => {
+      c.scale(k, k);
+      const hull = sunk('#d8b24c', place, 0.18);
+      const back = mixHex(hull, '#0c2733', 0.3);
+      const beam = Skia.Paint();
+      beam.setAntiAlias(true);
+      const a = Skia.Color('#f4e7b0');
+      a[3] = 0.28;
+      const b = Skia.Color('#f4e7b0');
+      b[3] = 0;
+      beam.setShader(Skia.Shader.MakeLinearGradient({ x: 22, y: 0 }, { x: 70, y: 0 }, [a, b], [0, 1], TileMode.Clamp));
+      poly(c, [22, -3, 70, -16, 70, 16, 22, 3], beam);
+      c.drawLine(-24, 0, -30, 0, line(back, 1.4));
+      oval(c, -31, 0, 1.4, 6, fill(back));
+      c.drawRRect(Skia.RRectXY(Skia.XYWHRect(-4, -18, 12, 10), 2.5, 2.5), fill(back));
+      c.drawLine(4, -18, 4, -24, line(back, 1.2));
+      c.drawLine(4, -24, 9, -24, line(back, 1.2));
+      const body = Skia.Paint();
+      body.setAntiAlias(true);
+      body.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: -10 }, { x: 0, y: 11 }, [Skia.Color(back), Skia.Color(hull), Skia.Color(mixHex(hull, '#ffffff', 0.25))], [0, 0.5, 1], TileMode.Clamp));
+      c.drawRRect(Skia.RRectXY(Skia.XYWHRect(-24, -10, 48, 21), 10.5, 10.5), body);
+      for (const px of [-10, 2, 14]) {
+        oval(c, px, 0, 3.2, 3.2, fill(back));
+        oval(c, px, 0, 2.1, 2.1, fill('#f4e7b0', 0.9));
+      }
+    },
+    Skia.XYWHRect(-40, -30, 120, 60)
+  );
+}
+
+/** The squid, as frames from relaxed to squeezed: a long mantle pointing up, big eyes, arms trailing below. */
+export function recordSquid(place: Place, k: number): SkPicture[] {
+  const out: SkPicture[] = [];
+  const skin = sunk('#c9b0c0', place, 0.1);
+  const back = mixHex(skin, '#0c1a33', 0.35);
+  for (let i = 0; i < FRAMES; i++) {
+    const squeeze = i / (FRAMES - 1);
+    out.push(
+      createPicture(
+        (c) => {
+          c.scale(k, k);
+          const narrow = 1 - squeeze * 0.22;
+          const arm = (x: number, len: number, wave: number, wide: number) => {
+            const pts: number[] = [];
+            for (let j = 0; j <= 6; j++) {
+              const f = j / 6;
+              pts.push(x * (1 - f * squeeze * 0.6) + Math.sin(f * 4 + wave) * 3 * f, 8 + f * len * (1 + squeeze * 0.25));
+            }
+            taper(c, pts, wide, 0.5, back);
+          };
+          for (let a = 0; a < 6; a++) arm(-6 + a * 2.4, 15 + (a % 2) * 4, a * 1.1, 1.7);
+          arm(-7, 30, 0.4, 1);
+          arm(7, 30, 2.1, 1);
+          // The mantle, narrowing to a point, with fins near the top.
+          poly(c, [-3, -22, -13 - squeeze * 2, -14, -6, -10], fill(back));
+          poly(c, [3, -22, 13 + squeeze * 2, -14, 6, -10], fill(back));
+          const b = path();
+          b.moveTo(0, -28);
+          b.cubicTo(8 * narrow, -18, 9 * narrow, -2, 7 * narrow, 8);
+          b.lineTo(-7 * narrow, 8);
+          b.cubicTo(-9 * narrow, -2, -8 * narrow, -18, 0, -28);
+          b.close();
+          const body = Skia.Paint();
+          body.setAntiAlias(true);
+          body.setShader(Skia.Shader.MakeLinearGradient({ x: -9, y: 0 }, { x: 9, y: 0 }, [Skia.Color(back), Skia.Color(skin), Skia.Color(back)], [0, 0.5, 1], TileMode.Clamp));
+          c.drawPath(b.build(), body);
+          for (const [sx, sy] of [[-3, -14], [3, -9], [-2, -4], [3, -19], [1, 1]]) oval(c, sx, sy, 0.9, 0.9, fill(back, 0.8));
+          for (const side of [-1, 1]) {
+            oval(c, side * 4.6, 7.5, 2.5, 2.5, fill('#e9e2d6'));
+            oval(c, side * 4.6, 7.8, 1.3, 1.3, fill('#0b1a22'));
+          }
+        },
+        Skia.XYWHRect(-44, -44, 88, 110)
+      )
+    );
+  }
+  return out;
+}
+
 /** Everything still about a place: what only this biome has, and what your listening grew in it. */
 export function recordPlace(place: Place, width: number, height: number, coral: CoralPiece[], sand: SandLife | null, trails: Trail[]): SkPicture {
   const row = DEPTHS.indexOf(place.depth);
@@ -362,6 +629,17 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
           oval(c, x, floor(x) + 2, (3 + r() * 5) * k, (2 + r() * 2) * k, fill(toneAt('#cfc3ab', 'reef', 3), 0.8));
         }
       }
+      // Things to find. Each place's own, resting on its sand or hanging where it hangs.
+      for (const l of landmarksAt(place)) {
+        const spot = landmarkSpot(l, width, height);
+        if (l.kind === 'chest') drawChest(c, spot.x, spot.y, k, place);
+        if (l.kind === 'boat') drawBoat(c, spot.x, spot.y, k, place);
+        if (l.kind === 'anchor') drawAnchor(c, spot.x, spot.y, k, place);
+        if (l.kind === 'wreck') drawWreck(c, spot.x, spot.y, k, place);
+      }
+      if (place.water === 'kelp' && row < 2) drawChain(c, place, 0.72, width, height, k);
+      if (row === 3 && place.water === 'reef') drawShells(c, place, width, height, k, 7, floor);
+      if (row === 3 && place.water === 'kelp') drawShells(c, place, width, height, k, 23, floor);
       // What you heard and let go settles on the sea floor, one colored speck per song.
       if (row === 3)
         for (const speck of sand?.specks ?? []) {
