@@ -109,9 +109,10 @@ function tubes(c: SkCanvas, x: number, y: number, color: string, lip: string, r:
   }
 }
 
-const ROCK: Record<Water, string> = { reef: '#cfc6b4', kelp: '#6d7363', blue: '#54708f', midnight: '#232845' };
+// Always darker than the water it stands in, so the wall still reads at depth.
+const ROCK: Record<Water, string> = { reef: '#b3a68f', kelp: '#4c5346', blue: '#2f4663', midnight: '#10142a' };
 const PALE = ['#e4eeee', '#dbe7e8', '#d3e0e2', '#d6e2e2', '#d8e4e5', '#e0eaeb'];
-const DEEP: number[] = [0, 0.35, 0.66, 0.86, 0.9];
+const DEEP: number[] = [0, 0.3, 0.55, 0.72, 0.78];
 const ABYSS: Record<Water, string> = { reef: '#04203a', kelp: '#04221f', blue: '#041a40', midnight: '#020818' };
 
 const toneAt = (hexColor: string, water: Water, row: number) => mixHex(hexColor, ABYSS[water], DEEP[Math.max(0, Math.min(4, row))]);
@@ -185,7 +186,7 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
         if (y === -2) rim.moveTo(edge(y / height), y);
         else rim.lineTo(edge(y / height), y);
       }
-      c.drawPath(rim.build(), line(mixHex(ROCK[place.water], '#ffffff', 0.35), 2.2 * k, 0.5));
+      c.drawPath(rim.build(), line(toneAt(mixHex(ROCK[place.water], '#ffffff', 0.3), place.water, row), 2 * k, 0.45));
       c.save();
       c.clipPath(wallShape, CLIP_IN, true);
       const crack = line(mixHex(ROCK[place.water], '#1b2a33', 0.45), 1, 0.3);
@@ -201,7 +202,7 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
       // Pale flora growing out of the wall. Only your listening adds color. On the sea floor it's on the sand instead.
       const pale = (i: number) => paled(PALE[i % PALE.length], place);
       // A little shelf of rock for something to grow on, so nothing floats off the wall.
-      const shelf = (x: number, y: number, reach: number) => oval(c, x + reach * 0.35, y + 3 * k, reach, 5.5 * k, fill(mixHex(toneAt(ROCK[place.water], place.water, row), '#ffffff', 0.08)));
+      const shelf = (x: number, y: number, reach: number) => oval(c, x + reach * 0.3, y + 3 * k, reach, 5.5 * k, fill(toneAt(ROCK[place.water], place.water, row)));
       const floor = (x: number) => height - seabedAt(x / width) * height + 4;
       const count = place.water === 'reef' ? 5 : place.water === 'kelp' ? 2 : place.water === 'blue' ? 2 : 2;
       for (let i = 0; i < count; i++) {
@@ -447,7 +448,15 @@ function drawKind(c: SkCanvas, kind: Kind, a: Anatomy, w: number, swing: number,
       // Wings that really flap; the second color runs along their backs.
       const flap = swing * 7;
       const L = 15 * a.length;
-      const wing = (side: number) => poly(c, [L * 0.6, 0, -L * 0.15, side * (17 + a.fin * 6) + flap * side * 0.5, -L * 0.7, side * 4], fill(p.body));
+      const wing = (side: number) => {
+        const tipY = side * (17 + a.fin * 6) + flap * side * 0.5;
+        const b = path();
+        b.moveTo(L * 0.6, side * 1);
+        b.quadTo(L * 0.25, tipY * 0.8, -L * 0.25, tipY);
+        b.quadTo(-L * 0.3, tipY * 0.4, -L * 0.7, side * 2);
+        b.close();
+        c.drawPath(b.build(), fill(p.body));
+      };
       wing(-1);
       wing(1);
       const tail = path();
