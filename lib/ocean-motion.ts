@@ -129,6 +129,8 @@ export function restSpot(seed: number, i: number, n: number, col: number, row: n
   return { x: fx * w, y: (0.3 + unit(seed, 3) * 0.42) * h };
 }
 
+export const MAX_BOTTLES = 10;
+
 /** Bottles float, so they all bob along near the top of Popular, spread in a loose line. */
 export function bottleSpot(i: number, n: number, w: number, h: number): { x: number; y: number } {
   'worklet';

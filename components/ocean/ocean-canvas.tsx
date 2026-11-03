@@ -7,7 +7,7 @@ import { drawOcean, type Stage, type StageMember, type StopRow } from '@/compone
 import { anatomyKey } from '@/lib/ocean-anatomy';
 import { castFor } from '@/lib/ocean-cast';
 import { DEPTHS, WATERS, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
-import { bottleSpot } from '@/lib/ocean-motion';
+import { MAX_BOTTLES, bottleSpot } from '@/lib/ocean-motion';
 import { floorSand, type OceanLife } from '@/lib/ocean-person';
 import { SAND, dayMixAt, hexToRgb, waterStops, type Rgb } from '@/lib/ocean-scene';
 import type { SeaState } from '@/lib/sea-beat';
@@ -44,7 +44,6 @@ const rows = (w: Water, d: Depth, hour: number): StopRow => {
   return { top: hexToRgb(s.top), mid: hexToRgb(s.mid), bot: hexToRgb(s.bot), ray: s.ray };
 };
 const vividBucket = (v: number) => Math.round(v * 4) / 4;
-export const MAX_BOTTLES = 10;
 /** How far down the sand is dimmed: Buried is dark, because almost nobody has heard these. */
 const FLOOR_DIM = 0.86;
 const ABYSS: Record<Water, string> = { reef: '#04203a', kelp: '#04221f', blue: '#041a40', midnight: '#020818' };

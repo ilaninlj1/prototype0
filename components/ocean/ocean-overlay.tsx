@@ -14,7 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { oceanDive, oceanReduced, oceanTravel, onDiveSettled, settleDiveTo, surfaceNow, useDivePan } from '@/components/ocean/dive-gesture';
-import { MAX_BOTTLES, type OceanBottle } from '@/components/ocean/ocean-canvas';
+import type { OceanBottle } from '@/components/ocean/ocean-canvas';
 import { OceanChart } from '@/components/ocean/ocean-chart';
 import { OceanUi } from '@/components/ocean/ocean-ui';
 import { lazySkia } from '@/components/print/lazy-skia';
@@ -24,7 +24,7 @@ import type { PathPoint } from '@/lib/ocean-chart';
 import { depthDragResult, nearestPlaceIndex, settleDive, showsAt, waterDragResult } from '@/lib/ocean-dive';
 import { hitMember } from '@/lib/ocean-hit';
 import { DEPTHS, WATERS, WATER_INFO, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
-import { bottleSpot, stagePoses } from '@/lib/ocean-motion';
+import { MAX_BOTTLES, bottleSpot, stagePoses } from '@/lib/ocean-motion';
 import type { Creature, OceanLife } from '@/lib/ocean-person';
 import type { SeaState } from '@/lib/sea-beat';
 

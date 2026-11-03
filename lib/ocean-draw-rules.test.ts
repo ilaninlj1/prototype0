@@ -15,6 +15,17 @@ for (const file of FILES) {
   });
 }
 
+test('nothing loaded up front brings Skia with it: only type imports reach the canvas files', () => {
+  // On the web Skia binds when its module is first evaluated, so one stray value import blanks the whole ocean.
+  for (const file of ['components/ocean/ocean-overlay.tsx', 'components/ocean/ocean-chart.tsx', 'components/ocean/ocean-ui.tsx', 'components/ocean/hatchling.tsx', 'components/ocean/creature-sheet.tsx', 'hooks/use-ocean.ts', 'app/ocean-lab.tsx']) {
+    const source = readFileSync(file, 'utf8');
+    assert.doesNotMatch(source, /@shopify\/react-native-skia/, `${file} imports Skia`);
+    for (const line of source.split('\n')) {
+      if (/^import (?!type ).*(ocean-canvas|ocean-chart-canvas|ocean-art|ocean-draw)'/.test(line)) assert.fail(`${file}: ${line}`);
+    }
+  }
+});
+
 test('the frame file only imports worklets from lib', () => {
   const source = readFileSync('components/ocean/ocean-draw.ts', 'utf8');
   assert.doesNotMatch(source, /from '@\/lib\/ocean-person'/);
