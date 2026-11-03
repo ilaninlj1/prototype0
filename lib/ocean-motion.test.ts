@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { blink, bottleSpot, currentDrift, flourish, homeAt, restSpot, separation, scatter, schoolOffset, stagePoses, swimPose, tempoMatches } from './ocean-motion.ts';
+import { blink, bottleSpot, bubbleProgress, currentDrift, flourish, homeAt, restSpot, separation, scatter, schoolOffset, stagePoses, swimPose, tempoMatches } from './ocean-motion.ts';
 import { floorAt } from './ocean-scene.ts';
 
 const W = 390;
@@ -174,4 +174,28 @@ test('creatures too close push apart, equally and smoothly, and not at all past 
   assert.ok(nearer > near && near > 0);
   assert.ok(separation(0, 0, 0, 0, 40)[0] > 0, 'two in the very same spot still separate');
   assert.ok(separation(39.9, 0, 0, 0, 40)[0] < 0.01, 'it fades out, with no jump at the edge');
+});
+
+test('a bubble rises steadily: the beat nudges it but never throws it around, however long you stay', () => {
+  for (const t of [5, 60, 600, 6000]) {
+    const still = bubbleProgress(3, t, 0);
+    const onBeat = bubbleProgress(3, t, 1);
+    const moved = Math.abs(onBeat - still);
+    assert.ok(Math.min(moved, 1 - moved) < 0.01, `at ${t}s the beat moved it ${moved}`);
+  }
+  let last = bubbleProgress(3, 100, 0);
+  for (let t = 100.016; t < 130; t += 0.016) {
+    const now = bubbleProgress(3, t, 0);
+    const step = (now - last + 1) % 1;
+    assert.ok(step < 0.01, `a jump of ${step} at ${t}`);
+    last = now;
+  }
+});
+
+test('bubbles rise at their own speeds from their own starts', () => {
+  assert.notEqual(bubbleProgress(1, 50, 0), bubbleProgress(2, 50, 0));
+  for (let i = 0; i < 14; i++) {
+    const p = bubbleProgress(i, 77, 0.5);
+    assert.ok(p >= 0 && p < 1);
+  }
 });

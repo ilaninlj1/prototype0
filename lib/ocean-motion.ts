@@ -129,6 +129,14 @@ export function restSpot(seed: number, i: number, n: number, col: number, row: n
   return { x: fx * w, y: (0.3 + unit(seed, 3) * 0.42) * h };
 }
 
+/** How far up a bubble is, 0 to 1. The beat adds a tiny nudge on top; it must never multiply the clock, or bubbles jerk. */
+export function bubbleProgress(i: number, t: number, beat: number): number {
+  'worklet';
+  const speed = 0.035 + ((i * 37) % 11) * 0.0055;
+  const v = t * speed + ((i * 0.618) % 1) + beat * 0.004;
+  return v - Math.floor(v);
+}
+
 export const MAX_BOTTLES = 10;
 
 /** Bottles float, so they all bob along near the top of Popular, spread in a loose line. */

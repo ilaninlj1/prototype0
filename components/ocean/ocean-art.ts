@@ -243,7 +243,12 @@ const REEF_PIECES = 20;
 function drawReef(c: SkCanvas, place: Place, width: number, height: number, coral: CoralPiece[], k: number) {
   const row = DEPTHS.indexOf(place.depth);
   const tone = waterTone(place);
-  const ghost = fill(mixHex(tone, '#ffffff', 0.16), 0.42);
+  // The outlines' color runs into the next level's, so no band crosses the screen as you sink past one.
+  const below = waterTone({ water: 'reef', depth: DEPTHS[Math.min(3, row + 1)] });
+  const ghost = Skia.Paint();
+  ghost.setAntiAlias(true);
+  ghost.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: 0 }, { x: 0, y: height }, [Skia.Color(mixHex(tone, '#ffffff', 0.16)), Skia.Color(mixHex(below, '#ffffff', 0.16))], [0, 1], TileMode.Clamp));
+  ghost.setAlphaf(0.36);
   TOWERS.forEach((t, i) => {
     const left: number[] = [];
     const right: number[] = [];
@@ -391,22 +396,20 @@ function farColumn(x: number, half: number, sway: number, phase: number, height:
 
 /**
  * The far layer: faint shapes well behind everything, which barely move. Two screens tall and drawn once, so nothing
- * meets anything and no line can show. Open blue has none, on purpose.
+ * meets anything and no line can show.
  */
 export function recordFar(water: Water, width: number, height: number): SkPicture | null {
-  if (water === 'blue') return null;
+  // The reef's own faint towers do this job, and Open blue has nothing, on purpose.
+  if (water === 'blue' || water === 'reef') return null;
   const k = width / 270;
   return createPicture(
     (c) => {
       const r = rng(water.length * 53);
-      if (water === 'reef') {
-        const tone = fill('#04283a', 0.08);
-        for (const fx of [0.3, 0.62, 1.02]) c.drawPath(farColumn(fx * width, (18 + r() * 14) * k, 9 * k, r() * TAU, height), tone);
-      } else if (water === 'kelp') {
+      if (water === 'kelp') {
         const tone = fill('#04283a', 0.12);
         for (let i = 0; i < 12; i++) c.drawPath(farColumn(r() * width * 1.1, 1.2 * k, 8 * k, r() * TAU, height), tone);
       } else {
-        const tone = fill('#000000', 0.12);
+        const tone = fill('#000000', 0.08);
         for (let i = 0; i < 4; i++) c.drawPath(farColumn(r() * width, (24 + r() * 16) * k, 12 * k, r() * TAU, height), tone);
       }
     },

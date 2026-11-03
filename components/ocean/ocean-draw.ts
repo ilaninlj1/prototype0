@@ -8,7 +8,7 @@
 
 import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, type SkCanvas, type SkPicture, type SkShader } from '@shopify/react-native-skia';
 
-import { blink, scatter, separation, stagePoses, tempoMatches, type StagedMover } from '@/lib/ocean-motion';
+import { blink, bubbleProgress, scatter, separation, stagePoses, tempoMatches, type StagedMover } from '@/lib/ocean-motion';
 import { floorLift, seabedAt, type Rgb } from '@/lib/ocean-scene';
 import { SEA_BASE, seaY, type SeaState } from '@/lib/sea-beat';
 
@@ -560,7 +560,7 @@ function drawStage(c: SkCanvas, f: Frame, stage: Stage, dx: number, oy: number, 
 }
 
 /** Faint shapes far behind everything: they barely move, and they repeat as you sink. */
-function drawFar(c: SkCanvas, f: Frame, sceneY: number) {
+function drawFar(c: SkCanvas, f: Frame) {
   'worklet';
   const { width: w, height: h } = f;
   for (let col = 0; col < f.far.length; col++) {
@@ -571,9 +571,9 @@ function drawFar(c: SkCanvas, f: Frame, sceneY: number) {
     const layer = Skia.Paint();
     layer.setAlphaf(1 - away * away * (3 - 2 * away));
     c.saveLayer(layer);
-    const y = sceneY - wrap(f.posY * h * 0.3, h);
+    // Two screens tall and hung from above the screen, so its top edge never shows, however you slide.
     c.save();
-    c.translate(dx * w * 0.12, y);
+    c.translate(dx * w * 0.12, -wrap(f.posY * h * 0.3, h));
     c.drawPicture(pic);
     c.restore();
     c.restore();
@@ -612,12 +612,10 @@ function drawMotes(c: SkCanvas, f: Frame, surface: number) {
 function drawBubbles(c: SkCanvas, f: Frame, surface: number) {
   'worklet';
   const { width: w, height: h, t } = f;
-  const rise = 1 + f.sea.pulse * 0.08;
   const ring = Skia.PathBuilder.Make();
   const shine = Skia.PathBuilder.Make();
   for (let i = 0; i < 14; i++) {
-    const speed = 0.035 + ((i * 37) % 11) * 0.0055;
-    const prog = (t * speed * rise + ((i * 0.618) % 1)) % 1;
+    const prog = bubbleProgress(i, t, f.sea.pulse);
     const y = h + 8 + (surface + 6 - (h + 8)) * prog;
     if (y > h + 6) continue;
     const x = wrap(((i * 0.381966) % 1) * w * 1.1 - f.posX * w * 0.8, w * 1.1) + Math.sin(t * 1.4 + i * 1.3) * 5;
@@ -668,7 +666,7 @@ export function drawOcean(c: SkCanvas, f: Frame) {
   drawLight(c, f, here, surface);
   // The scene hangs from the surface, so Home and the ocean move as one.
   const sceneY = surface + (f.travel - f.surfaceY);
-  drawFar(c, f, sceneY);
+  drawFar(c, f);
   drawFloor(c, f, sceneY);
   for (let i = 0; i < f.stages.length; i++) {
     const s = f.stages[i];
