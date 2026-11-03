@@ -86,8 +86,8 @@ Everything here is a pure function of the swipe history, the Library, the sound 
 
 | What you did | Data | What it changes |
 |---|---|---|
-| Chose a song blind and saved it | a `like` or `reveal` entry for that track | It hatches as a creature in its home place. Saves with no such entry (looked up on the song page, say) stay in the Library with no creature |
-| How much you listened | the song's longest `listenMs`, full at 24 s as in `lib/dark-map.ts`; missing counts as middling | Vivid and full, or small and faint. Saving 100 songs in a hurry gets you 100 tiny fish |
+| Chose a song blind and saved it | `foundBlind` stamped on the save, or a non-run `like` or `reveal` entry for it, or a save older than the swipe log | It hatches as a creature in its home place. Other saves (looked up on the song page, say) stay in the Library with no creature |
+| How much you listened | the song's longest `listenMs`, raised when the card leaves so listening on after an early save counts; full at 24 s as in `lib/dark-map.ts`; missing counts as middling | Vivid and full, or small and faint. Saving 100 songs in a hurry gets you 100 tiny fish |
 | How long you've kept it | `likedAt` | It grows, on a curve that flattens out at about a year. Your oldest find is always the largest |
 | The hour you found it | `likedAt` in local time | Awake for the 12 hours centered on that hour. Asleep otherwise. No date means always awake |
 | How far it was from your usual taste then | `tasteDistance` against only the saves made before it; `deep` tier; needs 5 earlier saves | A rare, shimmering form. A folk song is rare in a metal fan's ocean and ordinary in a folk fan's |
@@ -98,7 +98,7 @@ Color rule: **only your listening adds color.** Each song's color is its print c
 
 **Every creature explains itself.** Tapping one shows a light sheet: cover, title, artist, your note, play or pause, "Swipe songs like this", and plain sentences from the table above, such as "Big because you've had it 8 months. Out at night because you found it at 2:14am." Wild creatures say they aren't your songs.
 
-**Blind stays blind.** Double-tap saves while the card stays blind, so a song's creature can hatch while its card is still up. Until that card is revealed or gone, its creature's sheet shows no title or artist: "Still blind. Reveal it on Home first."
+**Blind stays blind.** Double-tap saves while the card stays blind, so a song's creature can hatch while its card is still up. Until that card is revealed or gone, its creature's sheet shows no title, artist or cover, and the screen reader gets the same: "Still blind. Reveal it on Home first."
 
 **A written portrait.** Plain lines from the same data, in a "Your ocean" sheet opened from a button under the water and a card on You → Discoveries: "Mostly comes out at night. Most of your songs live in Midnight. You've never been to the Kelp forest. Your oldest find is 14 months old." Two people should never read the same thing.
 
@@ -142,7 +142,7 @@ Color rule: **only your listening adds color.** Each song's color is its print c
 
 On a save from Home, a light falls into the water (`LaunchLight` does this today only for songs that float as bottles; extend it to every save). The creature pops out at the surface, stays in Home's water a few seconds, then swims down to its home.
 
-Undo on Home doesn't remove saves today, and this design doesn't change that, so Undo leaves the creature. Undo does restore the history, so coral and sand follow it. Deleting a save from the Library takes the creature away, and the song falls back to coral if it has a `reveal` entry. Restoring brings it back.
+Undo on Home doesn't remove saves today, and this design doesn't change that, so Undo leaves the creature (`foundBlind` keeps it eligible after the entry is rewound). Undo does restore the history, so coral and sand follow it. Deleting a save from the Library takes the creature away, and the song falls back to coral if it has a `reveal` entry. Restoring brings it back.
 
 ### What makes it alive
 
@@ -162,7 +162,7 @@ Undo on Home doesn't remove saves today, and this design doesn't change that, so
 - All art is drawn in code, no image assets, so the app stays IP-original. App rules hold: no violet (`isBannedHue`, so the mock's purple tube coral changes), no emoji, Figtree text, white pill and black button as elsewhere.
 - Skia only in lazily loaded `*-canvas.tsx` files through `lazySkia`.
 - New rules go in pure, tested files: where a song lives, what a person's ocean contains, and creature movement (worklet-safe, like `lib/sea-beat.ts`). Required tests: the same history always gives the same ocean; the same song gives different creatures for two made-up people; saving in a hurry can't produce a big or vivid creature; a looked-up save never hatches; Undo and delete stay consistent; a blind card's creature never gives up its name.
-- Confirm that every blind way of saving really logs a `like` or `reveal` entry (Home, People and Run do; check Daily Drop, the Blind Spot Test, Blind Pack and DJ Picks). Add logging where missing, so a real blind find isn't left out. On the user's phone, check how many Library songs have no entry. If many of them are old finds, treat saves older than the swipe log as blind.
+- Every blind way of saving stamps `foundBlind`: Home, Daily Drop, People, the Blind Spot Test, Blind Pack, DJ Picks, and Run only for songs it played blind. Saves older than the swipe log count as blind.
 - Building a person's ocean must not stall the dive. Time it on a made-up history of 5,000 swipes and 500 saves. `deckPool` builds from about 10,000 songs on first use, so warm it after Home loads, not on the first drag.
 - Don't optimize on a guess. Measure frame rate on a real phone, while listening on Home and under the water, and fix only what the numbers show.
 - No reduced-motion or screen reader dead ends. Reduced motion: still scene, fades instead of following the finger. Screen reader: a list of waters, depths and saved songs with the same actions, like the Dark Map's LIST.
