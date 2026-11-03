@@ -17,7 +17,7 @@ function day(at: string): string {
 }
 
 /** Where one bottle has been: its print, a one-line summary, and every stop with its city and day. */
-export function JourneySheet({ bottle, title, onClose }: { bottle: Bottle | null; title: string; onClose: () => void }) {
+export function JourneySheet({ bottle, title, note = false, onClose }: { bottle: Bottle | null; title: string; note?: boolean; onClose: () => void }) {
   const router = useRouter();
   function openSea(id: string) {
     onClose();
@@ -32,10 +32,13 @@ export function JourneySheet({ bottle, title, onClose }: { bottle: Bottle | null
             <View style={styles.tile}>
               <BottlePrint trackId={bottle.trackId} hops={bottle.hops} size={PRINT} />
             </View>
-            <ThemedText style={styles.summary}>{journeySummary(bottle)}</ThemedText>
-            <ThemedText type="caption" style={styles.center}>
-              The middle is the song. Each ring is someone who kept it, drawn from the song they had saved just before.
-            </ThemedText>
+            <View style={note ? styles.paper : null}>
+              {note && <ThemedText type="caption" style={styles.center}>A bottle you sent out or kept. No one can write in these: the note is where it has been.</ThemedText>}
+              <ThemedText style={styles.summary}>{journeySummary(bottle)}</ThemedText>
+              <ThemedText type="caption" style={styles.center}>
+                The middle is the song. Each ring is someone who kept it, drawn from the song they had saved just before.
+              </ThemedText>
+            </View>
             <Pressable onPress={() => openSea(bottle.id)} style={[Ui.outlineButton, styles.sea]} accessibilityRole="button">
               <ThemedText style={Ui.label}>See it on the Sea</ThemedText>
             </Pressable>
@@ -61,6 +64,7 @@ export function JourneySheet({ bottle, title, onClose }: { bottle: Bottle | null
 const styles = StyleSheet.create({
   body: { padding: Spacing.lg, paddingTop: 0, gap: Spacing.md, alignItems: 'stretch' },
   tile: { alignSelf: 'center', width: PRINT, height: PRINT, borderRadius: 28, overflow: 'hidden', backgroundColor: DarkColors.background },
+  paper: { backgroundColor: '#f6efdf', borderRadius: 6, paddingVertical: Spacing.md, paddingHorizontal: Spacing.lg, gap: Spacing.xs, transform: [{ rotate: '-0.6deg' }] },
   summary: { fontSize: 17, fontWeight: '700', color: Colors.text, textAlign: 'center' },
   center: { textAlign: 'center' },
   sea: { alignSelf: 'center' },

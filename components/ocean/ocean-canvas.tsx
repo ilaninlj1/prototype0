@@ -58,24 +58,22 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
   const bottleArt = useRef(new Map<string, SkPicture>());
   const raftArt = useRef(new Map<string, SkPicture>());
 
-  // Moving to the next water loads the one beyond it only once the move has settled, so it can't hitch the glide.
+  // Moving to the next water loads the one beyond it only once the move has settled, so it can't hitch the glide. Tapping
+  // a far water keeps everything between ready at once, so you pass through each biome on the way there.
   const col = WATERS.indexOf(place.water);
-  const [loadedCol, setLoadedCol] = useState(col);
+  const [range, setRange] = useState<[number, number]>([Math.max(0, col - 1), Math.min(3, col + 1)]);
   useEffect(() => {
-    if (Math.abs(col - loadedCol) > 1) {
-      setLoadedCol(col);
-      return;
-    }
-    const t = setTimeout(() => setLoadedCol(col), 900);
+    setRange(([lo, hi]) => (col < lo || col > hi ? [Math.min(lo, col), Math.max(hi, col)] : [lo, hi]));
+    const t = setTimeout(() => setRange([Math.max(0, col - 1), Math.min(3, col + 1)]), 1500);
     return () => clearTimeout(t);
-  }, [col, loadedCol]);
+  }, [col]);
 
   const hourKey = Math.floor(hour);
   const nearArt = useMemo(() => WATERS.map((w) => recordNear(w, width, height)), [width, height]);
   const farArt = useMemo(() => WATERS.map((w) => recordFar(w, width, height)), [width, height]);
   const stages = useMemo(() => {
     const out: Stage[] = [];
-    for (let c = Math.max(0, loadedCol - 1); c <= Math.min(3, loadedCol + 1); c++) {
+    for (let c = range[0]; c <= range[1]; c++) {
       const water = WATERS[c];
       const sand = floorSand(life, water);
       const hereCoral = (key: string) => life?.places[key]?.coral ?? [];
@@ -180,7 +178,7 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
     return out;
     // hour moves only the cast; recorded art is cached above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, life, bottles, hourKey, loadedCol]);
+  }, [width, height, life, bottles, hourKey, range]);
 
   const stops = useMemo(() => DEPTHS.map((d) => WATERS.map((w) => rows(w, d, hour))), [hourKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const restStops = useMemo(() => rows(rest.water, rest.depth, hour), [rest.water, rest.depth, hourKey]); // eslint-disable-line react-hooks/exhaustive-deps

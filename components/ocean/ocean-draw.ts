@@ -544,7 +544,7 @@ function drawStage(c: SkCanvas, f: Frame, stage: Stage, dx: number, oy: number, 
     // Bottles float: they bob and rock a little.
     c.translate(b.x, b.y + Math.sin(t * 0.7 + i * 1.7) * 3 * k);
     c.rotate(Math.sin(t * 0.5 + i) * 7, 0, 0);
-    c.scale(k * 0.55, k * 0.55);
+    c.scale(k * 0.7, k * 0.7);
     c.drawPicture(b.sprite);
     c.restore();
   }

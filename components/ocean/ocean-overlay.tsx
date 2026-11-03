@@ -477,6 +477,7 @@ export const OceanOverlay = memo(function OceanOverlay({
           </GestureDetector>
           <OceanUi
             place={place}
+            posX={posX}
             subtitle={meter ?? subtitle}
             hint={hint}
             canSwipe={left > 0}

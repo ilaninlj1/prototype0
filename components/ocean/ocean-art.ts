@@ -788,18 +788,35 @@ export function makeWobble() {
   `);
 }
 
-/** A bottle hanging in the water or lying on the sand, glowing with its song's light. */
+/** A bottle with a rolled note inside, tied with a thread in its song's color: open it and it tells you where it's been. */
 export function recordBottle(color: string): SkPicture {
   return createPicture(
     (c) => {
-      c.rotate(-18, 0, 0);
-      oval(c, 0, 0, 13, 9, fill(color, 0.22));
-      c.drawRRect(Skia.RRectXY(Skia.XYWHRect(-11, -6, 18, 12), 6, 6), fill('#f3ead8', 0.6));
-      c.drawRRect(Skia.RRectXY(Skia.XYWHRect(6, -3.5, 6, 7), 2, 2), fill('#f3ead8', 0.6));
-      c.drawRRect(Skia.RRectXY(Skia.XYWHRect(11, -3, 3.6, 6), 1.3, 1.3), fill('#b07a4a'));
-      oval(c, -2, 0, 3.6, 3.6, fill(color));
+      c.rotate(-16, 0, 0);
+      // The glass behind the note.
+      const glass = Skia.PathBuilder.Make();
+      glass.moveTo(-14, -6);
+      glass.quadTo(-17, 0, -14, 6);
+      glass.lineTo(4, 6.5);
+      glass.quadTo(8, 6, 10, 3);
+      glass.lineTo(15, 3);
+      glass.lineTo(15, -3);
+      glass.lineTo(10, -3);
+      glass.quadTo(8, -6, 4, -6.5);
+      glass.close();
+      const shape = glass.build();
+      c.drawPath(shape, fill('#dfeef0', 0.32));
+      // The rolled note, its paper edge showing.
+      c.drawRRect(Skia.RRectXY(Skia.XYWHRect(-11, -3.4, 15, 6.8), 3.4, 3.4), fill('#f4ecd8'));
+      c.drawLine(-11, -1.4, 4, -1.4, line('#d8cdb2', 0.6));
+      c.drawLine(-11, 1.3, 4, 1.3, line('#d8cdb2', 0.6));
+      c.drawRect(Skia.XYWHRect(-4.6, -3.4, 2, 6.8), fill(color));
+      // The glass in front: an outline and one soft shine.
+      c.drawPath(shape, line('#ffffff', 0.9, 0.7));
+      c.drawLine(-11, -4.3, 2, -4.6, line('#ffffff', 1.1, 0.55));
+      c.drawRRect(Skia.RRectXY(Skia.XYWHRect(14.4, -2.6, 3.6, 5.2), 1.1, 1.1), fill('#b07a4a'));
     },
-    Skia.XYWHRect(-20, -14, 40, 28)
+    Skia.XYWHRect(-22, -14, 44, 28)
   );
 }
 

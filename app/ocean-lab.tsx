@@ -10,6 +10,8 @@ import { buildOcean } from '@/lib/ocean-person';
 import { NO_SPLASH } from '@/lib/ocean-splash';
 import { CALM_RHYTHM, restingSea } from '@/lib/sea-beat';
 
+const LAB_BOTTLES = ['#e99854', '#4fa8d8', '#d86f6f', '#7fc98f', '#e8c95a'].flatMap((color, i) => WATERS.map((water) => ({ id: `${water}${i}`, trackId: i, place: { water, depth: 'popular' as const }, color, seed: i * 7 + 1 })));
+
 const OceanCanvas = lazySkia(() => import('@/components/ocean/ocean-canvas'));
 
 // A place frozen in time, to judge the art: /ocean-lab?water=midnight&depth=gems&hour=2&person=example&t=30
@@ -55,7 +57,7 @@ export default function OceanLab() {
         rest={{ water: 'reef', depth: 'popular' }}
         hour={hour}
         life={life}
-        bottles={[]}
+        bottles={q.person === 'example' ? LAB_BOTTLES : []}
       />
     </View>
   );
