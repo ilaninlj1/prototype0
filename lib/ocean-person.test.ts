@@ -301,7 +301,7 @@ test('the ocean does not shrink or lose color after time away', () => {
   }
 });
 
-test('building 5000 swipes and 500 saves stays well under a dive's first frames', (t) => {
+test('building 5000 swipes and 500 saves stays quick enough to build between swipes', (t) => {
   const history = Array.from({ length: 5000 }, (_, i) => swipe(i + 1, {
     timestamp: NOW - (5000 - i) * 60_000, action: i < 500 ? 'like' : i % 3 ? 'skip' : 'reveal',
   }));

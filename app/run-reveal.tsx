@@ -73,7 +73,7 @@ export default function RunRevealScreen() {
   };
 
   const keep = (indexes: number[]) => {
-    for (const i of indexes) void saveLike({ ...run.played[i].track, via: 'run' });
+    for (const i of indexes) void saveLike({ ...run.played[i].track, via: 'run', foundBlind: run.played[i].blind });
     update((r) => ({ ...r, played: r.played.map((s, i) => (indexes.includes(i) ? { ...s, kept: true } : s)) }));
   };
 

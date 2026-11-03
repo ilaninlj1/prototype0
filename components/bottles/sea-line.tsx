@@ -17,6 +17,7 @@ import Animated, {
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { settleDiveTo, useDivePan } from '@/components/ocean/dive-gesture';
+import { Hatchling } from '@/components/ocean/hatchling';
 
 import { DarkColors } from '@/constants/theme';
 import { CALM_RHYTHM, SEA_BASE, SEA_TALL, SPLASH_AT, crestOf, seaY, startWave, stepSea, swellFront, type Rhythm, type SeaState } from '@/lib/sea-beat';
@@ -107,6 +108,7 @@ export function SeaLine({
   below,
   water,
   onTapWater,
+  hatch,
   incoming,
   outgoing,
   rhythm,
@@ -121,6 +123,8 @@ export function SeaLine({
   below: number;
   water: SeaWater;
   onTapWater: () => void;
+  /** A save's creature, which pops out at the surface and swims down. */
+  hatch: { key: number; color: string } | null;
   incoming: SeaBottle;
   outgoing: { key: number; color: string } | null;
   /** The playing song's rhythm; null while its sound is still being looked up (the sea keeps what it has). */
@@ -296,7 +300,7 @@ export function SeaLine({
   const gesture = Gesture.Exclusive(divePan, tap);
 
   return (
-    <View style={[styles.sea, { height: bottom }]} pointerEvents="box-none">
+    <View style={[styles.sea, { height: bottom, bottom: -below }]} pointerEvents="box-none">
       <Svg width={width} height={bottom} pointerEvents="none">
         <Defs>
           <LinearGradient id="seaWater" x1="0" y1={SEA_BASE - 12} x2="0" y2={bottom} gradientUnits="userSpaceOnUse">
@@ -320,8 +324,9 @@ export function SeaLine({
           <Drop key={i} i={i} sea={sea} color={water.foam} />
         ))}
       </Svg>
+      <Hatchling hatch={hatch} width={width} surface={SEA_BASE} depth={bottom - SEA_BASE} />
       <GestureDetector gesture={gesture}>
-        <View style={[styles.strip, { top: SEA_BASE - STRIP_ABOVE }]} />
+        <View style={[styles.strip, { top: SEA_BASE - STRIP_ABOVE, bottom: below }]} />
       </GestureDetector>
       <Animated.View
         style={[styles.grabber, grabberStyle]}
@@ -347,7 +352,7 @@ export function SeaLine({
 
 const styles = StyleSheet.create({
   sea: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  strip: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  strip: { position: 'absolute', left: 0, right: 0 },
   grabber: { position: 'absolute', left: 0, top: 0, width: GRABBER, height: 4, borderRadius: 2, backgroundColor: '#ffffff', shadowColor: '#06222b', shadowOpacity: 0.25, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
   bottle: { position: 'absolute', left: 0, top: 0, width: BOTTLE, height: BOTTLE },
 });

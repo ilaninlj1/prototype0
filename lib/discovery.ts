@@ -658,7 +658,20 @@ export async function refillQueueWithFallback(
 export function keepDropEntries(snapshot: SwipeEntry[], current: SwipeEntry[]): SwipeEntry[] {
   const key = (e: SwipeEntry) => `${e.trackId}:${e.timestamp}`;
   const have = new Set(snapshot.map(key));
-  return [...snapshot, ...current.filter((e) => e.source === 'drop' && !have.has(key(e)))];
+  const elsewhere = (e: SwipeEntry) => e.source === 'drop' || e.source === 'people' || e.source === 'run';
+  return [...snapshot, ...current.filter((e) => elsewhere(e) && !have.has(key(e)))];
+}
+
+/** A card left: its song's latest entry takes the longest it was really heard, so listening on after a quick save counts. */
+export function withListen(history: SwipeEntry[], trackId: number, listenMs: number): SwipeEntry[] {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].trackId !== trackId) continue;
+    if ((history[i].listenMs ?? 0) >= listenMs) return history;
+    const next = [...history];
+    next[i] = { ...history[i], listenMs };
+    return next;
+  }
+  return history;
 }
 
 /** Genres in the Liked list, most common first — the filter chips. */

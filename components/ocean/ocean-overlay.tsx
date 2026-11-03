@@ -20,8 +20,9 @@ import { castFor, type CastMember } from '@/lib/ocean-cast';
 import { depthDragResult, nearestPlaceIndex, settleDive, showsAt, waterDragResult } from '@/lib/ocean-dive';
 import { hitMember } from '@/lib/ocean-hit';
 import { DEPTHS, SPECIES_INFO, WATERS, WATER_INFO, placeKey, placeLabel, type Depth, type Place, type Species, type Water } from '@/lib/ocean-map';
-import { swimPose } from '@/lib/ocean-motion';
+import { restPose, swimPose } from '@/lib/ocean-motion';
 import type { Creature, OceanLife } from '@/lib/ocean-person';
+import { seabedAt } from '@/lib/ocean-scene';
 import type { OceanBottle } from '@/components/ocean/ocean-canvas';
 import type { SeaState } from '@/lib/sea-beat';
 
@@ -48,6 +49,8 @@ export function OceanOverlay({
   bottles,
   spotlight,
   activePlace,
+  jump,
+  notice,
   songsLeft,
   onSwipeHere,
   onWake,
@@ -74,6 +77,10 @@ export function OceanOverlay({
   spotlight: SharedValue<number>;
   /** The place an ocean filter is on, so you arrive there. */
   activePlace: Place | null;
+  /** A request to go under, to a place: from Details, the Library or You. */
+  jump: { place: Place; key: number } | null;
+  /** A line under the pill, when this isn't your own ocean. */
+  notice: string | null;
   songsLeft: (place: Place, species: Species | null) => number;
   onSwipeHere: (filter: OceanFilter) => void;
   onWake: () => void;
@@ -96,6 +103,7 @@ export function OceanOverlay({
   const [place, setPlace] = useState<Place>({ water: 'reef', depth: 'popular' });
   const [species, setSpecies] = useState<Species | null>(null);
   const [hintSeen, setHintSeen] = useState(true);
+  const [wildLine, setWildLine] = useState<string | null>(null);
   const posX = useSharedValue(0);
   const posY = useSharedValue(0);
   const clock = useSharedValue(0);
@@ -151,6 +159,14 @@ export function OceanOverlay({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey]);
 
+  useEffect(() => {
+    if (!jump) return;
+    jumpTo(jump.place, false);
+    settleDiveTo(1);
+    // Once per request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jump?.key]);
+
   useEffect(
     () =>
       onDiveSettled((nowUnder) => {
@@ -191,6 +207,7 @@ export function OceanOverlay({
     const next = { water: WATERS[waterIndex], depth: DEPTHS[depthIndex] };
     if (placeKey(next) === placeKey(place)) return;
     setSpecies(null);
+    setWildLine(null);
     jumpTo(next, false);
   }
 
@@ -198,16 +215,26 @@ export function OceanOverlay({
     const t = clock.get();
     const poses = member.members.map((m: CastMember) => swimPose(m, t, width, height));
     const i = hitMember(x, y, member.members, poses);
-    if (i == null) {
-      setSpecies(null);
+    if (i != null) {
+      const m = member.members[i];
+      if (m.creature) return onTapCreature(m.creature);
+      const picked = m.wild?.species ?? null;
+      if (picked) setSpecies((now) => (now === picked ? null : picked));
+      setWildLine(picked ? `A wild one, not your song. ${SPECIES_INFO[picked].means} songs live here too.` : 'A wild one, not your song.');
+      void AsyncStorage.setItem(HINT_KEY, '1').catch(() => {});
+      setHintSeen(true);
       return;
     }
-    const m = member.members[i];
-    if (m.creature) return onTapCreature(m.creature);
-    const picked = m.wild?.species ?? null;
-    if (picked) setSpecies((now) => (now === picked ? null : picked));
-    void AsyncStorage.setItem(HINT_KEY, '1').catch(() => {});
-    setHintSeen(true);
+    // A bottle resting on the sand.
+    const here = bottles.filter((b) => placeKey(b.place) === placeKey(place));
+    const row = DEPTHS.indexOf(place.depth);
+    for (let b = 0; b < here.length; b++) {
+      const rest = restPose(here[b].seed, b, here.length, width, height * 0.86);
+      const fx = Math.max(0, Math.min(1, rest.x / width));
+      if (Math.hypot(rest.x - x, height - seabedAt(row, fx) * height - 4 - y) < 30) return onTapBottle(here[b]);
+    }
+    setSpecies(null);
+    setWildLine(null);
   };
 
   // One finger: sideways changes water, up sinks, down rises, and down from Popular brings you to the surface.
@@ -339,23 +366,28 @@ export function OceanOverlay({
             place={place}
             title={species ? `${SPECIES_INFO[species].means} songs in ${placeLabel(place)}` : null}
             subtitle={subtitle}
-            hint={hintSeen ? null : 'Tap a fish to pick its kind of song.'}
+            hint={notice ?? wildLine ?? (hintSeen ? null : 'Tap a fish to pick its kind of song.')}
             speciesTag={species ? SPECIES_INFO[species].means : null}
             canSwipe={left > 0}
-            allCount={hiddenHere > 0 ? (life?.places[placeKey(place)]?.creatures.length ?? 0) : 0}
+            allCount={hiddenHere > 0 || screenReader ? (life?.places[placeKey(place)]?.creatures.length ?? 0) : 0}
             onWater={(w: Water) => {
               setSpecies(null);
+              setWildLine(null);
               jumpTo({ ...place, water: w }, true);
             }}
             onDepth={(d: Depth) => {
               setSpecies(null);
+              setWildLine(null);
               jumpTo({ ...place, depth: d }, true);
             }}
             onSwipe={() => onSwipeHere({ place, species })}
             onBackUp={() => settleDiveTo(0)}
             onPortrait={onPortrait}
             onOpenList={() => onOpenList(place)}
-            onClearSpecies={() => setSpecies(null)}
+            onClearSpecies={() => {
+              setSpecies(null);
+              setWildLine(null);
+            }}
           />
         </Animated.View>
       )}

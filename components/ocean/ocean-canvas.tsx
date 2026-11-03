@@ -10,7 +10,7 @@ import type { OceanLife } from '@/lib/ocean-person';
 import { dayMixAt, hexToRgb, waterStops } from '@/lib/ocean-scene';
 import type { SeaState } from '@/lib/sea-beat';
 
-export type OceanBottle = { id: string; place: Place; color: string; seed: number };
+export type OceanBottle = { id: string; trackId: number; place: Place; color: string; seed: number };
 
 export type OceanCanvasProps = {
   width: number;

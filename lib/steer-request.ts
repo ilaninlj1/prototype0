@@ -1,8 +1,9 @@
 import type { Strategy } from '@/lib/discovery';
+import type { Place } from '@/lib/ocean-map';
 import type { MapPoint } from '@/lib/sound-map';
 
 // The Liked list and the Dark Map ask Home to steer; Home takes it the next time it's focused.
-export type SteerRequest = { kind: 'artist' | 'sound'; strategy: Strategy } | { kind: 'map'; point: MapPoint; words: string };
+export type SteerRequest = { kind: 'artist' | 'sound'; strategy: Strategy } | { kind: 'map'; point: MapPoint; words: string } | { kind: 'ocean'; place: Place; trackId?: number };
 
 let pending: SteerRequest | null = null;
 

@@ -17,6 +17,9 @@ import type { SoundRecord } from '@/lib/sound';
 import { releaseLine } from '@/lib/song-age';
 
 type Props = {
+  /** Where this song lives in the ocean, like "Midnight · Buried", and the way there. */
+  livesIn?: string | null;
+  onDive?: () => void;
   visible: boolean;
   track: DiscoveryTrack | null;
   /** The artist's Last.fm listeners: undefined while loading, null if unknown. */
@@ -34,7 +37,7 @@ type Props = {
  * cover, where to listen, how many people do, Call it, how it sounds,
  * comments and the credits.
  */
-export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, knownSound, onClose }: Props) {
+export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, knownSound, livesIn, onDive, onClose }: Props) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const looked = useSound(visible ? track : null);
@@ -95,6 +98,12 @@ export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, kn
           </View>
         </View>
 
+        {livesIn && onDive && (
+          <Pressable onPress={onDive} accessibilityRole="button" style={styles.livesIn}>
+            <ThemedText style={styles.livesInText}>Lives in {livesIn}</ThemedText>
+            <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />
+          </Pressable>
+        )}
         <ThemedText style={sheetStyles.heading}>The sound</ThemedText>
         {sound ? (
           <>
@@ -156,6 +165,8 @@ export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, kn
 }
 
 const styles = StyleSheet.create({
+  livesIn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36 },
+  livesInText: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: Colors.text },
   body: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, paddingBottom: Spacing.xl, gap: Spacing.xs },
   cover: { borderRadius: 20, marginBottom: Spacing.md, alignSelf: 'center' },
   secondary: { fontSize: 15, lineHeight: 21, color: Colors.textSecondary },

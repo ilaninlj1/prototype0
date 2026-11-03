@@ -230,7 +230,7 @@ export function useRunSession() {
     song.liked = 'you';
     song.kept = true;
     s.likedFlash += 1;
-    void saveLike({ ...song.track, via: 'run' });
+    void saveLike({ ...song.track, via: 'run', foundBlind: song.blind });
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     publish();
   }, [publish]);

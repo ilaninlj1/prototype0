@@ -15,6 +15,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { PieceView } from '@/components/print/piece-view';
 import { CalledItStory } from '@/components/you/called-it-story';
 import { DarkMapCard } from '@/components/you/dark-map-card';
+import { OceanCard } from '@/components/you/ocean-card';
 import { SeaCard } from '@/components/you/sea-card';
 import { ViewSwitch, type YouView } from '@/components/you/view-switch';
 import {
@@ -301,6 +302,7 @@ export default function ProfileScreen() {
             </>
           ) : finds.length === 0 ? (
             <>
+              {view === 'discoveries' && <OceanCard />}
               {view === 'discoveries' && <DarkMapCard width={width - 2 * Spacing.lg} onOpen={() => router.push('/map')} />}
               {view === 'discoveries' && <SeaCard onOpen={() => router.push('/sea')} />}
               <ThemedText style={styles.dim}>

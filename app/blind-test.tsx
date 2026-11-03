@@ -74,7 +74,7 @@ export default function BlindTestScreen() {
     const i = liked.length;
     const next = [...liked, like];
     setLiked(next);
-    if (like) await appendLikedTrack({ ...songToTrack(items[i].song), likedAt: Date.now() });
+    if (like) await appendLikedTrack({ ...songToTrack(items[i].song), likedAt: Date.now(), foundBlind: true });
     if (next.length === items.length) {
       player.pause();
       const score = scoreTest(items, next);

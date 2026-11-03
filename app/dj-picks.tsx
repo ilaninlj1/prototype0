@@ -103,7 +103,7 @@ export default function DjPicksScreen() {
                 </ThemedText>
               )}
               <View style={styles.links}>
-                <LikeButton track={c.track} size={18} />
+                <LikeButton track={{ ...c.track, foundBlind: true }} size={18} />
                 <AppleMusicLink trackId={c.track.id} url={c.track.trackViewUrl} height={26} />
                 <SpotifyLink artist={c.track.artistName} title={c.track.trackName} />
               </View>

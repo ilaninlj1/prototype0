@@ -101,7 +101,7 @@ export function usePeople() {
       source: 'people',
     };
     await appendSwipeEntry(entry);
-    if (hearted) await saveLike(t);
+    if (hearted) await saveLike({ ...t, foundBlind: true });
     await sendVerdict(t, hearted);
     if (hearted) await refreshPeople();
   }

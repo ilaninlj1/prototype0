@@ -5,7 +5,7 @@ import { onLikeChange } from '@/components/like-button';
 import { songLight } from '@/hooks/use-bottles';
 import { loadLikedTracks } from '@/lib/discovery-storage';
 import type { DiscoveryTrack, SwipeEntry } from '@/lib/discovery';
-import type { Depth } from '@/lib/ocean-map';
+import { driftWater, waterOf, type Depth, type Place } from '@/lib/ocean-map';
 import { buildOcean, type OceanLife } from '@/lib/ocean-person';
 import { catalogTrackById, deckPool, depthOfTrack } from '@/lib/pool';
 import { soundFor } from '@/lib/sound-index';
@@ -38,6 +38,10 @@ function depthOf(t: DiscoveryTrack | SwipeEntry): Depth {
  * after the swipe that caused it has settled). Null until the first build.
  */
 export function useOcean(history: SwipeEntry[]): OceanLife | null {
+  return useOceanData(history).life;
+}
+
+export function useOceanData(history: SwipeEntry[]): { life: OceanLife | null; liked: DiscoveryTrack[] } {
   const [life, setLife] = useState<OceanLife | null>(null);
   const [liked, setLiked] = useState<DiscoveryTrack[] | null>(null);
   const [warm, setWarm] = useState(false);
@@ -67,5 +71,11 @@ export function useOcean(history: SwipeEntry[]): OceanLife | null {
     return () => clearTimeout(t);
   }, [warm, liked, history]);
 
-  return life;
+  return { life, liked: liked ?? [] };
+}
+
+/** Where a song lives, by the same rules as its creature. */
+export function oceanPlaceOf(track: DiscoveryTrack): Place {
+  const s = soundOf(track.id);
+  return { water: s ? waterOf(s) : driftWater(track.id), depth: depthOf(track) };
 }

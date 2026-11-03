@@ -11,6 +11,7 @@ import {
   deriveGenresHeard,
   deriveRatedGenres,
   keepDropEntries,
+  withListen,
   likedGenres,
   growthLabel,
   filterByGenre,
@@ -599,4 +600,21 @@ test('growthLabel reads like a view count: found → now, with the change', () =
 test('countSongsHeard: a double-tapped card that is then swiped counts once', () => {
   const h = (trackId: number, action: string) => ({ trackId, artistId: 1, genre: 'g', action, timestamp: 0 }) as unknown as SwipeEntry;
   assert.equal(countSongsHeard([h(1, 'like'), h(1, 'reveal'), h(2, 'skip'), h(3, 'steer-artist')]), 2);
+});
+
+test('withListen raises the latest entry for a song and never lowers it', () => {
+  const a = { trackId: 1, artistId: 1, genre: 'x', action: 'reveal', timestamp: 1, listenMs: 2000 } as const;
+  const b = { trackId: 2, artistId: 2, genre: 'x', action: 'skip', timestamp: 2, listenMs: 1000 } as const;
+  const raised = withListen([a, b], 1, 28_000);
+  assert.equal(raised[0].listenMs, 28_000);
+  assert.equal(raised[1].listenMs, 1000);
+  assert.equal(withListen([a, b], 1, 500)[0].listenMs, 2000);
+  assert.equal(withListen([a, b], 9, 500).length, 2);
+});
+
+test('keepDropEntries keeps People and Run entries through an Undo as well as drops', () => {
+  const feed = { trackId: 1, artistId: 1, genre: 'x', action: 'skip', timestamp: 1 } as const;
+  const people = { trackId: 2, artistId: 2, genre: 'x', action: 'like', timestamp: 2, source: 'people' } as const;
+  const run = { trackId: 3, artistId: 3, genre: 'x', action: 'like', timestamp: 3, source: 'run' } as const;
+  assert.deepEqual(keepDropEntries([], [feed, people, run]), [people, run]);
 });

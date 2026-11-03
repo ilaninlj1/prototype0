@@ -40,6 +40,7 @@ import { appendExportBatch, loadLikedTracks, loadRecentlyDeleted, loadSwipeHisto
 import { heardSongs } from '@/lib/heard';
 import { libraryView, searchLibrary } from '@/lib/library';
 import { setNote } from '@/lib/saved-songs';
+import { oceanPlaceOf } from '@/hooks/use-ocean';
 import { requestSteer, type SteerRequest } from '@/lib/steer-request';
 
 // react-native-web's Alert.alert is a no-op (confirmed against the installed
@@ -550,6 +551,13 @@ export function LikedTracksScreen() {
                 accessibilityRole="button"
                 onPress={() => steerHome({ kind: 'sound', strategy: { type: 'genre', genre: savedPlaying.primaryGenreName } })}>
                 <ThemedText style={styles.exploreLabel}>More like this sound</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.exploreButton}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                onPress={() => steerHome({ kind: 'ocean', place: oceanPlaceOf(savedPlaying), trackId: savedPlaying.id })}>
+                <ThemedText style={styles.exploreLabel}>Where it lives</ThemedText>
               </TouchableOpacity>
             </View>
           )}

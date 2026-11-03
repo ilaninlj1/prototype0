@@ -83,7 +83,7 @@ export function useDailyDrop() {
   async function vote(liked: boolean): Promise<'more' | 'done'> {
     if (!drop) return 'done';
     const current = votesRef.current;
-    const next = [...current, { position: current.length, liked }];
+    const next = [...current, { position: current.length, liked, at: Date.now() }];
     setVotesBoth(next);
     await saveDropProgress({ day: drop.day, votes: next });
     if (next.length < 5) return 'more';

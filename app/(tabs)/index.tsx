@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, useWindowDimensions, View, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,20 +39,26 @@ import { SEA_BASE, SEA_HEIGHT, SeaLine, seaX, type SeaWave } from '@/components/
 import { settleDiveTo, oceanDive, oceanTravel, oceanReduced, setOceanInk, useOceanTabBarHeight } from '@/components/ocean/dive-gesture';
 import type { OceanBottle } from '@/components/ocean/ocean-canvas';
 import { OceanOverlay, type OceanFilter } from '@/components/ocean/ocean-overlay';
-import type { Creature } from '@/lib/ocean-person';
+import { CreatureSheet } from '@/components/ocean/creature-sheet';
+import { OceanPortrait, THIN_OCEAN } from '@/components/ocean/ocean-portrait';
+import { PlaceList } from '@/components/ocean/place-list';
+import { JourneySheet } from '@/components/bottles/journey-sheet';
+import { exampleInput } from '@/lib/ocean-example';
+import { EXAMPLE_NOTICE, buildOcean, stillBlind, type Creature, type OceanInput, type OceanLife } from '@/lib/ocean-person';
 import { songLight, useBottles } from '@/hooks/use-bottles';
 import { queueBottleNow, seaPosition } from '@/lib/bottle-countdown';
 import { revealLine } from '@/lib/bottle-journey';
 import type { FeedMode } from '@/lib/bottles';
 import { allDecks, deckCounts, deckLabel, nearestInDeck, oceanDeckLeft, pickDeck, type Deck } from '@/lib/decks';
-import type { Place, Species } from '@/lib/ocean-map';
+import { placeKey, placeLabel, type Place, type Species } from '@/lib/ocean-map';
 import { dayMixAt, surfaceWater } from '@/lib/ocean-scene';
 import { CALM_RHYTHM, restingSea, type SeaState } from '@/lib/sea-beat';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useHomeChrome } from '@/hooks/use-home-chrome';
-import { useOcean } from '@/hooks/use-ocean';
+import { useMyBottles } from '@/hooks/use-my-bottles';
+import { oceanPlaceOf, useOceanData } from '@/hooks/use-ocean';
 import { cluesLine } from '@/lib/home-copy';
 import { pickStatus, statusText, type StatusItem } from '@/lib/status-line';
 import { addToPiece, forkPiece, saveOnPiece, undoOnPiece, useArt } from '@/hooks/use-art';
@@ -75,6 +82,7 @@ import {
   type Region,
   type Strategy,
   type SwipeEntry,
+  withListen,
 } from '@/lib/discovery';
 import {
   appendPresetChangeEntry,
@@ -94,7 +102,7 @@ import {
 import { pickSimilar } from '@/lib/charts';
 import { genreUnderDark, heardIds, refillSource } from '@/lib/dark-map';
 import { loadMapView } from '@/lib/dark-map-app';
-import { deckPool, fetchArtistListeners, fetchSimilarArtists, getTracks, getTracksBySound, getTracksNear, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
+import { catalogTrackById, deckPool, fetchArtistListeners, fetchSimilarArtists, getTracks, getTracksBySound, getTracksNear, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
 import { deckSize } from '@/lib/pool-config';
 import { ANY_FILTER, DIMENSIONS, describeFilter, isActive, relax, type SoundFilter } from '@/lib/sound-filter';
 import { findItunesArtist } from '@/lib/song-details';
@@ -284,7 +292,14 @@ export default function HomeScreen() {
 
   // The top card plays while Home is in view. A falsy previewUrl means
   // "nothing to play" (see lib/pool.ts), so nothing is loaded.
-  usePreviewWhileFocused(currentTrack?.previewUrl || undefined, queue[1]?.previewUrl);
+  // One of your songs playing under the water, in place of the card's.
+  const [oceanSong, setOceanSongState] = useState<DiscoveryTrack | null>(null);
+  const oceanSongRef = useRef<DiscoveryTrack | null>(null);
+  function setOceanSong(next: DiscoveryTrack | null) {
+    oceanSongRef.current = next;
+    setOceanSongState(next);
+  }
+  usePreviewWhileFocused(oceanSong?.previewUrl || currentTrack?.previewUrl || undefined, oceanSong ? undefined : queue[1]?.previewUrl);
 
   // ---- The piece: every swipe adds the song's print (see lib/piece.ts) ----
   const { piece } = useArt();
@@ -323,6 +338,8 @@ export default function HomeScreen() {
     furthestRef.current = 0;
   }, [currentTrack?.id]);
   useEffect(() => {
+    // Only the card's own song: your songs playing under the water don't count toward it.
+    if (oceanSongRef.current) return;
     furthestRef.current = Math.max(furthestRef.current, status.currentTime);
   }, [status.currentTime]);
   const heardNow = () => (status.duration > 0 ? Math.min(1, furthestRef.current / (status.duration * 0.8)) : 0);
@@ -517,7 +534,11 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    if (status.didJustFinish) setHasEnded(true);
+    if (!status.didJustFinish) return;
+    if (underWater) playNextUnderWater();
+    else setHasEnded(true);
+    // Only when a clip ends.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status.didJustFinish]);
 
 
@@ -656,6 +677,22 @@ export default function HomeScreen() {
     setQueue((q) => (q.length > 0 && !q.some((t) => t.id === incoming.track.id) ? [q[0], incoming.track, ...q.slice(1)] : q));
   }, [incoming, queue.length]);
 
+  // A clip ended under the water: your songs from this place play one after another, and each one's creature comes
+  // forward. With none here, it goes quiet and the sea stays calm.
+  function playNextUnderWater() {
+    const here = oceanLifeRef.current?.places[placeKey(oceanPlaceRef.current)]?.creatures ?? [];
+    const songs = here.filter((c) => c.trackId !== currentTrack?.id && !!oceanTracks.get(c.trackId)?.previewUrl);
+    if (songs.length === 0) {
+      setOceanSong(null);
+      oceanSpot.set(0);
+      return;
+    }
+    const at = oceanSongRef.current ? songs.findIndex((c) => c.trackId === oceanSongRef.current!.id) : -1;
+    const next = songs[(at + 1) % songs.length];
+    setOceanSong(oceanTracks.get(next.trackId)!);
+    oceanSpot.set(next.trackId);
+  }
+
   // The panel's buttons. Cancel abandons the load: back to where you were if there's an undo, otherwise just stop.
   function handleFeedAction(action: FeedAction) {
     if (action === 'retry') {
@@ -790,7 +827,8 @@ export default function HomeScreen() {
       ...(isSteer
         ? {}
         : {
-            listenMs: Math.round(status.currentTime * 1000),
+            // Its own song's furthest point, so a clip played twice or your songs under the water don't muddle it.
+            listenMs: Math.round(Math.max(oceanSongRef.current ? 0 : status.currentTime, furthestRef.current) * 1000),
             // Wall-clock time this card was the top of the stack, distinct
             // from listenMs — see SwipeEntry's own comment. Skipped for
             // steering for the same reason listenMs is: the card doesn't
@@ -958,6 +996,14 @@ export default function HomeScreen() {
   async function handleRevealDone() {
     if (revealIdRef.current == null) return lock.release();
     const revealed = revealTrack;
+    // Listening on after the reveal counts, even though the reveal was already logged.
+    if (revealed) {
+      const raised = withListen(swipeHistory, revealed.id, Math.round(furthestRef.current * 1000));
+      if (raised !== swipeHistory) {
+        setSwipeHistory(raised);
+        void saveSwipeHistory(raised);
+      }
+    }
     setRevealTrack(null);
     revealIdRef.current = null;
     revealRecipeRef.current = null;
@@ -1060,7 +1106,13 @@ export default function HomeScreen() {
     if (!hydrated || !isFocused) return;
     const request = takeSteerRequest();
     if (!request) return;
-    if (request.kind === 'map') applyMapJump(request.point, request.words);
+    if (request.kind === 'ocean') {
+      setOceanJump({ place: request.place, key: Date.now() });
+      if (request.trackId != null) {
+        const c = oceanLifeRef.current?.places[placeKey(request.place)]?.creatures.find((x) => x.trackId === request.trackId);
+        if (c) setOpenCreature(c);
+      }
+    } else if (request.kind === 'map') applyMapJump(request.point, request.words);
     else applyRouteSteering(request.kind, request.strategy);
   }, [hydrated, isFocused]);
 
@@ -1257,7 +1309,37 @@ export default function HomeScreen() {
   // Coming back to Home brings them back for a moment.
   useFocusEffect(wake);
   useFocusEffect(useCallback(() => setOceanHour(localHour()), []));
-  const oceanLife = useOcean(swipeHistory);
+  const { life: myOcean, liked: myLiked } = useOceanData(swipeHistory);
+  const [oceanExample, setOceanExample] = useState<{ life: OceanLife; input: OceanInput } | null>(null);
+  const oceanLife = oceanExample?.life ?? myOcean;
+  const oceanLifeRef = useRef(oceanLife);
+  oceanLifeRef.current = oceanLife;
+  const oceanTracks = useMemo(() => new Map((oceanExample?.input.liked ?? myLiked).map((t) => [t.id, t])), [oceanExample, myLiked]);
+  const oceanPlaceRef = useRef<Place>(REST_PLACE);
+  const [openCreature, setOpenCreature] = useState<Creature | null>(null);
+  const [openList, setOpenList] = useState<Place | null>(null);
+  const [portraitOpen, setPortraitOpen] = useState(false);
+  const [oceanJump, setOceanJump] = useState<{ place: Place; key: number } | null>(null);
+  const [hatch, setHatch] = useState<{ key: number; color: string } | null>(null);
+  const [firstHatchLine, setFirstHatchLine] = useState(false);
+  const firstHatchSeenRef = useRef(true);
+  useEffect(() => {
+    void AsyncStorage.getItem(FIRST_HATCH_KEY)
+      .then((v) => {
+        firstHatchSeenRef.current = v === '1';
+      })
+      .catch(() => {});
+  }, []);
+  const myBottles = useMyBottles();
+  const [journey, setJourney] = useState<OceanBottle | null>(null);
+  const oceanBottles = useMemo<OceanBottle[]>(
+    () =>
+      [...myBottles.entries()].map(([id, b]) => {
+        const t = catalogTrackById(id);
+        return { id: b.id, trackId: id, place: t ? oceanPlaceOf(t) : REST_PLACE, color: songLight(id), seed: id };
+      }),
+    [myBottles]
+  );
   const onUnderChange = useCallback(
     (nowUnder: boolean) => {
       setUnderWater(nowUnder);
@@ -1266,16 +1348,20 @@ export default function HomeScreen() {
         // Time under the water isn't time spent deciding on this card.
         if (underSinceRef.current != null) cardShownAtRef.current += Date.now() - underSinceRef.current;
         underSinceRef.current = null;
+        // Rising brings the card's own song back, and its own ocean back after an example.
+        setOceanSong(null);
+        oceanSpot.set(0);
+        setOceanExample(null);
         wake();
       }
     },
     [wake]
   );
-  const noteOceanPlace = useCallback(() => {}, []);
-  const noteCreature = useCallback((_c: Creature) => {}, []);
-  const noteBottle = useCallback((_b: OceanBottle) => {}, []);
-  const openPortrait = useCallback(() => {}, []);
-  const openList = useCallback((_p: Place) => {}, []);
+  const noteOceanPlace = useCallback((place: Place) => {
+    oceanPlaceRef.current = place;
+  }, []);
+  const noteBottle = useCallback((b: OceanBottle) => setJourney(b), []);
+  const openPortrait = useCallback(() => setPortraitOpen(true), []);
 
   if (!hydrated) {
     return (
@@ -1296,6 +1382,15 @@ export default function HomeScreen() {
       setToast(true);
     }
     const listenMs = Math.round(status.currentTime * 1000);
+    if (first) {
+      setHatch({ key: Date.now(), color: songLight(track.id) });
+      if (!firstHatchSeenRef.current) {
+        firstHatchSeenRef.current = true;
+        setFirstHatchLine(true);
+        void AsyncStorage.setItem(FIRST_HATCH_KEY, '1').catch(() => {});
+        setTimeout(() => setFirstHatchLine(false), 6000);
+      }
+    }
     await handleSave(track);
     if (first && (await bottles.saved(track, swipeHistory, listenMs))) setToastFloating(true);
     // Keeping a bottle shows the keep moment in the toast's place; the toast mustn't come back after it.
@@ -1353,6 +1448,27 @@ export default function HomeScreen() {
       heardIds(swipeHistory),
       (a) => !hideFromDiscovery(a) && !alreadyKnown(a)
     ).songs;
+  function isStillBlind(trackId: number) {
+    return stillBlind(trackId, currentTrack ? { id: currentTrack.id, revealed: revealedNow } : null);
+  }
+  function playCreature(c: Creature) {
+    const t = oceanTracks.get(c.trackId);
+    if (!t?.previewUrl) return;
+    if (oceanSong?.id === c.trackId) {
+      if (status.playing) player.pause();
+      else player.play();
+      return;
+    }
+    setOceanSong(t);
+    oceanSpot.set(c.trackId);
+  }
+  function swipeLikeCreature(c: Creature) {
+    setOpenCreature(null);
+    const sound = soundFor(c.trackId);
+    settleDiveTo(0);
+    const name = oceanTracks.get(c.trackId)?.trackName ?? 'this song';
+    void startDeck(sound ? { kind: 'like', trackId: c.trackId, label: name, sound } : { kind: 'ocean', water: c.place.water, depth: c.place.depth });
+  }
   function swipeThisPlace({ place, species }: OceanFilter) {
     settleDiveTo(0);
     void startDeck({ kind: 'ocean', water: place.water, depth: place.depth, ...(species ? { species } : {}) });
@@ -1372,6 +1488,7 @@ export default function HomeScreen() {
       <Pressable style={StyleSheet.absoluteFill} onPress={wake} accessible={false} />
       {frameW > 0 && (
         <SeaLine
+          hatch={hatch}
           sea={oceanSea}
           width={frameW}
           below={tabBarHeight}
@@ -1485,10 +1602,10 @@ export default function HomeScreen() {
                 onCancelPeek={cancelPeek}
               />
               <LaunchLight
-                trigger={bottles.launchFx?.key ?? 0}
+                trigger={hatch?.key ?? 0}
                 height={cardSize.height}
                 fall={seaSurfaceY - (cardTop + side / 2)}
-                color={bottles.launchFx?.color ?? '#e8a33d'}
+                color={hatch?.color ?? '#e8a33d'}
               />
               <ChromeFade visible={chrome.visible} style={styles.cornerPause}>
                 <CornerPause paused={!status.playing} onPress={() => {
@@ -1552,6 +1669,8 @@ export default function HomeScreen() {
               <View style={styles.lift} pointerEvents="none">
                 <KeepMoment moment={bottles.keep} onDone={bottles.dismissKeep} />
               </View>
+            ) : firstHatchLine ? (
+              <ThemedText style={styles.firstHatch}>Your song went under. Swipe up to see it.</ThemedText>
             ) : toast ? (
               <SavedToast
                 visible
@@ -1616,6 +1735,12 @@ export default function HomeScreen() {
         onSave={saveFromHome}
         onPlayDeck={startDeck}
         knownSound={revealTrack && revealTrack.id === currentTrack?.id ? topSound : null}
+        livesIn={revealTrack ? placeLabel(oceanPlaceOf(revealTrack)) : null}
+        onDive={() => {
+          if (!revealTrack) return;
+          setDetailsOpen(false);
+          setOceanJump({ place: oceanPlaceOf(revealTrack), key: Date.now() });
+        }}
         onClose={() => setDetailsOpen(false)}
       />
       <FindsNewsSheet
@@ -1643,24 +1768,65 @@ export default function HomeScreen() {
         rest={restPlace}
         hour={oceanHour}
         life={oceanLife}
-        bottles={NO_BOTTLES}
+        bottles={oceanExample ? NO_BOTTLES : oceanBottles}
         spotlight={oceanSpot}
         activePlace={deck?.kind === 'ocean' ? restPlace : null}
+        jump={oceanJump}
+        notice={oceanExample ? EXAMPLE_NOTICE : null}
         songsLeft={oceanSongsLeft}
         onSwipeHere={swipeThisPlace}
         onWake={wake}
         onUnderChange={onUnderChange}
         onPlaceChange={noteOceanPlace}
-        onTapCreature={noteCreature}
+        onTapCreature={setOpenCreature}
         onTapBottle={noteBottle}
         onPortrait={openPortrait}
-        onOpenList={openList}
+        onOpenList={setOpenList}
       />
+      <CreatureSheet
+        creature={openCreature}
+        track={openCreature ? (oceanTracks.get(openCreature.trackId) ?? null) : null}
+        blind={!!openCreature && !oceanExample && isStillBlind(openCreature.trackId)}
+        playing={!!openCreature && oceanSong?.id === openCreature.trackId && status.playing}
+        onPlay={() => openCreature && playCreature(openCreature)}
+        onSwipeLike={() => openCreature && swipeLikeCreature(openCreature)}
+        onClose={() => setOpenCreature(null)}
+      />
+      <PlaceList
+        place={openList}
+        creatures={openList ? (oceanLife?.places[placeKey(openList)]?.creatures ?? []) : []}
+        trackOf={(id) => oceanTracks.get(id) ?? null}
+        isBlind={(id) => !oceanExample && isStillBlind(id)}
+        onPick={(c) => {
+          setOpenList(null);
+          setOpenCreature(c);
+        }}
+        onClose={() => setOpenList(null)}
+      />
+      <OceanPortrait
+        visible={portraitOpen}
+        life={oceanLife}
+        example={!!oceanExample}
+        onExample={
+          oceanExample
+            ? () => setOceanExample(null)
+            : (myOcean?.total ?? 0) < THIN_OCEAN
+              ? () => {
+                  const input = exampleInput(Date.now());
+                  setOceanExample({ input, life: buildOcean(input) });
+                  setPortraitOpen(false);
+                }
+              : null
+        }
+        onClose={() => setPortraitOpen(false)}
+      />
+      <JourneySheet bottle={journey ? (myBottles.get(journey.trackId) ?? null) : null} title="This bottle's journey" onClose={() => setJourney(null)} />
     </View>
   );
 }
 
 const REST_PLACE: Place = { water: 'reef', depth: 'popular' };
+const FIRST_HATCH_KEY = 'blindspotDiscovery:oceanFirstHatch';
 const NO_BOTTLES: OceanBottle[] = [];
 const localHour = () => {
   const d = new Date();
@@ -1672,6 +1838,7 @@ const CARD_MAX = 340;
 
 const styles = StyleSheet.create({
   oceanRoot: { flex: 1, backgroundColor: Colors.background },
+  firstHatch: { ...Typography.caption, fontSize: 14, lineHeight: 18, fontWeight: '600', textAlign: 'center', color: Colors.text },
   container: {
     flex: 1,
     paddingHorizontal: Spacing.lg,

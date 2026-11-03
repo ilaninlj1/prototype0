@@ -13,7 +13,7 @@ export type DropSong = {
   listeners: number;
 };
 export type Drop = { day: string; number: number; songs: DropSong[] };
-export type DropVote = { position: number; liked: boolean };
+export type DropVote = { position: number; liked: boolean; at?: number };
 export type SongResult = { position: number; voters: number; likes: number };
 export type GuessResult = { position: number; count: number };
 
@@ -87,7 +87,7 @@ export function dropToDiscoveryTracks(drop: Drop): DiscoveryTrack[] {
 /** The drop songs you liked, as Liked-list entries — written only once the drop is finished, so an undone like never lands. */
 export function likedDropTracks(drop: Drop, votes: DropVote[], likedAt: number): DiscoveryTrack[] {
   const tracks = dropToDiscoveryTracks(drop);
-  return votes.filter((v) => v.liked).map((v) => ({ ...tracks[v.position], likedAt }));
+  return votes.filter((v) => v.liked).map((v) => ({ ...tracks[v.position], likedAt: v.at ?? likedAt, foundBlind: true }));
 }
 
 export type PendingVotes = { day: string; votes: DropVote[]; guess?: number };

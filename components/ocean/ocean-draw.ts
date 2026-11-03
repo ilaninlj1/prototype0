@@ -108,15 +108,15 @@ function drawLight(c: SkCanvas, f: Frame, here: StopRow, surface: number) {
   const k = w / WORLD_W;
   const tint = f.night > 0.5 ? 'rgba(190,212,255,1)' : f.warm > 0.4 ? 'rgba(255,226,190,1)' : 'rgba(255,255,240,1)';
   const clear = f.night > 0.5 ? 'rgba(190,212,255,0)' : f.warm > 0.4 ? 'rgba(255,226,190,0)' : 'rgba(255,255,240,0)';
-  const len = 430 * k;
   const paint = Skia.Paint();
   paint.setBlendMode(BlendMode.Screen);
-  paint.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: surface }, { x: 0, y: surface + len }, [Skia.Color(tint), Skia.Color(clear)], [0, 1], TileMode.Clamp));
   for (let i = 0; i < 6; i++) {
     const x0 = (w * (i + 0.3)) / 6 + Math.sin(t * 0.28 + i * 1.7) * 20 * k;
     const rw = (10 + ((i * 37) % 13)) * k;
     const slant = (-34 + ((i * 17) % 18)) * k;
     const rlen = (300 + ((i * 53) % 170)) * k;
+    // Each ray fades out along its own length, so none ends in a hard edge.
+    paint.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: surface }, { x: 0, y: surface + rlen }, [Skia.Color(tint), Skia.Color(clear)], [0, 1], TileMode.Clamp));
     paint.setAlphaf(a * (0.32 + 0.22 * Math.sin(t * 0.6 + i * 2.1)));
     const ray = Skia.PathBuilder.Make();
     ray.moveTo(x0 - rw, surface);

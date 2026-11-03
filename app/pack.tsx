@@ -151,7 +151,7 @@ export default function PackScreen() {
               {t.artistName} · {liked[i] ? 'you liked it' : 'you skipped it'}
             </ThemedText>
             <View style={styles.links}>
-              <LikeButton track={t} size={18} />
+              <LikeButton track={{ ...t, foundBlind: true }} size={18} />
               <AppleMusicLink trackId={t.id} url={t.trackViewUrl} />
               <SpotifyLink artist={t.artistName} title={t.trackName} />
             </View>
