@@ -10,7 +10,7 @@ import { DEPTHS, DEPTH_INFO, WATERS, WATER_INFO, WATER_WORD, placeLabel, type De
 
 function SoundWord({ water, i, here, posX, width, onPress }: { water: Water; i: number; here: boolean; posX: SharedValue<number>; width: number; onPress: () => void }) {
   // The white word fades in over the black one as the highlight arrives, so it changes with the swipe rather than after it.
-  const light = useAnimatedStyle(() => ({ opacity: Math.max(0, 1 - Math.abs(posX.get() - i) * 1.6) }));
+  const light = useAnimatedStyle(() => ({ opacity: Math.max(0, 1 - Math.abs(posX.get() - i) * 1.15) }));
   return (
     <Pressable
       onPress={onPress}

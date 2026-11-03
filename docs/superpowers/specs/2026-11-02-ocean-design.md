@@ -26,6 +26,10 @@ The user: no wall or floor on the side; each biome gets life meant just for it, 
 
 **The whole chart.** Pinching out, or a button, shows the entire ocean as one graph: every fish, every trail, your path, the waters and depths labeled. Tapping a fish explains it and tapping a place goes there. See an example shows a full one.
 
+**Things to find (the user's ask, 2026-11-03).** A rowboat seen from below in the Kelp forest, its chain down to where it snapped, the anchor on the sand at the bottom; a shipwreck in Open blue; a treasure chest on the reef floor; a tiny submarine; a squid in Midnight. Muted scenery, not songs, each with one short line when tapped. The squid and submarine are the only moving things that aren't your songs (Claude's call). Bottles carry a rolled note, and opening one shows where it has been: nobody can write in them, on purpose.
+
+**Picking a place.** A strip of four sound words (Upbeat, Acoustic, Instrumental, Moody) replaces the side arrows, the partner of the depth control.
+
 **Dropped:** the reef wall, `restSpot` against it.
 
 ## Why
