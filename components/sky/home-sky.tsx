@@ -187,7 +187,8 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {/* Shows at once, and stays if the shader can't run. */}
-      <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
+      <View style={StyleSheet.absoluteFill}>
+      <Svg width={width} height={height}>
         <Defs>
           <LinearGradient id="skyBase" x1="0" y1="0" x2="0" y2={horizon} gradientUnits="userSpaceOnUse">
             <Stop offset="0" stopColor={zen} />
@@ -197,10 +198,12 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
         </Defs>
         <Rect width={width} height={height} fill="url(#skyBase)" />
       </Svg>
+      </View>
       <SkyCanvas width={width} height={height} horizon={horizon} lookFrom={lookFrom} lookTo={lookTo} lookT={lookT} cloud={cloud} flash={flash} />
 
       {night > 0.3 && (
-        <Svg style={StyleSheet.absoluteFill} width={width} height={horizon}>
+        <View style={StyleSheet.absoluteFill}>
+        <Svg width={width} height={horizon}>
           <Defs>
             <RadialGradient id="moonShade" cx="42%" cy="40%" r="60%">
               <Stop offset="0" stopColor="#f6f7fb" />
@@ -215,11 +218,13 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
           </AnimatedG>
           {moonVis > 0.01 && <Circle cx={moon.x} cy={moon.y} r={15} fill="url(#moonShade)" opacity={moonVis} />}
         </Svg>
+        </View>
       )}
 
       {/* A haze behind the words, only as strong as this sky needs. */}
       {veil.opacity > 0.01 && (
-        <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
+        <View style={StyleSheet.absoluteFill}>
+        <Svg width={width} height={height}>
           <Defs>
             <LinearGradient id="wordsVeil" x1="0" y1={wordsTop - 10} x2="0" y2={horizon} gradientUnits="userSpaceOnUse">
               <Stop offset="0" stopColor={toHex(veil.color)} stopOpacity="0" />
@@ -230,18 +235,22 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
           </Defs>
           <Rect x={0} y={wordsTop - 10} width={width} height={horizon - wordsTop + 10} fill="url(#wordsVeil)" />
         </Svg>
+        </View>
       )}
 
-      <Svg style={StyleSheet.absoluteFill} width={width} height={horizon}>
+      <View style={StyleSheet.absoluteFill}>
+      <Svg width={width} height={horizon}>
         {night < 0.5 && weather.dark < 0.25 && !reduced && <AnimatedPath animatedProps={gulls} fill="none" stroke={toHex(look.shade)} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" strokeOpacity={0.8 * (1 - night)} />}
         {weather.rain > 0.02 && !reduced && <AnimatedPath animatedProps={rainD} fill="none" stroke="#ebf2ff" strokeWidth={1.2} strokeLinecap="round" strokeOpacity={0.42} />}
         {weather.storm && !reduced && <AnimatedPath animatedProps={boltD} fill="none" stroke="#ffffff" strokeWidth={1.7} strokeLinejoin="round" />}
       </Svg>
+      </View>
 
       <SkyIsland left={islandLeft} top={headerY - ISLAND_GROUND + 4} colors={colors} clock={clock} wind={windForSock} sign={sign} front={signFront} back={signBack} />
 
       {/* The far water, from the horizon to behind the near wave. */}
-      <Svg style={[styles.far, { top: horizon - 26 }]} width={width} height={HORIZON_ABOVE + 26 + 34} pointerEvents="none">
+      <View style={[styles.far, { top: horizon - 26 }]}>
+      <Svg width={width} height={HORIZON_ABOVE + 26 + 34}>
         <Defs>
           <LinearGradient id="farHaze" x1="0" y1="0" x2="0" y2="26" gradientUnits="userSpaceOnUse">
             <Stop offset="0" stopColor={hor} stopOpacity="0" />
@@ -258,6 +267,7 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
         <AnimatedPath animatedProps={swellFill} fill="url(#farWater)" />
         <AnimatedPath animatedProps={swellLine} fill="none" stroke={water.line} strokeWidth={1} strokeOpacity={water.lineOpacity * 0.36} />
       </Svg>
+      </View>
     </View>
   );
 }
@@ -288,9 +298,11 @@ export function SeaGlitter({ width, height, surfaceY, look, hour, active }: { wi
   if (!source || strength < 0.03 || source.y > horizon + 6) return null;
   const color = sun.up ? toHex([255, 244 - 68 * sun.low, 210 - 100 * sun.low]) : '#d6e2ff';
   return (
-    <Svg style={[styles.far, { top: horizon }]} width={width} height={span} pointerEvents="none">
-      <AnimatedPath animatedProps={dashes} fill="none" stroke={color} strokeWidth={1.1} strokeLinecap="round" strokeOpacity={strength * 0.75} />
-    </Svg>
+    <View style={[styles.far, { top: horizon }]} pointerEvents="none">
+      <Svg width={width} height={span}>
+        <AnimatedPath animatedProps={dashes} fill="none" stroke={color} strokeWidth={1.1} strokeLinecap="round" strokeOpacity={strength * 0.75} />
+      </Svg>
+    </View>
   );
 }
 
