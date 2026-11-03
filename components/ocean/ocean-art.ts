@@ -323,9 +323,9 @@ function sunk(hexColor: string, place: Place, amount = 0.28): string {
 }
 
 function drawChest(c: SkCanvas, x: number, y: number, k: number, place: Place) {
-  const wood = sunk('#8a6236', place);
-  const dark = sunk('#4d3519', place);
-  const metal = sunk('#c9a24a', place, 0.18);
+  const wood = sunk('#c98f4e', place, 0.08);
+  const dark = sunk('#7a5428', place, 0.08);
+  const metal = sunk('#f0cc6a', place, 0.04);
   c.save();
   c.translate(x, y + 4 * k);
   c.rotate(-6, 0, 0);
@@ -395,7 +395,8 @@ function drawChain(c: SkCanvas, place: Place, fx: number, width: number, height:
 }
 
 function drawAnchor(c: SkCanvas, x: number, y: number, k: number, place: Place) {
-  const iron = sunk('#5f5a4f', place, 0.1);
+  // Lighter than the dark sand around it: it's what you came all this way down to find.
+  const iron = sunk('#c9c4b4', place, 0.04);
   c.save();
   c.translate(x, y + 2 * k);
   c.rotate(24, 0, 0);
@@ -413,7 +414,7 @@ function drawAnchor(c: SkCanvas, x: number, y: number, k: number, place: Place) 
   poly(c, [20, -14, 25, -3, 14, -5], fill(iron));
   c.restore();
   // The bit of chain still on it, trailing across the sand to where it snapped.
-  const tone = sunk('#5d6358', place, 0.15);
+  const tone = sunk('#b0ad9e', place, 0.05);
   const ringX = x + Math.sin((24 * Math.PI) / 180) * 45 * k;
   const ringY = y - Math.cos((24 * Math.PI) / 180) * 41 * k;
   for (let i = 0; i < 7; i++) {
