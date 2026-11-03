@@ -7,6 +7,7 @@ import { lazySkia } from '@/components/print/lazy-skia';
 import { DEPTHS, WATERS, type Depth, type Water } from '@/lib/ocean-map';
 import { exampleInput } from '@/lib/ocean-example';
 import { buildOcean } from '@/lib/ocean-person';
+import { NO_SPLASH } from '@/lib/ocean-splash';
 import { CALM_RHYTHM, restingSea } from '@/lib/sea-beat';
 
 const OceanCanvas = lazySkia(() => import('@/components/ocean/ocean-canvas'));
@@ -31,6 +32,7 @@ export default function OceanLab() {
   const spotlight = useSharedValue(0);
   const song = useSharedValue<{ tempo: number; key: number } | null>(null);
   const drawMs = useSharedValue(0);
+  const splash = useSharedValue(NO_SPLASH);
   return (
     <View style={styles.root}>
       <OceanCanvas
@@ -48,6 +50,7 @@ export default function OceanLab() {
         spotlight={spotlight}
         song={song}
         drawMs={drawMs}
+        splash={splash}
         place={{ water, depth }}
         rest={{ water: 'reef', depth: 'popular' }}
         hour={hour}

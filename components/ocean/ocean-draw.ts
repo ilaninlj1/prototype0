@@ -6,10 +6,11 @@
 // specks drift past at different speeds so you feel yourself travel. Biomes dissolve into each other in layers: faint far
 // shapes barely move, then what stands in the biome, then what swims in it, then big soft shapes close by, fastest.
 
-import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, type SkCanvas, type SkPicture, type SkShader } from '@shopify/react-native-skia';
+import { BlendMode, FilterMode, PaintStyle, Skia, StrokeCap, TileMode, createPicture, type SkCanvas, type SkPicture, type SkRuntimeEffect, type SkShader } from '@shopify/react-native-skia';
 
 import { blink, bubbleProgress, scatter, separation, stagePoses, tempoMatches, type StagedMover } from '@/lib/ocean-motion';
 import { floorLift, seabedAt, type Rgb } from '@/lib/ocean-scene';
+import { DROP_COUNT, GLASS_COUNT, RUSH_COUNT, crownAt, dropAt, glassAt, kickAt, ringAt, rushAt, splashMix, wobbleAt, type Splash } from '@/lib/ocean-splash';
 import { SEA_BASE, seaY, type SeaState } from '@/lib/sea-beat';
 
 /** Skia's "intersect" clip. */
@@ -65,6 +66,9 @@ export type Frame = {
   rises: number[];
   floorDetail: SkPicture;
   far: (SkPicture | null)[];
+  splash: Splash;
+  /** Bends the whole scene as you go through the surface; null if the phone can't, and then it just doesn't bend. */
+  wobble: SkRuntimeEffect | null;
 };
 
 function mix3(a: Rgb, b: Rgb, t: number): Rgb {
@@ -637,31 +641,48 @@ function drawBubbles(c: SkCanvas, f: Frame, surface: number) {
   c.drawPath(shine.build(), q);
 }
 
-export function drawOcean(c: SkCanvas, f: Frame) {
+/** Bubbles rushing past as you go in, the big ones soft and close. */
+function drawRush(c: SkCanvas, f: Frame, surface: number) {
   'worklet';
   const { width: w, height: h } = f;
-  const surface = f.surfaceY - f.dive * f.travel;
-  const boxTop = surface - SEA_BASE;
-  const here = waterHere(f);
-
-  const wave = Skia.PathBuilder.Make();
-  const crest = Skia.PathBuilder.Make();
-  for (let x = -6; x <= w + 6; x += 6) {
-    const y = boxTop + seaY(x, f.sea, w);
-    if (x === -6) {
-      wave.moveTo(x, y);
-      crest.moveTo(x, y);
-    } else {
-      wave.lineTo(x, y);
-      crest.lineTo(x, y);
-    }
+  const s = f.splash;
+  const k = w / WORLD_W;
+  const rings = Skia.PathBuilder.Make();
+  const big = Skia.PathBuilder.Make();
+  const shine = Skia.PathBuilder.Make();
+  for (let i = 0; i < RUSH_COUNT; i++) {
+    const b = rushAt(i, s.e, s.power, h);
+    if (!b.on || b.alpha < 0.05 || b.y < surface - 2 || b.y > h + 20) continue;
+    const r = b.r * k * b.alpha;
+    const x = b.x * w + Math.sin(s.e * 3 + i) * (3 + b.r * 0.4) * k;
+    if (b.r > 5) big.addCircle(x, b.y, r);
+    else rings.addCircle(x, b.y, r);
+    shine.addCircle(x - r * 0.35, b.y - r * 0.35, r * 0.2);
   }
-  wave.lineTo(w + 6, h + 6);
-  wave.lineTo(-6, h + 6);
-  wave.close();
+  const p = Skia.Paint();
+  p.setAntiAlias(true);
+  p.setColor(Skia.Color('white'));
+  p.setStyle(PaintStyle.Stroke);
+  p.setStrokeWidth(0.9);
+  p.setAlphaf(0.8);
+  c.drawPath(rings.build(), p);
+  const soft = big.build();
+  p.setStrokeWidth(1.3);
+  p.setAlphaf(0.5);
+  c.drawPath(soft, p);
+  const q = Skia.Paint();
+  q.setAntiAlias(true);
+  q.setColor(Skia.Color('white'));
+  q.setAlphaf(0.1);
+  c.drawPath(soft, q);
+  q.setAlphaf(0.85);
+  c.drawPath(shine.build(), q);
+}
 
-  c.save();
-  c.clipPath(wave.build(), CLIP_IN, true);
+/** Everything under the surface. */
+function drawScene(c: SkCanvas, f: Frame, here: StopRow, surface: number) {
+  'worklet';
+  const { width: w, height: h } = f;
   drawWater(c, f, here, surface);
   drawLight(c, f, here, surface);
   // The scene hangs from the surface, so Home and the ocean move as one.
@@ -680,6 +701,153 @@ export function drawOcean(c: SkCanvas, f: Frame) {
   }
   drawMotes(c, f, surface);
   drawBubbles(c, f, surface);
+  if (f.splash.kind === 1) drawRush(c, f, surface);
+}
+
+/** Above the surface: the crown of water, the drops it throws, and the rings it leaves. Tinted like the water, so they show on any sky. */
+function drawThrown(c: SkCanvas, f: Frame, here: StopRow, surface: number) {
+  'worklet';
+  const { width: w } = f;
+  const s = f.splash;
+  const k = w / WORLD_W;
+  const spray = mix3(here.mid, [255, 255, 255], 0.14);
+  if (s.e < 0.62) {
+    const b = Skia.PathBuilder.Make();
+    b.moveTo(-6, surface + 12 * k);
+    for (let x = -6; x <= w + 6; x += 3) b.lineTo(x, surface - crownAt(x / w, s.e, s.power) * k);
+    b.lineTo(w + 6, surface + 12 * k);
+    b.close();
+    const p = Skia.Paint();
+    p.setAntiAlias(true);
+    p.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: surface - 80 * k }, { x: 0, y: surface + 12 * k }, [colorOf(spray), colorOf(here.top)], [0, 1], TileMode.Clamp));
+    p.setAlphaf(0.92);
+    c.drawPath(b.build(), p);
+  }
+  if (surface > -10 && s.e < 1) {
+    const ring = Skia.Paint();
+    ring.setAntiAlias(true);
+    ring.setStyle(PaintStyle.Stroke);
+    ring.setStrokeWidth(1.3);
+    ring.setColor(Skia.Color('white'));
+    for (let i = 0; i < 3; i++) {
+      const r = ringAt(i, s.e, s.power);
+      if (r.alpha <= 0.01) continue;
+      ring.setAlphaf(r.alpha);
+      const rx = r.radius * k;
+      const ry = rx * 0.14;
+      c.drawOval(Skia.XYWHRect(w / 2 + (i - 1) * 30 * k - rx, surface + 4 * k - ry, rx * 2, ry * 2), ring);
+    }
+  }
+  if (s.e < 1.3) {
+    const body = Skia.PathBuilder.Make();
+    const shine = Skia.PathBuilder.Make();
+    for (let i = 0; i < DROP_COUNT; i++) {
+      const d = dropAt(i, s.e, s.power);
+      if (!d.on) continue;
+      const x = w / 2 + d.x * k;
+      const y = s.y0 + d.y * k;
+      const r = d.r * k;
+      body.addOval(Skia.XYWHRect(x - r, y - r * 1.5, r * 2, r * 3));
+      shine.addCircle(x - r * 0.3, y - r * 0.4, r * 0.26);
+    }
+    const p = Skia.Paint();
+    p.setAntiAlias(true);
+    p.setColor(colorOf(spray));
+    c.drawPath(body.build(), p);
+    p.setColor(Skia.Color('white'));
+    p.setAlphaf(0.8);
+    c.drawPath(shine.build(), p);
+  }
+}
+
+/** Coming back up: drops cling to the glass and run down it, over Home. */
+export function drawGlass(c: SkCanvas, f: Frame) {
+  'worklet';
+  const { width: w, height: h } = f;
+  const s = f.splash;
+  const k = w / WORLD_W;
+  const body = Skia.Paint();
+  body.setAntiAlias(true);
+  body.setColor(Skia.Color('#78c8d8'));
+  const trail = Skia.Paint();
+  trail.setAntiAlias(true);
+  trail.setStyle(PaintStyle.Stroke);
+  trail.setColor(Skia.Color('#96d6e2'));
+  const rim = Skia.Paint();
+  rim.setAntiAlias(true);
+  rim.setStyle(PaintStyle.Stroke);
+  rim.setStrokeWidth(0.8);
+  rim.setColor(Skia.Color('white'));
+  const dot = Skia.Paint();
+  dot.setAntiAlias(true);
+  dot.setColor(Skia.Color('white'));
+  for (let i = 0; i < GLASS_COUNT; i++) {
+    const g = glassAt(i, s.e, s.power);
+    if (g.alpha <= 0.02) continue;
+    const x = g.x * w;
+    const y = g.y * h + g.run * k;
+    const r = g.r * k;
+    trail.setStrokeWidth(Math.max(0.8, r * 0.5));
+    trail.setAlphaf(0.35 * g.alpha);
+    c.drawLine(x, y - g.tail * k, x, y, trail);
+    const oval = Skia.XYWHRect(x - r, y - r * 1.25, r * 2, r * 2.5);
+    body.setAlphaf(0.42 * g.alpha);
+    c.drawOval(oval, body);
+    rim.setAlphaf(0.75 * g.alpha);
+    c.drawOval(oval, rim);
+    dot.setAlphaf(0.9 * g.alpha);
+    c.drawCircle(x - r * 0.32, y - r * 0.4, r * 0.22, dot);
+  }
+}
+
+export function drawOcean(c: SkCanvas, f: Frame) {
+  'worklet';
+  const { width: w, height: h } = f;
+  const k = w / WORLD_W;
+  const surface = f.surfaceY - f.dive * f.travel;
+  const boxTop = surface - SEA_BASE;
+  const here = waterHere(f);
+  const s = f.splash;
+  const goingIn = s.kind === 1;
+
+  const wave = Skia.PathBuilder.Make();
+  const crest = Skia.PathBuilder.Make();
+  for (let x = -6; x <= w + 6; x += 6) {
+    // Hitting the water heaves the surface for a moment.
+    const y = boxTop + seaY(x, f.sea, w) + (goingIn ? kickAt(x / k, s.e, s.power) * k : 0);
+    if (x === -6) {
+      wave.moveTo(x, y);
+      crest.moveTo(x, y);
+    } else {
+      wave.lineTo(x, y);
+      crest.lineTo(x, y);
+    }
+  }
+  wave.lineTo(w + 6, h + 6);
+  wave.lineTo(-6, h + 6);
+  wave.close();
+
+  c.save();
+  c.clipPath(wave.build(), CLIP_IN, true);
+  const bend = goingIn && f.wobble ? wobbleAt(s.e, s.power) * k : 0;
+  if (bend > 0.25 && f.wobble) {
+    // Going through the surface: the whole scene is drawn once, then bent as one picture while it settles.
+    const scene = createPicture(
+      (pc) => {
+        drawScene(pc, f, here, surface);
+      },
+      { width: w, height: h }
+    );
+    const p = Skia.Paint();
+    p.setShader(f.wobble.makeShaderWithChildren([w, s.e, bend, k], [scene.makeShader(TileMode.Clamp, TileMode.Clamp, FilterMode.Linear)]));
+    c.drawRect(Skia.XYWHRect(0, 0, w, h), p);
+    // A soft band of light sweeps down with it, stronger on a slow slide, where the wobble leads.
+    const bandY = surface + (s.e / 1.1) * (h - surface);
+    const band = Skia.Paint();
+    const glow = 0.42 * splashMix(s.power).wobble * Math.exp(-s.e * 2);
+    band.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: bandY - 60 * k }, { x: 0, y: bandY + 60 * k }, [Skia.Color('rgba(255,255,255,0)'), Skia.Color(`rgba(255,255,255,${glow.toFixed(3)})`), Skia.Color('rgba(255,255,255,0)')], [0, 0.5, 1], TileMode.Clamp));
+    c.drawRect(Skia.XYWHRect(0, bandY - 60 * k, w, 120 * k), band);
+  } else drawScene(c, f, here, surface);
   c.restore();
 
   if (f.dive < 1) {
@@ -691,4 +859,5 @@ export function drawOcean(c: SkCanvas, f: Frame) {
     edge.setAlphaf(0.9);
     c.drawPath(crest.build(), edge);
   }
+  if (goingIn) drawThrown(c, f, here, surface);
 }

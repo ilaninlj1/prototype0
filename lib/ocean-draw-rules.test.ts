@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 // On a phone these run on the UI thread, where calling a function that isn't a worklet crashes the app. The web
 // preview runs them on the JS thread, so it can't catch this. Only this check can, before a phone build.
-const FILES = ['components/ocean/ocean-draw.ts', 'lib/ocean-motion.ts'];
+const FILES = ['components/ocean/ocean-draw.ts', 'lib/ocean-motion.ts', 'lib/ocean-splash.ts'];
 
 for (const file of FILES) {
   test(`every function in ${file} that a frame calls is marked as a worklet`, () => {

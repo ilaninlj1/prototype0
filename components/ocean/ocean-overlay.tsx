@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -26,6 +27,7 @@ import { hitMember } from '@/lib/ocean-hit';
 import { DEPTHS, WATERS, WATER_INFO, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
 import { MAX_BOTTLES, bottleSpot, stagePoses } from '@/lib/ocean-motion';
 import type { Creature, OceanLife } from '@/lib/ocean-person';
+import { DIVE_IN_AT, DIVE_OUT_AT, NO_SPLASH, splashOver, splashPower, type Splash } from '@/lib/ocean-splash';
 import type { SeaState } from '@/lib/sea-beat';
 
 const OceanCanvas = lazySkia(() => import('./ocean-canvas'));
@@ -121,7 +123,9 @@ export const OceanOverlay = memo(function OceanOverlay({
   const metering = useSharedValue(false);
   const [meter, setMeter] = useState<string | null>(null);
   const [chart, setChart] = useState<PathPoint[] | null>(null);
-  if (Platform.OS === 'web') (globalThis as { __ocean?: unknown }).__ocean = { posX, posY, dive: oceanDive };
+  const splash = useSharedValue<Splash>(NO_SPLASH);
+  const lastDive = useSharedValue(0);
+  if (Platform.OS === 'web') (globalThis as { __ocean?: unknown }).__ocean = { posX, posY, dive: oceanDive, splash };
 
   // The scene only loads once Home has settled, so Home's first moments stay quick.
   useEffect(() => {
@@ -212,8 +216,28 @@ export const OceanOverlay = memo(function OceanOverlay({
 
   const pushMeter = useCallback((fps: number, worst: number, ms: number) => setMeter(`${fps} fps · worst ${worst} ms · draw ${ms} ms`), []);
   const window = useSharedValue({ frames: 0, total: 0, worst: 0 });
+  const thump = useCallback((power: number) => {
+    if (power > 0.55) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+  }, []);
   useFrameCallback((f) => {
     const dt = f.timeSincePreviousFrame ?? 16;
+    // Crossing the surface starts the splash, and how fast the water was moving sets how big it is.
+    const d = oceanDive.get();
+    const was = lastDive.get();
+    lastDive.set(d);
+    if (!oceanReduced.get()) {
+      const speed = ((d - was) / Math.max(dt, 8)) * 1000;
+      const now = splash.get();
+      if (was <= DIVE_IN_AT && d > DIVE_IN_AT) {
+        const power = splashPower(speed);
+        splash.set({ kind: 1, e: 0, power, y0: surfaceY - d * oceanTravel.get() });
+        runOnJS(thump)(power);
+      } else if (was >= DIVE_OUT_AT && d < DIVE_OUT_AT) splash.set({ kind: 2, e: 0, power: splashPower(speed), y0: 0 });
+      else if (now.kind !== 0) {
+        const next: Splash = { ...now, e: now.e + Math.min(64, dt) / 1000 };
+        splash.set(splashOver(next) ? NO_SPLASH : next);
+      }
+    }
     if (reduced || !running.get() || oceanDive.get() <= 0) return;
     clock.set(clock.get() + Math.min(64, dt) / 1000);
     if (!metering.get()) return;
@@ -394,7 +418,8 @@ export const OceanOverlay = memo(function OceanOverlay({
 
   const canvasStyle = useAnimatedStyle(() => {
     const d = oceanDive.get();
-    return { opacity: oceanReduced.get() ? d : d > 0 ? 1 : 0 };
+    // It stays up just after you surface, for the drops running down the glass.
+    return { opacity: oceanReduced.get() ? d : d > 0 || splash.get().kind === 2 ? 1 : 0 };
   });
   const uiStyle = useAnimatedStyle(() => ({ opacity: showsAt(oceanDive.get()).ui }));
 
@@ -432,6 +457,7 @@ export const OceanOverlay = memo(function OceanOverlay({
             spotlight={spotlight}
             song={song}
             drawMs={drawMs}
+            splash={splash}
             place={place}
             rest={rest}
             hour={hour}

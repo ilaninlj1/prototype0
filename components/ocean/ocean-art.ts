@@ -773,6 +773,21 @@ export function recordHalo(color: string, bright: boolean): SkPicture {
   );
 }
 
+/** Bends the scene sideways in rows that sway, for going through the surface. Null if the phone can't compile it. */
+export function makeWobble() {
+  return Skia.RuntimeEffect.Make(`
+    uniform shader image;
+    uniform float w;
+    uniform float e;
+    uniform float a;
+    uniform float k;
+    half4 main(vec2 xy) {
+      float dx = sin(xy.y * 0.042 / k + e * 15.0) * a + sin(xy.y * 0.11 / k - e * 9.0) * a * 0.4;
+      return image.eval(vec2(clamp(xy.x + dx, 0.5, w - 0.5), xy.y));
+    }
+  `);
+}
+
 /** A bottle hanging in the water or lying on the sand, glowing with its song's light. */
 export function recordBottle(color: string): SkPicture {
   return createPicture(

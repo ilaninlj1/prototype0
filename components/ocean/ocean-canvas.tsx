@@ -2,8 +2,9 @@ import { Canvas, Picture, createPicture, type SkPicture } from '@shopify/react-n
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAnimatedReaction, useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 
-import { anemonesFor, kelpFor, mixHex, raftsFor, recordBottle, waterTone, recordCreature, recordFar, recordFloorDetail, recordHalo, recordNear, recordPlace, recordRaft, songPalette, tendrilsFor, ventsFor, type Trail } from '@/components/ocean/ocean-art';
-import { drawOcean, type Stage, type StageMember, type StopRow } from '@/components/ocean/ocean-draw';
+import { anemonesFor, kelpFor, makeWobble, mixHex, raftsFor, recordBottle, waterTone, recordCreature, recordFar, recordFloorDetail, recordHalo, recordNear, recordPlace, recordRaft, songPalette, tendrilsFor, ventsFor, type Trail } from '@/components/ocean/ocean-art';
+import { drawGlass, drawOcean, type Stage, type StageMember, type StopRow } from '@/components/ocean/ocean-draw';
+import type { Splash } from '@/lib/ocean-splash';
 import { anatomyKey } from '@/lib/ocean-anatomy';
 import { castFor } from '@/lib/ocean-cast';
 import { DEPTHS, WATERS, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
@@ -31,6 +32,7 @@ export type OceanCanvasProps = {
   /** What's playing, so creatures can react to it. */
   song: SharedValue<{ tempo: number; key: number } | null>;
   drawMs: SharedValue<number>;
+  splash: SharedValue<Splash>;
   /** Where you are: only this water and the ones either side are kept ready. */
   place: Place;
   rest: Place;
@@ -48,7 +50,7 @@ const vividBucket = (v: number) => Math.round(v * 4) / 4;
 const FLOOR_DIM = 0.86;
 const ABYSS: Record<Water, string> = { reef: '#04203a', kelp: '#04221f', blue: '#041a40', midnight: '#020818' };
 
-export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea, posX, posY, clock, touch, touchPower, spotlight, song, drawMs, place, rest, hour, life, bottles }: OceanCanvasProps) {
+export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea, posX, posY, clock, touch, touchPower, spotlight, song, drawMs, splash, place, rest, hour, life, bottles }: OceanCanvasProps) {
   // Pictures are expensive to record and cheap to draw, so each is kept until its look actually changes.
   const pictures = useRef(new Map<string, { signature: string; picture: SkPicture }>());
   const sprites = useRef(new Map<string, SkPicture[]>());
@@ -184,6 +186,7 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
   const restStops = useMemo(() => rows(rest.water, rest.depth, hour), [rest.water, rest.depth, hourKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const day = dayMixAt(hour);
   const floorDetail = useMemo(() => recordFloorDetail(width, height), [width, height]);
+  const wobble = useMemo(() => makeWobble(), []);
   const { floorTop, floorBot, rises } = useMemo(() => {
     const dim = (w: Water, hexColor: string): Rgb => hexToRgb(mixHex(hexColor, ABYSS[w], FLOOR_DIM));
     return {
@@ -237,17 +240,20 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
       rises,
       floorDetail,
       far: farArt,
+      splash: splash.get(),
+      wobble,
     };
     const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const result = createPicture(
       (c) => {
         if (d > 0) drawOcean(c, f);
+        if (f.splash.kind === 2) drawGlass(c, f);
       },
       { width, height }
     );
     drawMs.set((typeof performance !== 'undefined' ? performance.now() : Date.now()) - started);
     return result;
-  }, [width, height, travel, surfaceY, night, warm, stops, restStops, stages, floorTop, floorBot, rises, floorDetail, farArt]);
+  }, [width, height, travel, surfaceY, night, warm, stops, restStops, stages, floorTop, floorBot, rises, floorDetail, farArt, wobble]);
 
   return (
     <Canvas style={{ width, height }} pointerEvents="none">
