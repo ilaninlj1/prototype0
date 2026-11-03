@@ -75,7 +75,7 @@ export function CreatureSheet({
 }
 
 const styles = StyleSheet.create({
-  body: { gap: Spacing.md, paddingBottom: Spacing.xl },
+  body: { gap: Spacing.md, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl },
   blind: { fontSize: 17, lineHeight: 23, fontWeight: '600', color: Colors.text },
   song: { flexDirection: 'row', gap: Spacing.md, alignItems: 'center' },
   cover: { width: 84, height: 84, borderRadius: 16, backgroundColor: Colors.surface },

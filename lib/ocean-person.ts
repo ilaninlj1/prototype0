@@ -220,7 +220,7 @@ export function whyLines(c: Creature, now: number): string[] {
       const age = ageWords(c.likedAt, now);
       lines.push(monthsHeld(c.likedAt, now) >= 1 ? `Big because you've had it ${age}.` : "Still growing because you've had it less than a month.");
     }
-    lines.push(c.heard === 1 ? 'Vivid because you listened for at least 24 seconds.' : 'Its color reflects how long you listened, with older unrecorded listens counted halfway.');
+    lines.push(c.heard >= 0.8 ? 'Vivid because you listened to most of it.' : 'Partly colored because you listened to about half of it.');
   }
   if (c.first) lines.push('Largest because it is your oldest find that you took time to hear.');
   if (c.foundHour !== null && c.likedAt !== null) lines.push(`Out ${atNight(c.foundHour) ? 'at night' : 'during the day'} because you found it at ${clockTime(c.likedAt)}.`);

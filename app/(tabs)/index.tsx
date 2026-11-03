@@ -1322,6 +1322,20 @@ export default function HomeScreen() {
   const [oceanJump, setOceanJump] = useState<{ place: Place; key: number } | null>(null);
   const [hatch, setHatch] = useState<{ key: number; color: string } | null>(null);
   const [firstHatchLine, setFirstHatchLine] = useState(false);
+  const [firstHatchPending, setFirstHatchPending] = useState(false);
+  // The line that teaches the dive waits for its moment: the bottle question and the keep moment use the same row.
+  useEffect(() => {
+    if (!firstHatchPending || bottles.ask || bottles.keep || firstHatchSeenRef.current) return;
+    firstHatchSeenRef.current = true;
+    setFirstHatchPending(false);
+    setFirstHatchLine(true);
+    void AsyncStorage.setItem(FIRST_HATCH_KEY, '1').catch(() => {});
+  }, [firstHatchPending, bottles.ask, bottles.keep]);
+  useEffect(() => {
+    if (!firstHatchLine) return;
+    const t = setTimeout(() => setFirstHatchLine(false), 6000);
+    return () => clearTimeout(t);
+  }, [firstHatchLine]);
   const firstHatchSeenRef = useRef(true);
   useEffect(() => {
     void AsyncStorage.getItem(FIRST_HATCH_KEY)
@@ -1384,12 +1398,7 @@ export default function HomeScreen() {
     const listenMs = Math.round(status.currentTime * 1000);
     if (first) {
       setHatch({ key: Date.now(), color: songLight(track.id) });
-      if (!firstHatchSeenRef.current) {
-        firstHatchSeenRef.current = true;
-        setFirstHatchLine(true);
-        void AsyncStorage.setItem(FIRST_HATCH_KEY, '1').catch(() => {});
-        setTimeout(() => setFirstHatchLine(false), 6000);
-      }
+      if (!firstHatchSeenRef.current) setFirstHatchPending(true);
     }
     await handleSave(track);
     if (first && (await bottles.saved(track, swipeHistory, listenMs))) setToastFloating(true);

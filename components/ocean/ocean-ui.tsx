@@ -121,7 +121,7 @@ export function OceanUi({
           <ThemedText style={styles.swipeText}>Swipe these songs</ThemedText>
         </Pressable>
         <View style={styles.row}>
-          <Pressable onPress={onBackUp} style={styles.plain} accessibilityRole="button">
+          <Pressable onPress={onBackUp} style={styles.plain} accessibilityRole="button" accessibilityLabel="Back up">
             <Ionicons name="arrow-up" size={16} color={Colors.text} />
             <ThemedText style={styles.plainText}>Back up</ThemedText>
           </Pressable>

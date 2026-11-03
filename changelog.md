@@ -6,6 +6,9 @@ staleness.
 
 Add new entries at the top, newest first.
 
+## [2026-11-03] The Ocean: Home's water, and a portrait of you under it
+Home's sea line is now real water with a grabber on its crest. Swipe up from it, or from the tab bar, and Home slides away as you go under, into 16 places: four waters by sound, four depths by popularity. Swimming to one and tapping Swipe these songs filters the feed there. The ocean is made of what you did: songs you found blind become creatures (species from the sound, size from how long you've kept them, color from how much you listened, active at the hour you found them), songs you revealed and let go become coral, skips become sand, and each creature explains itself in plain sentences. A place you've never heard stays pale, so blind spots show. Your songs play under the water when the card's clip ends. Also: blind saves carry `foundBlind` through Undo, listening on after a reveal now counts, More like this stays inside any deck, bottles wait outside decks, and Undo keeps People and Run entries.
+
 ## [2026-11-02] People: song-first matching replaces Taste Twins
 Added People between Play and Library: a neutral age screen, consent, first name, intent and optional handle,
 then a tap-to-listen blind deck using Home’s card. Hearts reveal the song and its counts; passes move on without

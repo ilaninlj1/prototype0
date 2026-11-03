@@ -8,6 +8,9 @@ Add new entries at the top, newest first.
 ## Format
 
 ```
+## [2026-11-03] The Ocean: what's left
+Built on branch `ocean` (spec `docs/superpowers/specs/2026-11-02-ocean-design.md`). Not done yet: backup (a new phone starts a new ocean), sharing it with other people, and the resume polish pass. Nothing has run on a real phone at the time of writing, so frame rate, haptics and the home-indicator swipe are unmeasured.
+
 ## [YYYY-MM-DD] Short title
 Description of the feature, motivation, and any relevant context.
 ```

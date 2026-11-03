@@ -55,7 +55,7 @@ export function PlaceList({
 }
 
 const styles = StyleSheet.create({
-  body: { gap: Spacing.sm, paddingBottom: Spacing.xl },
+  body: { gap: Spacing.sm, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl },
   empty: { fontSize: 15, lineHeight: 21, color: Colors.textSecondary },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, minHeight: 56 },
   cover: { width: 48, height: 48, borderRadius: 12 },

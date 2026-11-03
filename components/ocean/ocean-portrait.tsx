@@ -45,7 +45,7 @@ export function OceanPortrait({
 }
 
 const styles = StyleSheet.create({
-  body: { gap: Spacing.md, paddingBottom: Spacing.xl },
+  body: { gap: Spacing.md, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl },
   note: { fontSize: 14, lineHeight: 20, color: Colors.textSecondary },
   line: { fontSize: 17, lineHeight: 24, color: Colors.text },
   button: { alignSelf: 'flex-start', borderWidth: 1, borderColor: Colors.rule, borderRadius: 22, height: 44, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },

@@ -109,6 +109,8 @@ export function OceanOverlay({
   const clock = useSharedValue(0);
   const touch = useSharedValue<{ x: number; y: number; r: number } | null>(null);
   const running = useSharedValue(false);
+  // With reduced motion the scene doesn't rise with the finger: it's already in place, and only fades in.
+  const stillDive = useSharedValue(1);
 
   // The scene only loads once Home has settled, so Home's first moments stay quick.
   useEffect(() => {
@@ -341,7 +343,7 @@ export function OceanOverlay({
           <OceanCanvas
             width={width}
             height={height}
-            dive={oceanDive}
+            dive={reduced || screenReader ? stillDive : oceanDive}
             travel={surfaceY + CLEARANCE}
             surfaceY={surfaceY}
             sea={sea}
