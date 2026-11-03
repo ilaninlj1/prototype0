@@ -12,7 +12,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { oceanDive, oceanReduced, oceanTravel, onDiveSettled, settleDiveTo, useDivePan } from '@/components/ocean/dive-gesture';
+import { oceanDive, oceanReduced, oceanTravel, onDiveSettled, settleDiveTo, surfaceNow, useDivePan } from '@/components/ocean/dive-gesture';
 import { OceanUi } from '@/components/ocean/ocean-ui';
 import { lazySkia } from '@/components/print/lazy-skia';
 import { useScreenReader } from '@/hooks/use-screen-reader';
@@ -181,12 +181,8 @@ export function OceanOverlay({
   // Leaving Home always puts you back at the surface, so no other tab ever finds it half slid.
   useEffect(() => {
     running.set(focused);
-    if (!focused && oceanDive.get() > 0) {
-      oceanDive.set(0);
-      setUnder(false);
-      onUnderChange(false);
-    }
-  }, [focused, running, onUnderChange]);
+    if (!focused && oceanDive.get() > 0) surfaceNow();
+  }, [focused, running]);
 
   useEffect(() => {
     if (!under) return;
@@ -247,6 +243,7 @@ export function OceanOverlay({
   const swim = Gesture.Pan()
     .minDistance(12)
     .onBegin((e) => {
+      axis.set(0);
       touch.set({ x: e.x, y: e.y, r: 90 });
     })
     .onStart((e) => {
@@ -268,6 +265,11 @@ export function OceanOverlay({
         rising.set(true);
         oceanDive.set(Math.max(0, Math.min(1, 1 - e.translationY / Math.max(1, oceanTravel.get()))));
         return;
+      }
+      // Changed your mind mid-rise: all the way back under before sinking.
+      if (rising.get()) {
+        rising.set(false);
+        oceanDive.set(1);
       }
       const next = from - e.translationY / Math.max(1, height * 0.6);
       posY.set(Math.max(Math.max(0, from - 1), Math.min(Math.min(3, from + 1), next)));
@@ -293,8 +295,13 @@ export function OceanOverlay({
       posY.set(withSpring(result.depth, SPRING));
       runOnJS(settledAt)(startX.get(), result.depth);
     })
-    .onFinalize(() => {
+    .onFinalize((_e, success) => {
       touch.set(null);
+      // A drag the system took away never leaves you between places.
+      if (success || axis.get() === 0) return;
+      if (oceanDive.get() > 0 && oceanDive.get() < 1) settleDiveTo(1);
+      posX.set(withSpring(startX.get(), SPRING));
+      posY.set(withSpring(startY.get(), SPRING));
     });
   const tap = Gesture.Tap()
     .maxDistance(12)

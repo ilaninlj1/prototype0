@@ -46,6 +46,12 @@ export function settleDiveTo(target: 0 | 1, velocity = 0) {
   oceanDive.set(withSpring(target, { ...SPRING, velocity: travel > 0 ? -velocity / travel : 0 }, done));
 }
 
+/** Back at the surface at once, for when Home loses focus: everyone who reads the dive hears about it. */
+export function surfaceNow() {
+  oceanDive.set(0);
+  notifySettled(false);
+}
+
 /**
  * The drag that dives, from the water or the tab bar. Only a clear upward drag starts it, so a tap still lands and
  * a sideways swipe is left alone.
@@ -55,7 +61,7 @@ export function useDivePan(enabled = true) {
     () =>
       Gesture.Pan()
         .enabled(enabled)
-        .activeOffsetY([-14, 14])
+        .activeOffsetY(-14)
         .failOffsetX([-20, 20])
         .onStart(() => {
           runOnJS(brokeTheSurface)();

@@ -288,6 +288,8 @@ export default function HomeScreen() {
     // dwellMs needs a start time for — stamped here rather than a separate
     // effect with the same dependency array.
     cardShownAtRef.current = Date.now();
+    // A new card can arrive while you rise: only the time since then is time away from it.
+    if (underSinceRef.current != null) underSinceRef.current = Date.now();
   }, [currentTrack?.id]);
 
   // The top card plays while Home is in view. A falsy previewUrl means
@@ -295,7 +297,10 @@ export default function HomeScreen() {
   // One of your songs playing under the water, in place of the card's.
   const [oceanSong, setOceanSongState] = useState<DiscoveryTrack | null>(null);
   const oceanSongRef = useRef<DiscoveryTrack | null>(null);
+  const cardRestartingRef = useRef(false);
   function setOceanSong(next: DiscoveryTrack | null) {
+    // For a moment after this the player still reports the ocean song's clock, which isn't the card's.
+    if (oceanSongRef.current && !next) cardRestartingRef.current = true;
     oceanSongRef.current = next;
     setOceanSongState(next);
   }
@@ -340,6 +345,10 @@ export default function HomeScreen() {
   useEffect(() => {
     // Only the card's own song: your songs playing under the water don't count toward it.
     if (oceanSongRef.current) return;
+    if (cardRestartingRef.current) {
+      if (status.currentTime > 0.5) return;
+      cardRestartingRef.current = false;
+    }
     furthestRef.current = Math.max(furthestRef.current, status.currentTime);
   }, [status.currentTime]);
   const heardNow = () => (status.duration > 0 ? Math.min(1, furthestRef.current / (status.duration * 0.8)) : 0);
@@ -828,7 +837,7 @@ export default function HomeScreen() {
         ? {}
         : {
             // Its own song's furthest point, so a clip played twice or your songs under the water don't muddle it.
-            listenMs: Math.round(Math.max(oceanSongRef.current ? 0 : status.currentTime, furthestRef.current) * 1000),
+            listenMs: Math.round(Math.max(oceanSongRef.current || cardRestartingRef.current ? 0 : status.currentTime, furthestRef.current) * 1000),
             // Wall-clock time this card was the top of the stack, distinct
             // from listenMs — see SwipeEntry's own comment. Skipped for
             // steering for the same reason listenMs is: the card doesn't

@@ -61,12 +61,14 @@ export function CreatureSheet({
                 </Pressable>
               </View>
             )}
-            <ThemedText style={sheetStyles.heading}>Why it looks like this</ThemedText>
-            {whyLines(creature, Date.now()).map((line) => (
-              <ThemedText key={line} style={styles.line}>
-                {line}
-              </ThemedText>
-            ))}
+            {/* Even the reasons can hint at it (a school means you already saved this artist), so they wait too. */}
+            {!blind && <ThemedText style={sheetStyles.heading}>Why it looks like this</ThemedText>}
+            {!blind &&
+              whyLines(creature, Date.now()).map((line) => (
+                <ThemedText key={line} style={styles.line}>
+                  {line}
+                </ThemedText>
+              ))}
           </ScrollView>
         </>
       )}

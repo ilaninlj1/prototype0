@@ -84,10 +84,10 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
       marginTop: onHome ? -height.get() : 0,
     };
   });
-  const divePan = useDivePan(onHome);
   const waterInk = WATER_INK[useOceanInk()];
   const [under, setUnder] = useState(false);
   useEffect(() => onDiveSettled(setUnder), []);
+  const divePan = useDivePan(onHome && !under);
 
   // A save on Home lands on Library: the icon bumps, and a +N stays until you open it.
   const libraryRef = useRef<ViewInstance>(null);
