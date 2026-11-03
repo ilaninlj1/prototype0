@@ -167,16 +167,17 @@ export function recordRaft(color: string, k: number): SkPicture {
   return createPicture(
     (c) => {
       const r = rng(hexToRgb(color)[0] * 31 + 7);
-      const frond = line(color, 1.5 * k, 0.9);
-      for (let i = 0; i < 7; i++) {
+      // A wide tangled mat with little air bladders holding it up, nothing like a jellyfish's bell.
+      const frond = line(mixHex(color, '#1b2a33', 0.2), 1.3 * k, 0.9);
+      for (let i = 0; i < 14; i++) {
         const b = path();
-        const x = (i - 3) * 4.5 * k;
-        b.moveTo(x, 0);
-        b.quadTo(x + (r() - 0.5) * 12 * k, 12 * k, x + (r() - 0.5) * 8 * k, (16 + r() * 16) * k);
+        const x = (r() - 0.5) * 44 * k;
+        const y = (r() - 0.5) * 6 * k;
+        b.moveTo(x, y);
+        b.quadTo(x + (r() - 0.5) * 14 * k, y + 5 * k, x + (r() - 0.5) * 18 * k, y + (r() * 9 - 2) * k);
         c.drawPath(b.build(), frond);
-        oval(c, x + (r() - 0.5) * 6 * k, (7 + r() * 10) * k, 2 * k, 1.3 * k, fill(color, 0.9));
       }
-      oval(c, 0, 0, 17 * k, 4 * k, fill(mixHex(color, '#1b2a33', 0.15)));
+      for (let i = 0; i < 16; i++) oval(c, (r() - 0.5) * 42 * k, (r() - 0.5) * 7 * k, 1.8 * k, 1.8 * k, fill(color));
     },
     Skia.XYWHRect(-40 * k, -10 * k, 80 * k, 60 * k)
   );
@@ -251,6 +252,18 @@ function drawTowers(c: SkCanvas, place: Place, width: number, height: number, co
     for (let j = right.length - 2; j >= 0; j -= 2) b.lineTo(right[j], right[j + 1]);
     b.close();
     c.drawPath(b.build(), rock);
+    // Lumps of old coral all over it, so it reads as something grown and not a pillar.
+    const lump = rng(41 + i * 13 + row * 7);
+    const light = fill(toneAt(mixHex(ROCK.reef, '#ffffff', 0.22), 'reef', row), 0.55);
+    const dark = fill(toneAt(mixHex(ROCK.reef, '#3a3428', 0.35), 'reef', row), 0.5);
+    for (let n = 0; n < 34; n++) {
+      const y = lump() * height;
+      const radius = towerRadius(i, row + y / height);
+      if (radius <= 0.012) continue;
+      const x = t.cx * width + (lump() * 2 - 1) * radius * width * 0.92;
+      const size = (2.5 + lump() * 6) * k;
+      oval(c, x, y, size, size * 0.8, n % 3 === 0 ? dark : light);
+    }
     const edge = path();
     edge.moveTo(right[0], right[1]);
     for (let j = 2; j < right.length; j += 2) edge.lineTo(right[j], right[j + 1]);
@@ -355,7 +368,7 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
         }
       // A faint trail back to where you found each fish that has climbed.
       for (const t of trails) {
-        const dot = fill(t.color, 0.42);
+        const dot = fill(t.color, 0.28);
         for (let y = Math.max(t.y0, -4); y <= Math.min(t.y1, height + 4); y += 7 * k) {
           oval(c, t.x + Math.sin(((row * height + y) / height) * 2.4 + t.seed) * 10 * k, y, 1.1 * k, 1.1 * k, dot);
         }

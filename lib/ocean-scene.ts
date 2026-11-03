@@ -114,7 +114,7 @@ export function seabedAt(x: number): number {
 /** The coast: the reef's floor is shallowest, Midnight's is a trench. Fractions of the screen, for any point between biomes. */
 export function floorLift(col: number): number {
   'worklet';
-  const lifts = [0.14, 0.07, 0, -0.06];
+  const lifts = [0.2, 0.14, 0.09, 0.06];
   const c = col < 0 ? 0 : col > 3 ? 3 : col;
   const i = Math.min(2, Math.floor(c));
   return lifts[i] + (lifts[i + 1] - lifts[i]) * (c - i);

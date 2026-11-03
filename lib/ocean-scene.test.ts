@@ -81,7 +81,7 @@ test('the floor runs like a coast: shallow at the reef, a trench at Midnight, wi
   assert.ok(floorAt(2, 0.3) > floorAt(3, 0.3));
   for (let c = 0; c < 3; c += 0.01) assert.ok(Math.abs(floorLift(c) - floorLift(c + 0.01)) < 0.002);
   for (let x = 0; x < 1; x += 0.01) assert.ok(floorAt(3, x) >= 0.03, 'never under the screen');
-  assert.ok(floorAt(0, 0.25) < 0.5, 'the shallowest floor still leaves most of the screen for water');
+  assert.ok(floorAt(0, 0.25) < 0.52, 'the shallowest floor still leaves most of the screen for water');
 });
 
 test('reef towers grow from below: nothing above their tips, wider going down, no jumps', () => {

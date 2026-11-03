@@ -451,11 +451,17 @@ function drawSmoke(c: SkCanvas, v: VentData, f: Frame) {
   const k = w / WORLD_W;
   const p = Skia.Paint();
   p.setAntiAlias(true);
-  p.setColor(Skia.Color('#8fa8b8'));
-  for (let i = 0; i < 7; i++) {
-    const g = wrap(t * 0.16 + i / 7 + v.x * 0.01, 1);
-    p.setAlphaf(0.16 * (1 - g));
-    c.drawCircle(v.x + Math.sin(g * 6 + i + t * 0.4) * 9 * k * g, v.y - g * 120 * k, (4 + g * 16) * k, p);
+  const solid = Skia.Color('rgba(150,172,188,0.34)');
+  const clear = Skia.Color('rgba(150,172,188,0)');
+  for (let i = 0; i < 8; i++) {
+    const g = wrap(t * 0.14 + i / 8 + v.x * 0.01, 1);
+    const x = v.x + Math.sin(g * 6 + i + t * 0.4) * 11 * k * g;
+    const y = v.y - g * 150 * k;
+    const r = (7 + g * 26) * k;
+    // Each puff fades out from its middle, so it reads as smoke and not as a ball.
+    p.setShader(Skia.Shader.MakeRadialGradient({ x, y }, r, [solid, clear], [0, 1], TileMode.Clamp));
+    p.setAlphaf(1 - g);
+    c.drawCircle(x, y, r, p);
   }
 }
 

@@ -31,7 +31,9 @@ export function exampleInput(now: number): OceanInput {
     date.setDate(date.getDate() - (270 - Math.floor((i % 40) * 268 / 39)));
     date.setHours(i % 10 === 9 ? 10 : [22, 23, 0, 1, 2][i % 5], (14 + i * 7) % 60, 0, 0);
     const at = date.getTime();
-    const water = i % 4;
+    // A story: this listener started somewhere bright and well known, and drifted deeper and darker over nine months.
+    const progress = (i % 40) / 39;
+    const water = (Math.round(progress * 3) + (i % 3 === 0 ? i % 4 : 0)) % 4;
     const sound: SoundFeatures = {
       tempo: 76 + i * 17 % 80, key: i % 12, mode: water === 3 ? 0 : 1,
       energy: 0.25 + (i % 6) * 0.13, danceability: 0.35 + (i % 5) * 0.12,
@@ -39,7 +41,7 @@ export function exampleInput(now: number): OceanInput {
       speechiness: 0.06, liveness: 0.12, valence: water === 3 ? 0.18 : 0.7, loudness: -14 + i % 9,
     };
     sounds.set(id, sound);
-    depths.set(id, DEPTHS[Math.floor(i / 4) % 4]);
+    depths.set(id, DEPTHS[Math.max(0, Math.min(3, Math.round(progress * 3.4 + ((i % 5) - 2) * 0.35)))]);
     const artist = i % ARTISTS.length;
     const title = i < 40 ? TITLES[i] : `Echo of ${TITLES[i - 40]}`;
     const entry: SwipeEntry = {
@@ -66,7 +68,7 @@ export function exampleInput(now: number): OceanInput {
     // A few artists in this made-up history took off, so its graph has climbers.
     listenersNowOf: (artist) => {
       const i = ARTISTS.indexOf(artist);
-      return i % 3 === 0 ? (4000 + i * 3000) * (6 + i * 3) : 4000 + i * 3000;
+      return i % 4 === 0 ? (4000 + i * 3000) * [5, 3, 9, 18][(i / 4) % 4] : 4000 + i * 3000;
     },
     accentOf: (id) => {
       const sound = sounds.get(id);
