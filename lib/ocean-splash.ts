@@ -37,6 +37,18 @@ export function splashPower(screensPerSecond: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
+/**
+ * The water's speed, smoothed over about a tenth of a second. A drag's first frame is always a jump, because it only
+ * starts after the finger has already moved, so one frame's speed would make every slow slide look hard.
+ */
+export function smoothSpeed(previous: number, measured: number, dtMs: number): number {
+  'worklet';
+  return previous + (measured - previous) * (1 - Math.exp(-dtMs / 90));
+}
+
+/** A splash's first moments keep listening, because a flick is still speeding up when it crosses the surface. */
+export const POWER_SETTLES_AT = 0.16;
+
 /** The mix at a given swipe. Bubbles stay about the same; the crown and the wobble trade places. */
 export function splashMix(power: number): { crown: number; wobble: number; rush: number; drops: number } {
   'worklet';

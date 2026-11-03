@@ -27,7 +27,7 @@ import { hitMember } from '@/lib/ocean-hit';
 import { DEPTHS, WATERS, WATER_INFO, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
 import { MAX_BOTTLES, bottleSpot, stagePoses } from '@/lib/ocean-motion';
 import type { Creature, OceanLife } from '@/lib/ocean-person';
-import { DIVE_IN_AT, DIVE_OUT_AT, NO_SPLASH, splashOver, splashPower, type Splash } from '@/lib/ocean-splash';
+import { DIVE_IN_AT, DIVE_OUT_AT, NO_SPLASH, POWER_SETTLES_AT, smoothSpeed, splashOver, splashPower, type Splash } from '@/lib/ocean-splash';
 import type { SeaState } from '@/lib/sea-beat';
 
 const OceanCanvas = lazySkia(() => import('./ocean-canvas'));
@@ -125,6 +125,7 @@ export const OceanOverlay = memo(function OceanOverlay({
   const [chart, setChart] = useState<PathPoint[] | null>(null);
   const splash = useSharedValue<Splash>(NO_SPLASH);
   const lastDive = useSharedValue(0);
+  const diveSpeed = useSharedValue(0);
   if (Platform.OS === 'web') (globalThis as { __ocean?: unknown }).__ocean = { posX, posY, dive: oceanDive, splash };
 
   // The scene only loads once Home has settled, so Home's first moments stay quick.
@@ -226,7 +227,8 @@ export const OceanOverlay = memo(function OceanOverlay({
     const was = lastDive.get();
     lastDive.set(d);
     if (!oceanReduced.get()) {
-      const speed = ((d - was) / Math.max(dt, 8)) * 1000;
+      const speed = smoothSpeed(diveSpeed.get(), ((d - was) / Math.max(dt, 8)) * 1000, dt);
+      diveSpeed.set(speed);
       const now = splash.get();
       if (was <= DIVE_IN_AT && d > DIVE_IN_AT) {
         const power = splashPower(speed);
@@ -235,6 +237,8 @@ export const OceanOverlay = memo(function OceanOverlay({
       } else if (was >= DIVE_OUT_AT && d < DIVE_OUT_AT) splash.set({ kind: 2, e: 0, power: splashPower(speed), y0: 0 });
       else if (now.kind !== 0) {
         const next: Splash = { ...now, e: now.e + Math.min(64, dt) / 1000 };
+        // A flick is still speeding up as it crosses, so the size can grow for its first moments, and never shrinks.
+        if (next.kind === 1 && next.e < POWER_SETTLES_AT) next.power = Math.max(next.power, splashPower(speed));
         splash.set(splashOver(next) ? NO_SPLASH : next);
       }
     }

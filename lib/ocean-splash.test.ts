@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { DIVE_IN_AT, DIVE_OUT_AT, DROP_COUNT, GLASS_COUNT, RUSH_COUNT, SPLASH_IN_S, crownAt, dropAt, glassAt, kickAt, ringAt, rushAt, splashMix, splashOver, splashPower, wobbleAt } from './ocean-splash.ts';
+import { DIVE_IN_AT, DIVE_OUT_AT, DROP_COUNT, GLASS_COUNT, RUSH_COUNT, SPLASH_IN_S, crownAt, dropAt, glassAt, kickAt, ringAt, rushAt, smoothSpeed, splashMix, splashOver, splashPower, wobbleAt } from './ocean-splash.ts';
 
 const peakCrown = (power: number) => {
   let top = 0;
@@ -90,4 +90,18 @@ test('a splash ends, and going under starts sooner than coming up', () => {
   assert.equal(splashOver({ kind: 1, e: 3, power: 0, y0: 0 }), true);
   assert.equal(splashOver({ kind: 2, e: 2.4, power: 0, y0: 0 }), false);
   assert.ok(DIVE_IN_AT < DIVE_OUT_AT);
+});
+
+test('a slow drag stays slow: the one-frame jump as it starts barely moves the smoothed speed', () => {
+  // 14 points in one 16 ms frame on a 740-point travel is about 1.2 screens a second, for that one frame only.
+  let v = smoothSpeed(0, 1.18, 16);
+  assert.ok(splashPower(v) < 0.05, `power ${splashPower(v)}`);
+  for (let i = 0; i < 12; i++) v = smoothSpeed(v, 0.2, 16);
+  assert.ok(splashPower(v) < 0.05, `power ${splashPower(v)}`);
+});
+
+test('a hard flick reaches full power within its first moments', () => {
+  let v = 0;
+  for (let i = 0; i < 9; i++) v = smoothSpeed(v, 5, 16); // nine frames is the first 0.144 seconds
+  assert.ok(splashPower(v) > 0.9, `power ${splashPower(v)}`);
 });
