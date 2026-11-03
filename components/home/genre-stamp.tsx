@@ -1,3 +1,4 @@
+import { useSkyInk } from '@/components/home/sky-ink';
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withSequence, withTiming } from 'react-native-reanimated';
@@ -12,6 +13,7 @@ const TOTAL_MS = 700;
  * before the next song arrives. "New to you" only when your history says so.
  */
 export function GenreStamp({ genre, fresh, onDone }: { genre: string | null; fresh: boolean; onDone: () => void }) {
+  const ink = useSkyInk();
   const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -36,10 +38,10 @@ export function GenreStamp({ genre, fresh, onDone }: { genre: string | null; fre
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.center, style]}>
       <View style={styles.box}>
-        <ThemedText style={styles.genre} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.5}>
+        <ThemedText style={[styles.genre, { color: ink.text }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.5}>
           {genre.toUpperCase()}
         </ThemedText>
-        {fresh && <ThemedText style={styles.fresh}>NEW TO YOU</ThemedText>}
+        {fresh && <ThemedText style={[styles.fresh, { color: ink.secondary }]}>NEW TO YOU</ThemedText>}
       </View>
     </Animated.View>
   );

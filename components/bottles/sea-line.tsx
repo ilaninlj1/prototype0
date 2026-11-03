@@ -87,7 +87,7 @@ function BottleGlyph({ color }: { color: string }) {
 }
 
 /** The water's colors at the surface: its shallows, where it reaches by the bottom of the phone, and foam's tint. */
-export type SeaWater = { top: string; low: string; foam: string };
+export type SeaWater = { top: string; low: string; foam: string; mid?: string; midAt?: number; line?: string; lineOpacity?: number; mist?: string };
 
 // Light on the water: fixed spots that twinkle in turn, and bubbles that rise and wobble. One path each, so it stays light.
 const GLINTS = Array.from({ length: 9 }, (_, i) => ({ x: (i * 0.137 + 0.06) % 1, y: 12 + ((i * 29) % 58), speed: 0.7 + (i % 4) * 0.28, phase: i * 2.1, size: 2.4 + (i % 3) * 1.2 }));
@@ -306,12 +306,15 @@ export function SeaLine({
       <Svg width={width} height={bottom} pointerEvents="none">
         <Defs>
           <LinearGradient id="seaWater" x1="0" y1={SEA_BASE - 12} x2="0" y2={bottom} gradientUnits="userSpaceOnUse">
-            <Stop offset="0" stopColor={water.top} />
-            <Stop offset="1" stopColor={water.low} />
+            {[
+              <Stop key="top" offset="0" stopColor={water.top} />,
+              ...(water.mid ? [<Stop key="mid" offset={water.midAt ?? 0.5} stopColor={water.mid} />] : []),
+              <Stop key="low" offset="1" stopColor={water.low} />,
+            ]}
           </LinearGradient>
           <LinearGradient id="seaMist" x1="0" y1="0" x2="0" y2={SEA_BASE + 6} gradientUnits="userSpaceOnUse">
-            <Stop offset="0" stopColor={water.top} stopOpacity="0" />
-            <Stop offset="1" stopColor={water.top} stopOpacity="0.2" />
+            <Stop offset="0" stopColor={water.mist ?? water.top} stopOpacity="0" />
+            <Stop offset="1" stopColor={water.mist ?? water.top} stopOpacity="0.2" />
           </LinearGradient>
         </Defs>
         <Rect x={0} y={0} width={width} height={SEA_BASE + 6} fill="url(#seaMist)" />
@@ -319,7 +322,7 @@ export function SeaLine({
         <AnimatedPath animatedProps={body} fill="url(#seaWater)" />
         <AnimatedPath animatedProps={bubbles} fill="none" stroke="#ffffff" strokeOpacity={0.6} strokeWidth={0.9} />
         <AnimatedPath animatedProps={glints} fill="none" stroke="#ffffff" strokeOpacity={0.85} strokeWidth={1} strokeLinecap="round" />
-        <AnimatedPath animatedProps={front} fill="none" stroke="#ffffff" strokeOpacity={0.9} strokeWidth={1.6} />
+        <AnimatedPath animatedProps={front} fill="none" stroke={water.line ?? '#ffffff'} strokeOpacity={water.lineOpacity ?? 0.9} strokeWidth={1.6} />
         <AnimatedPath animatedProps={foam} fill="none" stroke={water.foam} strokeWidth={1.2} strokeLinecap="round" strokeDasharray="1 3.5" />
         <AnimatedPath animatedProps={curl} fill="none" stroke={water.foam} strokeWidth={1.5} strokeLinecap="round" />
         {DROPS.map((i) => (

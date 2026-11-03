@@ -1,3 +1,4 @@
+import { useSkyInk } from '@/components/home/sky-ink';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, StyleSheet } from 'react-native';
 
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export function CallButton({ track, listeners, onSave = saveLike }: Props) {
+  const ink = useSkyInk();
   const { calls, loaded } = useCalledShots();
   const [now, setNow] = useState(Date.now);
   const [busy, setBusy] = useState(false);
@@ -69,7 +71,7 @@ export function CallButton({ track, listeners, onSave = saveLike }: Props) {
       accessibilityRole="button"
       accessibilityLabel={action === 'take-back' ? 'Take back today’s call' : label}
       accessibilityState={{ disabled, busy }}>
-      <ThemedText style={styles.label}>{label}</ThemedText>
+      <ThemedText style={[styles.label, { color: ink.text }]}>{label}</ThemedText>
     </Pressable>
   );
 }

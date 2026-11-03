@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 
 import { CallButton } from '@/components/discovery/call-button';
+import { useSkyInk } from '@/components/home/sky-ink';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Spacing, Typography } from '@/constants/theme';
 import { describeListeners, type DiscoveryTrack } from '@/lib/discovery';
@@ -29,13 +30,14 @@ export const LISTEN_INFO_HEIGHT = 92;
  */
 export function ListenInfo({ track, revealed, clues, listeners, onCallSave, origin }: Props) {
   const reduceMotion = useReducedMotion();
+  const ink = useSkyInk();
   if (!revealed) {
     return (
       <View style={styles.box}>
-        <ThemedText type="subtitle" style={styles.center}>
+        <ThemedText type="subtitle" style={[styles.center, { color: ink.text }]}>
           Just listen.
         </ThemedText>
-        {!!clues && <ThemedText style={[styles.caption, styles.center]}>{clues}</ThemedText>}
+        {!!clues && <ThemedText style={[styles.caption, styles.center, { color: ink.secondary }]}>{clues}</ThemedText>}
       </View>
     );
   }
@@ -43,14 +45,14 @@ export function ListenInfo({ track, revealed, clues, listeners, onCallSave, orig
   const release = origin ?? releaseLine(track.releaseDate, track.collectionName);
   return (
     <Animated.View key={track.id} entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={styles.box}>
-      <ThemedText style={[styles.title, styles.center]} numberOfLines={1}>
+      <ThemedText style={[styles.title, styles.center, { color: ink.text }]} numberOfLines={1}>
         {track.trackName}
       </ThemedText>
-      <ThemedText style={[styles.caption, styles.center]} numberOfLines={1}>
+      <ThemedText style={[styles.caption, styles.center, { color: ink.secondary }]} numberOfLines={1}>
         {release ? `${track.artistName} · ${release}` : track.artistName}
       </ThemedText>
       <View style={styles.callRow}>
-        <ThemedText style={styles.caption} numberOfLines={1}>
+        <ThemedText style={[styles.caption, { color: ink.secondary }]} numberOfLines={1}>
           {described ? `${described.count} listeners` : listeners === undefined ? 'Counting listeners…' : 'No listener count yet'}
         </ThemedText>
         <View style={styles.call}>

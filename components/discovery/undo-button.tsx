@@ -1,3 +1,4 @@
+import { useSkyInk } from '@/components/home/sky-ink';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 
@@ -13,10 +14,11 @@ type UndoButtonProps = {
 
 /** A thin outline, 44px tall; or, as `variant="icon"`, just the arrow, like Map and Tune beside it. */
 export function UndoButton({ disabled, onPress, variant }: UndoButtonProps) {
+  const ink = useSkyInk();
   if (variant === 'icon') {
     return (
       <TouchableOpacity onPress={onPress} disabled={disabled} activeOpacity={0.6} style={[styles.icon, disabled && styles.disabled]} accessibilityLabel="Undo the last swipe">
-        <Ionicons name="arrow-undo" size={22} color={Colors.text} />
+        <Ionicons name="arrow-undo" size={22} color={ink.text} />
       </TouchableOpacity>
     );
   }

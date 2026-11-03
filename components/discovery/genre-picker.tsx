@@ -1,3 +1,4 @@
+import { useSkyInk } from '@/components/home/sky-ink';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -64,6 +65,7 @@ export function GenrePicker({
 }: GenrePickerProps) {
   const [tab, setTab] = useState<Tab>('genres');
   const [counts, setCounts] = useState<Map<string, number> | null>(null);
+  const ink = useSkyInk();
   const [visible, setVisibleState] = useState(false);
   const setVisible = (open: boolean) => {
     setVisibleState(open);
@@ -223,11 +225,11 @@ export function GenrePicker({
 
   return (
     <>
-      <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.6} style={[Ui.textButton, styles.trigger]} accessibilityLabel={`Genre: ${currentLabel}. Change genre`}>
-        <ThemedText numberOfLines={1} style={styles.triggerText}>
+      <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.6} style={[Ui.textButton, styles.trigger, { backgroundColor: ink.frost }]} accessibilityLabel={`Genre: ${currentLabel}. Change genre`}>
+        <ThemedText numberOfLines={1} style={[styles.triggerText, { color: ink.text }]}>
           {currentLabel}
         </ThemedText>
-        <Ionicons name="chevron-down" size={16} color={Colors.text} />
+        <Ionicons name="chevron-down" size={16} color={ink.text} />
       </TouchableOpacity>
 
       <BottomSheet visible={visible} onClose={close} maxHeight="80%">

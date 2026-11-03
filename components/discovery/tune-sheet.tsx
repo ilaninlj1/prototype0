@@ -1,3 +1,5 @@
+import { useSkyInk } from '@/components/home/sky-ink';
+import type { SkyTest } from '@/lib/home-sky';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -39,6 +41,9 @@ type TuneSheetProps = {
   /** Make the feed's loading slow or fail on purpose, to see the loading screens. Not saved. */
   networkTest: NetworkTest;
   onChangeNetworkTest: (mode: NetworkTest) => void;
+  /** Look at Home's sky at any time of day. Not saved. */
+  skyTest?: SkyTest;
+  onChangeSkyTest?: (mode: SkyTest) => void;
   /** 'icon': a round icon button for Home's top bar instead of the labeled one. */
   trigger?: 'button' | 'icon';
   /** Told every time the sheet opens or closes (Home keeps its buttons up while a sheet is open). */
@@ -58,9 +63,12 @@ export function TuneSheet({
   onChangeSoundFilter,
   networkTest,
   onChangeNetworkTest,
+  skyTest,
+  onChangeSkyTest,
   trigger = 'button',
   onOpenChange,
 }: TuneSheetProps) {
+  const ink = useSkyInk();
   const [visible, setVisibleState] = useState(false);
   const setVisible = (open: boolean) => {
     setVisibleState(open);
@@ -102,7 +110,7 @@ export function TuneSheet({
           style={styles.iconTrigger}
           accessibilityRole="button"
           accessibilityLabel={`Tune: ${summary}`}>
-          <Ionicons name="options-outline" size={22} color={Colors.text} />
+          <Ionicons name="options-outline" size={22} color={ink.text} />
         </TouchableOpacity>
       ) : (
         <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.6} style={Ui.outlineButton}>
@@ -248,6 +256,24 @@ export function TuneSheet({
               <ThemedText type="caption">
                 For trying the loading screens: makes loading new songs slow or fail on purpose. Songs already playing aren’t affected. Turns off when you close the app.
               </ThemedText>
+              {skyTest != null && onChangeSkyTest && (
+                <>
+                  <ThemedText style={sheetStyles.heading}>Test sky</ThemedText>
+                  <Segment
+                    options={[
+                      { key: 'clock', label: 'Clock' },
+                      { key: 'dawn', label: 'Dawn' },
+                      { key: 'noon', label: 'Noon' },
+                      { key: 'dusk', label: 'Dusk' },
+                      { key: 'night', label: 'Night' },
+                    ]}
+                    value={skyTest}
+                    onChange={(mode) => onChangeSkyTest(mode as SkyTest)}
+                    label="Test sky"
+                  />
+                  <ThemedText type="caption">Shows Home&apos;s sky at another time of day. Turns off when you close the app.</ThemedText>
+                </>
+              )}
             </>
           )}
         </ScrollView>

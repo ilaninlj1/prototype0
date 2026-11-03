@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useSkyInk } from '@/components/home/sky-ink';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
 
@@ -62,6 +63,7 @@ export function Button({
   iconColor?: string;
 }) {
   const size = primary ? BIG : SMALL;
+  const ink = useSkyInk();
   return (
     <View style={styles.slot}>
       <Pressable
@@ -72,12 +74,12 @@ export function Button({
         style={({ pressed }) => [
           styles.circle,
           { width: size, height: size, borderRadius: size / 2, marginTop: (BIG - size) / 2 },
-          primary && styles.primary,
+          { backgroundColor: primary ? ink.main : ink.frost },
           (pressed || disabled) && { opacity: disabled ? 0.4 : 0.7 },
         ]}>
-        <Ionicons name={icon} size={primary ? 28 : 22} color={iconColor ?? (primary ? Colors.accentText : Colors.text)} />
+        <Ionicons name={icon} size={primary ? 28 : 22} color={iconColor ?? (primary ? ink.mainText : ink.text)} />
       </Pressable>
-      <ThemedText style={[styles.label, primary && styles.primaryLabel]} numberOfLines={1}>
+      <ThemedText style={[styles.label, { color: ink.secondary }, primary && styles.primaryLabel, primary && { color: ink.text }]} numberOfLines={1}>
         {label}
       </ThemedText>
     </View>
@@ -87,8 +89,7 @@ export function Button({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: Spacing.xxl },
   slot: { alignItems: 'center', gap: Spacing.sm, minWidth: BIG },
-  circle: { alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
-  primary: { backgroundColor: Colors.accent },
+  circle: { alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 13, lineHeight: 16, color: Colors.textSecondary },
   primaryLabel: { color: Colors.text, fontWeight: '600' },
 });

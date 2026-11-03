@@ -1,3 +1,4 @@
+import { useSkyInk } from '@/components/home/sky-ink';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 
@@ -9,13 +10,14 @@ import { Colors, Spacing, TapTarget, Ui } from '@/constants/theme';
  * with `variant="icon"` a map icon and the % for Home's top bar.
  */
 export function MapButton({ share, onPress, variant }: { share: number | null; onPress: () => void; variant?: 'icon' }) {
+  const ink = useSkyInk();
   const pct = share == null ? null : Math.round(share * 100);
   const a11y = pct == null ? 'Dark map' : `Dark map, ${pct} percent lit`;
   if (variant === 'icon') {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.6} style={styles.icon} accessibilityRole="button" accessibilityLabel={a11y}>
-        <Ionicons name="map-outline" size={22} color={Colors.text} />
-        {pct != null && <ThemedText style={styles.pct}>{pct}%</ThemedText>}
+        <Ionicons name="map-outline" size={22} color={ink.text} />
+        {pct != null && <ThemedText style={[styles.pct, { color: ink.secondary }]}>{pct}%</ThemedText>}
       </TouchableOpacity>
     );
   }

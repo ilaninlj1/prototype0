@@ -36,6 +36,9 @@ import { KeepMoment } from '@/components/bottles/keep-moment';
 import { BottleOpening, type OpeningGeometry } from '@/components/bottles/bottle-opening';
 import { LaunchLight } from '@/components/bottles/launch-light';
 import { SEA_BASE, SEA_HEIGHT, SeaLine, seaX, type SeaWave } from '@/components/bottles/sea-line';
+import { DARK_WORDS, LIGHT_WORDS, SkyInkProvider } from '@/components/home/sky-ink';
+import { HomeSky, SeaGlitter } from '@/components/sky/home-sky';
+import { SKY_TEST_HOURS, matchedWater, skyAt, weatherOf, wordsAreDark, type SkyTest } from '@/lib/home-sky';
 import { settleDiveTo, oceanDive, oceanTravel, oceanReduced, setOceanInk, useOceanTabBarHeight } from '@/components/ocean/dive-gesture';
 import type { OceanBottle } from '@/components/ocean/ocean-canvas';
 import { OceanOverlay, type OceanHandlers } from '@/components/ocean/ocean-overlay';
@@ -52,11 +55,10 @@ import type { FeedMode } from '@/lib/bottles';
 import { allDecks, deckCounts, deckLabel, nearestInDeck, oceanDeckLeft, pickDeck, type Deck } from '@/lib/decks';
 import { listeningPath } from '@/lib/ocean-chart';
 import { placeKey, placeLabel, waterOf, type Place } from '@/lib/ocean-map';
-import { dayMixAt, surfaceWater } from '@/lib/ocean-scene';
 import { CALM_RHYTHM, restingSea, type SeaState } from '@/lib/sea-beat';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Spacing, Typography } from '@/constants/theme';
+import { Colors, Spacing, TapTarget, Typography } from '@/constants/theme';
 import { useHomeChrome } from '@/hooks/use-home-chrome';
 import { useMyBottles } from '@/hooks/use-my-bottles';
 import { oceanPlaceOf, oceanPlaceOfEntry, useOceanData } from '@/hooks/use-ocean';
@@ -123,7 +125,7 @@ import {
 } from '@/lib/feed-load';
 import { type PieceMark } from '@/lib/piece';
 import { recipeFor, type PrintRecipe } from '@/lib/print-recipe';
-import { moreLikeLabel } from '@/lib/sound';
+import { keyLabel, moreLikeLabel, type SoundFeatures } from '@/lib/sound';
 import { soundFor } from '@/lib/sound-index';
 import { soundLookup } from '@/lib/sound-lookup-app';
 import { loadSoundMap, mapPointOf, type MapPoint } from '@/lib/sound-map';
@@ -222,8 +224,6 @@ export default function HomeScreen() {
   const tabBarHeight = useOceanTabBarHeight();
   const [oceanHour, setOceanHour] = useState(localHour);
   const restPlace = useMemo<Place>(() => (deck?.kind === 'ocean' ? { water: deck.water, depth: deck.depth } : REST_PLACE), [deck]);
-  const seaWater = surfaceWater(restPlace.water, restPlace.depth, dayMixAt(oceanHour));
-  useEffect(() => setOceanInk(seaWater.ink), [seaWater.ink]);
   const [underWater, setUnderWater] = useState(false);
   const underSinceRef = useRef<number | null>(null);
   const oceanSpot = useSharedValue(0);
@@ -363,6 +363,26 @@ export default function HomeScreen() {
   // The top card's sound and print. Cards underneath show their still print from the index.
   const { record: topSound } = useSound(currentTrack);
   const seaRhythmNow = topSound ? seaRhythm(topSound.status === 'measured' ? topSound.features : null) : null;
+  // The sky: the clock sets it and the song sets the weather, and the water and Home's words follow it. While a song's
+  // sound is still being looked up, the sky keeps the last song's weather instead of clearing and clouding over again.
+  const [skyHour, setSkyHour] = useState(localHour);
+  const [skyTest, setSkyTest] = useState<SkyTest>('clock');
+  const [skySound, setSkySound] = useState<SoundFeatures | null>(null);
+  useEffect(() => {
+    if (topSound) setSkySound(topSound.status === 'measured' ? topSound.features : null);
+  }, [topSound]);
+  useEffect(() => {
+    const id = setInterval(() => setSkyHour(localHour()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const hourNow = skyTest === 'clock' ? skyHour : SKY_TEST_HOURS[skyTest];
+  const skyLook = useMemo(() => skyAt(hourNow, weatherOf(skySound)), [hourNow, skySound]);
+  const seaWater = useMemo(() => matchedWater(restPlace.water, restPlace.depth, skyLook), [restPlace, skyLook]);
+  useEffect(() => setOceanInk(seaWater.ink), [seaWater.ink]);
+  const wordsDark = wordsAreDark(skyLook, true);
+  const skyInk = wordsDark ? DARK_WORDS : LIGHT_WORDS;
+  const signFront = skySound ? `${Math.round(skySound.tempo)} BPM` : '♪';
+  const signBack = (skySound && keyLabel(skySound.key, skySound.mode)?.replace(' minor', ' min').replace(' major', ' maj')) || '♪';
   const seaSongRef = useRef<number | null>(null);
   useEffect(() => {
     const id = currentTrack?.id ?? null;
@@ -1523,7 +1543,27 @@ export default function HomeScreen() {
         pointerEvents={underWater ? 'none' : 'box-none'}
         accessibilityElementsHidden={underWater}
         importantForAccessibility={underWater ? 'no-hide-descendants' : 'auto'}>
+    {frameW > 0 && (
+      <HomeSky
+        width={frameW}
+        height={frameH + tabBarHeight}
+        surfaceY={seaSurfaceY}
+        headerY={insets.top + Spacing.sm + 20 + Spacing.md + TapTarget / 2}
+        wordsTop={cardArea ? cardTop + side + Spacing.md : frameH * 0.6}
+        hour={hourNow}
+        look={skyLook}
+        water={seaWater}
+        wordsDark={wordsDark}
+        tempo={seaRhythmNow?.tempo ?? CALM_RHYTHM.tempo}
+        wave={seaWave}
+        signFront={signFront}
+        signBack={signBack}
+        active={isFocused}
+      />
+    )}
+    <SkyInkProvider value={skyInk}>
     <ThemedView
+      backgroundColor="transparent"
       style={[styles.container, { paddingTop: insets.top + Spacing.sm, marginBottom: tabBarHeight }]}
       onLayout={(e) => setFrame({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
       {/* Behind everything: a tap on empty space brings the buttons back. */}
@@ -1544,6 +1584,7 @@ export default function HomeScreen() {
           playing={status.playing}
         />
       )}
+      {frameW > 0 && <SeaGlitter width={frameW} height={frameH + tabBarHeight} surfaceY={seaSurfaceY} look={skyLook} hour={hourNow} active={isFocused} />}
 
       <ChromeFade visible={chrome.visible} alwaysShow={statusItem?.kind === 'failed'} style={styles.statusLine}>
         {statusItem && (
@@ -1554,10 +1595,10 @@ export default function HomeScreen() {
             accessibilityRole={statusTappable ? 'button' : 'text'}
             style={styles.statusRow}>
             {(statusItem.kind === 'failed' || statusItem.kind === 'edition' || statusItem.kind === 'news') && <View style={styles.dot} />}
-            <ThemedText style={styles.statusText} numberOfLines={1}>
+            <ThemedText style={[styles.statusText, { color: skyInk.secondary }]} numberOfLines={1}>
               {statusText(statusItem)}
             </ThemedText>
-            {statusTappable && statusItem.kind !== 'map' && <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />}
+            {statusTappable && statusItem.kind !== 'map' && <Ionicons name="chevron-forward" size={14} color={skyInk.secondary} />}
           </Pressable>
         )}
       </ChromeFade>
@@ -1591,6 +1632,8 @@ export default function HomeScreen() {
             onSetNextMode={handleSetNextMode}
             soundFilter={soundFilter}
             onChangeSoundFilter={handleChangeSoundFilter}
+            skyTest={skyTest}
+            onChangeSkyTest={setSkyTest}
             networkTest={networkTest}
             onChangeNetworkTest={(mode) => {
               networkTestRef.current = mode;
@@ -1712,7 +1755,7 @@ export default function HomeScreen() {
                 <KeepMoment moment={bottles.keep} onDone={bottles.dismissKeep} />
               </View>
             ) : firstHatchLine ? (
-              <ThemedText style={styles.firstHatch}>Your song went under. Swipe up to see it.</ThemedText>
+              <ThemedText style={[styles.firstHatch, { color: skyInk.text }]}>Your song went under. Swipe up to see it.</ThemedText>
             ) : toast ? (
               <SavedToast
                 visible
@@ -1731,14 +1774,14 @@ export default function HomeScreen() {
           </View>
 
           {!chrome.visible && !bottles.ask && !bottles.keep && (
-            <ThemedText style={styles.hint} pointerEvents="none">
+            <ThemedText style={[styles.hint, { color: skyInk.secondary }]} pointerEvents="none">
               {revealedNow ? 'Double-tap to save · swipe up for details' : 'Tap anywhere for buttons · swipe the card to choose'}
             </ThemedText>
           )}
         </>
       ) : (
         <>
-          <View style={styles.statusArea}>
+          <View style={[styles.statusArea, !wordsDark && styles.statusAtNight]}>
             <FeedStatus load={load} onAction={handleFeedAction} />
           </View>
           <CreditLine />
@@ -1799,6 +1842,7 @@ export default function HomeScreen() {
         }}
       />
     </ThemedView>
+    </SkyInkProvider>
       </Animated.View>
       <OceanOverlay
         sea={oceanSea}
@@ -1904,6 +1948,8 @@ const styles = StyleSheet.create({
   slot: { height: 52, justifyContent: 'center' },
   lift: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   statusArea: { flex: 1, marginBottom: Spacing.lg },
+  // The loading screen keeps its light look, so at night it sits on its own light panel.
+  statusAtNight: { backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 28, padding: Spacing.md },
   under: { position: 'absolute', top: 0, left: 0, opacity: 0.55 },
   centered: {
     flex: 1,

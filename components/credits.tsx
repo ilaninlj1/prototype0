@@ -1,3 +1,4 @@
+import { useSkyInk } from '@/components/home/sky-ink';
 import { FontAwesome } from '@expo/vector-icons';
 import { Linking, StyleSheet, TouchableOpacity } from 'react-native';
 import { SvgCss } from 'react-native-svg/css';
@@ -18,8 +19,9 @@ function useBrandInk() {
 
 /** Required source credit — shown wherever previews play. */
 export function CreditLine({ lastfm = true }: { lastfm?: boolean }) {
+  const ink = useSkyInk();
   return (
-    <ThemedText type="caption" style={styles.credit}>
+    <ThemedText type="caption" style={[styles.credit, ink.onSky && { color: ink.secondary }]}>
       {lastfm ? CREDIT_LINE : 'Previews provided courtesy of iTunes'}
     </ThemedText>
   );
