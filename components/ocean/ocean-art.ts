@@ -269,7 +269,7 @@ function drawTowers(c: SkCanvas, place: Place, width: number, height: number, co
     for (let j = 2; j < right.length; j += 2) edge.lineTo(right[j], right[j + 1]);
     c.drawPath(edge.build(), rim);
     // Places on the tower for things to grow.
-    for (let y = Math.max(first + 20, height * 0.08); y < height * 0.92; y += height * 0.16) {
+    for (let y = Math.max(first + 20, height * 0.08) + i * height * 0.055; y < height * 0.92; y += height * (0.14 + i * 0.025)) {
       const radius = towerRadius(i, row + y / height);
       if (radius > 0.02) spots.push({ x: t.cx * width + (i === 1 ? -radius : radius) * width, y, side: i === 1 ? -1 : 1 });
     }

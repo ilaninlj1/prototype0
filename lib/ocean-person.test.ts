@@ -301,6 +301,7 @@ test('the ocean does not shrink or lose color after time away', () => {
   }
 });
 
+// About 43 ms on this Mac alone. The limit is high so a busy machine can't fail it, and only a real slowdown can.
 test('building 5000 swipes and 500 saves stays quick enough to build between swipes', (t) => {
   const history = Array.from({ length: 5000 }, (_, i) => swipe(i + 1, {
     timestamp: NOW - (5000 - i) * 60_000, action: i < 500 ? 'like' : i % 3 ? 'skip' : 'reveal',
@@ -316,7 +317,7 @@ test('building 5000 swipes and 500 saves stays quick enough to build between swi
   t.diagnostic(`Build time for 5000 swipes and 500 saves: ${elapsed.toFixed(2)} ms`);
   assert.equal(life.total, 500);
   assert.equal(life.heardTotal, 5000);
-  assert.ok(elapsed < 250, `Build took ${elapsed.toFixed(2)} ms`);
+  assert.ok(elapsed < 600, `Build took ${elapsed.toFixed(2)} ms`);
 });
 
 const risen = (extra: Partial<OceanInput>) => buildOcean(input({ history: [swipe(1)], liked: [track(1, { artistListeners: 10_000 })], depthOf: () => 'buried', ...extra }));
