@@ -1,14 +1,16 @@
-// The ocean's still art, recorded once as Skia pictures on the JS thread: each place's seabed, flora, coral and sand,
-// and every creature's frames. The canvas's frame worklet only composes these, so a frame stays cheap.
-// Skia is only ever reached through lazySkia, so importing it here is safe on the web.
+// The ocean's still art, recorded once as Skia pictures on the JS thread: each place's stretch of reef wall, its pale
+// flora and your coral, the sea floor's detail, and every creature's frames. The canvas's frame worklet only composes
+// these, so a frame stays cheap. Skia is only ever reached through lazySkia, so importing it here is safe on the web.
 
-import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, createPicture, type SkCanvas, type SkPaint, type SkPicture } from '@shopify/react-native-skia';
+import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, createPicture, type SkCanvas, type SkPaint, type SkPathBuilder, type SkPicture, type SkShader } from '@shopify/react-native-skia';
 
-import { DEPTHS, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
+import type { Anatomy } from '@/lib/ocean-anatomy';
+import { DEPTHS, WATERS, type Depth, type Kind, type Place, type Water } from '@/lib/ocean-map';
 import type { CoralPiece, SandLife } from '@/lib/ocean-person';
-import { hexToRgb, mixRgb, seabedAt, type Rgb, type WildLook } from '@/lib/ocean-scene';
+import { hexToRgb, mixRgb, seabedAt, wallAt, type Rgb } from '@/lib/ocean-scene';
 
 const TAU = Math.PI * 2;
+const CLIP_IN = 1;
 
 const rng = (seed: number) => {
   let s = Math.max(1, Math.floor(seed) % 2147483647);
@@ -16,6 +18,7 @@ const rng = (seed: number) => {
 };
 const hex = (c: Rgb) => `#${c.map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('')}`;
 export const mixHex = (a: string, b: string, t: number) => hex(mixRgb(hexToRgb(a), hexToRgb(b), t));
+const path = () => Skia.PathBuilder.Make();
 
 function fill(color: string, alpha = 1): SkPaint {
   const p = Skia.Paint();
@@ -39,6 +42,13 @@ const oval = (c: SkCanvas, x: number, y: number, rx: number, ry: number, paint: 
   c.drawOval(Skia.XYWHRect(-rx, -ry, rx * 2, ry * 2), paint);
   c.restore();
 };
+const poly = (c: SkCanvas, pts: number[], paint: SkPaint) => {
+  const b = path();
+  b.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) b.lineTo(pts[i], pts[i + 1]);
+  b.close();
+  c.drawPath(b.build(), paint);
+};
 
 /* ---------- flora ---------- */
 
@@ -46,10 +56,10 @@ function branch(c: SkCanvas, x: number, y: number, len: number, ang: number, w: 
   if (d <= 0 || len < 4) return;
   const x2 = x + Math.cos(ang) * len;
   const y2 = y + Math.sin(ang) * len;
-  const path = Skia.PathBuilder.Make();
-  path.moveTo(x, y);
-  path.quadTo(x + Math.cos(ang + 0.4) * len * 0.5, y + Math.sin(ang + 0.4) * len * 0.5, x2, y2);
-  c.drawPath(path.build(), line(color, w));
+  const b = path();
+  b.moveTo(x, y);
+  b.quadTo(x + Math.cos(ang + 0.4) * len * 0.5, y + Math.sin(ang + 0.4) * len * 0.5, x2, y2);
+  c.drawPath(b.build(), line(color, w));
   const n = d > 2 ? 3 : 2;
   for (let i = 0; i < n; i++) branch(c, x2, y2, len * (0.62 + r() * 0.14), ang + (i - (n - 1) / 2) * (0.55 + r() * 0.25), w * 0.72, color, r, d - 1);
 }
@@ -57,252 +67,284 @@ function fan(c: SkCanvas, x: number, y: number, rad: number, color: string) {
   const rib = line(color, 1.5);
   for (let i = 0; i < 13; i++) {
     const a = -Math.PI + 0.25 + (i * (Math.PI - 0.5)) / 12;
-    const path = Skia.PathBuilder.Make();
-    path.moveTo(x, y);
-    path.quadTo(x + Math.cos(a) * rad * 0.5, y + Math.sin(a) * rad * 0.7, x + Math.cos(a) * rad, y + Math.sin(a) * rad);
-    c.drawPath(path.build(), rib);
+    const b = path();
+    b.moveTo(x, y);
+    b.quadTo(x + Math.cos(a) * rad * 0.5, y + Math.sin(a) * rad * 0.7, x + Math.cos(a) * rad, y + Math.sin(a) * rad);
+    c.drawPath(b.build(), rib);
   }
   const web = line(color, 0.8, 0.6);
   for (let k = 1; k < 4; k++) {
     const rr = (rad * k) / 4;
-    const path = Skia.PathBuilder.Make();
-    path.addArc(Skia.XYWHRect(x - rr, y - rr, rr * 2, rr * 2), 180 + 14, 180 - 28);
-    c.drawPath(path.build(), web);
+    const b = path();
+    b.addArc(Skia.XYWHRect(x - rr, y - rr, rr * 2, rr * 2), 194, 152);
+    c.drawPath(b.build(), web);
   }
 }
 function brain(c: SkCanvas, x: number, y: number, rx: number, ry: number, color: string, dark: string) {
-  const dome = Skia.PathBuilder.Make();
-  dome.addArc(Skia.XYWHRect(x - rx, y - ry, rx * 2, ry * 2), 180, 180);
-  dome.close();
-  c.drawPath(dome.build(), fill(color));
+  const b = path();
+  b.addArc(Skia.XYWHRect(x - rx, y - ry, rx * 2, ry * 2), 180, 180);
+  b.close();
+  const dome = b.build();
+  c.drawPath(dome, fill(color));
   c.save();
-  c.clipPath(dome.build(), 1, true);
+  c.clipPath(dome, CLIP_IN, true);
   const groove = line(dark, 1.2);
   for (let j = 0; j < 5; j++) {
-    const path = Skia.PathBuilder.Make();
+    const g = path();
     for (let i = -rx; i <= rx; i += 3) {
       const yy = y - (ry * (j + 0.5)) / 5 + Math.sin(i * 0.35 + j * 1.7) * 2.2;
-      if (i === -rx) path.moveTo(x + i, yy);
-      else path.lineTo(x + i, yy);
+      if (i === -rx) g.moveTo(x + i, yy);
+      else g.lineTo(x + i, yy);
     }
-    c.drawPath(path.build(), groove);
+    c.drawPath(g.build(), groove);
   }
   c.restore();
 }
 function tubes(c: SkCanvas, x: number, y: number, color: string, lip: string, r: () => number) {
-  for (let i = 0; i < 5; i++) {
-    const tx = x + (i - 2) * 9 + r() * 3;
-    const h = 18 + r() * 22;
-    c.drawRRect(Skia.RRectXY(Skia.XYWHRect(tx - 4, y - h, 8, h + 4), 4, 4), fill(color));
-    oval(c, tx, y - h, 4, 1.8, fill(lip));
+  for (let i = 0; i < 4; i++) {
+    const tx = x + i * 8 + r() * 3;
+    const h = 14 + r() * 20;
+    c.drawRRect(Skia.RRectXY(Skia.XYWHRect(tx - 3.6, y - h, 7.2, h + 4), 3.6, 3.6), fill(color));
+    oval(c, tx, y - h, 3.6, 1.6, fill(lip));
   }
-}
-function rock(c: SkCanvas, x: number, y: number, rx: number, ry: number, color: string) {
-  const dome = Skia.PathBuilder.Make();
-  dome.addArc(Skia.XYWHRect(x - rx, y - ry, rx * 2, ry * 2), 180, 180);
-  dome.close();
-  c.drawPath(dome.build(), fill(color));
-}
-function star(c: SkCanvas, x: number, y: number, s: number, color: string) {
-  const path = Skia.PathBuilder.Make();
-  for (let i = 0; i < 10; i++) {
-    const a = (i * Math.PI) / 5 - Math.PI / 2 + 0.3;
-    const rr = i % 2 ? s * 0.42 : s;
-    const px = x + Math.cos(a) * rr;
-    const py = y + Math.sin(a) * rr;
-    if (i === 0) path.moveTo(px, py);
-    else path.lineTo(px, py);
-  }
-  path.close();
-  c.drawPath(path.build(), fill(color));
 }
 
-const SAND: Record<Water, [string, string]> = {
-  reef: ['#f8e7bb', '#dcc08a'],
-  kelp: ['#d4c791', '#9c8f60'],
-  blue: ['#9db3cb', '#5f7895'],
-  midnight: ['#2b3050', '#14172c'],
-};
-const ROCK: Record<Water, string> = { reef: '#d7cfc0', kelp: '#6d7363', blue: '#54708f', midnight: '#1b1f38' };
-const PALE_REEF = ['#e4eeee', '#dbe7e8', '#d3e0e2', '#d6e2e2', '#d8e4e5', '#e0eaeb'];
-const DEEP: Record<Depth, number> = { popular: 0, deepcuts: 0.35, gems: 0.66, buried: 0.86 };
+const ROCK: Record<Water, string> = { reef: '#cfc6b4', kelp: '#6d7363', blue: '#54708f', midnight: '#232845' };
+const PALE = ['#e4eeee', '#dbe7e8', '#d3e0e2', '#d6e2e2', '#d8e4e5', '#e0eaeb'];
+const DEEP: number[] = [0, 0.35, 0.66, 0.86, 0.9];
 const ABYSS: Record<Water, string> = { reef: '#04203a', kelp: '#04221f', blue: '#041a40', midnight: '#020818' };
 
-/** A pale piece of the place's own life, dimmer the deeper it sits. */
-const paled = (hexColor: string, place: Place) => mixHex(hexColor, ABYSS[place.water], DEEP[place.depth]);
+const toneAt = (hexColor: string, water: Water, row: number) => mixHex(hexColor, ABYSS[water], DEEP[Math.max(0, Math.min(4, row))]);
 
-export type Weed = { x: number; base: number; height: number; color: string; width: number; phase: number; leaves: boolean };
+/** A place's color for things with no ground: pale, and dimmer the deeper it sits. */
+const paled = (hexColor: string, place: Place) => toneAt(hexColor, place.water, DEPTHS.indexOf(place.depth));
 
-/** The swaying plants of a place, which the frame worklet draws live so they can follow the beat. */
-export function weedsFor(place: Place, width: number, height: number): Weed[] {
-  const depthIndex = DEPTHS.indexOf(place.depth);
-  const r = rng(137 + depthIndex * 41 + place.water.length * 13);
-  const k = width / 270;
-  const out: Weed[] = [];
-  const floor = (x: number) => height - seabedAt(depthIndex, x / width) * height + 8;
-  const colors: Record<Water, [string, string]> = {
-    reef: ['#c9dcd2', '#d6e5dc'],
-    kelp: ['#a9b58a', '#bfc99f'],
-    blue: ['#b4c8d8', '#c5d6e3'],
-    midnight: ['#34506f', '#3f5f80'],
-  };
-  const [a, b] = colors[place.water];
-  const n = place.water === 'kelp' ? 9 : place.water === 'midnight' ? 3 : place.water === 'blue' ? 2 : 5;
-  for (let i = 0; i < n; i++) {
-    const x = (r() * 0.9 + 0.05) * width;
-    const tall = place.water === 'kelp';
-    out.push({
-      x,
-      base: floor(x),
-      height: (tall ? 150 + r() * 200 : 30 + r() * 42) * k,
-      color: paled(r() < 0.5 ? a : b, place),
-      width: (tall ? 3.4 : 2.2) * k,
-      phase: r() * 9,
-      leaves: tall,
-    });
-  }
-  return out;
+/** Colors running top to bottom of a place, meeting the next place's so nothing changes abruptly as you sink. */
+function fadingDown(hexColor: string, water: Water, row: number, height: number): SkShader {
+  return Skia.Shader.MakeLinearGradient({ x: 0, y: 0 }, { x: 0, y: height }, [Skia.Color(toneAt(hexColor, water, row)), Skia.Color(toneAt(hexColor, water, row + 1))], [0, 1], TileMode.Clamp);
 }
 
-/** Everything still about a place: its terraced seabed, pale flora, your coral and your sand. */
-export function recordPlace(place: Place, width: number, height: number, coral: CoralPiece[], sand: SandLife | null, colorSafe: (c: string) => string): SkPicture {
-  const depthIndex = DEPTHS.indexOf(place.depth);
+export type Weed = { x: number; top: number; base: number; width: number; phase: number; tall: boolean; amp: number };
+
+const WEED_TONE: Record<Water, string> = { reef: '#c9dcd2', kelp: '#b4bf8e', blue: '#b4c8d8', midnight: '#34506f' };
+
+/**
+ * The plants that sway live, so they can follow the beat. Kelp grows from the floor to the surface: the same stems at
+ * every depth, drawn in stretches that meet, so you sink past them. Elsewhere it's a little seagrass on the reef wall.
+ */
+export function weedsFor(place: Place, width: number, height: number): { weeds: Weed[]; shader: SkShader } {
+  const row = DEPTHS.indexOf(place.depth);
+  const col = WATERS.indexOf(place.water);
   const k = width / 270;
+  const out: Weed[] = [];
+  if (place.water === 'kelp') {
+    const r = rng(137);
+    for (let i = 0; i < 9; i++) {
+      const x = (0.26 + r() * 0.68) * width;
+      const phase = r() * 9;
+      const floor = height - seabedAt(x / width) * height + 8;
+      out.push({ x, top: row === 0 ? height * (0.16 + r() * 0.2) : 0, base: row === 3 ? floor : height, width: 3.4 * k, phase, tall: true, amp: 15 * k });
+      if (row !== 0) r();
+    }
+  } else {
+    const r = rng(211 + row * 41 + col * 13);
+    const n = place.water === 'midnight' ? 2 : 3;
+    for (let i = 0; i < n; i++) {
+      const yf = 0.18 + r() * 0.66;
+      const y = yf * height;
+      const x = wallAt(col, row + yf) * width + 3;
+      out.push({ x, top: y - (26 + r() * 30) * k, base: y, width: 2.2 * k, phase: r() * 9, tall: false, amp: 9 * k });
+    }
+  }
+  return { weeds: out, shader: fadingDown(WEED_TONE[place.water], place.water, row, height) };
+}
+
+/** A stretch of reef wall, with its pale flora, the same for everyone. Above it, your coral in each song's color. */
+export function recordPlace(place: Place, width: number, height: number, coral: CoralPiece[], sand: SandLife | null): SkPicture {
+  const row = DEPTHS.indexOf(place.depth);
+  const col = WATERS.indexOf(place.water);
+  const k = width / 270;
+  const edge = (yf: number) => wallAt(col, row + yf) * width;
   return createPicture(
     (c) => {
-      const r = rng(19 + depthIndex * 97 + place.water.length * 31);
-      const rise = (sand?.rise ?? 0) * 28 * k;
-      const floor = (x: number) => height - seabedAt(depthIndex, Math.max(0, Math.min(1, x / width))) * height - rise;
-
-      // The seabed, with a second, darker ledge in front so the terraces read.
-      const body = Skia.PathBuilder.Make();
-      body.moveTo(-2, height + 2);
-      for (let x = -2; x <= width + 2; x += 5) body.lineTo(x, floor(x));
-      body.lineTo(width + 2, height + 2);
-      body.close();
-      const [light, dark] = SAND[place.water];
-      const sandPaint = Skia.Paint();
-      sandPaint.setAntiAlias(true);
-      const top = height * 0.72;
-      sandPaint.setShader(
-        Skia.Shader.MakeLinearGradient({ x: 0, y: top }, { x: 0, y: height }, [Skia.Color(paled(light, place)), Skia.Color(paled(dark, place))], [0, 1], TileMode.Clamp)
-      );
-      c.drawPath(body.build(), sandPaint);
-
-      const grain = fill(paled(dark, place), 0.34);
-      for (let i = 0; i < 150; i++) {
-        const x = r() * width;
-        const y = floor(x) + 6 + r() * (height - floor(x));
-        c.drawRect(Skia.XYWHRect(x, y, 1.2, 1.2), grain);
+      const r = rng(19 + row * 97 + col * 31);
+      // The wall runs off the left edge, its shape depending only on depth, so stretches meet.
+      const wall = path();
+      wall.moveTo(-4, -2);
+      for (let y = -2; y <= height + 2; y += 5) wall.lineTo(edge(y / height), y);
+      wall.lineTo(-4, height + 2);
+      wall.close();
+      const rock = Skia.Paint();
+      rock.setAntiAlias(true);
+      rock.setShader(fadingDown(ROCK[place.water], place.water, row, height));
+      const wallShape = wall.build();
+      c.drawPath(wallShape, rock);
+      // Soft ledges and cracks, so it reads as rock.
+      c.save();
+      c.clipPath(wallShape, CLIP_IN, true);
+      const crack = line(mixHex(ROCK[place.water], '#1b2a33', 0.45), 1, 0.3);
+      for (let i = 0; i < 12; i++) {
+        const y = r() * height;
+        const b = path();
+        b.moveTo(-2, y);
+        b.quadTo(edge(y / height) * 0.5, y + (r() - 0.5) * 24 * k, edge(y / height) + 2, y + (r() - 0.5) * 12 * k);
+        c.drawPath(b.build(), crack);
       }
-      const ripple = line(paled(dark, place), 1, 0.2);
-      for (let i = 0; i < 7; i++) {
-        const path = Skia.PathBuilder.Make();
-        for (let x = -10; x < width + 10; x += 12) {
-          const yy = floor(Math.max(0, x)) + 14 + i * 11 * k + Math.sin(x * 0.03 + i) * 3;
-          if (x < 0) path.moveTo(x, yy);
-          else path.lineTo(x, yy);
-        }
-        c.drawPath(path.build(), ripple);
-      }
+      c.restore();
 
-      // Pale flora: the same for everyone. Only your listening adds color.
-      const pale = (i: number) => paled(PALE_REEF[i % PALE_REEF.length], place);
-      const at = (f: number) => floor(f * width) + 4;
-      if (place.water === 'reef') {
-        const glow = depthIndex < 2;
-        fan(c, 0.46 * width, at(0.46), 44 * k * (glow ? 1 : 0.8), pale(0));
-        branch(c, 0.17 * width, at(0.17), 27 * k, -Math.PI / 2, 5.5 * k, pale(1), r, 4);
-        branch(c, 0.32 * width, at(0.32), 15 * k, -Math.PI / 2 + 0.25, 3.5 * k, pale(2), r, 3);
-        tubes(c, 0.86 * width, at(0.86), pale(4), mixHex(pale(4), '#ffffff', 0.5), r);
-        brain(c, 0.67 * width, at(0.67) + 2, 27 * k, 19 * k, pale(3), mixHex(pale(3), '#70868a', 0.3));
-        branch(c, 0.76 * width, at(0.76), 16 * k, -Math.PI / 2 - 0.2, 3.5 * k, pale(5), r, 3);
-      } else if (place.water === 'kelp') {
-        rock(c, 0.16 * width, at(0.16) + 4, 38 * k, 28 * k, paled(ROCK.kelp, place));
-        rock(c, 0.79 * width, at(0.79) + 4, 50 * k, 30 * k, paled(mixHex(ROCK.kelp, '#3a4038', 0.2), place));
-        rock(c, 0.48 * width, at(0.48) + 4, 20 * k, 14 * k, paled(mixHex(ROCK.kelp, '#ffffff', 0.1), place));
-        branch(c, 0.34 * width, at(0.34), 13 * k, -Math.PI / 2, 2.6 * k, pale(1), r, 3);
-      } else if (place.water === 'blue') {
-        rock(c, 0.78 * width, at(0.78) + 4, 34 * k, 18 * k, paled(ROCK.blue, place));
-        rock(c, 0.22 * width, at(0.22) + 4, 20 * k, 10 * k, paled(mixHex(ROCK.blue, '#ffffff', 0.1), place));
-      } else {
-        rock(c, 0.22 * width, at(0.22) + 4, 46 * k, 44 * k, paled(ROCK.midnight, place));
-        rock(c, 0.8 * width, at(0.8) + 4, 40 * k, 58 * k, paled(mixHex(ROCK.midnight, '#0d1024', 0.3), place));
-      }
-      if (depthIndex >= 2) {
-        // First glowing specks in the twilight; the sea floor glows faintly in the dark.
-        const spot = fill('#9fe8f2', 0.75);
-        const halo = fill('#9fe8f2', 0.16);
-        for (let i = 0; i < 14; i++) {
-          const x = r() * width;
-          const y = floor(x) - 4 - r() * 90 * k;
-          oval(c, x, y, 4.5, 4.5, halo);
-          oval(c, x, y, 1.3, 1.3, spot);
-        }
+      // Pale flora growing out of the wall. Only your listening adds color. On the sea floor it's on the sand instead.
+      const pale = (i: number) => paled(PALE[i % PALE.length], place);
+      const floor = (x: number) => height - seabedAt(x / width) * height + 4;
+      const count = place.water === 'reef' ? 5 : place.water === 'kelp' ? 2 : place.water === 'blue' ? 2 : 2;
+      for (let i = 0; i < count; i++) {
+        const yf = (i + 0.2 + r() * 0.6) / count;
+        const y = yf * height;
+        const onFloor = row === 3;
+        const x = onFloor ? (0.3 + r() * 0.62) * width : edge(yf) - 2;
+        const base = onFloor ? floor(x) : y;
+        const form = (i + col) % 4;
+        const lean = onFloor ? 0 : 0.55;
+        if (form === 0) branch(c, x, base, 24 * k, -Math.PI / 2 + lean, 5 * k, pale(i), r, 4);
+        else if (form === 1) fan(c, x + (onFloor ? 0 : 14 * k), base, 30 * k, pale(i));
+        else if (form === 2) brain(c, x + (onFloor ? 0 : 12 * k), base, 20 * k, 14 * k, pale(i), mixHex(pale(i), '#70868a', 0.3));
+        else tubes(c, x, base, pale(i), mixHex(pale(i), '#ffffff', 0.5), r);
       }
 
-      // Your coral grows over it, in each song's color.
+      // Your coral, in each song's color.
       for (const piece of coral) {
         const f = rng(piece.seed + 3);
-        const x = (0.05 + f() * 0.9) * width;
-        const y = floor(x) + 6;
-        const color = colorSafe(piece.color);
-        if (piece.form === 0) branch(c, x, y, 22 * k * piece.size, -Math.PI / 2 + (f() - 0.5) * 0.4, 4.5 * k * piece.size, color, f, 4);
-        else if (piece.form === 1) fan(c, x, y, 34 * k * piece.size, color);
-        else brain(c, x, y + 4, 22 * k * piece.size, 15 * k * piece.size, color, mixHex(color, '#1b2a33', 0.32));
+        const yf = 0.08 + f() * 0.84;
+        const onFloor = row === 3;
+        const x = onFloor ? (0.26 + f() * 0.68) * width : edge(yf) - 2;
+        const y = onFloor ? floor(x) + 2 : yf * height;
+        const lean = onFloor ? (f() - 0.5) * 0.4 : 0.55;
+        const shift = onFloor ? 0 : 12 * k * piece.size;
+        if (piece.form === 0) branch(c, x, y, 22 * k * piece.size, -Math.PI / 2 + lean, 4.5 * k * piece.size, piece.color, f, 4);
+        else if (piece.form === 1) fan(c, x + shift, y, 30 * k * piece.size, piece.color);
+        else brain(c, x + shift, y, 20 * k * piece.size, 14 * k * piece.size, piece.color, mixHex(piece.color, '#1b2a33', 0.32));
       }
-      // Your sand: one colored speck per song you heard and let go.
-      for (const speck of sand?.specks ?? []) {
-        const f = rng(speck.seed + 11);
-        const x = f() * width;
-        const y = floor(x) + 8 + f() * (height - floor(x) - 10);
-        oval(c, x, y, 0.9 + f() * 0.8, 0.9 + f() * 0.8, fill(colorSafe(speck.color), 0.78));
-      }
+
+      // What you heard and let go settles on the sea floor, one colored speck per song.
+      if (row === 3)
+        for (const speck of sand?.specks ?? []) {
+          const f = rng(speck.seed + 11);
+          const x = f() * width;
+          const y = floor(x) + 4 + f() * (height - floor(x) - 6);
+          oval(c, x, y, 0.9 + f() * 0.8, 0.9 + f() * 0.8, fill(speck.color, 0.78));
+        }
     },
     { width, height }
   );
 }
 
+/** The sand's grain and ripples, one screen wide and repeating, in a tone that sits on any biome's sand. */
+export function recordFloorDetail(width: number, height: number): SkPicture {
+  return createPicture(
+    (c) => {
+      const r = rng(19);
+      const grain = fill('#000000', 0.1);
+      for (let i = 0; i < 170; i++) {
+        const x = r() * width;
+        const top = height - seabedAt(x / width) * height;
+        c.drawRect(Skia.XYWHRect(x, top + 6 + r() * (height - top), 1.2, 1.2), grain);
+      }
+      const ripple = line('#000000', 1, 0.06);
+      for (let i = 0; i < 7; i++) {
+        const b = path();
+        for (let x = 0; x <= width; x += 10) {
+          const yy = height - seabedAt(x / width) * height + 14 + i * 12 + Math.sin((x / width) * TAU * 2 + i) * 3;
+          if (x === 0) b.moveTo(x, yy);
+          else b.lineTo(x, yy);
+        }
+        c.drawPath(b.build(), ripple);
+      }
+    },
+    { width, height: height * 1.2 }
+  );
+}
+
 /* ---------- creatures ---------- */
 
-export type SpritePalette = { body: string; dark: string; light: string; alpha: number };
+export type SpritePalette = { body: string; dark: string; light: string; accent: string };
 
-/** The wild look: pale, the same in every ocean. */
-export const PALE: SpritePalette = { body: '#c9d9de', dark: '#a7bcc4', light: '#eef5f6', alpha: 1 };
-
-/** A song's creature: its print's color, as vivid as you listened. */
-export function songPalette(color: string, vivid: number): SpritePalette {
-  const body = mixHex(PALE.body, color, Math.min(1, vivid * 1.05));
-  return { body, dark: mixHex(body, '#14303d', 0.28), light: mixHex(body, '#ffffff', 0.55), alpha: 0.55 + 0.45 * vivid };
+/** A song's creature: its print's colors, as vivid as you listened. */
+export function songPalette(color: string, accent: string, vivid: number): SpritePalette {
+  const pale = '#c9d9de';
+  const body = mixHex(pale, color, Math.min(1, vivid * 1.05));
+  return { body, dark: mixHex(body, '#14303d', 0.3), light: mixHex(body, '#ffffff', 0.6), accent: mixHex(pale, accent, Math.min(1, vivid * 1.05)) };
 }
 
 const eye = (c: SkCanvas, x: number, y: number, r = 1.5) => {
   oval(c, x, y, r, r, fill('#ffffff'));
   oval(c, x + 0.3, y, r * 0.6, r * 0.6, fill('#111111'));
 };
-function tail(c: SkCanvas, x: number, color: string, w: number, size: number) {
-  const path = Skia.PathBuilder.Make();
-  path.moveTo(x + 1, 0);
-  path.lineTo(x - size, -size * 0.8 + w * size * 0.5);
-  path.lineTo(x - size * 0.72, w * size * 0.5);
-  path.lineTo(x - size, size * 0.8 + w * size * 0.5);
-  path.close();
-  c.drawPath(path.build(), fill(color));
+
+function tailFin(c: SkCanvas, x: number, a: Anatomy, p: SpritePalette, w: number, size: number) {
+  const s = size * (0.8 + a.fin * 0.3);
+  const lift = w * s * 0.5;
+  const paint = fill(p.dark);
+  if (a.tail === 'fork') poly(c, [x + 1, 0, x - s, -s * 0.85 + lift, x - s * 0.55, lift, x - s, s * 0.85 + lift], paint);
+  else if (a.tail === 'round') {
+    const b = path();
+    b.moveTo(x + 1, 0);
+    b.quadTo(x - s * 1.3, -s * 0.9 + lift, x - s, lift);
+    b.quadTo(x - s * 1.3, s * 0.9 + lift, x + 1, 0);
+    c.drawPath(b.build(), paint);
+  } else poly(c, [x + 1, 0, x - s, -s * 0.6 + lift, x - s * 1.15, lift, x - s, s * 0.6 + lift], paint);
+}
+
+/** A fish's markings, clipped to its body. */
+function markings(c: SkCanvas, a: Anatomy, p: SpritePalette, L: number, H: number) {
+  const b = path();
+  b.addOval(Skia.XYWHRect(-L, -H, L * 2, H * 2));
+  c.save();
+  c.clipPath(b.build(), CLIP_IN, true);
+  const mark = fill(p.accent);
+  if (a.pattern === 'stripes') {
+    const n = Math.max(1, a.marks);
+    const gap = (L * 1.5) / (n + 1);
+    for (let i = 1; i <= n; i++) c.drawRect(Skia.XYWHRect(-L * 0.75 + gap * i - 1.4, -H, 2.8, H * 2), mark);
+  } else if (a.pattern === 'spots') {
+    const f = rng(a.marks * 31 + 7);
+    for (let i = 0; i < 4 + a.marks * 2; i++) oval(c, (f() * 1.6 - 0.8) * L, (f() * 1.5 - 0.75) * H, 1.2, 1.2, mark);
+  } else if (a.pattern === 'lines') {
+    const glow = line(p.accent, 0.9);
+    for (let i = 0; i < 2 + (a.marks % 2); i++) c.drawLine(-L, -H * 0.4 + i * H * 0.42, L, -H * 0.4 + i * H * 0.42, glow);
+  } else if (a.pattern === 'band') {
+    c.drawRect(Skia.XYWHRect(-L * 0.2, -H, L * 0.5, H * 2), mark);
+  }
+  oval(c, -L * 0.05, H * 0.55, L * 0.72, H * 0.42, fill(p.light, 0.55));
+  c.restore();
+}
+
+function fish(c: SkCanvas, a: Anatomy, p: SpritePalette, w: number, L0: number, H0: number, swing: number) {
+  const L = L0 * a.length;
+  const H = H0 * a.depth;
+  tailFin(c, -L + 1, a, p, w, L0 * 0.68);
+  // Top and bottom fins, bigger on brighter songs.
+  const f = a.fin;
+  poly(c, [-L * 0.5, -H * 0.8, -L * 0.1 + swing, -H - 5 * f, L * 0.45, -H * 0.72], fill(p.dark));
+  poly(c, [-L * 0.3, H * 0.8, -L * 0.1 - swing, H + 3.6 * f, L * 0.3, H * 0.74], fill(p.dark));
+  oval(c, 0, 0, L, H, fill(p.body));
+  markings(c, a, p, L, H);
+  // The side fin beats.
+  oval(c, L * 0.12, H * 0.25, 3.4 * f, 1.8, fill(p.dark), 0.5 + swing * 0.4);
+  eye(c, L * 0.62, -H * 0.24, Math.max(1, H0 * 0.2));
+  if (a.voice) oval(c, L * 0.95, H * 0.16, 1.4, 1.4, fill('#14202a', 0.8));
 }
 
 const FRAMES = 6;
 
-/** One look in one palette, as frames from one end of its stroke to the other. */
-export function recordSprite(look: WildLook | 'darter' | 'drifter', p: SpritePalette): SkPicture[] {
+/** One song's creature, as frames from one end of its stroke to the other. */
+export function recordCreature(kind: Kind, a: Anatomy, p: SpritePalette): SkPicture[] {
   const out: SkPicture[] = [];
-  const box = look === 'whale' ? 200 : 80;
+  const box = 90;
   for (let i = 0; i < FRAMES; i++) {
     const swing = (i / (FRAMES - 1)) * 2 - 1;
-    const w = swing * 0.35;
     out.push(
       createPicture(
         (c) => {
-          drawLook(c, look, w, swing, p);
+          drawKind(c, kind, a, swing * 0.35, swing, p);
         },
         Skia.XYWHRect(-box, -box, box * 2, box * 2)
       )
@@ -311,48 +353,19 @@ export function recordSprite(look: WildLook | 'darter' | 'drifter', p: SpritePal
   return out;
 }
 
-function drawLook(c: SkCanvas, look: WildLook | 'darter' | 'drifter', w: number, swing: number, p: SpritePalette) {
+function drawKind(c: SkCanvas, kind: Kind, a: Anatomy, w: number, swing: number, p: SpritePalette) {
   const body = fill(p.body);
   const dark = fill(p.dark);
   const light = fill(p.light);
-  switch (look) {
-    case 'clown': {
-      tail(c, -10, p.dark, w, 8);
-      oval(c, 0, 0, 12, 7, body);
-      const clip = Skia.PathBuilder.Make();
-      clip.addOval(Skia.XYWHRect(-12, -7, 24, 14));
-      c.save();
-      c.clipPath(clip.build(), 1, true);
-      c.drawRect(Skia.XYWHRect(-6, -8, 3.4, 16), light);
-      c.drawRect(Skia.XYWHRect(2, -8, 3.2, 16), light);
-      c.restore();
-      eye(c, 8, -1.5);
+  switch (kind) {
+    case 'clown':
+      fish(c, a, p, w, 12, 7.5, swing);
       break;
-    }
-    case 'tang': {
-      tail(c, -9, p.dark, w, 6);
-      const fin = Skia.PathBuilder.Make();
-      fin.moveTo(-2, -7);
-      fin.lineTo(3, -11);
-      fin.lineTo(6, -6);
-      fin.close();
-      c.drawPath(fin.build(), body);
-      oval(c, 0, 0, 10.5, 7.5, body);
-      oval(c, -1, 2, 7, 3.4, light);
-      eye(c, 6, -2);
+    case 'darter':
+      fish(c, a, p, w, 11, 3.6, swing);
       break;
-    }
-    case 'neon':
-    case 'darter': {
-      tail(c, -7, p.dark, w, 4.5);
-      oval(c, 0, 0, 8, 2.8, body);
-      c.drawRect(Skia.XYWHRect(-5, 0.2, 9, 1.5), light);
-      eye(c, 5, -0.8, 1);
-      break;
-    }
-    case 'silver':
     case 'drifter': {
-      tail(c, -9, p.dark, w, 5);
+      tailFin(c, -9, a, p, w, 5);
       oval(c, 0, 0, 10, 3.2, body);
       c.drawRect(Skia.XYWHRect(-7, -2.4, 14, 1.2), dark);
       eye(c, 7, -0.6, 1);
@@ -360,18 +373,20 @@ function drawLook(c: SkCanvas, look: WildLook | 'darter' | 'drifter', w: number,
     }
     case 'turtle': {
       const f = swing * 0.55;
-      const flipper = fill(mixHex(p.body, '#3f6650', 0.2));
-      oval(c, 8, -8, 8, 3, flipper, -0.8 + f);
-      oval(c, 8, 8, 8, 3, flipper, 0.8 - f);
+      const flipper = fill(mixHex(p.dark, '#3f6650', 0.25));
+      oval(c, 8, -8, 8 * a.fin, 3, flipper, -0.8 + f);
+      oval(c, 8, 8, 8 * a.fin, 3, flipper, 0.8 - f);
       oval(c, -11, -6, 5, 2.4, flipper, 0.7 - f * 0.5);
       oval(c, -11, 6, 5, 2.4, flipper, -0.7 + f * 0.5);
       oval(c, 14, 0, 5, 3.6, flipper);
-      oval(c, 0, 0, 13, 10, dark);
-      oval(c, 0, 0, 10.5, 8, body);
-      const plate = line(p.dark, 1);
-      c.drawLine(-9, 0, 9, 0, plate);
-      c.drawLine(-3, -7, -3, 7, plate);
-      c.drawLine(3, -7, 3, 7, plate);
+      const L = 13 * a.length;
+      oval(c, 0, 0, L, 10 * a.depth, dark);
+      oval(c, 0, 0, L - 2.5, (10 - 2) * a.depth, body);
+      // The shell's plates are its key.
+      const plate = line(p.accent, 1.1);
+      const n = 1 + Math.max(1, a.marks);
+      for (let i = 1; i < n + 1; i++) c.drawLine(-L * 0.8 + (i * L * 1.6) / (n + 1), -6.5 * a.depth, -L * 0.8 + (i * L * 1.6) / (n + 1), 6.5 * a.depth, plate);
+      c.drawLine(-L * 0.75, 0, L * 0.75, 0, plate);
       eye(c, 15.5, -1.2, 1);
       break;
     }
@@ -380,88 +395,101 @@ function drawLook(c: SkCanvas, look: WildLook | 'darter' | 'drifter', w: number,
       const glow = Skia.Paint();
       glow.setAntiAlias(true);
       const c0 = Skia.Color(p.light);
-      c0[3] = 0.42;
+      c0[3] = 0.4;
       const c1 = Skia.Color(p.light);
       c1[3] = 0;
       glow.setShader(Skia.Shader.MakeRadialGradient({ x: 0, y: -2 }, 24, [c0, c1], [0, 1], TileMode.Clamp));
       c.drawCircle(0, -2, 24, glow);
-      const bell = Skia.PathBuilder.Make();
-      bell.addArc(Skia.XYWHRect(-11 * squeeze, -11 / squeeze, 22 * squeeze, 22 / squeeze), 180, 180);
+      const R = 11 * a.depth;
+      const bell = path();
+      bell.addArc(Skia.XYWHRect(-R * squeeze, -R / squeeze, 2 * R * squeeze, (2 * R) / squeeze), 180, 180);
       bell.close();
       c.drawPath(bell.build(), fill(p.body, 0.88));
+      // A rim in the second color, and strands from the song's key.
+      const rim = path();
+      rim.addArc(Skia.XYWHRect(-R * squeeze * 0.7, (-R / squeeze) * 0.7, 1.4 * R * squeeze, (1.4 * R) / squeeze), 200, 140);
+      c.drawPath(rim.build(), line(p.accent, 1.2, 0.8));
       const strand = line(p.body, 1.1, 0.72);
-      for (let i = 0; i < 5; i++) {
-        const x = -8 + i * 4;
-        const path = Skia.PathBuilder.Make();
-        path.moveTo(x, 0);
-        path.cubicTo(x + swing * 2, 7, x - swing * 3, 12, x + swing * 2, 18 + (i % 2) * 4);
-        c.drawPath(path.build(), strand);
+      const len = 16 + a.fin * 8;
+      for (let i = 0; i < a.strands; i++) {
+        const x = -R * 0.8 + (i * R * 1.6) / Math.max(1, a.strands - 1);
+        const b = path();
+        b.moveTo(x, 0);
+        b.cubicTo(x + swing * 2, len * 0.4, x - swing * 3, len * 0.7, x + swing * 2, len + (i % 2) * 4);
+        c.drawPath(b.build(), strand);
       }
       break;
     }
     case 'puffer': {
       const spike = fill(p.dark);
-      for (let i = 0; i < 12; i++) {
-        const a = (i * TAU) / 12;
-        const path = Skia.PathBuilder.Make();
-        path.moveTo(Math.cos(a - 0.2) * 9.5, Math.sin(a - 0.2) * 9.5);
-        path.lineTo(Math.cos(a) * 13.5, Math.sin(a) * 13.5);
-        path.lineTo(Math.cos(a + 0.2) * 9.5, Math.sin(a + 0.2) * 9.5);
-        path.close();
-        c.drawPath(path.build(), spike);
+      for (let i = 0; i < a.spines; i++) {
+        const t = (i * TAU) / a.spines;
+        poly(c, [Math.cos(t - 0.2) * 9.5, Math.sin(t - 0.2) * 9.5, Math.cos(t) * 13.5, Math.sin(t) * 13.5, Math.cos(t + 0.2) * 9.5, Math.sin(t + 0.2) * 9.5], spike);
       }
-      tail(c, -11, p.dark, w, 4.5);
+      tailFin(c, -10, a, p, w, 5);
       oval(c, 0, 0, 11, 10, body);
-      oval(c, 0, 3.4, 8, 5.4, light);
+      markings(c, a, p, 11, 10);
       eye(c, 5, -3, 1.8);
+      if (a.voice) oval(c, 10, 1, 1.5, 1.5, fill('#14202a', 0.8));
       break;
     }
-    case 'whale': {
-      const fluke = Skia.PathBuilder.Make();
-      fluke.moveTo(-60, 0);
-      fluke.lineTo(-76, -11 + w * 10);
-      fluke.lineTo(-68, 0);
-      fluke.lineTo(-76, 11 + w * 10);
-      fluke.close();
-      c.drawPath(fluke.build(), dark);
-      oval(c, 0, 0, 62, 20, body);
-      oval(c, 6, 8, 48, 10, light);
-      oval(c, 0, 16, 12, 4, dark, 0.35);
-      eye(c, 42, -4, 1.6);
+    case 'manta': {
+      // Wings that really flap; the second color runs along their backs.
+      const flap = swing * 7;
+      const L = 15 * a.length;
+      const wing = (side: number) => poly(c, [L * 0.6, 0, -L * 0.15, side * (17 + a.fin * 6) + flap * side * 0.5, -L * 0.7, side * 4], fill(p.body));
+      wing(-1);
+      wing(1);
+      const tail = path();
+      tail.moveTo(-L * 0.7, 0);
+      tail.quadTo(-L * 1.4, swing * 5, -L * 2.2, -swing * 6);
+      c.drawPath(tail.build(), line(p.dark, 1.2));
+      oval(c, 0, 0, L * 0.75, 5.5, fill(p.dark));
+      for (let i = 0; i < Math.max(1, a.marks); i++) oval(c, -L * 0.4 + i * 5, 0, 1.5, 1.5, fill(p.accent));
+      poly(c, [L * 0.55, -3, L * 0.95, -5, L * 0.72, -1], fill(p.dark));
+      poly(c, [L * 0.55, 3, L * 0.95, 5, L * 0.72, 1], fill(p.dark));
       break;
     }
-    case 'angler': {
-      tail(c, -11, p.dark, w, 8);
-      oval(c, 0, 0, 13, 10, body);
-      const lure = Skia.PathBuilder.Make();
-      lure.moveTo(5, -9);
-      lure.quadTo(12, -18, 18, -13);
-      c.drawPath(lure.build(), line(p.dark, 1.2));
-      oval(c, 18, -12, 6, 6, fill('#9fe8f2', 0.22));
-      oval(c, 18, -12, 2, 2, fill('#d8fbff'));
-      eye(c, 7, -3, 1.6);
+    case 'seahorse': {
+      // Upright, with its tail curled and a little fin fluttering.
+      const b = path();
+      b.moveTo(1, -12);
+      b.cubicTo(7 * a.depth, -7, 7 * a.depth, 3, 2, 8);
+      b.cubicTo(-1, 13, -5 + swing, 16, -2 + swing, 19);
+      b.cubicTo(1 + swing, 21, 4 + swing, 18, 1 + swing, 16);
+      c.drawPath(b.build(), line(p.body, 5 * a.depth));
+      oval(c, 3, -14, 4.6, 3.6, body, 0.2);
+      poly(c, [6, -15, 12, -14, 7, -12], fill(p.dark));
+      for (let i = 0; i < 3; i++) poly(c, [-1 + i * 2, -17.5, i * 2, -21 - (i % 2) * 1.5, 1 + i * 2, -17], fill(p.accent));
+      poly(c, [-2, -6, -8 - swing * 2.5 * a.fin, -2, -2, 2], fill(p.dark, 0.85));
+      for (let i = 0; i < Math.max(1, a.marks); i++) c.drawLine(0, -6 + i * 5, 5 * a.depth, -5 + i * 5, line(p.accent, 1));
+      eye(c, 4, -15, 1.1);
       break;
     }
-    case 'crab': {
-      const leg = line(p.dark, 1.4);
-      for (let i = 0; i < 3; i++) {
-        c.drawLine(-5, 1 + i, -12, 5 + i * 1.5, leg);
-        c.drawLine(5, 1 + i, 12, 5 + i * 1.5, leg);
+    case 'eel': {
+      // A long body in a wave, always open-mouthed: eels are the songs that talk.
+      const L = 26 * a.length;
+      const b = path();
+      for (let i = 0; i <= 12; i++) {
+        const f = i / 12;
+        const x = L * 0.7 - f * L * 1.9;
+        const y = Math.sin(f * 6 + swing * 2.4) * (2 + f * 5);
+        if (i === 0) b.moveTo(x, y);
+        else b.lineTo(x, y);
       }
-      oval(c, -10, -4, 3.4, 2.6, body, -0.5);
-      oval(c, 10, -4, 3.4, 2.6, body, 0.5);
-      oval(c, 0, 0, 8, 5.4, body);
-      eye(c, -2.5, -5, 1);
-      eye(c, 2.5, -5, 1);
+      const spine = b.build();
+      c.drawPath(spine, line(p.body, 5 * a.depth));
+      c.drawPath(spine, line(p.accent, 1.1));
+      oval(c, L * 0.75, Math.sin(swing * 2.4) * 2, 6.5, 3.8 * a.depth, body);
+      oval(c, L * 0.75 + 5, Math.sin(swing * 2.4) * 2 + 1, 1.8, 1.8, fill('#14202a', 0.85));
+      eye(c, L * 0.75 + 1.5, Math.sin(swing * 2.4) * 2 - 1.6, 1.1);
       break;
     }
-    case 'starfish':
-      star(c, 0, 0, 8, p.body);
-      break;
   }
+  void light;
 }
 
-/** A soft ring of light around a creature, for the night and the deep. */
+/** A soft ring of light around a creature, for the night, the deep, and a song in the same key. */
 export function recordHalo(color: string): SkPicture {
   return createPicture(
     (c) => {
@@ -479,7 +507,7 @@ export function recordHalo(color: string): SkPicture {
   );
 }
 
-/** A bottle resting on the sand, glowing with its song's light. */
+/** A bottle resting on the wall or the sand, glowing with its song's light. */
 export function recordBottle(color: string): SkPicture {
   return createPicture(
     (c) => {
@@ -494,4 +522,4 @@ export function recordBottle(color: string): SkPicture {
   );
 }
 
-export const placeId = placeKey;
+export type { SkPathBuilder };

@@ -12,11 +12,10 @@ import { DEPTHS, DEPTH_INFO, WATERS, WATER_INFO, placeLabel, type Depth, type Pl
  */
 export function OceanUi({
   place,
-  title,
   subtitle,
   hint,
-  speciesTag,
   canSwipe,
+  offerExample,
   allCount,
   onWater,
   onDepth,
@@ -24,15 +23,15 @@ export function OceanUi({
   onBackUp,
   onPortrait,
   onOpenList,
-  onClearSpecies,
+  onExample,
+  onToggleMeter,
 }: {
   place: Place;
-  /** Overrides the place's name, for "Fast songs in Midnight · Buried". */
-  title: string | null;
   subtitle: string;
   hint: string | null;
-  speciesTag: string | null;
   canSwipe: boolean;
+  /** Your ocean is still thin: offer a look at a grown one. */
+  offerExample: boolean;
   /** How many of yours live here, when more live here than can swim at once; otherwise 0. */
   allCount: number;
   onWater: (water: Water) => void;
@@ -41,7 +40,9 @@ export function OceanUi({
   onBackUp: () => void;
   onPortrait: () => void;
   onOpenList: () => void;
-  onClearSpecies: () => void;
+  onExample: () => void;
+  /** Holding the pill shows the frame rate, to measure smoothness on a real phone. */
+  onToggleMeter: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const w = WATERS.indexOf(place.water);
@@ -50,26 +51,20 @@ export function OceanUi({
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={[styles.top, { paddingTop: insets.top + Spacing.sm }]} pointerEvents="box-none">
-        <View style={styles.pill} accessibilityRole="header" accessibilityLiveRegion="polite">
+        <Pressable style={styles.pill} onLongPress={onToggleMeter} accessibilityRole="header" accessibilityLiveRegion="polite">
           <ThemedText style={styles.pillTitle} numberOfLines={1}>
-            {title ?? placeLabel(place)}
+            {placeLabel(place)}
           </ThemedText>
           <ThemedText style={styles.pillSub} numberOfLines={1}>
             {subtitle}
           </ThemedText>
-        </View>
-        {speciesTag && (
-          <Pressable
-            onPress={onClearSpecies}
-            hitSlop={8}
-            style={styles.tag}
-            accessibilityRole="button"
-            accessibilityLabel={`${speciesTag}. Clear this filter`}>
-            <ThemedText style={styles.tagText}>{speciesTag}</ThemedText>
-            <Ionicons name="close" size={14} color={Colors.accentText} />
+        </Pressable>
+        {hint && <ThemedText style={styles.hint}>{hint}</ThemedText>}
+        {offerExample && (
+          <Pressable style={styles.plain} onPress={onExample} accessibilityRole="button">
+            <ThemedText style={styles.plainText}>See an example</ThemedText>
           </Pressable>
         )}
-        {hint && <ThemedText style={styles.hint}>{hint}</ThemedText>}
       </View>
 
       {previous && (
@@ -156,16 +151,6 @@ const styles = StyleSheet.create({
   },
   pillTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: Colors.text },
   pillSub: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.text,
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  tagText: { fontSize: 13, lineHeight: 17, fontWeight: '600', color: Colors.accentText },
   hint: { fontSize: 14, lineHeight: 19, fontWeight: '600', color: '#ffffff', textAlign: 'center', textShadowColor: 'rgba(0,30,45,0.55)', textShadowRadius: 6 },
   arrow: {
     position: 'absolute',

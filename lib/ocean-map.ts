@@ -6,7 +6,7 @@ export const DEPTHS = ['popular', 'deepcuts', 'gems', 'buried'] as const;
 export type Water = (typeof WATERS)[number];
 export type Depth = (typeof DEPTHS)[number];
 export type Place = { water: Water; depth: Depth };
-export type Species = 'jelly' | 'turtle' | 'puffer' | 'darter' | 'clown';
+export type Species = 'jelly' | 'manta' | 'eel' | 'seahorse' | 'turtle' | 'puffer' | 'darter' | 'clown';
 export type Kind = Species | 'drifter';
 
 export const WATER_INFO: Record<Water, { name: string; caption: string }> = {
@@ -25,6 +25,9 @@ export const DEPTH_INFO: Record<Depth, { name: string }> = {
 
 export const SPECIES_INFO: Record<Species, { name: string; means: string }> = {
   jelly: { name: 'Jellyfish', means: 'Quiet' },
+  manta: { name: 'Manta ray', means: 'Instrumental and unhurried' },
+  eel: { name: 'Eel', means: 'Talking or rapping' },
+  seahorse: { name: 'Seahorse', means: 'Danceable and unhurried' },
   turtle: { name: 'Turtle', means: 'Slow' },
   puffer: { name: 'Puffer', means: 'Loud' },
   darter: { name: 'Darting fish', means: 'Fast' },
@@ -41,6 +44,9 @@ export function waterOf(s: SoundFeatures): Water {
 
 export function speciesOf(s: SoundFeatures): Species {
   if (s.energy < 0.4) return 'jelly';
+  if (s.instrumentalness > 0.5 && s.tempo < 118) return 'manta';
+  if (s.speechiness > 0.2) return 'eel';
+  if (s.danceability >= 0.72 && s.tempo < 118) return 'seahorse';
   if (s.tempo < 95) return 'turtle';
   if (s.energy >= 0.88) return 'puffer';
   if (s.tempo >= 125) return 'darter';

@@ -27,7 +27,10 @@ export default function OceanLab() {
   const posY = useSharedValue(DEPTHS.indexOf(depth));
   const clock = useSharedValue(Number(q.t ?? 20));
   const touch = useSharedValue<{ x: number; y: number; r: number } | null>(null);
+  const touchPower = useSharedValue(0);
   const spotlight = useSharedValue(0);
+  const song = useSharedValue<{ tempo: number; key: number } | null>(null);
+  const drawMs = useSharedValue(0);
   return (
     <View style={styles.root}>
       <OceanCanvas
@@ -41,7 +44,11 @@ export default function OceanLab() {
         posY={posY}
         clock={clock}
         touch={touch}
+        touchPower={touchPower}
         spotlight={spotlight}
+        song={song}
+        drawMs={drawMs}
+        place={{ water, depth }}
         rest={{ water: 'reef', depth: 'popular' }}
         hour={hour}
         life={life}

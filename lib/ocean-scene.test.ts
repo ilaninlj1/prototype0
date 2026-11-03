@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { allPlaces, DEPTHS, WATERS } from './ocean-map.ts';
-import { dayMixAt, gradientAt, hexToRgb, seabedAt, surfaceWater, waterStops, wildRoster } from './ocean-scene.ts';
+import { dayMixAt, gradientAt, hexToRgb, seabedAt, surfaceWater, wallAt, waterStops } from './ocean-scene.ts';
 
 const hue = (hex: string) => {
   const [r, g, b] = hexToRgb(hex).map((v) => v / 255);
@@ -66,34 +66,22 @@ test('the gradient meets its stops', () => {
   assert.deepEqual(gradientAt(stops, -3), [0, 0, 0]);
 });
 
-test('the seabed stays in the bottom quarter with no jumps across the screen', () => {
-  for (let d = 0; d < 4; d++) {
-    let last = seabedAt(d, 0);
-    for (let x = 0.005; x <= 1; x += 0.005) {
-      const y = seabedAt(d, x);
-      assert.ok(y >= 0.09 && y <= 0.27, `depth ${d} at ${x}: ${y}`);
-      assert.ok(Math.abs(y - last) < 0.012, `a jump at depth ${d}, x ${x}`);
-      last = y;
-    }
+test('the sea floor is one unbroken shape: it repeats across biomes with no jumps', () => {
+  for (let x = 0; x <= 3; x += 0.005) {
+    const y = seabedAt(x);
+    assert.ok(y >= 0.04 && y <= 0.25, `${x}: ${y}`);
+    assert.ok(Math.abs(y - seabedAt(x + 0.005)) < 0.006, `a jump at ${x}`);
+    assert.ok(Math.abs(y - seabedAt(x + 1)) < 1e-6, 'it repeats each screen');
   }
 });
 
-test('every place has its wild life, the same each time, with at least 3 kinds of song to tap', () => {
-  for (const p of allPlaces()) {
-    const a = wildRoster(p);
-    assert.deepEqual(a, wildRoster(p));
-    assert.ok(a.length >= 6, `${p.water}/${p.depth}`);
-    assert.ok(new Set(a.map((f) => f.species).filter(Boolean)).size >= 3, `${p.water}/${p.depth} kinds`);
-    assert.ok(a.some((f) => f.look === 'crab' || f.look === 'starfish'));
-    for (const f of a) {
-      assert.ok(f.band >= 0 && f.band <= 1);
-      assert.ok(f.x >= 0 && f.x <= 1);
+test('the reef wall runs on unbroken as you sink, and stays at the side', () => {
+  for (let col = 0; col < 4; col++) {
+    for (let d = 0; d < 4; d += 0.002) {
+      const x = wallAt(col, d);
+      assert.ok(x > 0.03 && x < 0.21, `${col} ${d}: ${x}`);
+      assert.ok(Math.abs(x - wallAt(col, d + 0.002)) < 0.003, `a jump at ${d}`);
     }
   }
-});
-
-test('a whale lives in Open blue, an angler in the deep', () => {
-  assert.ok(wildRoster({ water: 'blue', depth: 'popular' }).some((f) => f.look === 'whale'));
-  assert.ok(wildRoster({ water: 'reef', depth: 'gems' }).some((f) => f.look === 'angler'));
-  assert.equal(wildRoster({ water: 'reef', depth: 'gems' }).find((f) => f.look === 'angler')?.species, null);
+  assert.notEqual(wallAt(0, 1), wallAt(1, 1));
 });

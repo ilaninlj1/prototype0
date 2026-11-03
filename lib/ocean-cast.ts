@@ -1,92 +1,110 @@
-// Who is on stage in a place right now. The canvas draws it and the tap test reads it, so they always agree.
+// Who is on stage in a place right now: only your songs, nothing else lives here. The canvas draws it and the tap test
+// reads it, so they always agree.
 
 import type { Kind, Place } from './ocean-map.ts';
 import { placeKey } from './ocean-map.ts';
 import { isAwake, type Creature, type OceanLife } from './ocean-person.ts';
-import { wildRoster, type WildFish, type WildLook } from './ocean-scene.ts';
+import { soundDistance } from './sound-neighbors.ts';
 
 export type CastMember = {
   key: string;
-  look: WildLook | Kind;
-  wild: WildFish | null;
-  creature: Creature | null;
+  look: Kind;
+  creature: Creature;
   seed: number;
-  speed: number;
+  /** How quick it is, from the song's tempo. */
+  pace: number;
   band: number;
   x: number;
   scale: number;
   awake: boolean;
-  school: number;
+  /** The one it swims with: the first of its artist's songs here, or the song that sounds most like it; -1 if none. */
+  leader: number;
   schoolIndex: number;
+  /** It follows a song that sounds alike, not one by the same artist. */
+  soundAlike: boolean;
+  restI: number;
+  restN: number;
+  tempo: number;
+  songKey: number;
 };
 
 export const MAX_ANIMATED = 40;
-
-const SPEED: Record<Kind, number> = { jelly: 3, turtle: 10, puffer: 8, darter: 28, clown: 15, drifter: 12 };
+/** Closer than this in sound and two songs swim together. Songs this near are in the closest tenth of a listener's saves. */
+export const SOUND_ALIKE = 0.09;
 
 const unit = (seed: number, salt: number) => {
   const v = Math.sin((seed + salt) * 12.9898) * 43758.5453;
   return v - Math.floor(v);
 };
 
-function yours(c: Creature, school: number, schoolIndex: number, awake: boolean): CastMember {
-  const dir = unit(c.seed, 4) < 0.5 ? 1 : -1;
-  return {
-    key: `song:${c.trackId}`,
-    look: c.kind,
-    wild: null,
-    creature: c,
-    seed: c.seed,
-    speed: SPEED[c.kind] * dir * (0.8 + unit(c.seed, 5) * 0.4),
-    band: unit(c.seed, 6),
-    x: unit(c.seed, 7),
-    scale: c.size,
-    awake,
-    school,
-    schoolIndex,
-  };
-}
-
-function wildMember(f: WildFish): CastMember {
-  return { key: `wild:${f.id}`, look: f.look, wild: f, creature: null, seed: f.seed, speed: f.speed, band: f.band, x: f.x, scale: f.scale, awake: true, school: f.school, schoolIndex: 0 };
-}
-
-/** Wild ones thin out as your songs move in: all of them at none of yours, about half at 10, 2 at 25 or more. */
-function wildLeft(rosterSize: number, mine: number): number {
-  if (mine >= 25) return 2;
-  return Math.max(2, Math.round(rosterSize - (rosterSize - 2) * (mine / 16)));
-}
-
 export function castFor(place: Place, life: OceanLife | null, hour: number): { members: CastMember[]; hiddenCount: number } {
   const here = life?.places[placeKey(place)]?.creatures ?? [];
-  const roster = wildRoster(place);
-  const swimmers = roster.filter((f) => f.look !== 'crab' && f.look !== 'starfish');
-  const floorLife = roster.filter((f) => f.look === 'crab' || f.look === 'starfish');
-
   // buildOcean already sorts each place newest first, with undated finds last.
-  const kept = here.slice(0, Math.max(0, MAX_ANIMATED - floorLife.length - 2));
+  const kept = here.slice(0, MAX_ANIMATED);
   const hiddenCount = here.length - kept.length;
 
-  const schools = new Map<string, { number: number; next: number }>();
-  const mine = kept.map((c) => {
-    let school = 0;
-    let schoolIndex = 0;
-    if (c.school) {
-      const known = schools.get(c.school) ?? { number: schools.size + 1, next: 0 };
-      schools.set(c.school, known);
-      school = known.number;
-      schoolIndex = known.next++;
-    }
-    return yours(c, school, schoolIndex, isAwake(c, hour));
+  const members: CastMember[] = kept.map((c) => {
+    const tempo = c.sound?.tempo ?? 100;
+    return {
+      key: `song:${c.trackId}`,
+      look: c.kind,
+      creature: c,
+      seed: c.seed,
+      pace: Math.max(0.7, Math.min(1.4, tempo / 110)),
+      band: unit(c.seed, 6),
+      x: unit(c.seed, 7),
+      scale: c.size,
+      awake: isAwake(c, hour),
+      leader: -1,
+      schoolIndex: 0,
+      soundAlike: false,
+      restI: 0,
+      restN: 1,
+      tempo,
+      songKey: c.sound?.key ?? -1,
+    };
   });
 
-  let wildCount = wildLeft(swimmers.length, mine.length);
-  const awakeMine = mine.filter((m) => m.awake).length;
-  // If most of yours are asleep at this hour, wild ones come back so the water never feels dead.
-  const total = mine.length + wildCount;
-  if (total > 0 && (awakeMine + wildCount) / total < 1 / 3) wildCount = Math.min(swimmers.length, Math.ceil(mine.length / 2 - awakeMine) + 1);
+  // Saves by one artist swim as a school.
+  const schools = new Map<string, { leader: number; next: number }>();
+  members.forEach((m, i) => {
+    const school = m.creature.school;
+    if (!school || !m.awake) return;
+    const known = schools.get(school);
+    if (!known) schools.set(school, { leader: i, next: 1 });
+    else {
+      m.leader = known.leader;
+      m.schoolIndex = known.next++;
+    }
+  });
+  // Songs that sound alike find each other, two by two.
+  const taken = new Set<number>();
+  members.forEach((m, i) => {
+    if (m.leader >= 0 || m.creature.school || !m.awake || !m.creature.sound || taken.has(i)) return;
+    let best = -1;
+    let bestDistance = SOUND_ALIKE;
+    for (let j = i + 1; j < members.length; j++) {
+      const o = members[j];
+      if (o.leader >= 0 || o.creature.school || !o.awake || !o.creature.sound || taken.has(j)) continue;
+      const d = soundDistance(m.creature.sound, o.creature.sound);
+      if (d < bestDistance) {
+        best = j;
+        bestDistance = d;
+      }
+    }
+    if (best >= 0) {
+      taken.add(i);
+      taken.add(best);
+      members[best].leader = i;
+      members[best].schoolIndex = 1;
+      members[best].soundAlike = true;
+    }
+  });
 
-  const room = MAX_ANIMATED - mine.length - floorLife.length;
-  const wild = swimmers.slice(0, Math.max(0, Math.min(wildCount, room))).map(wildMember);
-  return { members: [...floorLife.map(wildMember), ...wild, ...mine], hiddenCount };
+  const asleep = members.filter((m) => !m.awake);
+  asleep.forEach((m, i) => {
+    m.restI = i;
+    m.restN = asleep.length;
+  });
+  return { members, hiddenCount };
 }

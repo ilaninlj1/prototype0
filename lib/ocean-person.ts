@@ -4,9 +4,10 @@ import type { SoundFeatures } from './sound.ts';
 import { FULL_LISTEN_MS } from './dark-map.ts';
 import { MIN_SAVES, tasteDistance, tierFor } from './taste-distance.ts';
 import { soundDistance } from './sound-neighbors.ts';
+import { anatomyLines, anatomyOf, type Anatomy } from './ocean-anatomy.ts';
 import {
   allPlaces, driftWater, placeKey, speciesOf, waterOf, WATER_INFO, WATERS,
-  type Depth, type Kind, type Place,
+  type Depth, type Kind, type Place, type Water,
 } from './ocean-map.ts';
 
 export type Creature = {
@@ -21,6 +22,10 @@ export type Creature = {
   first: boolean;
   school: string | null;
   seed: number;
+  /** A second color from the song's print, for its markings. */
+  accent: string;
+  anatomy: Anatomy;
+  sound: SoundFeatures | null;
 };
 export type CoralPiece = { trackId: number; place: Place; color: string; form: 0 | 1 | 2; size: number; seed: number };
 export type SandLife = { rise: number; specks: { color: string; seed: number }[] };
@@ -33,6 +38,8 @@ export type OceanInput = {
   soundOf: (id: number) => SoundFeatures | null;
   depthOf: (t: DiscoveryTrack | SwipeEntry) => Depth;
   colorOf: (id: number) => string;
+  /** A second color from the song's print; its main color when not given. */
+  accentOf?: (id: number) => string;
   now: number;
 };
 
@@ -137,6 +144,7 @@ export function buildOcean(input: OceanInput): OceanLife {
       color: colorOf(track.id), heard, hurried, size: hurried ? Math.min(0.9, ageSize) : ageSize,
       vivid: 0.25 + 0.75 * heard, likedAt, foundHour: likedAt === null ? null : new Date(likedAt).getHours(),
       rare: s !== null && likedAt !== null && wasRare(s, previous), first: false, school: null, seed: seedOf(track.id),
+      accent: (input.accentOf ?? colorOf)(track.id), anatomy: anatomyOf(s), sound: s,
     };
     place.creatures.push(creature);
     all.push(creature);
@@ -210,10 +218,14 @@ export function whyLines(c: Creature, now: number): string[] {
       turtle: 'A turtle because the song is slow.',
       puffer: 'A puffer because the song is loud.',
       darter: 'A darting fish because the song is fast.',
-      clown: 'A clownfish because the song is between the quieter, slower, louder and faster sounds.',
+      clown: 'A clownfish because the song is right in the middle: not too quiet, slow, loud or fast.',
+      manta: 'A manta ray because the song is instrumental and unhurried.',
+      eel: 'An eel because the song has a lot of talking or rapping.',
+      seahorse: 'A seahorse because the song is danceable and unhurried.',
     };
     lines.push(reason[c.kind]);
   }
+  lines.push(...anatomyLines(c.anatomy));
   if (c.hurried) lines.push('Small and faint because you only listened briefly.');
   else {
     if (c.likedAt !== null) {
@@ -252,6 +264,22 @@ export function portrait(life: OceanLife, now: number): string[] {
   const unvisited = waters.find((w) => w.heard === 0);
   if (unvisited) lines.push(`You have not heard a song from ${WATER_INFO[unvisited.water].name} yet.`);
   if (life.oldest?.likedAt !== null && life.oldest?.likedAt !== undefined) lines.push(`Your oldest find is ${ageWords(life.oldest.likedAt, now)} old.`);
+  return lines;
+}
+
+/** Everything you heard and let go in one water sinks to its sea floor, the only sand there is. */
+export function floorSand(life: OceanLife | null, water: Water): SandLife {
+  const specks = Object.values(life?.places ?? {}).filter((p) => p.place.water === water).flatMap((p) => p.sand.specks).slice(0, SAND_CAP);
+  return { rise: specks.length / SAND_CAP, specks };
+}
+
+/** Why a creature is reacting to the song playing right now. */
+export function reactionLines(c: Creature, song: SoundFeatures | null): string[] {
+  if (!song || !c.sound) return [];
+  const lines: string[] = [];
+  const near = (a: number, b: number) => Math.abs(a - b) / b <= 0.04;
+  if (near(c.sound.tempo, song.tempo) || near(c.sound.tempo * 2, song.tempo) || near(c.sound.tempo, song.tempo * 2)) lines.push("Dancing because it's the same tempo as what's playing.");
+  if (c.sound.key != null && c.sound.key === song.key) lines.push("Glowing because it's in the same key as what's playing.");
   return lines;
 }
 

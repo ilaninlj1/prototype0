@@ -8,6 +8,7 @@ import type { DiscoveryTrack, SwipeEntry } from '@/lib/discovery';
 import { driftWater, waterOf, type Depth, type Place } from '@/lib/ocean-map';
 import { buildOcean, type OceanLife } from '@/lib/ocean-person';
 import { catalogTrackById, deckPool, depthOfTrack } from '@/lib/pool';
+import { recipeFor } from '@/lib/print-recipe';
 import { soundFor } from '@/lib/sound-index';
 import { soundLookup } from '@/lib/sound-lookup-app';
 
@@ -20,6 +21,17 @@ function colorOf(id: number): string {
   if (!c) {
     c = songLight(id);
     colors.set(id, c);
+  }
+  return c;
+}
+/** A second color from the song's print, for its creature's markings. */
+const accents = new Map<number, string>();
+function accentOf(id: number): string {
+  let c = accents.get(id);
+  if (!c) {
+    const rings = recipeFor(id, soundOf(id), null).rings;
+    c = rings[1]?.color ?? rings[0]?.color ?? colorOf(id);
+    accents.set(id, c);
   }
   return c;
 }
@@ -41,10 +53,14 @@ export function useOcean(history: SwipeEntry[]): OceanLife | null {
   return useOceanData(history).life;
 }
 
-export function useOceanData(history: SwipeEntry[]): { life: OceanLife | null; liked: DiscoveryTrack[] } {
+/** A pause this long in your swiping before the ocean catches up, so it never costs anything between quick swipes. */
+const IDLE_MS = 2500;
+
+export function useOceanData(history: SwipeEntry[], urgent = false): { life: OceanLife | null; liked: DiscoveryTrack[] } {
   const [life, setLife] = useState<OceanLife | null>(null);
   const [liked, setLiked] = useState<DiscoveryTrack[] | null>(null);
   const [warm, setWarm] = useState(false);
+  const firstBuilt = useRef(false);
   const historyRef = useRef(history);
   historyRef.current = history;
 
@@ -65,11 +81,13 @@ export function useOceanData(history: SwipeEntry[]): { life: OceanLife | null; l
 
   useEffect(() => {
     if (!warm || !liked) return;
+    // Going under catches up at once, so a song you just saved is there when you arrive.
     const t = setTimeout(() => {
-      setLife(buildOcean({ history: historyRef.current, liked, soundOf, depthOf, colorOf, now: Date.now() }));
-    }, 250);
+      setLife(buildOcean({ history: historyRef.current, liked, soundOf, depthOf, colorOf, accentOf, now: Date.now() }));
+    }, urgent || !firstBuilt.current ? 0 : IDLE_MS);
+    firstBuilt.current = true;
     return () => clearTimeout(t);
-  }, [warm, liked, history]);
+  }, [warm, liked, history, urgent]);
 
   return { life, liked: liked ?? [] };
 }

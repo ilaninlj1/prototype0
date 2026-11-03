@@ -1,41 +1,25 @@
 // One frame of the ocean. Every function here runs on the UI thread and only composes numbers and recorded pictures.
 // lib/ocean-draw-rules.test.ts checks that each function in this file is marked as a worklet: a missing mark crashes
 // only on a phone, never on the web preview.
+//
+// The ocean is one world, not pages: the water's color blends, the sea floor runs on unbroken under every biome, and
+// specks drift past at different speeds so you feel yourself travel. Each biome's creatures fade as it slides away, so
+// nothing pops in at the edge of the screen.
 
-import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, type SkCanvas, type SkPicture } from '@shopify/react-native-skia';
+import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, type SkCanvas, type SkPicture, type SkShader } from '@shopify/react-native-skia';
 
-import { floorY, restPose, scatter, schoolOffset, swimPose } from '@/lib/ocean-motion';
-import { SEA_BASE, seaY, type SeaState } from '@/lib/sea-beat';
+import { scatter, stagePoses, tempoMatches, type StagedMover } from '@/lib/ocean-motion';
 import { seabedAt, type Rgb } from '@/lib/ocean-scene';
+import { SEA_BASE, seaY, type SeaState } from '@/lib/sea-beat';
 
 /** Skia's "intersect" clip. */
 const CLIP_IN = 1;
 const WORLD_W = 270;
 
 export type StopRow = { top: Rgb; mid: Rgb; bot: Rgb; ray: number };
-export type WeedData = { x: number; base: number; height: number; color: Float32Array; width: number; phase: number; leaves: boolean };
-export type StageMember = {
-  look: string;
-  sprite: number;
-  halo: number;
-  seed: number;
-  speed: number;
-  band: number;
-  x: number;
-  scale: number;
-  awake: boolean;
-  /** How many swim together when wild, drawn as one. */
-  flock: number;
-  /** Your saves by one artist: the first one's index leads, or -1. */
-  leader: number;
-  schoolIndex: number;
-  rare: boolean;
-  trackId: number;
-  restI: number;
-  restN: number;
-  big: boolean;
-};
-export type Stage = { col: number; row: number; picture: SkPicture; weeds: WeedData[]; members: StageMember[]; bottles: { sprite: SkPicture; seed: number; i: number; n: number }[] };
+export type WeedData = { x: number; top: number; base: number; width: number; phase: number; tall: boolean; amp: number };
+export type StageMember = StagedMover & { frames: SkPicture[]; halo: SkPicture; scale: number; rare: boolean; trackId: number; tempo: number; songKey: number; big: boolean };
+export type Stage = { col: number; row: number; picture: SkPicture; weeds: WeedData[]; weedShader: SkShader; members: StageMember[]; bottles: { sprite: SkPicture; x: number; y: number }[] };
 
 export type Frame = {
   width: number;
@@ -48,15 +32,19 @@ export type Frame = {
   posX: number;
   posY: number;
   touch: { x: number; y: number; r: number } | null;
+  touchPower: number;
   spotId: number;
   spotMix: number;
+  song: { tempo: number; key: number } | null;
   night: number;
   warm: number;
   stops: StopRow[][];
   rest: StopRow;
   stages: Stage[];
-  sprites: SkPicture[][];
-  halos: SkPicture[];
+  floorTop: Rgb[];
+  floorBot: Rgb[];
+  rises: number[];
+  floorDetail: SkPicture;
 };
 
 function mix3(a: Rgb, b: Rgb, t: number): Rgb {
@@ -67,6 +55,11 @@ function mix3(a: Rgb, b: Rgb, t: number): Rgb {
 function colorOf(c: Rgb): Float32Array {
   'worklet';
   return Skia.Color(`rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`);
+}
+
+function wrap(v: number, span: number): number {
+  'worklet';
+  return ((v % span) + span) % span;
 }
 
 /** The water here: between the places either side of you, and toward Home's water as you near the surface. */
@@ -88,7 +81,9 @@ function waterHere(f: Frame): StopRow {
     'worklet';
     return mix3(f.rest[k], mix3(mix3(a[k], b[k], fx), mix3(c[k], d[k], fx), fy), m);
   };
-  const rayHere = a.ray + (b.ray - a.ray) * fx + (c.ray - a.ray) * fy;
+  const rayTop = a.ray + (b.ray - a.ray) * fx;
+  const rayLow = c.ray + (d.ray - c.ray) * fx;
+  const rayHere = rayTop + (rayLow - rayTop) * fy;
   return { top: pick('top'), mid: pick('mid'), bot: pick('bot'), ray: f.rest.ray + (rayHere - f.rest.ray) * m };
 }
 
@@ -110,10 +105,12 @@ function drawLight(c: SkCanvas, f: Frame, here: StopRow, surface: number) {
   const clear = f.night > 0.5 ? 'rgba(190,212,255,0)' : f.warm > 0.4 ? 'rgba(255,226,190,0)' : 'rgba(255,255,240,0)';
   const paint = Skia.Paint();
   paint.setBlendMode(BlendMode.Screen);
+  // The sun's shafts slide a little as you swim sideways: they're far off, so slower than what's near you.
+  const slide = f.posX * w * 0.3;
   for (let i = 0; i < 6; i++) {
-    const x0 = (w * (i + 0.3)) / 6 + Math.sin(t * 0.28 + i * 1.7) * 20 * k;
+    const x0 = wrap((w * 1.2 * (i + 0.3)) / 6 + Math.sin(t * 0.28 + i * 1.7) * 20 * k - slide, w * 1.2) - w * 0.1;
     const rw = (10 + ((i * 37) % 13)) * k;
-    const slant = (-34 + ((i * 17) % 18)) * k;
+    const lean = (-34 + ((i * 17) % 18)) * k;
     const rlen = (300 + ((i * 53) % 170)) * k;
     // Each ray fades out along its own length, so none ends in a hard edge.
     paint.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: surface }, { x: 0, y: surface + rlen }, [Skia.Color(tint), Skia.Color(clear)], [0, 1], TileMode.Clamp));
@@ -121,8 +118,8 @@ function drawLight(c: SkCanvas, f: Frame, here: StopRow, surface: number) {
     const ray = Skia.PathBuilder.Make();
     ray.moveTo(x0 - rw, surface);
     ray.lineTo(x0 + rw, surface);
-    ray.lineTo(x0 + rw * 2.6 + slant, surface + rlen);
-    ray.lineTo(x0 - rw * 2.2 + slant, surface + rlen);
+    ray.lineTo(x0 + rw * 2.6 + lean, surface + rlen);
+    ray.lineTo(x0 - rw * 2.2 + lean, surface + rlen);
     ray.close();
     c.drawPath(ray.build(), paint);
   }
@@ -172,160 +169,139 @@ function drawLight(c: SkCanvas, f: Frame, here: StopRow, surface: number) {
   ripple.setColor(Skia.Color('white'));
   ripple.setAlphaf(a * 0.32);
   for (let j = 0; j < 7; j++) {
-    const path = Skia.PathBuilder.Make();
+    const b = Skia.PathBuilder.Make();
     const y = surface + 10 * k + j * 9 * k;
     for (let x = -6; x <= w + 6; x += 9) {
       const yy = y + Math.sin(x * 0.05 + t * 0.8 + j * 2.1) * 4 + Math.sin(x * 0.13 - t * 0.5 + j) * 2;
-      if (x === -6) path.moveTo(x, yy);
-      else path.lineTo(x, yy);
+      if (x === -6) b.moveTo(x, yy);
+      else b.lineTo(x, yy);
     }
-    c.drawPath(path.build(), ripple);
+    c.drawPath(b.build(), ripple);
   }
 }
 
-function drawWeed(c: SkCanvas, w: WeedData, t: number, lift: number) {
+/** The sand: only at the very bottom, and one shape under every biome, so swimming across it has no seam. */
+function drawFloor(c: SkCanvas, f: Frame, sceneY: number) {
   'worklet';
-  const n = Math.max(4, Math.floor(w.height / 16));
-  const path = Skia.PathBuilder.Make();
-  path.moveTo(w.x, w.base);
-  const stem = Skia.Paint();
-  stem.setAntiAlias(true);
-  stem.setStyle(PaintStyle.Stroke);
-  stem.setStrokeCap(StrokeCap.Round);
-  stem.setStrokeWidth(w.width);
-  stem.setColor(w.color);
-  const leaf = Skia.Paint();
-  leaf.setAntiAlias(true);
-  leaf.setColor(w.color);
-  for (let i = 1; i <= n; i++) {
-    const f = i / n;
-    const px = w.x + Math.sin(t * 0.9 + w.phase + f * 3) * f * f * 15 * (w.height / 120 + 0.4) * lift;
-    const py = w.base - w.height * f;
-    path.lineTo(px, py);
-    if (w.leaves && f >= 0.12) {
-      const side = i % 2 ? 1 : -1;
+  const { width: w, height: h } = f;
+  const dy = (3 - f.posY) * h + sceneY;
+  if (dy >= h) return;
+  const k = w / WORLD_W;
+  const x0 = Math.max(0, Math.min(3, Math.floor(f.posX)));
+  const x1 = Math.min(3, x0 + 1);
+  const fx = Math.max(0, Math.min(1, f.posX - x0));
+  const rise = (f.rises[x0] + (f.rises[x1] - f.rises[x0]) * fx) * 28 * k;
+  const scroll = f.posX * w;
+  const b = Skia.PathBuilder.Make();
+  for (let sx = -6; sx <= w + 6; sx += 6) {
+    const y = h - seabedAt((sx + scroll) / w) * h - rise + dy;
+    if (sx === -6) b.moveTo(sx, y);
+    else b.lineTo(sx, y);
+  }
+  b.lineTo(w + 6, h + dy + 40);
+  b.lineTo(-6, h + dy + 40);
+  b.close();
+  const shape = b.build();
+  const p = Skia.Paint();
+  p.setAntiAlias(true);
+  p.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: dy + h * 0.72 }, { x: 0, y: dy + h }, [colorOf(mix3(f.floorTop[x0], f.floorTop[x1], fx)), colorOf(mix3(f.floorBot[x0], f.floorBot[x1], fx))], [0, 1], TileMode.Clamp));
+  c.drawPath(shape, p);
+  c.save();
+  c.clipPath(shape, CLIP_IN, true);
+  c.translate(-wrap(scroll, w), dy);
+  c.drawPicture(f.floorDetail);
+  c.translate(w, 0);
+  c.drawPicture(f.floorDetail);
+  c.restore();
+}
+
+function drawWeed(c: SkCanvas, weed: WeedData, paint: ReturnType<typeof Skia.Paint>, leaf: ReturnType<typeof Skia.Paint>, f: Frame, row: number, lift: number) {
+  'worklet';
+  const { height: h, t } = f;
+  const step = h / 40;
+  paint.setStrokeWidth(weed.width);
+  const b = Skia.PathBuilder.Make();
+  // Sampled at fixed depths, so a stem's stretches meet exactly from one place to the next.
+  const first = Math.ceil(weed.top / step);
+  const last = Math.floor(weed.base / step);
+  let started = false;
+  for (let i = last; i >= first; i--) {
+    const y = i * step;
+    const reach = weed.tall ? 1 : Math.pow(1 - (y - weed.top) / Math.max(1, weed.base - weed.top), 2);
+    const x = weed.x + Math.sin(t * 0.9 + weed.phase + (row + y / h) * 3.1) * weed.amp * reach * lift;
+    if (!started) {
+      b.moveTo(x, y);
+      started = true;
+    } else b.lineTo(x, y);
+    if (weed.tall && (row * 40 + i) % 2 === 0) {
+      const side = (row * 40 + i) % 4 === 0 ? 1 : -1;
       c.save();
-      c.translate(px + side * 6, py);
-      c.rotate(side * (0.5 + Math.sin(t + f * 4) * 0.15) * 57.3, 0, 0);
+      c.translate(x + side * 6, y);
+      c.rotate(side * (0.5 + Math.sin(t + y * 0.01) * 0.15) * 57.3, 0, 0);
       c.drawOval(Skia.XYWHRect(-7, -2.8, 14, 5.6), leaf);
       c.restore();
     }
   }
-  c.drawPath(path.build(), stem);
+  if (started) c.drawPath(b.build(), paint);
 }
 
-function drawStage(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: number) {
+function drawCreatures(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: number) {
   'worklet';
   const { width: w, height: h, t } = f;
   const k = w / WORLD_W;
   const pulse = f.sea.pulse;
-  c.save();
-  c.translate(ox, oy);
-  // The whole reef lifts a hair on the beat.
-  c.save();
-  c.translate(0, h);
-  c.scale(1, 1 + pulse * 0.006);
-  c.translate(0, -h);
-  c.drawPicture(stage.picture);
-  c.restore();
-  const lift = 1 + pulse * 0.55;
-  for (let i = 0; i < stage.weeds.length; i++) drawWeed(c, stage.weeds[i], t, lift);
-  for (let i = 0; i < stage.bottles.length; i++) {
-    const b = stage.bottles[i];
-    const pose = restPose(b.seed, b.i, b.n, w, h - seabedAt(stage.row, 0.5) * h);
-    const fx = pose.x / w;
-    c.save();
-    c.translate(pose.x, h - seabedAt(stage.row, fx < 0 ? 0 : fx > 1 ? 1 : fx) * h - 4);
-    c.scale(k * 0.8, k * 0.8);
-    c.drawPicture(b.sprite);
-    c.restore();
-  }
-
   const members = stage.members;
-  const xs: number[] = [];
-  const ys: number[] = [];
-  const dirs: number[] = [];
-  const tails: number[] = [];
-  const tilts: number[] = [];
-  for (let i = 0; i < members.length; i++) {
-    const m = members[i];
-    if (!m.awake) {
-      const xf = (m.restI + 0.5) / Math.max(1, m.restN);
-      const floor = h - seabedAt(stage.row, xf) * h;
-      const r = restPose(m.seed, m.restI, m.restN, w, floor);
-      xs.push(r.x);
-      ys.push(r.y + Math.sin(t * 0.4 + m.seed) * 1.2);
-      dirs.push(m.seed % 2 === 0 ? 1 : -1);
-      tails.push(0);
-      tilts.push(0);
-      continue;
-    }
-    const lead = m.leader >= 0 ? members[m.leader] : m;
-    const pose = swimPose({ seed: lead.seed, speed: lead.speed, scale: lead.scale, band: lead.band, x: lead.x, look: m.look }, t, w, floorY(h) / 0.86);
-    let x = pose.x;
-    let y = pose.y;
-    if (m.look === 'crab' || m.look === 'starfish') {
-      const fx = Math.max(0, Math.min(1, x / w));
-      y = h - seabedAt(stage.row, fx) * h - 3;
-    }
-    if (m.leader >= 0) {
-      const o = schoolOffset(m.schoolIndex);
-      x += o[0] * pose.dir * k;
-      y += o[1] * k;
-    }
-    xs.push(x);
-    ys.push(y);
-    dirs.push(pose.dir);
-    tails.push(Math.sin(t * (m.look === 'turtle' ? 2.2 : m.look === 'whale' ? 1.4 : m.look === 'jelly' ? 1.3 : 9) * (1 + pulse * 0.25) + m.seed));
-    tilts.push(pose.tilt);
-  }
+  const poses = stagePoses(members, stage.col, stage.row, t, w, h);
 
-  // Small fish scatter from a big one passing, and from your finger.
+  // Small ones get out of the way of a big one passing. Near your finger some scatter and the curious come closer.
   for (let i = 0; i < members.length; i++) {
     const m = members[i];
-    if (!m.awake || m.big || m.look === 'crab' || m.look === 'starfish') continue;
-    let px = xs[i];
-    let py = ys[i];
+    if (!m.awake || m.big) continue;
     for (let b = 0; b < members.length; b++) {
       if (!members[b].big || !members[b].awake) continue;
-      const push = scatter(px, py, xs[b], ys[b], 70 * k);
-      px += push[0];
-      py += push[1];
+      const push = scatter(poses[i].x, poses[i].y, poses[b].x, poses[b].y, 70 * k);
+      poses[i].x += push[0];
+      poses[i].y += push[1];
     }
-    if (f.touch) {
-      const push = scatter(px, py, f.touch.x - ox, f.touch.y - oy, f.touch.r);
-      px += push[0];
-      py += push[1];
+    if (f.touch && f.touchPower > 0.01) {
+      const push = scatter(poses[i].x, poses[i].y, f.touch.x - ox, f.touch.y - oy, f.touch.r);
+      const pull = m.seed % 3 === 0 ? -0.6 : 1;
+      poses[i].x += push[0] * pull * f.touchPower;
+      poses[i].y += push[1] * pull * f.touchPower;
     }
-    xs[i] = px;
-    ys[i] = py;
   }
 
   const glowing = f.night > 0.4 || stage.row >= 2;
   for (let i = 0; i < members.length; i++) {
     const m = members[i];
-    const frames = f.sprites[m.sprite];
-    const frame = Math.max(0, Math.min(frames.length - 1, Math.floor(((tails[i] + 1) / 2) * frames.length)));
-    let x = xs[i];
-    let y = ys[i];
-    let s = k * m.scale;
+    const pose = poses[i];
+    const dancing = !!f.song && m.awake && tempoMatches(m.tempo, f.song.tempo);
+    const inKey = !!f.song && m.songKey >= 0 && m.songKey === f.song.key;
+    const tail = dancing ? pulse * 2 - 1 : pose.tail;
+    const frame = Math.max(0, Math.min(m.frames.length - 1, Math.floor(((tail + 1) / 2) * m.frames.length)));
+    let x = pose.x;
+    let y = pose.y - (dancing ? pulse * 6 * k : 0);
+    let s = k * m.scale * pose.puff * (dancing ? 1 + 0.07 * pulse : 1);
     const lit = f.spotId !== 0 && m.trackId === f.spotId;
     if (lit) {
       x += (w * 0.5 - x) * f.spotMix;
       y += (h * 0.42 - y) * f.spotMix;
       s *= 1 + 0.45 * f.spotMix;
     }
-    const n = m.flock > 0 ? m.flock : 1;
-    for (let j = 0; j < n; j++) {
-      const o = j === 0 ? null : schoolOffset(j);
+    const face = Math.abs(pose.face) < 0.03 ? 0.03 : pose.face;
+    c.save();
+    c.translate(x, y);
+    const turn = pose.tilt + pose.spin;
+    if (turn !== 0) c.rotate(turn * 57.3, 0, 0);
+    if (glowing || lit || inKey || pose.flash > 0.2) {
       c.save();
-      c.translate(x + (o ? o[0] * dirs[i] * k : 0), y + (o ? o[1] * k + Math.sin(t * 1.5 + j) * 1.2 : 0));
-      if (tilts[i]) c.rotate(tilts[i] * 57.3, 0, 0);
-      c.scale(dirs[i] * s, s);
-      if (m.halo >= 0 && (glowing || lit)) c.drawPicture(f.halos[m.halo]);
-      c.drawPicture(frames[frame]);
+      c.scale(s, s);
+      c.drawPicture(m.halo);
       c.restore();
     }
+    c.scale(face * s, s);
+    c.drawPicture(m.frames[frame]);
+    c.restore();
     if (m.rare) {
       // A rare form shimmers: little stars that come and go around it.
       const star = Skia.Paint();
@@ -333,7 +309,7 @@ function drawStage(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: number) 
       star.setStrokeWidth(0.9);
       star.setStrokeCap(StrokeCap.Round);
       star.setColor(Skia.Color('white'));
-      const path = Skia.PathBuilder.Make();
+      const b = Skia.PathBuilder.Make();
       for (let j = 0; j < 3; j++) {
         const a = t * 0.8 + (j * 6.283) / 3 + m.seed;
         const v = Math.pow(Math.max(0, Math.sin(t * 2.1 + j * 2 + m.seed)), 3);
@@ -341,15 +317,89 @@ function drawStage(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: number) 
         const sx = x + Math.cos(a) * 17 * s;
         const sy = y + Math.sin(a) * 13 * s;
         const l = 3.4 * v * k;
-        path.moveTo(sx - l, sy);
-        path.lineTo(sx + l, sy);
-        path.moveTo(sx, sy - l);
-        path.lineTo(sx, sy + l);
+        b.moveTo(sx - l, sy);
+        b.lineTo(sx + l, sy);
+        b.moveTo(sx, sy - l);
+        b.lineTo(sx, sy + l);
       }
-      c.drawPath(path.build(), star);
+      c.drawPath(b.build(), star);
     }
   }
+}
+
+function drawStage(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: number, fade: number) {
+  'worklet';
+  const { width: w } = f;
+  const k = w / WORLD_W;
+  const pulse = f.sea.pulse;
+  c.save();
+  c.translate(ox, oy);
+  // The reef breathes out from the wall on the beat.
+  c.save();
+  c.scale(1 + pulse * 0.004, 1);
+  c.drawPicture(stage.picture);
   c.restore();
+  const lift = 1 + pulse * 0.55;
+  if (stage.weeds.length) {
+    const stem = Skia.Paint();
+    stem.setAntiAlias(true);
+    stem.setStyle(PaintStyle.Stroke);
+    stem.setStrokeCap(StrokeCap.Round);
+    stem.setShader(stage.weedShader);
+    const leaf = Skia.Paint();
+    leaf.setAntiAlias(true);
+    leaf.setShader(stage.weedShader);
+    for (let i = 0; i < stage.weeds.length; i++) drawWeed(c, stage.weeds[i], stem, leaf, f, stage.row, lift);
+  }
+  for (let i = 0; i < stage.bottles.length; i++) {
+    const b = stage.bottles[i];
+    c.save();
+    c.translate(b.x, b.y);
+    c.scale(k * 0.8, k * 0.8);
+    c.drawPicture(b.sprite);
+    c.restore();
+  }
+  // A biome's creatures fade as it slides away, so none pops in or out at the screen's edge.
+  if (stage.members.length) {
+    const layered = fade < 0.995;
+    if (layered) {
+      const layer = Skia.Paint();
+      layer.setAlphaf(fade);
+      c.saveLayer(layer);
+    }
+    drawCreatures(c, f, stage, ox, oy);
+    if (layered) c.restore();
+  }
+  c.restore();
+}
+
+/** Specks drifting in the water, near ones passing faster than far ones: what makes moving feel like moving. */
+function drawMotes(c: SkCanvas, f: Frame, surface: number) {
+  'worklet';
+  const { width: w, height: h, t } = f;
+  const deep = Math.min(1, f.posY / 2);
+  const spanX = w * 1.3;
+  const spanY = h * 1.3;
+  const near = Skia.PathBuilder.Make();
+  const soft = Skia.PathBuilder.Make();
+  for (let i = 0; i < 46; i++) {
+    const par = 0.35 + (i % 5) * 0.16;
+    const x = wrap(((i * 0.381966) % 1) * spanX - f.posX * w * par + Math.sin(t * 0.2 + i) * 6, spanX) - w * 0.15;
+    const y = wrap(((i * 0.618034) % 1) * spanY - f.posY * h * par + t * (1 + par) * 1.4, spanY) - h * 0.15;
+    if (y < surface) continue;
+    const r = 0.6 + (i % 4) * 0.3;
+    near.addCircle(x, y, r);
+    if (deep > 0.5 && i % 3 === 0) soft.addCircle(x, y, r * 4);
+  }
+  const p = Skia.Paint();
+  p.setAntiAlias(true);
+  p.setColor(Skia.Color(deep > 0.5 ? '#bff2f7' : '#ffffff'));
+  p.setAlphaf(0.3 + 0.3 * deep);
+  c.drawPath(near.build(), p);
+  if (deep > 0.5) {
+    p.setAlphaf(0.09);
+    c.drawPath(soft.build(), p);
+  }
 }
 
 function drawBubbles(c: SkCanvas, f: Frame, surface: number) {
@@ -358,12 +408,12 @@ function drawBubbles(c: SkCanvas, f: Frame, surface: number) {
   const rise = 1 + f.sea.pulse * 0.08;
   const ring = Skia.PathBuilder.Make();
   const shine = Skia.PathBuilder.Make();
-  for (let i = 0; i < 22; i++) {
+  for (let i = 0; i < 14; i++) {
     const speed = 0.035 + ((i * 37) % 11) * 0.0055;
     const prog = (t * speed * rise + ((i * 0.618) % 1)) % 1;
     const y = h + 8 + (surface + 6 - (h + 8)) * prog;
     if (y > h + 6) continue;
-    const x = ((i * 0.381966) % 1) * w + Math.sin(t * 1.4 + i * 1.3) * 5;
+    const x = wrap(((i * 0.381966) % 1) * w * 1.1 - f.posX * w * 0.8, w * 1.1) + Math.sin(t * 1.4 + i * 1.3) * 5;
     const r = 0.9 + ((i * 13) % 9) * 0.31;
     ring.addCircle(x, y, r);
     shine.addCircle(x - r * 0.35, y - r * 0.35, r * 0.24);
@@ -411,13 +461,16 @@ export function drawOcean(c: SkCanvas, f: Frame) {
   drawLight(c, f, here, surface);
   // The scene hangs from the surface, so Home and the ocean move as one.
   const sceneY = surface + (f.travel - f.surfaceY);
+  drawFloor(c, f, sceneY);
   for (let i = 0; i < f.stages.length; i++) {
     const s = f.stages[i];
     const dx = s.col - f.posX;
     const dy = s.row - f.posY;
     if (Math.abs(dx) >= 1 || Math.abs(dy) >= 1) continue;
-    drawStage(c, f, s, dx * w, dy * h + sceneY);
+    const away = Math.abs(dx);
+    drawStage(c, f, s, dx * w, dy * h + sceneY, 1 - away * away * (3 - 2 * away));
   }
+  drawMotes(c, f, surface);
   drawBubbles(c, f, surface);
   c.restore();
 

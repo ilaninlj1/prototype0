@@ -25,8 +25,8 @@ test('small fish still have a finger-sized target, and big ones a bigger one', (
   assert.equal(hitMember(145, 100, [fish(1.9)], [{ x: 100, y: 100 }]), 0);
 });
 
-test('a whale is a big target', () => {
-  assert.equal(hitMember(170, 100, [{ scale: 1, look: 'whale' }], [{ x: 100, y: 100 }]), 0);
+test('a big creature is a big target', () => {
+  assert.equal(hitMember(170, 100, [{ scale: 3.4, look: 'manta' }], [{ x: 100, y: 100 }]), 0);
 });
 
 test('an empty cast taps nothing', () => {

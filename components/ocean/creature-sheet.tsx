@@ -12,6 +12,7 @@ export function CreatureSheet({
   creature,
   track,
   blind,
+  extra,
   playing,
   onPlay,
   onSwipeLike,
@@ -21,6 +22,8 @@ export function CreatureSheet({
   track: DiscoveryTrack | null;
   /** The song's card is still up and blind: nothing here may give it away. */
   blind: boolean;
+  /** What it's doing right now, and who it swims with. */
+  extra: string[];
   playing: boolean;
   onPlay: () => void;
   onSwipeLike: () => void;
@@ -64,7 +67,7 @@ export function CreatureSheet({
             {/* Even the reasons can hint at it (a school means you already saved this artist), so they wait too. */}
             {!blind && <ThemedText style={sheetStyles.heading}>Why it looks like this</ThemedText>}
             {!blind &&
-              whyLines(creature, Date.now()).map((line) => (
+              [...whyLines(creature, Date.now()), ...extra].map((line) => (
                 <ThemedText key={line} style={styles.line}>
                   {line}
                 </ThemedText>

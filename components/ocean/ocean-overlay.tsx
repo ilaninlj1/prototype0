@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, StyleSheet, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -9,34 +9,46 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withSpring,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 
 import { oceanDive, oceanReduced, oceanTravel, onDiveSettled, settleDiveTo, surfaceNow, useDivePan } from '@/components/ocean/dive-gesture';
+import type { OceanBottle } from '@/components/ocean/ocean-canvas';
 import { OceanUi } from '@/components/ocean/ocean-ui';
 import { lazySkia } from '@/components/print/lazy-skia';
 import { useScreenReader } from '@/hooks/use-screen-reader';
-import { castFor, type CastMember } from '@/lib/ocean-cast';
+import { castFor } from '@/lib/ocean-cast';
 import { depthDragResult, nearestPlaceIndex, settleDive, showsAt, waterDragResult } from '@/lib/ocean-dive';
 import { hitMember } from '@/lib/ocean-hit';
-import { DEPTHS, SPECIES_INFO, WATERS, WATER_INFO, placeKey, placeLabel, type Depth, type Place, type Species, type Water } from '@/lib/ocean-map';
-import { restPose, swimPose } from '@/lib/ocean-motion';
+import { DEPTHS, WATERS, WATER_INFO, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
+import { restSpot, stagePoses } from '@/lib/ocean-motion';
 import type { Creature, OceanLife } from '@/lib/ocean-person';
-import { seabedAt } from '@/lib/ocean-scene';
-import type { OceanBottle } from '@/components/ocean/ocean-canvas';
 import type { SeaState } from '@/lib/sea-beat';
 
 const OceanCanvas = lazySkia(() => import('./ocean-canvas'));
 
 const PLACE_KEY = 'blindspotDiscovery:oceanPlace';
 const HINT_KEY = 'blindspotDiscovery:oceanHintSeen';
-/** Everything below this on the phone's surface is left to the water, so the surface can leave the screen fully. */
+/** How far the surface travels past the top of the phone, so it leaves the screen fully. */
 const CLEARANCE = 34;
-const SPRING = { damping: 24, stiffness: 150, mass: 0.9, overshootClamping: true };
+const SPRING = { damping: 24, stiffness: 120, mass: 0.9, overshootClamping: true };
+const GREET_MS = 3500;
 
-export type OceanFilter = { place: Place; species: Species | null };
+export type OceanHandlers = {
+  songsLeft: (place: Place) => number;
+  onSwipeHere: (place: Place) => void;
+  onWake: () => void;
+  onUnderChange: (under: boolean) => void;
+  onPlaceChange: (place: Place) => void;
+  onTapCreature: (creature: Creature, soundAlike: boolean) => void;
+  onTapBottle: (bottle: OceanBottle) => void;
+  onPortrait: () => void;
+  onOpenList: (place: Place) => void;
+  onExample: () => void;
+};
 
-export function OceanOverlay({
+export const OceanOverlay = memo(function OceanOverlay({
   sea,
   width,
   height,
@@ -48,18 +60,13 @@ export function OceanOverlay({
   life,
   bottles,
   spotlight,
+  song,
   activePlace,
   jump,
   notice,
-  songsLeft,
-  onSwipeHere,
-  onWake,
-  onUnderChange,
-  onPlaceChange,
-  onTapCreature,
-  onTapBottle,
-  onPortrait,
-  onOpenList,
+  offerExample,
+  heardCount,
+  handlers,
 }: {
   sea: SharedValue<SeaState>;
   width: number;
@@ -73,23 +80,21 @@ export function OceanOverlay({
   hour: number;
   life: OceanLife | null;
   bottles: OceanBottle[];
-  /** The track whose creature lights up and comes forward while your songs play, or 0. */
+  /** The track whose creature comes forward, or 0. */
   spotlight: SharedValue<number>;
+  /** What's playing, so creatures can react. */
+  song: SharedValue<{ tempo: number; key: number } | null>;
   /** The place an ocean filter is on, so you arrive there. */
   activePlace: Place | null;
   /** A request to go under, to a place: from Details, the Library or You. */
   jump: { place: Place; key: number } | null;
   /** A line under the pill, when this isn't your own ocean. */
   notice: string | null;
-  songsLeft: (place: Place, species: Species | null) => number;
-  onSwipeHere: (filter: OceanFilter) => void;
-  onWake: () => void;
-  onUnderChange: (under: boolean) => void;
-  onPlaceChange: (place: Place) => void;
-  onTapCreature: (creature: Creature) => void;
-  onTapBottle: (bottle: OceanBottle) => void;
-  onPortrait: () => void;
-  onOpenList: (place: Place) => void;
+  offerExample: boolean;
+  /** Changes when the songs you've heard change, so the count of songs left stays true. */
+  heardCount: number;
+  /** Home's callbacks, always current without re-rendering the ocean each time Home does. */
+  handlers: RefObject<OceanHandlers>;
 }) {
   const reduced = useReducedMotion();
   const screenReader = useScreenReader();
@@ -101,16 +106,18 @@ export function OceanOverlay({
   const [ready, setReady] = useState(false);
   const [under, setUnder] = useState(false);
   const [place, setPlace] = useState<Place>({ water: 'reef', depth: 'popular' });
-  const [species, setSpecies] = useState<Species | null>(null);
   const [hintSeen, setHintSeen] = useState(true);
-  const [wildLine, setWildLine] = useState<string | null>(null);
   const posX = useSharedValue(0);
   const posY = useSharedValue(0);
   const clock = useSharedValue(0);
   const touch = useSharedValue<{ x: number; y: number; r: number } | null>(null);
+  const touchPower = useSharedValue(0);
   const running = useSharedValue(false);
-  // With reduced motion the scene doesn't rise with the finger: it's already in place, and only fades in.
   const stillDive = useSharedValue(1);
+  const drawMs = useSharedValue(0);
+  const metering = useSharedValue(false);
+  const [meter, setMeter] = useState<string | null>(null);
+  if (Platform.OS === 'web') (globalThis as { __ocean?: unknown }).__ocean = { posX, posY, dive: oceanDive };
 
   // The scene only loads once Home has settled, so Home's first moments stay quick.
   useEffect(() => {
@@ -118,17 +125,23 @@ export function OceanOverlay({
     return () => clearTimeout(t);
   }, []);
 
+  const remember = useCallback(
+    (next: Place) => {
+      setPlace(next);
+      handlers.current?.onPlaceChange(next);
+      void AsyncStorage.setItem(PLACE_KEY, JSON.stringify(next)).catch(() => {});
+    },
+    [handlers]
+  );
   const jumpTo = useCallback(
     (next: Place, animated: boolean) => {
       const x = WATERS.indexOf(next.water);
       const y = DEPTHS.indexOf(next.depth);
       posX.set(animated && !reduced ? withSpring(x, SPRING) : x);
       posY.set(animated && !reduced ? withSpring(y, SPRING) : y);
-      setPlace(next);
-      onPlaceChange(next);
-      void AsyncStorage.setItem(PLACE_KEY, JSON.stringify(next)).catch(() => {});
+      remember(next);
     },
-    [posX, posY, reduced, onPlaceChange]
+    [posX, posY, reduced, remember]
   );
 
   // You arrive where you last were, or the first time, on Sunny reef / Popular.
@@ -173,9 +186,9 @@ export function OceanOverlay({
     () =>
       onDiveSettled((nowUnder) => {
         setUnder(nowUnder);
-        onUnderChange(nowUnder);
+        handlers.current?.onUnderChange(nowUnder);
       }),
-    [onUnderChange]
+    [handlers]
   );
 
   // Leaving Home always puts you back at the surface, so no other tab ever finds it half slid.
@@ -193,144 +206,179 @@ export function OceanOverlay({
     return () => sub.remove();
   }, [under]);
 
+  const pushMeter = useCallback((fps: number, worst: number, ms: number) => setMeter(`${fps} fps · worst ${worst} ms · draw ${ms} ms`), []);
+  const window = useSharedValue({ frames: 0, total: 0, worst: 0 });
   useFrameCallback((f) => {
+    const dt = f.timeSincePreviousFrame ?? 16;
     if (reduced || !running.get() || oceanDive.get() <= 0) return;
-    clock.set(clock.get() + Math.min(64, f.timeSincePreviousFrame ?? 16) / 1000);
+    clock.set(clock.get() + Math.min(64, dt) / 1000);
+    if (!metering.get()) return;
+    const m = window.get();
+    const next = { frames: m.frames + 1, total: m.total + dt, worst: Math.max(m.worst, dt) };
+    if (next.frames >= 30) {
+      runOnJS(pushMeter)(Math.round((1000 * next.frames) / next.total), Math.round(next.worst), Math.round(drawMs.get()));
+      window.set({ frames: 0, total: 0, worst: 0 });
+    } else window.set(next);
   });
+  const toggleMeter = useCallback(() => {
+    const on = !metering.get();
+    metering.set(on);
+    if (!on) setMeter(null);
+    else setMeter('Measuring…');
+  }, [metering]);
 
-  const member = useMemo(() => castFor(place, life, hour), [place, life, hour]);
-  const hiddenHere = member.hiddenCount;
+  const cast = useMemo(() => castFor(place, life, hour), [place, life, hour]);
 
-  function settledAt(waterIndex: number, depthIndex: number) {
-    const next = { water: WATERS[waterIndex], depth: DEPTHS[depthIndex] };
-    if (placeKey(next) === placeKey(place)) return;
-    setSpecies(null);
-    setWildLine(null);
-    jumpTo(next, false);
-  }
+  // Your newest find comes over to say hello when you arrive.
+  const placeId = placeKey(place);
+  useEffect(() => {
+    if (!under) return;
+    const first = cast.members.find((m) => m.awake);
+    if (!first || spotlight.get() !== 0) return;
+    const id = first.creature.trackId;
+    spotlight.set(id);
+    const t = setTimeout(() => {
+      if (spotlight.get() === id) spotlight.set(0);
+    }, GREET_MS);
+    return () => clearTimeout(t);
+    // When you arrive somewhere; not each time the cast's objects change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [under, placeId]);
 
-  const tapAt = (x: number, y: number) => {
-    const t = clock.get();
-    const poses = member.members.map((m: CastMember) => swimPose(m, t, width, height));
-    const i = hitMember(x, y, member.members, poses);
-    if (i != null) {
-      const m = member.members[i];
-      if (m.creature) return onTapCreature(m.creature);
-      const picked = m.wild?.species ?? null;
-      if (picked) setSpecies((now) => (now === picked ? null : picked));
-      setWildLine(picked ? `A wild one, not your song. ${SPECIES_INFO[picked].means} songs live here too.` : 'A wild one, not your song.');
-      void AsyncStorage.setItem(HINT_KEY, '1').catch(() => {});
-      setHintSeen(true);
-      return;
-    }
-    // A bottle resting on the sand.
-    const here = bottles.filter((b) => placeKey(b.place) === placeKey(place));
-    const row = DEPTHS.indexOf(place.depth);
-    for (let b = 0; b < here.length; b++) {
-      const rest = restPose(here[b].seed, b, here.length, width, height * 0.86);
-      const fx = Math.max(0, Math.min(1, rest.x / width));
-      if (Math.hypot(rest.x - x, height - seabedAt(row, fx) * height - 4 - y) < 30) return onTapBottle(here[b]);
-    }
-    setSpecies(null);
-    setWildLine(null);
-  };
+  // Everything a gesture needs from React, read when it fires, so the gestures themselves never change mid drag.
+  const now = useRef({ place, cast, bottles, width, height, remember });
+  now.current = { place, cast, bottles, width, height, remember };
+  const [js] = useState(() => ({
+    // Only React's copy of where you are: the spring that's carrying you there must not be interrupted.
+    settled(waterIndex: number, depthIndex: number) {
+      const next = { water: WATERS[waterIndex], depth: DEPTHS[depthIndex] };
+      if (placeKey(next) !== placeKey(now.current.place)) now.current.remember(next);
+    },
+    tap(x: number, y: number) {
+      const n = now.current;
+      const col = WATERS.indexOf(n.place.water);
+      const row = DEPTHS.indexOf(n.place.depth);
+      const members = n.cast.members;
+      const poses = stagePoses(members, col, row, clock.get(), n.width, n.height);
+      const i = hitMember(x, y, members, poses);
+      if (i != null) {
+        void AsyncStorage.setItem(HINT_KEY, '1').catch(() => {});
+        setHintSeen(true);
+        handlers.current?.onTapCreature(members[i].creature, members[i].soundAlike);
+        return;
+      }
+      const here = n.bottles.filter((b) => placeKey(b.place) === placeKey(n.place));
+      for (let b = 0; b < here.length; b++) {
+        const spot = restSpot(here[b].seed, b, here.length, col, row, n.width, n.height);
+        if (Math.hypot(spot.x - x, spot.y - y) < 30) return handlers.current?.onTapBottle(here[b]);
+      }
+    },
+    wake() {
+      handlers.current?.onWake();
+    },
+  }));
 
   // One finger: sideways changes water, up sinks, down rises, and down from Popular brings you to the surface.
   const axis = useSharedValue(0);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
   const rising = useSharedValue(false);
-  const swim = Gesture.Pan()
-    .minDistance(12)
-    .onBegin((e) => {
-      axis.set(0);
-      touch.set({ x: e.x, y: e.y, r: 90 });
-    })
-    .onStart(() => {
-      startX.set(nearestPlaceIndex(posX.get()));
-      startY.set(nearestPlaceIndex(posY.get()));
-      rising.set(false);
-    })
-    .onUpdate((e) => {
-      touch.set({ x: e.x, y: e.y, r: 90 });
-      // Sideways or up and down is decided by the first real movement: at the start both can still read zero.
-      if (axis.get() === 0) {
-        const ax = Math.abs(e.translationX);
-        const ay = Math.abs(e.translationY);
-        if (ax < 4 && ay < 4) return;
-        axis.set(ax > ay ? 1 : 2);
-      }
-      if (axis.get() === 1) {
-        const from = startX.get();
-        const next = from - e.translationX / Math.max(1, width);
-        posX.set(Math.max(Math.max(0, from - 1) - 0.08, Math.min(Math.min(3, from + 1) + 0.08, next)));
-        return;
-      }
-      const from = startY.get();
-      if (from === 0 && e.translationY > 0 && !reduced) {
-        rising.set(true);
-        oceanDive.set(Math.max(0, Math.min(1, 1 - e.translationY / Math.max(1, oceanTravel.get()))));
-        return;
-      }
-      // Changed your mind mid-rise: all the way back under before sinking.
-      if (rising.get()) {
+  const underGesture = useMemo(() => {
+    const swim = Gesture.Pan()
+      .minDistance(12)
+      .onBegin(() => {
+        axis.set(0);
+      })
+      .onStart(() => {
+        startX.set(nearestPlaceIndex(posX.get()));
+        startY.set(nearestPlaceIndex(posY.get()));
         rising.set(false);
-        oceanDive.set(1);
-      }
-      const next = from - e.translationY / Math.max(1, height * 0.6);
-      posY.set(Math.max(Math.max(0, from - 1), Math.min(Math.min(3, from + 1), next)));
-    })
-    .onEnd((e) => {
-      if (axis.get() === 0) return;
-      if (axis.get() === 1) {
-        const moved = Math.abs(e.translationX) > width * 0.18 || Math.abs(e.velocityX) > 500;
-        const target = moved ? waterDragResult(startX.get(), Math.sign(e.translationX)) : startX.get();
-        posX.set(withSpring(target, SPRING));
-        runOnJS(settledAt)(target, startY.get());
-        return;
-      }
-      if (rising.get()) {
-        settleDiveTo(settleDive(1 - oceanDive.get(), -e.velocityY) === 1 ? 0 : 1, e.velocityY);
-        return;
-      }
-      const moved = Math.abs(e.translationY) > height * 0.12 || Math.abs(e.velocityY) > 500;
-      const result = moved ? depthDragResult(startY.get(), Math.sign(e.translationY)) : { depth: startY.get(), surface: false };
-      if (result.surface) {
-        settleDiveTo(0);
-        return;
-      }
-      posY.set(withSpring(result.depth, SPRING));
-      runOnJS(settledAt)(startX.get(), result.depth);
-    })
-    .onFinalize((_e, success) => {
-      touch.set(null);
-      // A drag the system took away never leaves you between places.
-      if (success || axis.get() === 0) return;
-      if (oceanDive.get() > 0 && oceanDive.get() < 1) settleDiveTo(1);
-      posX.set(withSpring(startX.get(), SPRING));
-      posY.set(withSpring(startY.get(), SPRING));
-    });
-  const tap = Gesture.Tap()
-    .maxDistance(12)
-    .onBegin((e) => {
-      touch.set({ x: e.x, y: e.y, r: 70 });
-    })
-    .onEnd((e, ok) => {
-      if (ok) runOnJS(tapAt)(e.x, e.y);
-    })
-    .onFinalize(() => {
-      touch.set(null);
-    });
-  const underGesture = Gesture.Exclusive(swim, tap);
+      })
+      .onUpdate((e) => {
+        // Sideways or up and down is decided by the first real movement: at the start both can still read zero.
+        if (axis.get() === 0) {
+          const ax = Math.abs(e.translationX);
+          const ay = Math.abs(e.translationY);
+          if (ax < 4 && ay < 4) return;
+          axis.set(ax > ay ? 1 : 2);
+        }
+        if (axis.get() === 1) {
+          const from = startX.get();
+          const next = from - e.translationX / Math.max(1, width);
+          posX.set(Math.max(Math.max(0, from - 1) - 0.06, Math.min(Math.min(3, from + 1) + 0.06, next)));
+          return;
+        }
+        const from = startY.get();
+        if (from === 0 && e.translationY > 0 && !reduced) {
+          rising.set(true);
+          oceanDive.set(Math.max(0, Math.min(1, 1 - e.translationY / Math.max(1, oceanTravel.get()))));
+          return;
+        }
+        // Changed your mind mid-rise: all the way back under before sinking.
+        if (rising.get()) {
+          rising.set(false);
+          oceanDive.set(1);
+        }
+        const next = from - e.translationY / Math.max(1, height * 0.6);
+        posY.set(Math.max(Math.max(0, from - 1), Math.min(Math.min(3, from + 1), next)));
+      })
+      .onEnd((e) => {
+        if (axis.get() === 0) return;
+        if (axis.get() === 1) {
+          const moved = Math.abs(e.translationX) > width * 0.18 || Math.abs(e.velocityX) > 500;
+          const target = moved ? waterDragResult(startX.get(), Math.sign(e.translationX)) : startX.get();
+          // The glide carries on at the speed your finger left at, so letting go is seamless.
+          posX.set(withSpring(target, { ...SPRING, velocity: -e.velocityX / Math.max(1, width) }));
+          runOnJS(js.settled)(target, startY.get());
+          return;
+        }
+        if (rising.get()) {
+          settleDiveTo(settleDive(1 - oceanDive.get(), -e.velocityY) === 1 ? 0 : 1, e.velocityY);
+          return;
+        }
+        const moved = Math.abs(e.translationY) > height * 0.12 || Math.abs(e.velocityY) > 500;
+        const result = moved ? depthDragResult(startY.get(), Math.sign(e.translationY)) : { depth: startY.get(), surface: false };
+        if (result.surface) {
+          settleDiveTo(0);
+          return;
+        }
+        posY.set(withSpring(result.depth, { ...SPRING, velocity: -e.velocityY / Math.max(1, height * 0.6) }));
+        runOnJS(js.settled)(startX.get(), result.depth);
+      })
+      .onFinalize((_e, success) => {
+        // A drag the system took away never leaves you between places.
+        if (success || axis.get() === 0) return;
+        if (oceanDive.get() > 0 && oceanDive.get() < 1) settleDiveTo(1);
+        posX.set(withSpring(startX.get(), SPRING));
+        posY.set(withSpring(startY.get(), SPRING));
+      });
+    const tap = Gesture.Tap()
+      .maxDistance(12)
+      .onBegin((e) => {
+        touch.set({ x: e.x, y: e.y, r: 90 });
+        touchPower.set(withTiming(1, { duration: 220 }));
+      })
+      .onEnd((e, ok) => {
+        if (ok) runOnJS(js.tap)(e.x, e.y);
+      })
+      .onFinalize(() => {
+        touchPower.set(withTiming(0, { duration: 420 }));
+      });
+    return Gesture.Exclusive(swim, tap);
+    // The shared values never change, and js reads everything else when it fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, height, reduced]);
 
   // The water's lower strip, where the tab bar floats: when the bar has faded, it still takes a drag or a wake.
   const floorPan = useDivePan(!under);
-  const floorTap = Gesture.Tap()
-    .maxDistance(12)
-    .onEnd((_e, ok) => {
-      if (ok) runOnJS(onWake)();
-    });
-  const floorGesture = Gesture.Exclusive(floorPan, floorTap);
+  const floorGesture = useMemo(() => {
+    const tap = Gesture.Tap()
+      .maxDistance(12)
+      .onEnd((_e, ok) => {
+        if (ok) runOnJS(js.wake)();
+      });
+    return Gesture.Exclusive(floorPan, tap);
+  }, [floorPan, js]);
 
   const canvasStyle = useAnimatedStyle(() => {
     const d = oceanDive.get();
@@ -338,14 +386,17 @@ export function OceanOverlay({
   });
   const uiStyle = useAnimatedStyle(() => ({ opacity: showsAt(oceanDive.get()).ui }));
 
-  const left = under ? songsLeft(place, species) : 0;
-  const heardHere = life?.places[placeKey(place)]?.heard ?? 0;
+  // Counted when you arrive or your history changes, not each time something else redraws.
+  const left = useMemo(() => (under ? (handlers.current?.songsLeft(place) ?? 0) : 0), [under, place, heardCount, handlers]);
+  const here = life?.places[placeKey(place)];
   const subtitle =
     left > 0
       ? `${WATER_INFO[place.water].caption} · ${left} ${left === 1 ? 'song' : 'songs'} left`
-      : heardHere === 0
+      : (here?.heard ?? 0) === 0
         ? "You haven't been here yet"
         : `${WATER_INFO[place.water].caption} · You've heard them all`;
+  const empty = (life?.total ?? 0) === 0;
+  const hint = notice ?? (empty ? 'Nothing lives here yet. Save a song blind and it hatches here.' : !here?.creatures.length ? 'None of your songs live here yet.' : hintSeen ? null : 'Tap a creature to see why it looks like that.');
 
   return (
     <>
@@ -365,7 +416,11 @@ export function OceanOverlay({
             posY={posY}
             clock={clock}
             touch={touch}
+            touchPower={touchPower}
             spotlight={spotlight}
+            song={song}
+            drawMs={drawMs}
+            place={place}
             rest={rest}
             hour={hour}
             life={life}
@@ -380,36 +435,25 @@ export function OceanOverlay({
           </GestureDetector>
           <OceanUi
             place={place}
-            title={species ? `${SPECIES_INFO[species].means} songs in ${placeLabel(place)}` : null}
-            subtitle={subtitle}
-            hint={notice ?? wildLine ?? (hintSeen ? null : 'Tap a fish to pick its kind of song.')}
-            speciesTag={species ? SPECIES_INFO[species].means : null}
+            subtitle={meter ?? subtitle}
+            hint={hint}
             canSwipe={left > 0}
-            allCount={hiddenHere > 0 || screenReader ? (life?.places[placeKey(place)]?.creatures.length ?? 0) : 0}
-            onWater={(w: Water) => {
-              setSpecies(null);
-              setWildLine(null);
-              jumpTo({ ...place, water: w }, true);
-            }}
-            onDepth={(d: Depth) => {
-              setSpecies(null);
-              setWildLine(null);
-              jumpTo({ ...place, depth: d }, true);
-            }}
-            onSwipe={() => onSwipeHere({ place, species })}
+            offerExample={offerExample}
+            allCount={cast.hiddenCount > 0 || screenReader ? (here?.creatures.length ?? 0) : 0}
+            onWater={(w: Water) => jumpTo({ ...place, water: w }, true)}
+            onDepth={(d: Depth) => jumpTo({ ...place, depth: d }, true)}
+            onSwipe={() => handlers.current?.onSwipeHere(place)}
             onBackUp={() => settleDiveTo(0)}
-            onPortrait={onPortrait}
-            onOpenList={() => onOpenList(place)}
-            onClearSpecies={() => {
-              setSpecies(null);
-              setWildLine(null);
-            }}
+            onPortrait={() => handlers.current?.onPortrait()}
+            onOpenList={() => handlers.current?.onOpenList(place)}
+            onExample={() => handlers.current?.onExample()}
+            onToggleMeter={toggleMeter}
           />
         </Animated.View>
       )}
     </>
   );
-}
+});
 
 const styles = StyleSheet.create({
   floor: { position: 'absolute', left: 0, right: 0, bottom: 0 },

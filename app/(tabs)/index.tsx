@@ -38,19 +38,19 @@ import { LaunchLight } from '@/components/bottles/launch-light';
 import { SEA_BASE, SEA_HEIGHT, SeaLine, seaX, type SeaWave } from '@/components/bottles/sea-line';
 import { settleDiveTo, oceanDive, oceanTravel, oceanReduced, setOceanInk, useOceanTabBarHeight } from '@/components/ocean/dive-gesture';
 import type { OceanBottle } from '@/components/ocean/ocean-canvas';
-import { OceanOverlay, type OceanFilter } from '@/components/ocean/ocean-overlay';
+import { OceanOverlay, type OceanHandlers } from '@/components/ocean/ocean-overlay';
 import { CreatureSheet } from '@/components/ocean/creature-sheet';
 import { OceanPortrait, THIN_OCEAN } from '@/components/ocean/ocean-portrait';
 import { PlaceList } from '@/components/ocean/place-list';
 import { JourneySheet } from '@/components/bottles/journey-sheet';
 import { exampleInput } from '@/lib/ocean-example';
-import { EXAMPLE_NOTICE, buildOcean, stillBlind, type Creature, type OceanInput, type OceanLife } from '@/lib/ocean-person';
+import { EXAMPLE_NOTICE, buildOcean, reactionLines, stillBlind, type Creature, type OceanInput, type OceanLife } from '@/lib/ocean-person';
 import { songLight, useBottles } from '@/hooks/use-bottles';
 import { queueBottleNow, seaPosition } from '@/lib/bottle-countdown';
 import { revealLine } from '@/lib/bottle-journey';
 import type { FeedMode } from '@/lib/bottles';
 import { allDecks, deckCounts, deckLabel, nearestInDeck, oceanDeckLeft, pickDeck, type Deck } from '@/lib/decks';
-import { placeKey, placeLabel, type Place, type Species } from '@/lib/ocean-map';
+import { placeKey, placeLabel, type Place } from '@/lib/ocean-map';
 import { dayMixAt, surfaceWater } from '@/lib/ocean-scene';
 import { CALM_RHYTHM, restingSea, type SeaState } from '@/lib/sea-beat';
 import { ThemedText } from '@/components/themed-text';
@@ -220,7 +220,7 @@ export default function HomeScreen() {
   const oceanSea = useSharedValue<SeaState>(restingSea(CALM_RHYTHM));
   const tabBarHeight = useOceanTabBarHeight();
   const [oceanHour, setOceanHour] = useState(localHour);
-  const restPlace: Place = deck?.kind === 'ocean' ? { water: deck.water, depth: deck.depth } : REST_PLACE;
+  const restPlace = useMemo<Place>(() => (deck?.kind === 'ocean' ? { water: deck.water, depth: deck.depth } : REST_PLACE), [deck]);
   const seaWater = surfaceWater(restPlace.water, restPlace.depth, dayMixAt(oceanHour));
   useEffect(() => setOceanInk(seaWater.ink), [seaWater.ink]);
   const [underWater, setUnderWater] = useState(false);
@@ -229,8 +229,6 @@ export default function HomeScreen() {
   const slide = useAnimatedStyle(() => ({
     transform: [{ translateY: oceanReduced.get() ? 0 : -oceanDive.get() * oceanTravel.get() }],
   }));
-  // The species you narrowed to ran out, so the filter widened to the whole place.
-  const [deckWidened, setDeckWidened] = useState(false);
   // The MAP button's share, recomputed each time Home is focused.
   const [litShare, setLitShare] = useState<number | null>(null);
 
@@ -739,16 +737,9 @@ export default function HomeScreen() {
 
   // A sound deck's next songs: unheard, any genre, one per artist. When it runs dry, back to the genre.
   async function deckTracks(history: SwipeEntry[], excludeArtists: Set<string>, activePreset: PresetId, genre: string): Promise<DiscoveryTrack[]> {
-    let d = deckRef.current;
+    const d = deckRef.current;
     const keep = (a: string) => !excludeArtists.has(a) && !hideFromDiscovery(a) && !alreadyKnown(a);
-    const heard = heardIds(history);
-    // Too few of that kind left here: let go of the kind and keep the place, and say so on the status line.
-    if (d?.kind === 'ocean' && d.species && oceanDeckLeft(deckPool(), d, heard, keep).artists < 3) {
-      d = { kind: 'ocean', water: d.water, depth: d.depth };
-      setDeck(d);
-      setDeckWidened(true);
-    }
-    const picked = d ? pickDeck(deckPool(), d, { heard, keep, n: deckSize, rand: Math.random }) : [];
+    const picked = d ? pickDeck(deckPool(), d, { heard: heardIds(history), keep, n: deckSize, rand: Math.random }) : [];
     if (picked.length > 0) return d?.kind === 'ocean' ? picked.map((t) => ({ ...t, via: 'ocean' as const })) : picked;
     setDeck(null);
     return (await getTracks(activePreset, genre, excludeArtists)).map(trackToDiscoveryTrack);
@@ -778,7 +769,6 @@ export default function HomeScreen() {
     if (under !== strategy) setStrategy(under);
     if (nextMode === 'artist') setNextMode('genre');
     setDeck(next);
-    setDeckWidened(false);
     setQueue([]);
     await runRefill([], under, nextHistory, discoveredGenres, region, preset, nextSeen);
   }
@@ -1318,7 +1308,7 @@ export default function HomeScreen() {
   // Coming back to Home brings them back for a moment.
   useFocusEffect(wake);
   useFocusEffect(useCallback(() => setOceanHour(localHour()), []));
-  const { life: myOcean, liked: myLiked } = useOceanData(swipeHistory);
+  const { life: myOcean, liked: myLiked } = useOceanData(swipeHistory, underWater);
   const [oceanExample, setOceanExample] = useState<{ life: OceanLife; input: OceanInput } | null>(null);
   const oceanLife = oceanExample?.life ?? myOcean;
   const oceanLifeRef = useRef(oceanLife);
@@ -1326,6 +1316,13 @@ export default function HomeScreen() {
   const oceanTracks = useMemo(() => new Map((oceanExample?.input.liked ?? myLiked).map((t) => [t.id, t])), [oceanExample, myLiked]);
   const oceanPlaceRef = useRef<Place>(REST_PLACE);
   const [openCreature, setOpenCreature] = useState<Creature | null>(null);
+  const [openSoundAlike, setOpenSoundAlike] = useState(false);
+  // What's playing, for the creatures that react to it.
+  const oceanTune = useSharedValue<{ tempo: number; key: number } | null>(null);
+  const tuneSound = oceanSong ? soundFor(oceanSong.id) : topSound?.status === 'measured' ? topSound.features : null;
+  useEffect(() => {
+    oceanTune.set(tuneSound ? { tempo: tuneSound.tempo, key: tuneSound.key ?? -1 } : null);
+  }, [tuneSound, oceanTune]);
   const [openList, setOpenList] = useState<Place | null>(null);
   const [portraitOpen, setPortraitOpen] = useState(false);
   const [oceanJump, setOceanJump] = useState<{ place: Place; key: number } | null>(null);
@@ -1357,11 +1354,14 @@ export default function HomeScreen() {
   const [journey, setJourney] = useState<OceanBottle | null>(null);
   const oceanBottles = useMemo<OceanBottle[]>(
     () =>
-      [...myBottles.entries()].map(([id, b]) => {
-        const t = catalogTrackById(id);
-        return { id: b.id, trackId: id, place: t ? oceanPlaceOf(t) : REST_PLACE, color: songLight(id), seed: id };
-      }),
-    [myBottles]
+      // Reading the catalog waits until the ocean's first build has warmed it, so it can't stall Home's first moments.
+      !myOcean
+        ? NO_BOTTLES
+        : [...myBottles.entries()].map(([id, b]) => {
+            const t = catalogTrackById(id);
+            return { id: b.id, trackId: id, place: t ? oceanPlaceOf(t) : REST_PLACE, color: songLight(id), seed: id };
+          }),
+    [myBottles, !myOcean]
   );
   const onUnderChange = useCallback(
     (nowUnder: boolean) => {
@@ -1380,6 +1380,7 @@ export default function HomeScreen() {
     },
     [wake]
   );
+  const oceanHandlers = useRef<OceanHandlers>(null as unknown as OceanHandlers);
   const noteOceanPlace = useCallback((place: Place) => {
     oceanPlaceRef.current = place;
   }, []);
@@ -1421,7 +1422,7 @@ export default function HomeScreen() {
     editionReady: editionReady ?? null,
     newsCount: news.length,
     mapWords: mapFocus ? mapFocus.words : null,
-    deckLabel: deck ? (deckWidened ? `${deckLabel(deck)}, every kind now` : deckLabel(deck)) : null,
+    deckLabel: deck ? deckLabel(deck) : null,
     moreLabel: !!moreLike && !!currentTrack && moreLike.ids.has(currentTrack.id) ? moreLike.label : null,
     sortedText:
       isActive(soundFilter) && strategy.type === 'genre'
@@ -1459,13 +1460,6 @@ export default function HomeScreen() {
 
   const revealedNow = !!currentTrack && revealTrack?.id === currentTrack.id;
 
-  const oceanSongsLeft = (place: Place, species: Species | null) =>
-    oceanDeckLeft(
-      deckPool(),
-      { kind: 'ocean', water: place.water, depth: place.depth, ...(species ? { species } : {}) },
-      heardIds(swipeHistory),
-      (a) => !hideFromDiscovery(a) && !alreadyKnown(a)
-    ).songs;
   function isStillBlind(trackId: number) {
     return stillBlind(trackId, currentTrack ? { id: currentTrack.id, revealed: revealedNow } : null);
   }
@@ -1487,9 +1481,30 @@ export default function HomeScreen() {
     const name = oceanTracks.get(c.trackId)?.trackName ?? 'this song';
     void startDeck(sound ? { kind: 'like', trackId: c.trackId, label: name, sound } : { kind: 'ocean', water: c.place.water, depth: c.place.depth });
   }
-  function swipeThisPlace({ place, species }: OceanFilter) {
-    settleDiveTo(0);
-    void startDeck({ kind: 'ocean', water: place.water, depth: place.depth, ...(species ? { species } : {}) });
+  oceanHandlers.current = {
+    songsLeft: (place) => oceanDeckLeft(deckPool(), { kind: 'ocean', water: place.water, depth: place.depth }, heardIds(swipeHistory), (a) => !hideFromDiscovery(a) && !alreadyKnown(a)).songs,
+    onSwipeHere: (place) => {
+      settleDiveTo(0);
+      // A save's lock can still be held from before you dove; it must not swallow this.
+      lock.release();
+      void startDeck({ kind: 'ocean', water: place.water, depth: place.depth });
+    },
+    onWake: wake,
+    onUnderChange,
+    onPlaceChange: noteOceanPlace,
+    onTapCreature: (c, soundAlike) => {
+      setOpenSoundAlike(soundAlike);
+      setOpenCreature(c);
+    },
+    onTapBottle: noteBottle,
+    onPortrait: openPortrait,
+    onOpenList: setOpenList,
+    onExample: startExample,
+  };
+  function startExample() {
+    const input = exampleInput(Date.now());
+    setOceanExample({ input, life: buildOcean(input) });
+    setPortraitOpen(false);
   }
 
   return (
@@ -1788,23 +1803,19 @@ export default function HomeScreen() {
         life={oceanLife}
         bottles={oceanExample ? NO_BOTTLES : oceanBottles}
         spotlight={oceanSpot}
+        song={oceanTune}
         activePlace={deck?.kind === 'ocean' ? restPlace : null}
         jump={oceanJump}
         notice={oceanExample ? EXAMPLE_NOTICE : null}
-        songsLeft={oceanSongsLeft}
-        onSwipeHere={swipeThisPlace}
-        onWake={wake}
-        onUnderChange={onUnderChange}
-        onPlaceChange={noteOceanPlace}
-        onTapCreature={setOpenCreature}
-        onTapBottle={noteBottle}
-        onPortrait={openPortrait}
-        onOpenList={setOpenList}
+        offerExample={!oceanExample && (myOcean?.total ?? 0) < THIN_OCEAN}
+        heardCount={swipeHistory.length}
+        handlers={oceanHandlers}
       />
       <CreatureSheet
         creature={openCreature}
         track={openCreature ? (oceanTracks.get(openCreature.trackId) ?? null) : null}
         blind={!!openCreature && !oceanExample && isStillBlind(openCreature.trackId)}
+        extra={openCreature ? [...reactionLines(openCreature, tuneSound), ...(openSoundAlike ? ['Swims with another of your songs because they sound alike.'] : [])] : []}
         playing={!!openCreature && oceanSong?.id === openCreature.trackId && status.playing}
         onPlay={() => openCreature && playCreature(openCreature)}
         onSwipeLike={() => openCreature && swipeLikeCreature(openCreature)}
@@ -1829,11 +1840,7 @@ export default function HomeScreen() {
           oceanExample
             ? () => setOceanExample(null)
             : (myOcean?.total ?? 0) < THIN_OCEAN
-              ? () => {
-                  const input = exampleInput(Date.now());
-                  setOceanExample({ input, life: buildOcean(input) });
-                  setPortraitOpen(false);
-                }
+              ? startExample
               : null
         }
         onClose={() => setPortraitOpen(false)}

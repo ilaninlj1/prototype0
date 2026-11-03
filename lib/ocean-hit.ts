@@ -4,7 +4,6 @@
 /** The smallest target, so a tiny fish can still be tapped with a finger. */
 const MIN_REACH = 26;
 const REACH_PER_SCALE = 24;
-const WHALE_REACH = 80;
 
 export function hitMember(
   x: number,
@@ -15,7 +14,7 @@ export function hitMember(
   let best: number | null = null;
   let bestDistance = Infinity;
   for (let i = 0; i < members.length; i++) {
-    const reach = members[i].look === 'whale' ? WHALE_REACH : Math.max(MIN_REACH, members[i].scale * REACH_PER_SCALE);
+    const reach = Math.max(MIN_REACH, members[i].scale * (members[i].look === 'manta' ? REACH_PER_SCALE * 1.5 : REACH_PER_SCALE));
     const distance = Math.hypot(poses[i].x - x, poses[i].y - y);
     if (distance <= reach && distance <= bestDistance) {
       best = i;

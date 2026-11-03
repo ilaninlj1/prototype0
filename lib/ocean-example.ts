@@ -63,5 +63,9 @@ export function exampleInput(now: number): OceanInput {
       const sound = sounds.get(id);
       return sound ? hslToHex(keyHue(sound.key ?? 0, sound.mode), 0.62, 0.64) : '#b8c9cd';
     },
+    accentOf: (id) => {
+      const sound = sounds.get(id);
+      return sound ? hslToHex(keyHue(((sound.key ?? 0) + 5) % 12, sound.mode), 0.7, 0.5) : '#8fa3a8';
+    },
   };
 }

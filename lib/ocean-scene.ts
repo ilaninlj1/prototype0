@@ -1,7 +1,7 @@
 // What each place looks like, as numbers: the water's colors by water, depth and hour, the seabed's terraces, and who
 // lives there wild. Pure. Everything marked 'worklet' runs each frame on the UI thread.
 
-import type { Depth, Place, Species, Water } from './ocean-map.ts';
+import type { Depth, Water } from './ocean-map.ts';
 
 export type DayMix = { night: number; warm: number };
 export type WaterStops = { top: string; mid: string; bot: string; ray: number };
@@ -93,59 +93,29 @@ export function surfaceWater(water: Water, depth: Depth, day: DayMix, reach = 96
   return { top: s.top, low: toHex(low), foam: toHex(mixRgb(rgb.mid, [2, 30, 45], 0.25)), ink: luminance(low) < 0.18 ? 'light' : 'dark' };
 }
 
+/** What every place's sea floor is made of, top of the sand to the bottom. Only Buried reaches it. */
+export const SAND: Record<Water, [string, string]> = {
+  reef: ['#f8e7bb', '#dcc08a'],
+  kelp: ['#d4c791', '#9c8f60'],
+  blue: ['#9db3cb', '#5f7895'],
+  midnight: ['#2b3050', '#14172c'],
+};
+
 /**
- * The seabed's height above the bottom of the screen, as a share of the screen's height: stepped terraces with soft
- * edges and a drop-off to one side. xFrac is 0 to 1 across. Each depth has its own shape.
+ * The sea floor's height above the bottom of the screen, as a share of its height. x is in screen widths, on any scale:
+ * the floor is one unbroken shape that repeats, so it runs on through every biome without a seam.
  */
-export function seabedAt(depthIndex: number, xFrac: number): number {
+export function seabedAt(x: number): number {
   'worklet';
-  const shelves = depthIndex === 0 ? [0.1, 0.16, 0.24] : depthIndex === 1 ? [0.22, 0.14, 0.11] : depthIndex === 2 ? [0.12, 0.2, 0.15] : [0.17, 0.11, 0.21];
-  const edges = depthIndex === 0 ? [0.42, 0.74] : depthIndex === 1 ? [0.3, 0.68] : depthIndex === 2 ? [0.36, 0.8] : [0.26, 0.58];
-  const step = (edge: number) => {
-    const t = (xFrac - (edge - 0.045)) / 0.09;
-    const v = t < 0 ? 0 : t > 1 ? 1 : t;
-    return v * v * (3 - 2 * v);
-  };
-  const a = shelves[0] + (shelves[1] - shelves[0]) * step(edges[0]);
-  const b = a + (shelves[2] - shelves[1]) * step(edges[1]);
-  return b + Math.sin(xFrac * 13 + depthIndex * 2) * 0.004;
+  const tau = 6.2831853;
+  return 0.14 + 0.05 * Math.sin(tau * x) + 0.03 * Math.sin(2 * tau * x + 1) + 0.012 * Math.sin(6 * tau * x + 2);
 }
 
-export type WildLook = 'clown' | 'tang' | 'neon' | 'silver' | 'turtle' | 'jelly' | 'puffer' | 'whale' | 'angler' | 'crab' | 'starfish';
-export type WildFish = { id: string; look: WildLook; species: Species | null; band: number; x: number; speed: number; scale: number; seed: number; school: number };
-
-const SPECIES_OF: Partial<Record<WildLook, Species>> = { neon: 'darter', clown: 'clown', tang: 'clown', turtle: 'turtle', jelly: 'jelly', puffer: 'puffer' };
-
-const WATER_LOOKS: Record<Water, WildLook[]> = {
-  reef: ['neon', 'clown', 'tang', 'turtle', 'puffer', 'clown', 'tang'],
-  kelp: ['silver', 'turtle', 'neon', 'jelly', 'silver', 'clown', 'turtle'],
-  blue: ['silver', 'neon', 'whale', 'jelly', 'puffer', 'silver', 'turtle'],
-  midnight: ['jelly', 'angler', 'jelly', 'neon', 'turtle', 'puffer', 'jelly'],
-};
-const SPEEDS: Record<WildLook, number> = { neon: 26, clown: 15, tang: 18, silver: 21, turtle: 10, jelly: 3, puffer: 8, whale: 9, angler: 8, crab: 0, starfish: 0 };
-
-/** Who lives in a place when none of your songs do. Always the same, always several kinds of song close at hand. */
-export function wildRoster(p: Place): WildFish[] {
-  const depthIndex = ['popular', 'deepcuts', 'gems', 'buried'].indexOf(p.depth);
-  const looks = [...WATER_LOOKS[p.water]];
-  if (depthIndex >= 2) looks[1] = 'angler';
-  if (depthIndex === 3) looks[0] = 'jelly';
-  const out: WildFish[] = looks.map((look, i) => {
-    const seed = (p.water.length * 7919 + depthIndex * 104729 + i * 15485863) % 2147483647;
-    const dir = i % 2 === 0 ? 1 : -1;
-    return {
-      id: `${p.water}:${p.depth}:${i}`,
-      look,
-      species: SPECIES_OF[look] ?? null,
-      band: 0.12 + ((i * 0.137 + depthIndex * 0.09) % 0.62),
-      x: (seed % 1000) / 1000,
-      speed: SPEEDS[look] * dir,
-      scale: look === 'whale' ? 0.92 : 0.95 + (seed % 5) * 0.08,
-      seed,
-      school: look === 'neon' || (look === 'silver' && i % 3 === 0) ? 5 : 0,
-    };
-  });
-  out.push({ id: `${p.water}:${p.depth}:crab`, look: depthIndex % 2 ? 'starfish' : 'crab', species: null, band: 1, x: 0.22 + depthIndex * 0.14, speed: 0, scale: 1, seed: depthIndex + 3, school: 0 });
-  if (p.water !== 'midnight') out.push({ id: `${p.water}:${p.depth}:star`, look: 'starfish', species: null, band: 1, x: 0.76 - depthIndex * 0.1, speed: 0, scale: 0.8, seed: depthIndex + 9, school: 0 });
-  return out;
+/**
+ * How far the reef wall reaches into the screen, as a share of its width. world is depth in screen heights, 0 at the
+ * surface and 4 on the sea floor. It only depends on the depth, so the wall runs on unbroken as you sink.
+ */
+export function wallAt(col: number, world: number): number {
+  'worklet';
+  return 0.12 + 0.045 * Math.sin(world * 3.7 + col * 1.9) + 0.02 * Math.sin(world * 9.3 + col) + 0.008 * Math.sin(world * 23 + col * 3);
 }

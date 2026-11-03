@@ -16,7 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
-import { settleDiveTo, useDivePan } from '@/components/ocean/dive-gesture';
+import { oceanDive, settleDiveTo, useDivePan } from '@/components/ocean/dive-gesture';
 import { Hatchling } from '@/components/ocean/hatchling';
 
 import { DarkColors } from '@/constants/theme';
@@ -146,7 +146,7 @@ export function SeaLine({
   useFrameCallback((f) => {
     if (reduceMotion) return;
     const dt = Math.min(64, f.timeSincePreviousFrame ?? 16);
-    lightClock.set(lightClock.get() + dt / 1000);
+    if (oceanDive.get() < 1) lightClock.set(lightClock.get() + dt / 1000);
     let s = sea.get();
     if (queued.get()) {
       s = startWave(s, queued.get() === 2 ? 'genre' : 'song');
@@ -178,15 +178,17 @@ export function SeaLine({
 
   // The surface every STEP px, from past the left edge (for the back swell) to just off the right.
   const ys = useDerivedValue(() => {
-    const s = sea.get();
     const out: number[] = [];
+    // Under the water the ocean's canvas covers all this, so it stops being redrawn.
+    if (oceanDive.get() >= 1) return out;
+    const s = sea.get();
     for (let x = FIRST_X; x <= width + STEP; x += STEP) out.push(seaY(x, s, width));
     return out;
   });
-  const front = useAnimatedProps(() => ({ d: linePath(ys.get(), 0, 1, 0) }));
-  const body = useAnimatedProps(() => ({ d: `${linePath(ys.get(), 0, 1, 0)}L${width + STEP} ${bottom} L${-STEP} ${bottom} Z` }));
+  const front = useAnimatedProps(() => ({ d: ys.get().length ? linePath(ys.get(), 0, 1, 0) : NONE }));
+  const body = useAnimatedProps(() => ({ d: ys.get().length ? `${linePath(ys.get(), 0, 1, 0)}L${width + STEP} ${bottom} L${-STEP} ${bottom} Z` : NONE }));
   // A paler swell behind, trailing the surface a little to the right.
-  const back = useAnimatedProps(() => ({ d: `${linePath(ys.get(), LAG, 0.6, -5)}L${width + STEP} ${bottom} L${-STEP} ${bottom} Z` }));
+  const back = useAnimatedProps(() => ({ d: ys.get().length ? `${linePath(ys.get(), LAG, 0.6, -5)}L${width + STEP} ${bottom} L${-STEP} ${bottom} Z` : NONE }));
   const glints = useAnimatedProps(() => {
     const t = lightClock.get();
     let d = '';

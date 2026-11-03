@@ -24,6 +24,7 @@ import { HeartBurst } from '@/components/heart-burst';
 import { LivePrint } from '@/components/print/live-print';
 import { PrintStill } from '@/components/print/print-still';
 import { DarkColors, Spacing } from '@/constants/theme';
+import { oceanDive } from '@/components/ocean/dive-gesture';
 import { usePlayback } from '@/hooks/use-playback';
 import { mixForDrag, shouldReportMix } from '@/lib/crossfade';
 import { artworkUrl, type DiscoveryTrack } from '@/lib/discovery';
@@ -126,9 +127,12 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
     duration.set(status.duration);
   }, [status.duration, duration]);
   useEffect(() => {
+    if (oceanDive.get() >= 1) return;
     if (Math.abs(clock.get() - status.currentTime) > 0.3) clock.set(status.currentTime);
   }, [status.currentTime, clock]);
   useFrameCallback((f) => {
+    // Out of sight under the water, the card's print doesn't need drawing.
+    if (oceanDive.get() >= 1) return;
     if (playing.get() && f.timeSincePreviousFrame) clock.set(clock.get() + f.timeSincePreviousFrame / 1000);
     if (clock.get() > furthest.get()) furthest.set(clock.get());
   });

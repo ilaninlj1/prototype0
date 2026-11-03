@@ -89,7 +89,10 @@ test('water and creature descriptions use the map table wording', () => {
     midnight: { name: 'Midnight', caption: 'Dark and moody' },
   });
   assert.deepEqual(SPECIES_INFO, {
-    jelly: { name: 'Jellyfish', means: 'Quiet' }, turtle: { name: 'Turtle', means: 'Slow' },
+    jelly: { name: 'Jellyfish', means: 'Quiet' },
+    manta: { name: 'Manta ray', means: 'Instrumental and unhurried' },
+    eel: { name: 'Eel', means: 'Talking or rapping' },
+    seahorse: { name: 'Seahorse', means: 'Danceable and unhurried' }, turtle: { name: 'Turtle', means: 'Slow' },
     puffer: { name: 'Puffer', means: 'Loud' }, darter: { name: 'Darting fish', means: 'Fast' },
     clown: { name: 'Clownfish', means: 'In between' },
   });
