@@ -1,0 +1,421 @@
+<h2>What happens under the water?</h2>
+<p class="subtitle">These are playable. Click and drag up from the water on any phone to dive, then try it. The card and songs are fake, this is only about the feel.</p>
+
+<style>
+  .oc-row { display: flex; flex-wrap: wrap; gap: 26px; justify-content: center; margin-top: 18px; }
+  .oc-col { width: 270px; }
+  .oc-col .options { margin-top: 14px; }
+  .phone { position: relative; width: 270px; height: 560px; border-radius: 34px; overflow: hidden; background: #fff;
+    box-shadow: 0 0 0 7px #141414, 0 18px 40px rgba(0,0,0,.28); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+  .phone:active { cursor: grabbing; }
+  .phone canvas { position: absolute; inset: 0; width: 270px; height: 560px; pointer-events: none; z-index: 2; }
+  .h-home { position: absolute; left: 0; right: 0; top: 0; height: 560px; z-index: 1;
+    background: linear-gradient(#fff 62%, #eefafc 80%, #dff5f8 100%); }
+  .h-status { position: absolute; top: 36px; left: 0; right: 0; display: flex; justify-content: center; }
+  .h-status button { all: unset; cursor: pointer; font-size: 11.5px; font-weight: 600; color: #111; background: #f2f2f2; border-radius: 99px; padding: 5px 11px; }
+  .h-card { position: absolute; left: 20px; top: 68px; width: 230px; height: 230px; border-radius: 19px; overflow: hidden;
+    background: radial-gradient(circle at 34% 28%, #463b40, transparent 55%), radial-gradient(circle at 82% 78%, #3d4150, transparent 45%), #23263a;
+    box-shadow: 0 10px 22px rgba(0,0,0,.24); }
+  .h-card svg { width: 100%; height: 100%; display: block; }
+  .h-title { position: absolute; top: 316px; left: 0; right: 0; text-align: center; font-size: 17px; font-weight: 700; color: #111; letter-spacing: -.2px; }
+  .h-sub { position: absolute; top: 343px; left: 0; right: 0; text-align: center; font-size: 10.5px; color: #6b6b6b; }
+  .u { position: absolute; inset: 0; z-index: 3; pointer-events: none; transition: opacity .18s; }
+  .u button { pointer-events: auto; }
+  .hint { position: absolute; left: 0; right: 0; top: 478px; z-index: 3; text-align: center; color: #fff; font-size: 11.5px; font-weight: 600;
+    text-shadow: 0 1px 4px rgba(0,50,90,.55); pointer-events: none; transition: opacity .2s; }
+  .hint i { display: block; font-style: normal; font-size: 14px; line-height: 12px; animation: oc-bob 1.5s ease-in-out infinite; }
+  @keyframes oc-bob { 50% { transform: translateY(-4px); } }
+  .pill { position: absolute; top: 28px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 226px; text-align: center; background: rgba(255,255,255,.94); color: #111; border-radius: 15px; padding: 8px 15px 9px; box-shadow: 0 4px 14px rgba(0,40,70,.2); }
+  .pill b { display: block; font-size: 14.5px; letter-spacing: -.1px; }
+  .pill span { display: block; font-size: 10.5px; color: #555; margin-top: 1px; }
+  .go { all: unset; position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); cursor: pointer; white-space: nowrap; background: #111; color: #fff; font-size: 13px; font-weight: 600; border-radius: 99px; padding: 11px 22px; box-shadow: 0 6px 16px rgba(0,0,0,.3); }
+  .back { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 10px; font-weight: 500; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  .arrow { all: unset; position: absolute; top: 240px; width: 32px; height: 32px; line-height: 30px; text-align: center; border-radius: 50%; background: rgba(255,255,255,.88); color: #111; cursor: pointer; font-size: 17px; }
+  .arrow.l { left: 10px; } .arrow.r { right: 10px; }
+  .arrow[disabled] { opacity: 0; pointer-events: none; }
+  .dots { position: absolute; bottom: 92px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; }
+  .dots s { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.5); }
+  .dots s.on { background: #fff; }
+  .scale { position: absolute; right: 9px; top: 124px; display: flex; flex-direction: column; gap: 46px; align-items: flex-end; }
+  .scale button { all: unset; cursor: pointer; font-size: 10px; font-weight: 600; color: #fff; background: rgba(0,20,45,.42); padding: 4px 8px; border-radius: 99px; pointer-events: auto; }
+  .scale button.on { background: #fff; color: #111; }
+</style>
+
+<div class="oc-row">
+  <div class="oc-col">
+    <div class="phone" data-mode="a"></div>
+    <div class="options"><div class="option" data-choice="a" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>Different waters</h3><p>Drag sideways between four waters. Each plays a different kind of song, and your sea on Home turns that color.</p></div></div></div>
+  </div>
+  <div class="oc-col">
+    <div class="phone" data-mode="b"></div>
+    <div class="options"><div class="option" data-choice="b" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>Pick a fish</h3><p>One reef. Each creature is a kind of song: turtle for slow, puffer for loud. The one you pick swims in your sea on Home.</p></div></div></div>
+  </div>
+  <div class="oc-col">
+    <div class="phone" data-mode="c"></div>
+    <div class="options"><div class="option" data-choice="c" onclick="toggleSelect(this)"><div class="letter">C</div><div class="content"><h3>Go deeper</h3><p>Keep dragging up to sink. The sun fades, and the deeper you go, the fewer people have heard the songs. The sea floor is Buried.</p></div></div></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const W = 270, H = 560, SEA_TOP = H - 118, DPR = Math.min(2, window.devicePixelRatio || 1), TAU = Math.PI * 2;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), lerp = (a, b, t) => a + (b - a) * t;
+  const hex = (h) => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+  const mix = (a, b, t) => { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round(lerp(v, B[i], t)).toString(16).padStart(2, '0')).join(''); };
+  const rng = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const layer = (fn) => { const c = document.createElement('canvas'); c.width = W * DPR; c.height = H * DPR; const x = c.getContext('2d'); x.scale(DPR, DPR); fn(x); return c; };
+
+  /* ---------- scenery, painted once ---------- */
+  function sand(c, cols, r, top = H - 72) {
+    c.beginPath(); c.moveTo(0, H); c.lineTo(0, top + 10);
+    for (let x = 0; x <= W; x += 10) c.lineTo(x, top + Math.sin(x * .022) * 9 + Math.sin(x * .07 + 1) * 3);
+    c.lineTo(W, H); c.closePath();
+    const g = c.createLinearGradient(0, top - 10, 0, H); g.addColorStop(0, cols[0]); g.addColorStop(1, cols[1]); c.fillStyle = g; c.fill();
+    c.globalAlpha = .28; c.fillStyle = cols[1];
+    for (let i = 0; i < 130; i++) c.fillRect(r() * W, top + 14 + r() * (H - top - 14), 1, 1);
+    c.globalAlpha = .18; c.strokeStyle = cols[1]; c.lineWidth = 1;
+    for (let i = 0; i < 7; i++) { const y = top + 20 + i * 8; c.beginPath(); for (let x = -10; x < W + 10; x += 12) { const yy = y + Math.sin(x * .03 + i) * 3; x < 0 ? c.moveTo(x, yy) : c.lineTo(x, yy); } c.stroke(); }
+    c.globalAlpha = 1;
+  }
+  function branch(c, x, y, len, ang, w, col, r, d) {
+    if (d <= 0 || len < 4) return;
+    const x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len;
+    c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); c.moveTo(x, y);
+    c.quadraticCurveTo(x + Math.cos(ang + .4) * len * .5, y + Math.sin(ang + .4) * len * .5, x2, y2); c.stroke();
+    const n = d > 2 ? 3 : 2;
+    for (let i = 0; i < n; i++) branch(c, x2, y2, len * (.62 + r() * .14), ang + (i - (n - 1) / 2) * (.55 + r() * .25), w * .72, col, r, d - 1);
+  }
+  function fan(c, x, y, rad, col) {
+    c.strokeStyle = col; c.lineCap = 'round';
+    for (let i = 0; i < 13; i++) { const a = -Math.PI + .25 + i * (Math.PI - .5) / 12; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + Math.cos(a) * rad * .5, y + Math.sin(a) * rad * .7, x + Math.cos(a) * rad, y + Math.sin(a) * rad); c.stroke(); }
+    c.lineWidth = .8; c.globalAlpha = .6; for (let k = 1; k < 4; k++) { c.beginPath(); c.arc(x, y, rad * k / 4, -Math.PI + .25, -.25); c.stroke(); } c.globalAlpha = 1;
+  }
+  function brain(c, x, y, rx, ry, col, dark) {
+    c.fillStyle = col; c.beginPath(); c.ellipse(x, y, rx, ry, 0, Math.PI, 0); c.fill();
+    c.save(); c.beginPath(); c.ellipse(x, y, rx, ry, 0, Math.PI, 0); c.clip(); c.strokeStyle = dark; c.lineWidth = 1.2;
+    for (let j = 0; j < 5; j++) { c.beginPath(); for (let i = -rx; i <= rx; i += 3) { const yy = y - ry * (j + .5) / 5 + Math.sin(i * .35 + j * 1.7) * 2.2; i === -rx ? c.moveTo(x + i, yy) : c.lineTo(x + i, yy); } c.stroke(); }
+    c.restore();
+  }
+  function tubes(c, x, y, col, lip, r) {
+    for (let i = 0; i < 5; i++) { const tx = x + (i - 2) * 9 + r() * 3, h = 18 + r() * 22; c.fillStyle = col; c.beginPath(); c.roundRect(tx - 4, y - h, 8, h + 4, 4); c.fill(); c.fillStyle = lip; c.beginPath(); c.ellipse(tx, y - h, 4, 1.8, 0, 0, TAU); c.fill(); }
+  }
+  function rock(c, x, y, rx, ry, col) { c.fillStyle = col; c.beginPath(); c.ellipse(x, y, rx, ry, 0, Math.PI, 0); c.fill(); }
+  function star(c, x, y, s, col) { c.fillStyle = col; c.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 - Math.PI / 2 + .3, rr = i % 2 ? s * .42 : s; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath(); c.fill(); }
+
+  const reefFlora = (c) => {
+    const r = rng(7); sand(c, ['#f8e7bb', '#dcc08a'], r);
+    fan(c, 124, H - 58, 44, '#ff9a5a');
+    branch(c, 46, H - 58, 27, -Math.PI / 2, 5.5, '#ff6f91', r, 4);
+    branch(c, 86, H - 52, 15, -Math.PI / 2 + .25, 3.5, '#ffb3c4', r, 3);
+    tubes(c, 232, H - 50, '#b58cff', '#efe3ff', r);
+    brain(c, 180, H - 50, 27, 19, '#f4b860', '#cf8d38');
+    branch(c, 206, H - 52, 16, -Math.PI / 2 - .2, 3.5, '#ff4f6e', r, 3);
+    star(c, 92, H - 26, 8, '#ef6b4a'); star(c, 214, H - 18, 6, '#f08ba0');
+  };
+  const WATERS = [
+    { name: 'Sunny reef', filter: 'Bright and happy', top: '#8be8e6', mid: '#27b0cf', bot: '#0e76a8', ray: .55, scene: layer(reefFlora), weed: ['#2fae7f', '#4cc98e'], kelp: 0 },
+    { name: 'Kelp forest', filter: 'Acoustic', top: '#a9e6b8', mid: '#2f9a7c', bot: '#0f5b55', ray: .48, kelp: 8, weed: ['#6f7d2a', '#8f9a36'],
+      scene: layer((c) => { const r = rng(21); sand(c, ['#d4c791', '#9c8f60'], r); rock(c, 44, H - 44, 38, 28, '#6d7363'); rock(c, 214, H - 42, 50, 30, '#5f6657'); rock(c, 130, H - 40, 20, 14, '#7c8271'); star(c, 150, H - 22, 7, '#d98448'); }) },
+    { name: 'Open blue', filter: 'Mostly instrumental', top: '#b7e2ff', mid: '#2f83dc', bot: '#0b3d91', ray: .38, kelp: 0, weed: ['#3f7fb5', '#5a98c9'],
+      scene: layer((c) => { const r = rng(33); sand(c, ['#9db3cb', '#5f7895'], r, H - 44); rock(c, 212, H - 30, 34, 18, '#54708f'); }) },
+    { name: 'Midnight', filter: 'Dark and moody', top: '#2c4f86', mid: '#11244f', bot: '#040920', ray: .1, kelp: 0, weed: ['#23395f', '#2d4a72'],
+      scene: layer((c) => { const r = rng(55); sand(c, ['#2b3050', '#14172c'], r); rock(c, 60, H - 50, 46, 44, '#1b1f38'); rock(c, 216, H - 46, 40, 58, '#171a31'); c.shadowColor = '#7ff0ff'; c.shadowBlur = 9; c.fillStyle = '#9ff7ff'; for (let i = 0; i < 22; i++) { c.beginPath(); c.arc(r() * W, H - 112 + r() * 86, .9 + r() * 1.1, 0, TAU); c.fill(); } c.shadowBlur = 0; }) },
+  ];
+  const DEPTHS = [
+    { name: 'Popular', note: 'Songs a lot of people know', top: '#8be8e6', mid: '#27b0cf', bot: '#0e76a8' },
+    { name: 'Deep cuts', note: 'Lesser-known songs by big artists', top: '#2aa7c4', mid: '#127fa8', bot: '#0a4f86' },
+    { name: 'Hidden gems', note: 'The best songs by small artists', top: '#0f4a86', mid: '#0a2f66', bot: '#061c45' },
+    { name: 'Buried', note: 'Almost nobody has heard these', top: '#081a3d', mid: '#050f28', bot: '#020614' },
+  ];
+  const CORALS = [0, 1, 2, 3, 4].map((i) => { const c = document.createElement('canvas'); c.width = c.height = 100 * DPR; const x = c.getContext('2d'); x.scale(DPR, DPR); const r = rng(11 + i * 9);
+    if (i === 0) branch(x, 30, 96, 26, -Math.PI / 2 + .3, 5, '#ff6f91', r, 4);
+    if (i === 1) fan(x, 40, 96, 42, '#ff9a5a');
+    if (i === 2) { brain(x, 34, 96, 28, 20, '#f4b860', '#cf8d38'); branch(x, 62, 96, 14, -Math.PI / 2, 3, '#ff4f6e', r, 3); }
+    if (i === 3) tubes(x, 40, 96, '#b58cff', '#efe3ff', r);
+    if (i === 4) { branch(x, 30, 96, 20, -Math.PI / 2 + .2, 4, '#8a9bb8', r, 4); }
+    return c; });
+
+  /* ---------- creatures ---------- */
+  const ell = (c, x, y, rx, ry, fill, rot = 0) => { c.fillStyle = fill; c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, TAU); c.fill(); };
+  const tail = (c, x, col, w, size) => { c.fillStyle = col; c.beginPath(); c.moveTo(x + 1, 0); c.lineTo(x - size, -size * .8 + w * size * .5); c.lineTo(x - size * .72, w * size * .5); c.lineTo(x - size, size * .8 + w * size * .5); c.closePath(); c.fill(); };
+  const eye = (c, x, y, r = 1.5) => { ell(c, x, y, r, r, '#fff'); ell(c, x + .3, y, r * .6, r * .6, '#111'); };
+  function creature(c, k, t, ph) {
+    const w = Math.sin(t * 9 + ph) * .35;
+    if (k === 'clown') { tail(c, -10, '#f2701d', w, 8); ell(c, 0, 0, 12, 7, '#f57c22'); c.save(); c.beginPath(); c.ellipse(0, 0, 12, 7, 0, 0, TAU); c.clip(); c.fillStyle = '#fff'; c.fillRect(-6, -8, 3.4, 16); c.fillRect(3, -8, 3.4, 16); c.restore(); eye(c, 8, -1.6); }
+    else if (k === 'neon') { tail(c, -7, '#2fb8e8', w, 4.5); ell(c, 0, 0, 8, 2.8, '#46d6ff'); c.fillStyle = '#ff4f6e'; c.fillRect(-5, .2, 9, 1.5); eye(c, 5, -.8, 1); }
+    else if (k === 'tang') { tail(c, -9, '#f2bb22', w, 6); c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(-2, -7); c.lineTo(3, -11); c.lineTo(6, -6); c.closePath(); c.fill(); ell(c, 0, 0, 10.5, 7.5, '#ffd23f'); eye(c, 6, -1.8); }
+    else if (k === 'silver') { tail(c, -9, '#a9bfca', w, 5); ell(c, 0, 0, 10, 3.2, '#dbe8ee'); c.fillStyle = '#9fb6c2'; c.fillRect(-7, -2.4, 14, 1.2); eye(c, 7, -.6, 1); }
+    else if (k === 'turtle') { const f = Math.sin(t * 2.2 + ph) * .55; ell(c, 8, -8, 8, 3, '#6fb784', -.8 + f); ell(c, 8, 8, 8, 3, '#6fb784', .8 - f); ell(c, -11, -6, 5, 2.4, '#6fb784', .7 - f * .5); ell(c, -11, 6, 5, 2.4, '#6fb784', -.7 + f * .5); ell(c, 17, 0, 5, 4, '#7ac08f'); ell(c, 0, 0, 15, 11, '#3f8f63'); ell(c, 0, 0, 10, 7, '#57a97a'); ell(c, 0, 0, 4.5, 3.5, '#3f8f63'); eye(c, 19.5, -1.2, 1.1); }
+    else if (k === 'whale') { c.fillStyle = '#1a3f73'; c.beginPath(); c.moveTo(-60, 0); c.lineTo(-76, -11 + w * 10); c.lineTo(-68, 0); c.lineTo(-76, 11 + w * 10); c.closePath(); c.fill(); ell(c, 0, 0, 62, 20, '#1a3f73'); ell(c, 10, 9, 46, 10, '#7ea0c6'); ell(c, 10, 17, 14, 4, '#1a3f73', .5); eye(c, 42, -3, 1.8); }
+    else if (k === 'jelly') { const g = c.createRadialGradient(0, -2, 1, 0, -2, 24); g.addColorStop(0, 'rgba(220,170,255,.5)'); g.addColorStop(1, 'rgba(220,170,255,0)'); c.fillStyle = g; c.beginPath(); c.arc(0, -2, 24, 0, TAU); c.fill(); c.strokeStyle = 'rgba(235,205,255,.75)'; c.lineWidth = 1; for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(i * 3.2, 3); c.quadraticCurveTo(i * 3.2 + Math.sin(t * 2 + i) * 3, 11, i * 3.2 + Math.sin(t * 2.4 + i) * 4, 19); c.stroke(); } c.fillStyle = 'rgba(240,205,255,.88)'; c.beginPath(); c.arc(0, 2, 10, Math.PI, 0); c.quadraticCurveTo(5, 5, 0, 3.5); c.quadraticCurveTo(-5, 5, -10, 2); c.fill(); }
+    else if (k === 'angler') { tail(c, -11, '#1d2340', w, 8); ell(c, 0, 0, 13, 10, '#262c4e'); c.strokeStyle = '#3a4270'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(5, -9); c.quadraticCurveTo(12, -18, 18, -13); c.stroke(); const g = c.createRadialGradient(18, -13, 0, 18, -13, 15); g.addColorStop(0, 'rgba(170,250,255,.95)'); g.addColorStop(.25, 'rgba(120,240,255,.4)'); g.addColorStop(1, 'rgba(120,240,255,0)'); c.fillStyle = g; c.beginPath(); c.arc(18, -13, 15, 0, TAU); c.fill(); c.fillStyle = '#e8edf5'; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(6 + i * 2, 3); c.lineTo(7 + i * 2, 6.5); c.lineTo(8 + i * 2, 3); c.fill(); } eye(c, 6, -3, 1.8); }
+    else if (k === 'puffer') { c.fillStyle = '#d9ad3a'; for (let i = 0; i < 12; i++) { const a = i * TAU / 12; c.beginPath(); c.moveTo(Math.cos(a - .2) * 9.5, Math.sin(a - .2) * 9.5); c.lineTo(Math.cos(a) * 13.5, Math.sin(a) * 13.5); c.lineTo(Math.cos(a + .2) * 9.5, Math.sin(a + .2) * 9.5); c.fill(); } tail(c, -10, '#d9ad3a', w, 4.5); ell(c, 0, 0, 10.5, 10.5, '#f4cf58'); ell(c, 1, 4, 7.5, 5.5, '#fbf1cd'); eye(c, 5, -3, 2); }
+  }
+  const SCHOOL = [[0, 0], [-15, -7], [-11, 8], [-26, 2], [-22, -13], [-34, 9]];
+  const swimmer = (k, d, v, s = 1, x = Math.random() * W, ph = Math.random() * 9, school = 0) => ({ k, d, v, s, x, ph, school, dir: v < 0 ? -1 : 1 });
+  const WATER_FISH = [
+    [swimmer('neon', .12, 26, 1, 60, 1, 6), swimmer('clown', .56, 15, 1.15, 40), swimmer('clown', .66, -12, 1, 200), swimmer('tang', .34, -18, 1.1, 170), swimmer('tang', .47, 11, .85, 90)],
+    [swimmer('silver', .13, 18, 1, 80, 2, 6), swimmer('silver', .42, -20, 1, 190, 3, 5), swimmer('turtle', .6, 10, 1.15, 60)],
+    [swimmer('silver', .12, 24, 1, 120, 2, 6), swimmer('whale', .4, 9, .92, 40)],
+    [swimmer('jelly', .13, 3, 1.1, 90), swimmer('jelly', .36, -4, 1.4, 200), swimmer('jelly', .54, 3, .9, 60), swimmer('angler', .7, 8, 1.2, 120)],
+  ];
+
+  /* ---------- one phone ---------- */
+  function Phone(el) {
+    const mode = el.dataset.mode;
+    el.innerHTML = '<div class="h-home"><div class="h-status"></div><div class="h-card"></div><div class="h-title">Just listen.</div><div class="h-sub">Tap anywhere for buttons · swipe the card to choose</div></div><canvas></canvas><div class="u"></div><div class="hint"><i>⌃</i>Swipe up to dive</div>';
+    const home = el.querySelector('.h-home'), cv = el.querySelector('canvas'), ui = el.querySelector('.u'), statusEl = el.querySelector('.h-status'), hint = el.querySelector('.hint');
+    cv.width = W * DPR; cv.height = H * DPR; const c = cv.getContext('2d'); c.scale(DPR, DPR);
+    const dr = rng(mode.charCodeAt(0) * 91); let dots = '';
+    for (let i = 0; i < 92; i++) { const a = dr() * TAU, rad = 62 + dr() * 16; dots += '<circle cx="' + (115 + Math.cos(a) * rad).toFixed(1) + '" cy="' + (112 + Math.sin(a) * rad).toFixed(1) + '" r="1.7" fill="#c98a52"/>'; }
+    el.querySelector('.h-card').innerHTML = '<svg viewBox="0 0 230 230">' + dots + '</svg>';
+
+    const bubbles = Array.from({ length: 22 }, () => ({ x: Math.random() * W, spd: .035 + Math.random() * .06, ph: Math.random(), r: .9 + Math.random() * 2.8, wob: Math.random() * 9 }));
+    const sparks = Array.from({ length: 22 }, () => ({ x: Math.random() * W, y: 4 + Math.random() * Math.random() * 62, spd: 1 + Math.random() * 1.8, ph: Math.random() * 9, s: 2.4 + Math.random() * 3.8 }));
+    const S = { dive: 0, diveV: 0, diveT: 0, pos: 0, posV: 0, posT: 0, depth: 0, depthV: 0, depthT: 0, chosen: null, dived: false, drag: null, lastUi: '' };
+
+    const B = mode === 'b' ? [
+      { k: 'neon', label: 'Fast', song: 'Fast', hx: 92, d: .17, A: 34, w: .85, s: 1.25, school: 6, ph: 0 },
+      { k: 'jelly', label: 'Quiet', song: 'Quiet and sparse', hx: 208, d: .27, A: 8, w: .3, s: 1.25, ph: 1 },
+      { k: 'turtle', label: 'Slow', song: 'Slow', hx: 72, d: .4, A: 22, w: .24, s: 1.2, ph: 2 },
+      { k: 'puffer', label: 'Loud', song: 'Loud and dense', hx: 196, d: .51, A: 16, w: .55, s: 1.35, ph: 4 },
+      { k: 'clown', label: 'Happy', song: 'Bright and happy', hx: 110, d: .66, A: 36, w: .6, s: 1.3, ph: 3 },
+    ].map((f) => ({ ...f, dn: f.d })) : null;
+
+    const WORLD = 1344, level = () => Math.round(S.depth * 3);
+    const wallX = (wy) => 58 + 30 * Math.sin(wy * .0065) + 13 * Math.sin(wy * .017 + 1);
+    const C_FISH = mode === 'c' ? [
+      swimmer('neon', 130, 26, 1, 90, 1, 6), swimmer('clown', 300, 14, 1.15, 150), swimmer('tang', 240, -17, 1.05, 200), swimmer('turtle', 410, 9, 1.05, 170),
+      swimmer('tang', 590, 14, 1, 130), swimmer('silver', 680, -18, 1, 220, 3, 6), swimmer('puffer', 790, 8, 1.15, 180),
+      swimmer('jelly', 1020, 3, 1.1, 170), swimmer('silver', 1140, 16, .85, 160, 5, 4), swimmer('jelly', 1260, -3, 1.4, 220),
+      swimmer('jelly', 1440, 3, 1, 150), swimmer('angler', 1600, 8, 1.3, 170), swimmer('angler', 1720, -6, .9, 240),
+    ] : null;
+    const C_CORAL = [[150, 0], [255, 1], [360, 3], [470, 2], [560, 0], [650, 1], [760, 3], [850, 4], [1010, 4], [1240, 4]];
+
+    function buildUI() {
+      if (mode === 'a') ui.innerHTML = '<div class="pill"><b></b><span></span></div><button class="arrow l">‹</button><button class="arrow r">›</button><div class="dots">' + WATERS.map(() => '<s></s>').join('') + '</div><button class="go">Swipe these songs</button><div class="back">Drag down to go back up</div>';
+      if (mode === 'b') ui.innerHTML = '<div class="pill"><b>Tap a creature</b><span>Each one is a kind of song</span></div><button class="go" style="display:none">Swipe these songs</button><div class="back">Drag down to go back up</div>';
+      if (mode === 'c') ui.innerHTML = '<div class="pill"><b></b><span></span></div><div class="scale">' + DEPTHS.map((d, i) => '<button data-l="' + i + '">' + d.name + '</button>').join('') + '</div><button class="go">Swipe these songs</button><div class="back">Drag up to sink, down to rise</div>';
+      const go = ui.querySelector('.go');
+      go.addEventListener('click', () => {
+        S.diveT = 0;
+        if (mode === 'a') setStatus(WATERS[Math.round(S.posT)].filter);
+        if (mode === 'b' && S.chosen) setStatus(S.chosen.song);
+        if (mode === 'c') setStatus(DEPTHS[Math.round(S.depthT * 3)].name);
+      });
+      ui.querySelector('.arrow.l')?.addEventListener('click', () => { S.posT = clamp(S.posT - 1, 0, 3); });
+      ui.querySelector('.arrow.r')?.addEventListener('click', () => { S.posT = clamp(S.posT + 1, 0, 3); });
+      ui.querySelectorAll('.scale button').forEach((b) => b.addEventListener('click', () => { S.depthT = +b.dataset.l / 3; }));
+    }
+    function setStatus(text) {
+      statusEl.innerHTML = text ? '<button>Swiping: ' + text + '  ✕</button>' : '';
+      const b = statusEl.querySelector('button');
+      if (b) b.addEventListener('click', () => { setStatus(null); S.posT = 0; S.depthT = 0; S.chosen = null; refreshB(); });
+    }
+    function refreshB() {
+      if (mode !== 'b') return;
+      const pill = ui.querySelector('.pill'), go = ui.querySelector('.go');
+      pill.innerHTML = S.chosen ? '<b>' + S.chosen.song + '</b><span>Songs that sound like this</span>' : '<b>Tap a creature</b><span>Each one is a kind of song</span>';
+      go.style.display = S.chosen ? '' : 'none';
+    }
+    function syncUI() {
+      const op = clamp((S.dive - .8) / .2, 0, 1);
+      ui.style.opacity = op; ui.style.visibility = op < .02 ? 'hidden' : 'visible';
+      hint.style.opacity = S.dived ? 0 : 1 - clamp(S.dive * 6, 0, 1);
+      let key = '';
+      if (mode === 'a') key = 'a' + Math.round(S.posT);
+      if (mode === 'c') key = 'c' + Math.round(S.depthT * 3);
+      if (key === S.lastUi) return; S.lastUi = key;
+      if (mode === 'a') { const i = Math.round(S.posT), w = WATERS[i]; ui.querySelector('.pill').innerHTML = '<b>' + w.name + '</b><span>' + w.filter + ' songs</span>'; ui.querySelectorAll('.dots s').forEach((d, j) => d.classList.toggle('on', j === i)); ui.querySelector('.arrow.l').disabled = i === 0; ui.querySelector('.arrow.r').disabled = i === 3; }
+      if (mode === 'c') { const i = Math.round(S.depthT * 3), d = DEPTHS[i]; ui.querySelector('.pill').innerHTML = '<b>' + d.name + '</b><span>' + d.note + '</span>'; ui.querySelectorAll('.scale button').forEach((b, j) => b.classList.toggle('on', j === i)); }
+    }
+
+    function palette() {
+      if (mode === 'b') return { ...WATERS[0], top: WATERS[0].top, ray: WATERS[0].ray };
+      const stops = mode === 'a' ? WATERS : DEPTHS, f = mode === 'a' ? S.pos : S.depth * 3, i = clamp(Math.floor(f), 0, stops.length - 2), t = clamp(f - i, 0, 1), a = stops[i], b = stops[i + 1];
+      return { top: mix(a.top, b.top, t), mid: mix(a.mid, b.mid, t), bot: mix(a.bot, b.bot, t), ray: mode === 'a' ? lerp(a.ray, b.ray, t) : .55 * clamp(1 - S.depth * 2.4, 0, 1) };
+    }
+    function wave(sy, t, amp, ph) {
+      c.beginPath(); c.moveTo(-4, H + 4); c.lineTo(-4, sy);
+      for (let x = -4; x <= W + 4; x += 6) c.lineTo(x, sy + Math.sin(x * .03 + t * 1.2 + ph) * 4 * amp + Math.sin(x * .071 - t * .9 + ph) * 2.2 * amp);
+      c.lineTo(W + 4, H + 4); c.closePath();
+    }
+    function crest(sy, t) {
+      c.beginPath();
+      for (let x = -4; x <= W + 4; x += 6) { const y = sy + Math.sin(x * .03 + t * 1.2) * 4 + Math.sin(x * .071 - t * .9) * 2.2; x === -4 ? c.moveTo(x, y) : c.lineTo(x, y); }
+      c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 1.4; c.stroke();
+    }
+    function rays(sy, t, a) {
+      if (a <= .01) return;
+      c.save(); c.globalCompositeOperation = 'screen';
+      for (let i = 0; i < 6; i++) {
+        const x0 = W * (i + .3) / 6 + Math.sin(t * .28 + i * 1.7) * 20, w = 10 + (i * 37 % 13), len = 300 + (i * 53 % 170), slant = -34 + (i * 17 % 18), al = a * (.32 + .22 * Math.sin(t * .6 + i * 2.1));
+        const g = c.createLinearGradient(0, sy, 0, sy + len); g.addColorStop(0, 'rgba(255,255,240,' + al.toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,255,240,0)');
+        c.fillStyle = g; c.beginPath(); c.moveTo(x0 - w, sy); c.lineTo(x0 + w, sy); c.lineTo(x0 + w * 2.6 + slant, sy + len); c.lineTo(x0 - w * 2.2 + slant, sy + len); c.closePath(); c.fill();
+      }
+      const g = c.createRadialGradient(W * .64, sy, 2, W * .64, sy, 190); g.addColorStop(0, 'rgba(255,255,235,' + (a * 1.15).toFixed(3) + ')'); g.addColorStop(.32, 'rgba(255,255,235,' + (a * .32).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,255,235,0)');
+      c.fillStyle = g; c.fillRect(0, sy - 6, W, 210);
+      c.restore();
+    }
+    function glints(sy, t, a) {
+      if (a <= .01) return;
+      c.save(); c.globalCompositeOperation = 'screen'; c.strokeStyle = '#fff'; c.fillStyle = '#fff';
+      for (const s of sparks) {
+        const v = Math.pow(Math.max(0, Math.sin(t * s.spd + s.ph)), 5); if (v < .04) continue;
+        const x = s.x + Math.sin(t * .3 + s.ph) * 8, y = sy + s.y, l = s.s * v; c.globalAlpha = v * Math.min(1, a * 2.1);
+        c.lineWidth = .9; c.beginPath(); c.moveTo(x - l, y); c.lineTo(x + l, y); c.moveTo(x, y - l); c.lineTo(x, y + l); c.stroke();
+        c.beginPath(); c.arc(x, y, .9, 0, TAU); c.fill();
+      }
+      c.restore();
+    }
+    function ripples(y, t, a) {
+      if (a <= .01) return;
+      c.save(); c.globalCompositeOperation = 'screen'; c.lineWidth = 1.5; c.strokeStyle = 'rgba(255,255,255,' + (a * .32).toFixed(3) + ')';
+      for (let j = 0; j < 7; j++) { c.beginPath(); for (let x = -6; x <= W + 6; x += 9) { const yy = y + j * 9 + Math.sin(x * .05 + t * .8 + j * 2.1) * 4 + Math.sin(x * .13 - t * .5 + j) * 2; x === -6 ? c.moveTo(x, yy) : c.lineTo(x, yy); } c.stroke(); }
+      c.restore();
+    }
+    function bubble(sy, t) {
+      c.save();
+      for (const b of bubbles) {
+        const f = (t * b.spd + b.ph) % 1, y = lerp(H + 8, sy + 6, f), x = b.x + Math.sin(t * 1.4 + b.wob) * 5; if (y > H + 6) continue;
+        c.globalAlpha = .75 * Math.min(1, (1 - f) * 8); c.strokeStyle = '#fff'; c.lineWidth = .9; c.beginPath(); c.arc(x, y, b.r, 0, TAU); c.stroke();
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(x - b.r * .35, y - b.r * .35, b.r * .24, 0, TAU); c.fill();
+      }
+      c.restore();
+    }
+    function weed(x, base, h, col, w, t, ph, leaves) {
+      c.strokeStyle = col; c.fillStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); c.moveTo(x, base);
+      const n = Math.max(4, h / 16 | 0), pts = [];
+      for (let i = 1; i <= n; i++) { const f = i / n, px = x + Math.sin(t * .9 + ph + f * 3) * f * f * 15 * (h / 120 + .4), py = base - h * f; c.lineTo(px, py); pts.push([px, py, f]); }
+      c.stroke();
+      if (leaves) for (const [px, py, f] of pts) { if (f < .12) continue; const side = Math.round(f * n) % 2 ? 1 : -1; ell(c, px + side * 6, py, 7, 2.8, col, side * (.5 + Math.sin(t + f * 4) * .15)); }
+    }
+    function swim(list, dt, t, sy, ox, yOf) {
+      for (const f of list) {
+        f.x += f.v * dt; if (f.x > W + 90) f.x = -90; if (f.x < -90) f.x = W + 90;
+        const y = yOf(f) + Math.sin(t * .8 + f.ph) * 4;
+        if (y < sy - 20 || y > H + 40) continue;
+        for (let i = 0; i < (f.school || 1); i++) { const o = f.school ? SCHOOL[i] : [0, 0]; c.save(); c.translate(ox + f.x + o[0] * f.dir, y + o[1] + Math.sin(t * 1.5 + i) * 1.2); c.scale(f.dir * f.s, f.s); creature(c, f.k, t, f.ph + i); c.restore(); }
+      }
+    }
+
+    function tag(text, x, y, on) {
+      c.font = '600 10.5px -apple-system, BlinkMacSystemFont, sans-serif';
+      const w = c.measureText(text).width + 14; x = clamp(x, w / 2 + 4, W - w / 2 - 4);
+      c.fillStyle = on ? '#111' : 'rgba(255,255,255,.94)'; c.beginPath(); c.roundRect(x - w / 2, y - 9, w, 18, 9); c.fill();
+      c.fillStyle = on ? '#fff' : '#111'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, x, y + .5);
+    }
+    function drawB(dt, t, sy) {
+      for (const f of B) {
+        f.dn = lerp(f.dn, S.chosen === f && S.dive < .6 ? .1 : f.d, Math.min(1, dt * 2.4));
+        const sway = Math.sin(t * f.w + f.ph), x = f.hx + sway * f.A, dir = Math.cos(t * f.w + f.ph) >= 0 ? 1 : -1, y = sy + f.dn * H + Math.sin(t * .9 + f.ph) * 4;
+        f.sx = x; f.sy = y;
+        for (let i = 0; i < (f.school || 1); i++) { const o = f.school ? SCHOOL[i] : [0, 0]; c.save(); c.translate(x + o[0] * dir, y + o[1]); const pop = S.chosen === f ? 1.14 : 1; c.scale(dir * f.s * pop, f.s * pop); creature(c, f.k, t, f.ph + i); c.restore(); }
+        if (S.dive > .75) { c.save(); c.globalAlpha = clamp((S.dive - .75) / .25, 0, 1); tag(f.label, f.k === 'neon' ? x - dir * 14 : x, y - (f.k === 'jelly' ? 30 : f.k === 'turtle' ? 25 : f.k === 'puffer' ? 27 : f.k === 'neon' ? 25 : 18), S.chosen === f); c.restore(); }
+      }
+    }
+    function drawC(dt, t, sy) {
+      const shift = S.depth * WORLD, d = S.depth;
+      swim(C_FISH, dt, t, sy, 0, (f) => sy + f.d - shift);
+      c.beginPath(); c.moveTo(-4, H + 4); c.lineTo(-4, sy);
+      for (let y = sy; y <= H + 16; y += 16) c.lineTo(wallX(y - sy + shift), y);
+      c.lineTo(-4, H + 4); c.closePath();
+      const tone = (wy) => { const f = clamp(wy / WORLD / 1.05, 0, 1); return f < .34 ? mix('#f8e7bb', '#b5a57a', f / .34) : f < .67 ? mix('#b5a57a', '#3c4a68', (f - .34) / .33) : mix('#3c4a68', '#191d33', (f - .67) / .33); };
+      const g = c.createLinearGradient(0, sy, 0, H); g.addColorStop(0, tone(shift)); g.addColorStop(1, tone(shift + H - sy)); c.fillStyle = g; c.fill();
+      for (const [wy, i] of C_CORAL) { const y = sy + wy - shift; if (y < sy - 90 || y > H + 90) continue; c.drawImage(CORALS[i], wallX(wy) - 22, y - 92, 100, 100); }
+      const floor = sy + WORLD + H - 70 - shift;
+      if (floor < H) { c.beginPath(); c.moveTo(-4, H + 4); c.lineTo(-4, floor); for (let x = -4; x <= W + 4; x += 10) c.lineTo(x, floor + Math.sin(x * .025) * 10 + Math.sin(x * .08) * 3); c.lineTo(W + 4, H + 4); c.closePath(); const f = c.createLinearGradient(0, floor, 0, H); f.addColorStop(0, '#2b3050'); f.addColorStop(1, '#14172c'); c.fillStyle = f; c.fill(); }
+      if (d > .72) { c.save(); c.globalAlpha = clamp((d - .72) / .28, 0, 1); c.fillStyle = '#9ff7ff'; for (let i = 0; i < 26; i++) { const x = (i * 97 % W), y = 90 + (i * 53 % 380), v = .4 + .6 * Math.max(0, Math.sin(t * .9 + i * 1.3)); c.globalAlpha = clamp((d - .72) / .28, 0, 1) * v * .75; c.beginPath(); c.arc(x, y, .9, 0, TAU); c.fill(); } c.restore(); }
+    }
+
+    let last = performance.now();
+    this.frame = (now, full) => {
+      const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
+      const spring = (x, v, tgt, k = 90, dmp = 15) => { v += (tgt - x) * k * dt; v *= Math.exp(-dmp * dt); return [x + v * dt, v]; };
+      if (S.drag?.kind !== 'dive' && S.drag?.kind !== 'rise') { [S.dive, S.diveV] = spring(S.dive, S.diveV, S.diveT, 80, 13); }
+      if (S.drag?.axis !== 'x') [S.pos, S.posV] = spring(S.pos, S.posV, S.posT);
+      if (S.drag?.kind !== 'sink') [S.depth, S.depthV] = spring(S.depth, S.depthV, S.depthT, 42, 11);
+      S.dive = clamp(S.dive, 0, 1.03);
+      if (!full) return;
+      const sy = lerp(SEA_TOP, -18, clamp(S.dive, 0, 1));
+      home.style.transform = 'translateY(' + (sy - SEA_TOP).toFixed(1) + 'px)';
+      syncUI();
+      c.clearRect(0, 0, W, H);
+      const p = palette();
+      c.fillStyle = p.top; c.globalAlpha = .45; wave(sy - 5, t, .9, 1.7); c.fill(); c.globalAlpha = 1;
+      c.save(); wave(sy, t, 1, 0); c.clip();
+      const g = c.createLinearGradient(0, sy, 0, sy + H + 18); g.addColorStop(0, p.top); g.addColorStop(.42, p.mid); g.addColorStop(1, p.bot); c.fillStyle = g; c.fillRect(0, sy - 12, W, H + 30);
+      rays(sy, t, p.ray);
+      const base = sy + 18;
+      if (mode === 'a') {
+        for (let i = 0; i < 4; i++) {
+          const ox = (i - S.pos) * W; if (Math.abs(ox) >= W) continue; const w = WATERS[i];
+          c.drawImage(w.scene, ox, base, W, H);
+          for (let k = 0; k < w.kelp; k++) weed(ox + 18 + k * 34, base + H - 52, 300 + (k * 71 % 150), k % 2 ? '#6d8a2c' : '#86993a', 3, t, k * 1.3, true);
+          if (!w.kelp) for (let k = 0; k < 6; k++) weed(ox + 10 + k * 47, base + H - 52, 36 + (k * 17 % 28), w.weed[k % 2], 3, t, k * 1.7, false);
+          swim(WATER_FISH[i], dt, t, sy, ox, (f) => sy + f.d * H);
+        }
+      } else if (mode === 'b') {
+        c.drawImage(WATERS[0].scene, 0, base, W, H);
+        for (let k = 0; k < 6; k++) weed(10 + k * 47, base + H - 52, 36 + (k * 17 % 28), WATERS[0].weed[k % 2], 3, t, k * 1.7, false);
+        drawB(dt, t, sy);
+      } else {
+        drawC(dt, t, sy);
+      }
+      ripples(sy + 12, t, p.ray);
+      glints(sy, t, p.ray);
+      bubble(sy, t);
+      c.restore();
+      crest(sy, t);
+    };
+
+    /* ---------- hands ---------- */
+    const local = (e) => { const r = el.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
+    el.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button')) return;
+      const p = local(e), surface = lerp(SEA_TOP, -18, clamp(S.dive, 0, 1));
+      if (S.dive < .5) { if (p.y < surface - 12) return; S.drag = { kind: 'dive', x: p.x, y: p.y, moved: 0 }; }
+      else S.drag = { kind: 'under', x: p.x, y: p.y, moved: 0, pos: S.pos, depth: S.depth };
+      el.setPointerCapture(e.pointerId); active = this;
+    });
+    el.addEventListener('pointermove', (e) => {
+      const d = S.drag; if (!d) return;
+      const p = local(e), dx = p.x - d.x, dy = p.y - d.y; d.moved = Math.max(d.moved, Math.hypot(dx, dy));
+      if (d.kind === 'dive') { S.dive = clamp(-dy / (SEA_TOP * .72), 0, 1); return; }
+      if (d.kind === 'under' && d.moved > 7) {
+        if (mode === 'a' && Math.abs(dx) > Math.abs(dy)) { d.kind = 'side'; d.axis = 'x'; }
+        else if (mode === 'c' && !(S.depth <= .004 && dy > 0)) d.kind = 'sink';
+        else if (dy > 0) d.kind = 'rise';
+        else return;
+      }
+      if (d.kind === 'side') S.pos = clamp(d.pos - dx / W, 0, 3);
+      if (d.kind === 'rise') S.dive = clamp(1 - dy / (SEA_TOP * .72), 0, 1);
+      if (d.kind === 'sink') S.depth = clamp(d.depth - dy / 840, 0, 1);
+    });
+    const up = (e) => {
+      const d = S.drag; if (!d) return; S.drag = null;
+      const p = local(e);
+      if (d.kind === 'dive') { S.diveT = d.moved < 6 || S.dive > .22 ? 1 : 0; if (S.diveT === 1) S.dived = true; S.diveV = 0; }
+      if (d.kind === 'rise') { S.diveT = S.dive < .78 ? 0 : 1; S.diveV = 0; }
+      if (d.kind === 'side') { const dx = p.x - d.x; S.posT = clamp(Math.round(d.pos) + (Math.abs(dx) > 36 ? -Math.sign(dx) : 0), 0, 3); }
+      if (d.kind === 'sink') { const dy = p.y - d.y, cur = Math.round(d.depth * 3); S.depthT = clamp(cur + (Math.abs(dy) > 44 ? (dy < 0 ? 1 : -1) * Math.max(1, Math.round(Math.abs(dy) / 280)) : 0), 0, 3) / 3; }
+      if (d.kind === 'under' && mode === 'b' && d.moved < 8) {
+        let best = null, bd = 40; for (const f of B) { const dist = Math.hypot(f.sx - p.x, f.sy - p.y); if (dist < bd) { bd = dist; best = f; } }
+        if (best) { S.chosen = best; refreshB(); }
+      }
+    };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+    buildUI();
+    if (location.hash.includes('dive')) { S.dive = S.diveT = 1; S.dived = true; }
+    this.S = S;
+  }
+
+  let active = null;
+  const phones = [...document.querySelectorAll('.phone')].map((el) => new Phone(el));
+  window.__oceanPhones = phones;
+  let n = 0;
+  function loop(now) { n++; phones.forEach((p, i) => p.frame(now, p === active || n % 3 === i)); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+})();
+</script>
