@@ -179,7 +179,13 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
       rock.setShader(fadingDown(ROCK[place.water], place.water, row, height));
       const wallShape = wall.build();
       c.drawPath(wallShape, rock);
-      // Soft ledges and cracks, so it reads as rock.
+      // A lit edge, and soft cracks, so it reads as rock.
+      const rim = path();
+      for (let y = -2; y <= height + 2; y += 5) {
+        if (y === -2) rim.moveTo(edge(y / height), y);
+        else rim.lineTo(edge(y / height), y);
+      }
+      c.drawPath(rim.build(), line(mixHex(ROCK[place.water], '#ffffff', 0.35), 2.2 * k, 0.5));
       c.save();
       c.clipPath(wallShape, CLIP_IN, true);
       const crack = line(mixHex(ROCK[place.water], '#1b2a33', 0.45), 1, 0.3);
@@ -194,6 +200,8 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
 
       // Pale flora growing out of the wall. Only your listening adds color. On the sea floor it's on the sand instead.
       const pale = (i: number) => paled(PALE[i % PALE.length], place);
+      // A little shelf of rock for something to grow on, so nothing floats off the wall.
+      const shelf = (x: number, y: number, reach: number) => oval(c, x + reach * 0.35, y + 3 * k, reach, 5.5 * k, fill(mixHex(toneAt(ROCK[place.water], place.water, row), '#ffffff', 0.08)));
       const floor = (x: number) => height - seabedAt(x / width) * height + 4;
       const count = place.water === 'reef' ? 5 : place.water === 'kelp' ? 2 : place.water === 'blue' ? 2 : 2;
       for (let i = 0; i < count; i++) {
@@ -203,7 +211,8 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
         const x = onFloor ? (0.3 + r() * 0.62) * width : edge(yf) - 2;
         const base = onFloor ? floor(x) : y;
         const form = (i + col) % 4;
-        const lean = onFloor ? 0 : 0.55;
+        const lean = onFloor ? 0 : 0.3;
+        if (!onFloor) shelf(x, base, 30 * k);
         if (form === 0) branch(c, x, base, 24 * k, -Math.PI / 2 + lean, 5 * k, pale(i), r, 4);
         else if (form === 1) fan(c, x + (onFloor ? 0 : 14 * k), base, 30 * k, pale(i));
         else if (form === 2) brain(c, x + (onFloor ? 0 : 12 * k), base, 20 * k, 14 * k, pale(i), mixHex(pale(i), '#70868a', 0.3));
@@ -217,8 +226,9 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
         const onFloor = row === 3;
         const x = onFloor ? (0.26 + f() * 0.68) * width : edge(yf) - 2;
         const y = onFloor ? floor(x) + 2 : yf * height;
-        const lean = onFloor ? (f() - 0.5) * 0.4 : 0.55;
+        const lean = onFloor ? (f() - 0.5) * 0.4 : 0.3;
         const shift = onFloor ? 0 : 12 * k * piece.size;
+        if (!onFloor) shelf(x, y, 28 * k * piece.size);
         if (piece.form === 0) branch(c, x, y, 22 * k * piece.size, -Math.PI / 2 + lean, 4.5 * k * piece.size, piece.color, f, 4);
         else if (piece.form === 1) fan(c, x + shift, y, 30 * k * piece.size, piece.color);
         else brain(c, x + shift, y, 20 * k * piece.size, 14 * k * piece.size, piece.color, mixHex(piece.color, '#1b2a33', 0.32));

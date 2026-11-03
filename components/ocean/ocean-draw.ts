@@ -3,8 +3,8 @@
 // only on a phone, never on the web preview.
 //
 // The ocean is one world, not pages: the water's color blends, the sea floor runs on unbroken under every biome, and
-// specks drift past at different speeds so you feel yourself travel. Each biome's creatures fade as it slides away, so
-// nothing pops in at the edge of the screen.
+// specks drift past at different speeds so you feel yourself travel. Biomes dissolve into each other as they drift a
+// little way, the far things less than the near ones, so no edge of anything ever crosses the screen.
 
 import { BlendMode, PaintStyle, Skia, StrokeCap, TileMode, type SkCanvas, type SkPicture, type SkShader } from '@shopify/react-native-skia';
 
@@ -327,18 +327,27 @@ function drawCreatures(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: numb
   }
 }
 
-function drawStage(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: number, fade: number) {
+function drawStage(c: SkCanvas, f: Frame, stage: Stage, dx: number, oy: number, fade: number) {
   'worklet';
   const { width: w } = f;
   const k = w / WORLD_W;
   const pulse = f.sea.pulse;
+  const layered = fade < 0.995;
+  if (layered) {
+    const layer = Skia.Paint();
+    layer.setAlphaf(fade);
+    c.saveLayer(layer);
+  }
+  // The reef wall only drifts a little and what swims in front of it drifts further, which is what gives it depth.
+  const ox = dx * w * 0.55;
   c.save();
-  c.translate(ox, oy);
+  c.translate(dx * w * 0.24, oy);
   // The reef breathes out from the wall on the beat.
-  c.save();
   c.scale(1 + pulse * 0.004, 1);
   c.drawPicture(stage.picture);
   c.restore();
+  c.save();
+  c.translate(ox, oy);
   const lift = 1 + pulse * 0.55;
   if (stage.weeds.length) {
     const stem = Skia.Paint();
@@ -359,18 +368,9 @@ function drawStage(c: SkCanvas, f: Frame, stage: Stage, ox: number, oy: number, 
     c.drawPicture(b.sprite);
     c.restore();
   }
-  // A biome's creatures fade as it slides away, so none pops in or out at the screen's edge.
-  if (stage.members.length) {
-    const layered = fade < 0.995;
-    if (layered) {
-      const layer = Skia.Paint();
-      layer.setAlphaf(fade);
-      c.saveLayer(layer);
-    }
-    drawCreatures(c, f, stage, ox, oy);
-    if (layered) c.restore();
-  }
+  if (stage.members.length) drawCreatures(c, f, stage, ox, oy);
   c.restore();
+  if (layered) c.restore();
 }
 
 /** Specks drifting in the water, near ones passing faster than far ones: what makes moving feel like moving. */
@@ -468,7 +468,7 @@ export function drawOcean(c: SkCanvas, f: Frame) {
     const dy = s.row - f.posY;
     if (Math.abs(dx) >= 1 || Math.abs(dy) >= 1) continue;
     const away = Math.abs(dx);
-    drawStage(c, f, s, dx * w, dy * h + sceneY, 1 - away * away * (3 - 2 * away));
+    drawStage(c, f, s, dx, dy * h + sceneY, 1 - away * away * (3 - 2 * away));
   }
   drawMotes(c, f, surface);
   drawBubbles(c, f, surface);
