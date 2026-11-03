@@ -1,5 +1,5 @@
 import { Canvas, Fill, Shader, Skia } from '@shopify/react-native-skia';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 
 import { mixVector } from '@/lib/home-sky-motion';
@@ -129,12 +129,15 @@ export default function SkyCanvas({ width, height, horizon, lookFrom, lookTo, lo
   const w = width / K;
   const h = height / K;
   return (
-    <Canvas style={[styles.canvas, { width: w, height: h, left: (width - w) / 2, top: (height - h) / 2, transform: [{ scale: K }] }]} pointerEvents="none">
-      <Fill>
-        <Shader source={effect} uniforms={uniforms} />
-      </Fill>
-    </Canvas>
+    <View style={[styles.stretch, { width: w, height: h, left: (width - w) / 2, top: (height - h) / 2, transform: [{ scale: K }] }]} pointerEvents="none">
+      {/* The web's Canvas passes its style straight to a div, so it only gets a plain size. */}
+      <Canvas style={{ width: w, height: h }}>
+        <Fill>
+          <Shader source={effect} uniforms={uniforms} />
+        </Fill>
+      </Canvas>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({ canvas: { position: 'absolute' } });
+const styles = StyleSheet.create({ stretch: { position: 'absolute' } });
