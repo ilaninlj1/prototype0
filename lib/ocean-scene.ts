@@ -140,7 +140,7 @@ export function towerRadius(i: number, world: number): number {
   if (world <= tip) return 0;
   const grown = Math.min(1, (world - tip) / 1.4);
   const round = Math.min(1, (world - tip) / 0.06);
-  return Math.sqrt(round) * (0.035 + 0.075 * Math.sqrt(grown)) + 0.008 * Math.sin(world * 17 + i * 2) + 0.005 * Math.sin(world * 41 + i);
+  return Math.sqrt(round) * (0.03 + 0.04 * Math.sqrt(grown)) * (i === 2 ? 0.8 : 1) + 0.008 * Math.sin(world * 17 + i * 2) + 0.005 * Math.sin(world * 41 + i);
 }
 
 /** Where anemones grow on the reef's towers in a level, as shares of the screen. Clownfish nest in them. */

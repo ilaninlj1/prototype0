@@ -45,7 +45,8 @@ export function OceanChart({
     if (hit) onPickCreature(hit.creature);
     else onPickPlace(placeAtChart(x, y, plotW, plotH));
   };
-  const gesture = Gesture.Exclusive(
+  // Side by side: waiting on a pinch that never comes would swallow every tap.
+  const gesture = Gesture.Simultaneous(
     // Pinching back out of the graph, the way you pinched into it.
     Gesture.Pinch().onEnd((e) => {
       if (e.scale > 1.2) runOnJS(onClose)();
