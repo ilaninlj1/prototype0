@@ -252,7 +252,8 @@ function drawReef(c: SkCanvas, place: Place, width: number, height: number, cora
   TOWERS.forEach((t, i) => {
     const left: number[] = [];
     const right: number[] = [];
-    for (let y = -4; y <= height + 4; y += 4) {
+    // Exactly one level tall: overlapping the next one would double the see-through color into a line.
+    for (let y = 0; y <= height; y = y === height ? height + 1 : Math.min(height, y + 4)) {
       const radius = towerRadius(i, row + y / height);
       if (radius <= 0) continue;
       left.push(t.cx * width - radius * width, y);

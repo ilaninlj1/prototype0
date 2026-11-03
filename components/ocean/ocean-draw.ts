@@ -672,7 +672,9 @@ export function drawOcean(c: SkCanvas, f: Frame) {
     const s = f.stages[i];
     const dx = s.col - f.posX;
     const dy = s.row - f.posY;
-    if (Math.abs(dx) >= 1 || Math.abs(dy) >= 1) continue;
+    // While the surface is on screen, the level above still shows between it and this one, so nothing starts flat.
+    const aboveWhileRising = f.dive < 1 && dy <= -1 && dy > -1.001;
+    if (Math.abs(dx) >= 1 || (Math.abs(dy) >= 1 && !aboveWhileRising)) continue;
     const away = Math.abs(dx);
     drawStage(c, f, s, dx, dy * h + sceneY, 1 - away * away * (3 - 2 * away));
   }
