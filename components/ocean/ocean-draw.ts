@@ -8,7 +8,7 @@
 
 import { BlendMode, FilterMode, PaintStyle, Skia, StrokeCap, TileMode, createPicture, type SkCanvas, type SkPicture, type SkRuntimeEffect, type SkShader } from '@shopify/react-native-skia';
 
-import { blink, bubbleProgress, scatter, separation, stagePoses, tempoMatches, type StagedMover } from '@/lib/ocean-motion';
+import { blink, bubbleProgress, scatter, separation, squidPose, stagePoses, subPose, tempoMatches, type StagedMover } from '@/lib/ocean-motion';
 import { floorLift, seabedAt, type Rgb } from '@/lib/ocean-scene';
 import { DROP_COUNT, GLASS_COUNT, RUSH_COUNT, crownAt, dropAt, glassAt, kickAt, ringAt, rushAt, splashMix, wobbleAt, type Splash } from '@/lib/ocean-splash';
 import { SEA_BASE, seaY, type SeaState } from '@/lib/sea-beat';
@@ -35,6 +35,9 @@ export type Stage = {
   ribbons: boolean;
   tendrils: TendrilData[];
   vents: VentData[];
+  /** The tiny submarine or the squid, if this place has one: landmarks that happen to move. */
+  sub: { sprite: SkPicture; fx: number; fy: number } | null;
+  squid: { frames: SkPicture[]; fx: number; fy: number } | null;
   members: StageMember[];
   /** Indexes into members, far ones first, so nearer creatures draw in front. */
   order: number[];
@@ -544,8 +547,26 @@ function drawStage(c: SkCanvas, f: Frame, stage: Stage, dx: number, oy: number, 
     // Bottles float: they bob and rock a little.
     c.translate(b.x, b.y + Math.sin(t * 0.7 + i * 1.7) * 3 * k);
     c.rotate(Math.sin(t * 0.5 + i) * 7, 0, 0);
-    c.scale(k * 0.55, k * 0.55);
+    c.scale(k * 0.7, k * 0.7);
     c.drawPicture(b.sprite);
+    c.restore();
+  }
+  if (stage.sub) {
+    const p = subPose(t, w, h, stage.sub.fx, stage.sub.fy);
+    c.save();
+    c.translate(p.x, p.y);
+    c.rotate(p.tilt * 57.3, 0, 0);
+    c.scale(Math.abs(p.face) < 0.03 ? 0.03 : p.face, 1);
+    c.drawPicture(stage.sub.sprite);
+    c.restore();
+  }
+  if (stage.squid) {
+    const p = squidPose(t, w, h, stage.squid.fx, stage.squid.fy);
+    const frames = stage.squid.frames;
+    c.save();
+    c.translate(p.x, p.y);
+    c.rotate(p.tilt * 57.3, 0, 0);
+    c.drawPicture(frames[Math.max(0, Math.min(frames.length - 1, Math.floor(((p.tail + 1) / 2) * frames.length)))]);
     c.restore();
   }
   if (stage.members.length) drawCreatures(c, f, stage, ox, oy);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { allPlaces, DEPTHS, depthOfBands, depthOfLiveTrack, driftWater, placeKey, placeLabel, SPECIES_INFO, speciesOf, WATER_INFO, WATERS, waterOf } from './ocean-map.ts';
+import { WATER_WORD, allPlaces, DEPTHS, depthOfBands, depthOfLiveTrack, driftWater, placeKey, placeLabel, SPECIES_INFO, speciesOf, WATER_INFO, WATERS, waterOf } from './ocean-map.ts';
 import type { SoundFeatures } from './sound.ts';
 
 const sound = (over: Partial<SoundFeatures> = {}): SoundFeatures => ({
@@ -96,4 +96,9 @@ test('water and creature descriptions use the map table wording', () => {
     puffer: { name: 'Puffer', means: 'Loud' }, darter: { name: 'Darting fish', means: 'Fast' },
     clown: { name: 'Clownfish', means: 'In between' },
   });
+});
+
+test('each water has one short word for the control', () => {
+  assert.deepEqual(Object.keys(WATER_WORD), ['reef', 'kelp', 'blue', 'midnight']);
+  for (const w of Object.values(WATER_WORD)) assert.ok(w.length <= 12, w);
 });

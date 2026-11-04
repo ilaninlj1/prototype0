@@ -2,11 +2,12 @@ import { Canvas, Picture, createPicture, type SkPicture } from '@shopify/react-n
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAnimatedReaction, useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 
-import { anemonesFor, kelpFor, makeWobble, mixHex, raftsFor, recordBottle, waterTone, recordCreature, recordFar, recordFloorDetail, recordHalo, recordNear, recordPlace, recordRaft, songPalette, tendrilsFor, ventsFor, type Trail } from '@/components/ocean/ocean-art';
+import { anemonesFor, kelpFor, makeWobble, mixHex, raftsFor, recordBottle, recordSquid, recordSub, waterTone, recordCreature, recordFar, recordFloorDetail, recordHalo, recordNear, recordPlace, recordRaft, songPalette, tendrilsFor, ventsFor, type Trail } from '@/components/ocean/ocean-art';
 import { drawGlass, drawOcean, type Stage, type StageMember, type StopRow } from '@/components/ocean/ocean-draw';
 import type { Splash } from '@/lib/ocean-splash';
 import { anatomyKey } from '@/lib/ocean-anatomy';
 import { castFor } from '@/lib/ocean-cast';
+import { landmarksAt } from '@/lib/ocean-landmarks';
 import { DEPTHS, WATERS, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
 import { MAX_BOTTLES, bottleSpot } from '@/lib/ocean-motion';
 import { floorSand, type OceanLife } from '@/lib/ocean-person';
@@ -57,25 +58,25 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
   const halos = useRef(new Map<string, { faint: SkPicture; bright: SkPicture }>());
   const bottleArt = useRef(new Map<string, SkPicture>());
   const raftArt = useRef(new Map<string, SkPicture>());
+  const subArt = useRef<SkPicture | null>(null);
+  const squidArt = useRef<SkPicture[] | null>(null);
 
-  // Moving to the next water loads the one beyond it only once the move has settled, so it can't hitch the glide.
+  // Moving to the next water loads the one beyond it only once the move has settled, so it can't hitch the glide. Tapping
+  // a far water keeps everything between ready at once, so you pass through each biome on the way there.
   const col = WATERS.indexOf(place.water);
-  const [loadedCol, setLoadedCol] = useState(col);
+  const [range, setRange] = useState<[number, number]>([Math.max(0, col - 1), Math.min(3, col + 1)]);
   useEffect(() => {
-    if (Math.abs(col - loadedCol) > 1) {
-      setLoadedCol(col);
-      return;
-    }
-    const t = setTimeout(() => setLoadedCol(col), 900);
+    setRange(([lo, hi]) => (col < lo || col > hi ? [Math.min(lo, col), Math.max(hi, col)] : [lo, hi]));
+    const t = setTimeout(() => setRange([Math.max(0, col - 1), Math.min(3, col + 1)]), 1500);
     return () => clearTimeout(t);
-  }, [col, loadedCol]);
+  }, [col]);
 
   const hourKey = Math.floor(hour);
   const nearArt = useMemo(() => WATERS.map((w) => recordNear(w, width, height)), [width, height]);
   const farArt = useMemo(() => WATERS.map((w) => recordFar(w, width, height)), [width, height]);
   const stages = useMemo(() => {
     const out: Stage[] = [];
-    for (let c = Math.max(0, loadedCol - 1); c <= Math.min(3, loadedCol + 1); c++) {
+    for (let c = range[0]; c <= range[1]; c++) {
       const water = WATERS[c];
       const sand = floorSand(life, water);
       const hereCoral = (key: string) => life?.places[key]?.coral ?? [];
@@ -98,6 +99,8 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
         const key = placeKey(here);
         const lives = life?.places[key];
         const trails = trailsIn(row);
+        const subHere = landmarksAt(here).find((l) => l.kind === 'sub');
+        const squidHere = landmarksAt(here).find((l) => l.kind === 'squid');
         const signature = `${width}x${height}|${(lives?.coral ?? []).map((p) => p.trackId).join()}|${row === 3 ? sand.specks.length : 0}|${trails.map((t) => `${t.y0.toFixed(0)}:${t.y1.toFixed(0)}`).join()}`;
         let cached = pictures.current.get(key);
         if (!cached || cached.signature !== signature) {
@@ -163,6 +166,8 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
           ribbons: water === 'blue',
           tendrils: tendrilsFor(here, width, height, lives?.coral ?? []),
           vents: ventsFor(here, width, height),
+          sub: subHere ? { sprite: (subArt.current ??= recordSub(here, width / 270)), fx: subHere.fx, fy: subHere.fy ?? 0.4 } : null,
+          squid: squidHere ? { frames: (squidArt.current ??= recordSquid(here, width / 270)), fx: squidHere.fx, fy: squidHere.fy ?? 0.4 } : null,
           members,
           order: members.map((_, i) => i).sort((a, b) => members[a].z - members[b].z || a - b),
           bottles: hereBottles.map((b, i) => {
@@ -180,7 +185,7 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
     return out;
     // hour moves only the cast; recorded art is cached above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, life, bottles, hourKey, loadedCol]);
+  }, [width, height, life, bottles, hourKey, range]);
 
   const stops = useMemo(() => DEPTHS.map((d) => WATERS.map((w) => rows(w, d, hour))), [hourKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const restStops = useMemo(() => rows(rest.water, rest.depth, hour), [rest.water, rest.depth, hourKey]); // eslint-disable-line react-hooks/exhaustive-deps

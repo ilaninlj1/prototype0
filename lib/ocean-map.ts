@@ -16,6 +16,9 @@ export const WATER_INFO: Record<Water, { name: string; caption: string }> = {
   midnight: { name: 'Midnight', caption: 'Dark and moody' },
 };
 
+/** Each water in one word, for the control you pick it with. */
+export const WATER_WORD: Record<Water, string> = { reef: 'Upbeat', kelp: 'Acoustic', blue: 'Instrumental', midnight: 'Moody' };
+
 export const DEPTH_INFO: Record<Depth, { name: string }> = {
   popular: { name: 'Popular' },
   deepcuts: { name: 'Deep cuts' },

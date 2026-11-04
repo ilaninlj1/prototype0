@@ -1,19 +1,61 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
-import { DEPTHS, DEPTH_INFO, WATERS, WATER_INFO, placeLabel, type Depth, type Place, type Water } from '@/lib/ocean-map';
+import { DEPTHS, DEPTH_INFO, WATERS, WATER_INFO, WATER_WORD, placeLabel, type Depth, type Place, type Water } from '@/lib/ocean-map';
+
+function SoundWord({ water, i, here, posX, width, onPress }: { water: Water; i: number; here: boolean; posX: SharedValue<number>; width: number; onPress: () => void }) {
+  // The white word fades in over the black one as the highlight arrives, so it changes with the swipe rather than after it.
+  const light = useAnimatedStyle(() => ({ opacity: Math.max(0, 1 - Math.abs(posX.get() - i) * 1.15) }));
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.soundWord, { width }]}
+      hitSlop={{ top: 8, bottom: 8 }}
+      accessibilityRole="button"
+      accessibilityState={{ selected: here }}
+      accessibilityLabel={`Go to ${WATER_INFO[water].name}, ${WATER_INFO[water].caption}`}>
+      <ThemedText style={styles.soundText} numberOfLines={1}>
+        {WATER_WORD[water]}
+      </ThemedText>
+      <Animated.View style={[styles.soundLight, light]} pointerEvents="none">
+        <ThemedText style={styles.soundTextOn} numberOfLines={1}>
+          {WATER_WORD[water]}
+        </ThemedText>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+/** How a song sounds, across: the partner of the depth control. Its highlight follows the water as you swipe sideways. */
+function SoundStrip({ place, posX, onWater }: { place: Place; posX: SharedValue<number>; onWater: (w: Water) => void }) {
+  const [inner, setInner] = useState(0);
+  const each = inner / WATERS.length;
+  const slider = useAnimatedStyle(() => ({ transform: [{ translateX: Math.max(0, Math.min(WATERS.length - 1, posX.get())) * each }] }));
+  return (
+    <View style={styles.sounds} onLayout={(e) => setInner(e.nativeEvent.layout.width - 6)}>
+      {each > 0 && <Animated.View style={[styles.soundSlider, { width: each }, slider]} />}
+      {each > 0 &&
+        WATERS.map((water, i) => (
+          <SoundWord key={water} water={water} i={i} here={water === place.water} posX={posX} width={each} onPress={() => onWater(water)} />
+        ))}
+    </View>
+  );
+}
 
 /**
- * What stays on screen under the water: where you are and how many songs are left there, the way to the next water
- * and depth, Swipe these songs, and the way back up. Every move has a button, so nothing depends on a swipe.
+ * What stays on screen under the water: where you are and how many songs are left there, the two controls for how it
+ * sounds and how well known it is, Swipe these songs, and the way back up. Every move has a button, so nothing depends on a swipe.
  */
 export function OceanUi({
   place,
   subtitle,
   hint,
+  posX,
   canSwipe,
   offerExample,
   allCount,
@@ -30,6 +72,8 @@ export function OceanUi({
   place: Place;
   subtitle: string;
   hint: string | null;
+  /** Where you are across the waters, so the strip's highlight moves with the water as you swipe. */
+  posX: SharedValue<number>;
   canSwipe: boolean;
   /** Your ocean is still thin: offer a look at a grown one. */
   offerExample: boolean;
@@ -47,9 +91,6 @@ export function OceanUi({
   onToggleMeter: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const w = WATERS.indexOf(place.water);
-  const previous = w > 0 ? WATERS[w - 1] : null;
-  const next = w < WATERS.length - 1 ? WATERS[w + 1] : null;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={[styles.top, { paddingTop: insets.top + Spacing.sm }]} pointerEvents="box-none">
@@ -68,27 +109,6 @@ export function OceanUi({
           </Pressable>
         )}
       </View>
-
-      {previous && (
-        <Pressable
-          onPress={() => onWater(previous)}
-          hitSlop={10}
-          style={[styles.arrow, styles.arrowLeft]}
-          accessibilityRole="button"
-          accessibilityLabel={`Go to ${WATER_INFO[previous].name}`}>
-          <Ionicons name="chevron-back" size={22} color={Colors.text} />
-        </Pressable>
-      )}
-      {next && (
-        <Pressable
-          onPress={() => onWater(next)}
-          hitSlop={10}
-          style={[styles.arrow, styles.arrowRight]}
-          accessibilityRole="button"
-          accessibilityLabel={`Go to ${WATER_INFO[next].name}`}>
-          <Ionicons name="chevron-forward" size={22} color={Colors.text} />
-        </Pressable>
-      )}
 
       <View style={styles.depths}>
         {DEPTHS.map((d) => {
@@ -109,6 +129,7 @@ export function OceanUi({
       </View>
 
       <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, Spacing.md) + Spacing.sm }]} pointerEvents="box-none">
+        <SoundStrip place={place} posX={posX} onWater={onWater} />
         <Pressable
           onPress={onSwipe}
           disabled={!canSwipe}
@@ -157,18 +178,12 @@ const styles = StyleSheet.create({
   pillTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: Colors.text },
   pillSub: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },
   hint: { fontSize: 14, lineHeight: 19, fontWeight: '600', color: '#ffffff', textAlign: 'center', textShadowColor: 'rgba(0,30,45,0.55)', textShadowRadius: 6 },
-  arrow: {
-    position: 'absolute',
-    top: '42%',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowLeft: { left: Spacing.sm },
-  arrowRight: { right: Spacing.sm },
+  sounds: { flexDirection: 'row', alignSelf: 'stretch', maxWidth: 340, width: '100%', height: 38, padding: 3, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.94)', shadowColor: '#04222d', shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  soundSlider: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 16, backgroundColor: Colors.text },
+  soundWord: { alignItems: 'center', justifyContent: 'center' },
+  soundText: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: Colors.text },
+  soundLight: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  soundTextOn: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: Colors.accentText },
   // One solid control, so it reads over any water and doesn't look like four loose labels.
   depths: { position: 'absolute', right: Spacing.sm, top: '52%', padding: 3, gap: 1, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.94)', shadowColor: '#04222d', shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   depth: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 13, justifyContent: 'center' },

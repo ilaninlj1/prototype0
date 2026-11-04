@@ -1898,7 +1898,7 @@ export default function HomeScreen() {
         }
         onClose={() => setPortraitOpen(false)}
       />
-      <JourneySheet bottle={journey ? (myBottles.get(journey.trackId) ?? null) : null} title="This bottle's journey" onClose={() => setJourney(null)} />
+      <JourneySheet bottle={journey ? (myBottles.get(journey.trackId) ?? null) : null} title="The note inside" note onClose={() => setJourney(null)} />
     </View>
   );
 }
