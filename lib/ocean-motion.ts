@@ -161,7 +161,7 @@ export const MAX_BOTTLES = 10;
 /** Bottles float, so they all bob along near the top of Popular, spread in a loose line. */
 export function bottleSpot(i: number, n: number, w: number, h: number): { x: number; y: number } {
   'worklet';
-  return { x: (0.08 + ((i + 0.5) / Math.max(1, n)) * 0.84) * w, y: (0.17 + ((i % 3) / 2) * 0.05) * h };
+  return { x: (0.08 + ((i + 0.5) / Math.max(1, n)) * 0.84) * w, y: (0.24 + ((i % 3) / 2) * 0.05) * h };
 }
 
 /** Two creatures closer than this push each other apart, so nothing sits on top of anything else. Nothing outside it. */

@@ -162,7 +162,7 @@ test('scatter pushes away inside its reach and is nothing outside it', () => {
 
 test('bottles float in a line near the top, spread across the screen', () => {
   const spots = Array.from({ length: 10 }, (_, i) => bottleSpot(i, 10, W, H));
-  for (const s of spots) assert.ok(s.y > H * 0.15 && s.y < H * 0.24);
+  for (const s of spots) assert.ok(s.y > H * 0.22 && s.y < H * 0.3);
   assert.ok(spots[9].x - spots[0].x > W * 0.6);
   assert.equal(new Set(spots.map((s) => Math.round(s.x))).size, 10);
 });

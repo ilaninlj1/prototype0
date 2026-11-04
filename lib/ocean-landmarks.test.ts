@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { CHAIN_LEVELS, LANDMARKS, hitLandmark, landmarkSpot, landmarksAt } from './ocean-landmarks.ts';
+import { bottleSpot } from './ocean-motion.ts';
 import { floorAt } from './ocean-scene.ts';
 
 const W = 390;
@@ -48,4 +49,10 @@ test('a tap finds the nearest landmark in reach, and open water finds nothing', 
   assert.equal(hitLandmark(spots[0].x + 10, spots[0].y, list, spots, 1.4)?.kind, 'wreck');
   assert.equal(hitLandmark(0, 0, list, spots, 1.4), null);
   assert.equal(hitLandmark(0, 0, [], [], 1.4), null);
+});
+
+test('the floating bottles stay clear of the rowboat above them', () => {
+  const boat = landmarkSpot(LANDMARKS.find((l) => l.kind === 'boat')!, W, H);
+  const k = W / 270;
+  for (let i = 0; i < 10; i++) assert.ok(bottleSpot(i, 10, W, H).y - boat.y > (15 + 12) * k, `bottle ${i}`);
 });
