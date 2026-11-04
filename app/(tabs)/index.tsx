@@ -467,16 +467,6 @@ export default function HomeScreen() {
   // What a save needs to fly from the card into the You tab, read by the listener below.
   const cardAreaViewRef = useRef<ViewInstance>(null);
   const isFocused = useIsFocused();
-  // Animals at the surface: rare, and only ever on top of the water, so "nothing wild under it" still holds.
-  const seaLife = useSeaLife({
-    active: isFocused,
-    paused: underWater,
-    width: frame.width || win.width,
-    screenH: (frame.height || win.height - 72 - insets.bottom) + tabBarHeight,
-    horizon: (frame.height || win.height - 72 - insets.bottom) + 4 - SEA_HEIGHT + SEA_BASE - HORIZON_ABOVE,
-    hour: hourNow,
-    look: skyLook,
-  });
   const flightRef = useRef({ focused: false, revealId: null as number | null, tracks: [] as DiscoveryTrack[], cardHeight: 0 });
   useEffect(() => {
     flightRef.current = {
@@ -1338,6 +1328,18 @@ export default function HomeScreen() {
     sheetOpen: detailsOpen || newsSheetVisible || tuneOpen || genreOpen,
   });
   const { wake } = chrome;
+  // Animals at the surface, and only ever on top of the water, so "nothing wild under it" still holds. They're rare, until
+  // you leave a song alone long enough for the buttons to go.
+  const seaLife = useSeaLife({
+    active: isFocused,
+    paused: underWater,
+    still: !chrome.visible && status.playing,
+    width: frame.width || win.width,
+    screenH: (frame.height || win.height - 72 - insets.bottom) + tabBarHeight,
+    horizon: (frame.height || win.height - 72 - insets.bottom) + 4 - SEA_HEIGHT + SEA_BASE - HORIZON_ABOVE,
+    hour: hourNow,
+    look: skyLook,
+  });
   // Coming back to Home brings them back for a moment.
   useFocusEffect(wake);
   useFocusEffect(useCallback(() => setOceanHour(localHour()), []));
@@ -1574,7 +1576,8 @@ export default function HomeScreen() {
         showFps={skyTest !== 'clock'}
       />
     )}
-    {frameW > 0 && <SeaLifeLayer life={seaLife} layer={0} width={frameW} top={seaSurfaceY - HORIZON_ABOVE - 100} height={100 + HORIZON_ABOVE + 40} />}
+    {frameW > 0 && <SeaLifeLayer life={seaLife.far} layer={0} width={frameW} top={seaSurfaceY - HORIZON_ABOVE - 100} height={100 + HORIZON_ABOVE + 40} />}
+    {frameW > 0 && <SeaLifeLayer life={seaLife.near} layer={0} width={frameW} top={seaSurfaceY - HORIZON_ABOVE - 100} height={100 + HORIZON_ABOVE + 40} />}
     <SkyInkProvider value={skyInk}>
     <ThemedView
       backgroundColor="transparent"
@@ -1599,7 +1602,7 @@ export default function HomeScreen() {
         />
       )}
       {frameW > 0 && <SeaGlitter width={frameW} height={frameH + 6} surfaceY={seaSurfaceY} look={skyLook} hour={hourNow} active={isFocused} />}
-      {frameW > 0 && <SeaLifeLayer life={seaLife} layer={1} width={frameW} top={seaSurfaceY - 120} height={120 + 80} />}
+      {frameW > 0 && <SeaLifeLayer life={seaLife.near} layer={1} width={frameW} top={seaSurfaceY - 120} height={120 + 80} />}
 
       <ChromeFade visible={chrome.visible} alwaysShow={statusItem?.kind === 'failed'} style={styles.statusLine}>
         {statusItem && (
@@ -1859,7 +1862,7 @@ export default function HomeScreen() {
       />
     </ThemedView>
     </SkyInkProvider>
-    {frameW > 0 && <SeaLifeLayer life={seaLife} layer={2} width={frameW} top={0} height={frameH + tabBarHeight} />}
+    {frameW > 0 && <SeaLifeLayer life={seaLife.near} layer={2} width={frameW} top={0} height={frameH + tabBarHeight} />}
       </Animated.View>
       <OceanOverlay
         sea={oceanSea}

@@ -21,10 +21,35 @@ export function pickKind(hour: number, rand: () => number): SeaLifeKind {
   return 'fly';
 }
 
-/** Seconds until the next one. A sighting every song or two, so it stays a surprise. */
-export const nextGap = (rand: () => number) => 30 + rand() * 45;
+/** Seconds until the next one while you're swiping: rare, so it stays a surprise. */
+export const nextGap = (rand: () => number) => 60 + rand() * 90;
 
-export function makeSighting(kind: SeaLifeKind, o: { width: number; screenH: number; horizon: number; hour: number; wind: number; rand?: () => number; forceBreach?: boolean; forceLeap?: boolean }): Sighting {
+export type StillStep = { at: number; kind: SeaLifeKind; quick: boolean };
+
+/**
+ * Leave a song alone until the buttons fade and the sea wakes up: something small and close, then dolphins, something
+ * else close, and last a whale that doesn't take long about it. A preview is 30 seconds and the buttons take 3 to go, so
+ * all of it fits in about 25. Seconds count from when the buttons went.
+ */
+export function stillPlan(hour: number, rand: () => number): StillStep[] {
+  const close: SeaLifeKind[] = fishAreUp(hour) ? ['bait', 'fly', 'seal'] : ['fly', 'seal'];
+  const first = close[Math.floor(rand() * close.length) % close.length];
+  const others = close.filter((k) => k !== first);
+  const second = others[Math.floor(rand() * others.length) % others.length];
+  const r = rand();
+  const whale: SeaLifeKind = r < 0.6 ? 'hump' : r < 0.8 ? 'sperm' : 'blue';
+  return [
+    { at: 3, kind: first, quick: false },
+    { at: 8, kind: 'pod', quick: false },
+    { at: 13, kind: second, quick: false },
+    { at: 17, kind: whale, quick: true },
+  ];
+}
+
+/** The animals in the distance share one slot and the ones close up share another, so both can be up at once. */
+export const isFar = (kind: SeaLifeKind) => kind === 'hump' || kind === 'blue' || kind === 'sperm' || kind === 'pod';
+
+export function makeSighting(kind: SeaLifeKind, o: { width: number; screenH: number; horizon: number; hour: number; wind: number; rand?: () => number; forceBreach?: boolean; forceLeap?: boolean; quick?: boolean }): Sighting {
   const rand = o.rand ?? Math.random;
   const dir: 1 | -1 = rand() < 0.5 ? 1 : -1;
   const between = (a: number, b: number) => a + rand() * (b - a);
@@ -32,9 +57,10 @@ export function makeSighting(kind: SeaLifeKind, o: { width: number; screenH: num
   if (kind === 'hump' || kind === 'blue' || kind === 'sperm') {
     const w = WHALES[kind];
     // Real runs of breaths are longer and further apart. On Home they're shortened, or you'd swipe past them.
-    const n = kind === 'sperm' ? 4 : 3;
+    // Quick is for the end of a still song, which only has seconds left.
+    const n = o.quick ? 1 : kind === 'sperm' ? 4 : 3;
     const gap = kind === 'blue' ? 8.5 : kind === 'hump' ? 6 : 4.5;
-    const lucky = kind === 'hump' && (o.forceBreach || rand() < 0.12 + 0.6 * o.wind);
+    const lucky = kind === 'hump' && (o.forceBreach || rand() < (o.quick ? 0.3 : 0.12) + 0.6 * o.wind);
     const ending: Sighting['ending'] = lucky ? 'breach' : rand() < (kind === 'blue' ? 0.55 : 0.85) ? 'fluke' : 'dive';
     const start = kind === 'sperm' ? 1.4 + (n - 1) * gap + 2.6 : n * gap;
     const leave = ending === 'breach' ? 4 : w.roll * 1.25 + (ending === 'fluke' ? 5.2 + 3 : 1);

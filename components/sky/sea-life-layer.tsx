@@ -2,7 +2,7 @@ import { View } from 'react-native';
 import Animated, { useAnimatedProps, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-import type { SeaLife } from '@/hooks/use-sea-life';
+import type { SeaSlot } from '@/hooks/use-sea-life';
 import type { Ink, Scene } from '@/lib/sea-life';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -26,7 +26,7 @@ const USED = { 0: ['hump', 'blue', 'sperm', 'pod', 'fly'], 1: ['seal', 'bait', '
  * The animals, in one of three layers: 0 behind the near wave, 1 in front of it, 2 in front of Home's buttons. Each is a
  * small strip that only exists while something is up, so a quiet sea costs nothing.
  */
-export function SeaLifeLayer({ life, layer, width, top, height }: { life: SeaLife; layer: 0 | 1 | 2; width: number; top: number; height: number }) {
+export function SeaLifeLayer({ life, layer, width, top, height }: { life: SeaSlot; layer: 0 | 1 | 2; width: number; top: number; height: number }) {
   const { sighting, colors, scene } = life;
   const fade = useAnimatedStyle(() => ({ opacity: layer === 2 ? scene.get().fade : 1 }));
   if (!sighting || !colors || !USED[layer].includes(sighting.kind)) return null;

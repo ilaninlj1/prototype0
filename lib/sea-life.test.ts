@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 import { CALM_WEATHER, skyAt } from './home-sky.ts';
 import { FLY_PASS_S, sceneAt, type Scene, type SeaLifeKind, type Sighting } from './sea-life.ts';
-import { colorsFor, dolphinsAwake, fishAreUp, makeSighting, nextGap, pickKind } from './sea-life-plan.ts';
+import { colorsFor, dolphinsAwake, fishAreUp, isFar, makeSighting, nextGap, pickKind, stillPlan } from './sea-life-plan.ts';
 
 const KINDS: SeaLifeKind[] = ['fly', 'bait', 'seal', 'pod', 'hump', 'sperm', 'blue'];
 const make = (kind: SeaLifeKind, o: Partial<Parameters<typeof makeSighting>[1]> = {}) => makeSighting(kind, { width: 390, screenH: 844, horizon: 704, hour: 12, wind: 0.5, ...o });
@@ -119,9 +119,45 @@ test('more wind, more breaches', () => {
   assert.ok(count(1) > count(0.1) * 1.8);
 });
 
-test('sightings stay rare', () => {
-  assert.ok(nextGap(() => 0) >= 30);
-  assert.ok(nextGap(() => 1) <= 75);
+test('sightings stay rare while you swipe', () => {
+  assert.ok(nextGap(() => 0) >= 60);
+  assert.ok(nextGap(() => 1) <= 150);
+});
+
+test('leaving a song alone wakes the sea: close things first, then dolphins, a whale last, all inside one preview', () => {
+  const rolls = [0, 0.2, 0.4, 0.6, 0.8, 0.99];
+  for (const a of rolls) for (const b of rolls) for (const c of rolls) {
+    const values = [a, b, c];
+    let i = 0;
+    const plan = stillPlan(12, () => values[i++ % 3]);
+    assert.equal(isFar(plan[0].kind), false);
+    assert.equal(plan[1].kind, 'pod');
+    assert.equal(isFar(plan[2].kind), false);
+    assert.notEqual(plan[0].kind, plan[2].kind);
+    assert.ok(['hump', 'sperm', 'blue'].includes(plan[3].kind));
+    assert.ok(plan.every((p, k) => k === 0 || p.at > plan[k - 1].at));
+    assert.ok(plan[3].at < 27 - 5, 'the whale has time to be seen before the preview ends');
+    for (const p of plan) assert.notEqual(p.kind, 'bait', 'small fish only come up from dusk to dawn');
+  }
+  let i = 0;
+  const seq = () => (i = (i + 0.137) % 1);
+  const seen = new Set<SeaLifeKind>();
+  for (let n = 0; n < 200; n++) for (const p of stillPlan(22, seq)) seen.add(p.kind);
+  assert.ok(seen.has('bait'));
+});
+
+test('a quick whale comes up sooner than a normal one, and breaches more often', () => {
+  const at = (quick: boolean) => makeSighting('hump', { width: 390, screenH: 844, horizon: 704, hour: 12, wind: 0.5, quick, rand: () => 0.9 });
+  assert.ok(at(true).n < at(false).n);
+  assert.ok(at(true).duration < at(false).duration);
+  let i = 0;
+  const seq = () => (i = (i + 0.0731) % 1);
+  const breaches = (quick: boolean) => {
+    let n = 0;
+    for (let k = 0; k < 400; k++) if (makeSighting('hump', { width: 390, screenH: 844, horizon: 704, hour: 12, wind: 0.3, quick, rand: seq }).ending === 'breach') n += 1;
+    return n;
+  };
+  assert.ok(breaches(true) > breaches(false));
 });
 
 test('a far animal is hazed toward the horizon', () => {
