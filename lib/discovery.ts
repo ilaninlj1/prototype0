@@ -1,6 +1,7 @@
 // ---------- Types ----------
 
 import type { Bottle } from './bottle-rows.ts';
+import type { Direction } from './follow-sound.ts';
 import type { PresetId } from './pool-types';
 import { releaseDay } from './song-age.ts';
 
@@ -29,7 +30,9 @@ export type DiscoveryTrack = {
   // with source 'map', so saves from the map can be compared with saves from genres. 'run' marks songs saved
   // during or after a run (lib/run-*.ts), so the Library can tell run songs apart. 'bottle' marks a stranger's
   // save that washed up on Home (lib/bottles.ts); bottleId and bottle (its chain, hidden until the verdict) go with it.
-  via?: 'map' | 'run' | 'bottle' | 'ocean';
+  via?: 'map' | 'run' | 'bottle' | 'ocean' | 'follow';
+  // Which way you were following, and from which song, when a song was served by Follow the Sound (lib/follow-sound.ts).
+  followed?: { dir: Direction; fromTrackId: number };
   bottleId?: string;
   bottle?: Bottle;
   // Optional solid-color fallback CardFace renders when artworkUrl100 is
@@ -102,7 +105,9 @@ export type SwipeEntry = {
   preset?: PresetId;
   // Set for Daily Drop swipes, so analysis can separate them from the feed, for songs served from the Dark Map,
   // for songs played in Run mode, and for bottles (a stranger's save that washed up on Home).
-  source?: 'drop' | 'map' | 'run' | 'bottle' | 'people' | 'ocean';
+  source?: 'drop' | 'map' | 'run' | 'bottle' | 'people' | 'ocean' | 'follow';
+  // The step that served this song, so a discovery path can be retraced later.
+  followed?: { dir: Direction; fromTrackId: number };
   artistListeners?: number;
   trackRank?: number;
   dwellMs?: number;

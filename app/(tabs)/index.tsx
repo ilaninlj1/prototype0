@@ -25,6 +25,7 @@ import { CornerPause } from '@/components/home/corner-pause';
 import { DetailsSheet } from '@/components/home/details-sheet';
 import { FeedStatus } from '@/components/home/feed-status';
 import { FlyingPrint } from '@/components/home/flying-print';
+import { FollowStrip } from '@/components/home/follow-strip';
 import { GenreStamp } from '@/components/home/genre-stamp';
 import { ListenCard, StackFace, type ListenCardHandle } from '@/components/home/listen-card';
 import { LISTEN_INFO_HEIGHT, ListenInfo } from '@/components/home/listen-info';
@@ -54,7 +55,8 @@ import { songLight, useBottles } from '@/hooks/use-bottles';
 import { queueBottleNow, seaPosition } from '@/lib/bottle-countdown';
 import { revealLine } from '@/lib/bottle-journey';
 import type { FeedMode } from '@/lib/bottles';
-import { allDecks, deckCounts, deckLabel, nearestInDeck, oceanDeckLeft, pickDeck, type Deck } from '@/lib/decks';
+import { allDecks, deckCounts, deckLabel, nearestInDeck, oceanDeckLeft, pickDeck, servedByDeck, type Deck } from '@/lib/decks';
+import { directionsOpen, followEndLine, type Direction, type FollowFrom } from '@/lib/follow-sound';
 import { listeningPath } from '@/lib/ocean-chart';
 import { placeKey, placeLabel, waterOf, type Place } from '@/lib/ocean-map';
 import { CALM_RHYTHM, restingSea, type SeaState } from '@/lib/sea-beat';
@@ -107,7 +109,7 @@ import {
 import { pickSimilar } from '@/lib/charts';
 import { genreUnderDark, heardIds, refillSource } from '@/lib/dark-map';
 import { loadMapView } from '@/lib/dark-map-app';
-import { catalogTrackById, deckPool, fetchArtistListeners, fetchSimilarArtists, getTracks, getTracksBySound, getTracksNear, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
+import { catalogTrackById, deckPool, depthOfTrack, fetchArtistListeners, fetchSimilarArtists, getTracks, getTracksBySound, getTracksNear, nearestBySound, trackToDiscoveryTrack } from '@/lib/pool';
 import { deckSize } from '@/lib/pool-config';
 import { ANY_FILTER, DIMENSIONS, describeFilter, isActive, relax, type SoundFilter } from '@/lib/sound-filter';
 import { findItunesArtist } from '@/lib/song-details';
@@ -160,6 +162,10 @@ type Stamp = { id: number; genre: string; fresh: boolean };
 /** A spot on the Dark Map that Home is serving songs from. */
 type MapFocus = { point: MapPoint; words: string };
 type Flight = { mark: Omit<PieceMark, 'branch'>; from: { x: number; y: number }; to: { x: number; y: number }; endSize: number };
+
+function followFromTrack(track: DiscoveryTrack, sound: SoundFeatures): FollowFrom {
+  return { trackId: track.id, label: track.trackName, artist: track.artistName, sound, depth: depthOfTrack(track) };
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -763,7 +769,7 @@ export default function HomeScreen() {
     const d = deckRef.current;
     const keep = (a: string) => !excludeArtists.has(a) && !hideFromDiscovery(a) && !alreadyKnown(a);
     const picked = d ? pickDeck(deckPool(), d, { heard: heardIds(history), keep, n: deckSize, rand: Math.random }) : [];
-    if (picked.length > 0) return d?.kind === 'ocean' ? picked.map((t) => ({ ...t, via: 'ocean' as const })) : picked;
+    if (d && picked.length > 0) return picked.map((t) => servedByDeck(d, t));
     setDeck(null);
     return (await getTracks(activePreset, genre, excludeArtists)).map(trackToDiscoveryTrack);
   }
@@ -845,7 +851,7 @@ export default function HomeScreen() {
       preset,
       artistListeners: track.artistListeners,
       trackRank: track.trackRank,
-      ...(track.via === 'map' ? { source: 'map' as const } : track.via === 'bottle' ? { source: 'bottle' as const } : track.via === 'ocean' ? { source: 'ocean' as const } : {}),
+      ...(track.via === 'map' ? { source: 'map' as const } : track.via === 'bottle' ? { source: 'bottle' as const } : track.via === 'ocean' ? { source: 'ocean' as const } : track.via === 'follow' ? { source: 'follow' as const, followed: track.followed } : {}),
       ...(isSteer
         ? {}
         : {
@@ -954,6 +960,8 @@ export default function HomeScreen() {
     revealRecipeRef.current = recipe;
     setRevealHeard(heardNow());
     markSwipe(track, 'reveal', recipe);
+    // A reveal is a decision: where to go next. Most reveals are swipes, which wouldn't otherwise bring the buttons back.
+    wake();
     setRevealTrack(track);
     setRevealListeners(track.artistListeners);
     revealIdRef.current = track.id;
@@ -968,6 +976,9 @@ export default function HomeScreen() {
   function steerToNeighbors(track: DiscoveryTrack) {
     const sound = topSound?.status === 'measured' ? topSound.features : null;
     // In a deck, More like this stays inside it, or the filter isn't real.
+    // Following a sound, the song you just revealed is where the next step starts from.
+    const steps = deckRef.current?.kind === 'follow' && !!sound;
+    if (steps) setDeck({ kind: 'follow', dir: (deckRef.current as Extract<Deck, { kind: 'follow' }>).dir, from: followFromTrack(track, sound) });
     const inDeck = deckRef.current;
     if (inDeck) {
       const near = nearestInDeck(deckPool(), inDeck, sound, track.artistName, {
@@ -975,9 +986,11 @@ export default function HomeScreen() {
         keep: (a) => !seenArtists.has(a) && !hideFromDiscovery(a) && !alreadyKnown(a),
         n: 3,
         rand: Math.random,
-      }).map((t) => (inDeck.kind === 'ocean' ? { ...t, via: 'ocean' as const } : t));
+      }).map((t) => servedByDeck(inDeck, t));
+      // Songs picked from the old starting point could now be the wrong way. Out of road, Next goes back to the genre.
+      if (steps && !near.length) setQueue([queue[0]]);
       if (near.length) {
-        const rest = queue.slice(1).filter((t) => !near.some((n) => n.id === t.id));
+        const rest = steps ? [] : queue.slice(1).filter((t) => !near.some((n) => n.id === t.id));
         setQueue([queue[0], ...near, ...rest]);
         setMoreLike({ ids: new Set(near.map((t) => t.id)), label: sound ? moreLikeLabel(sound) : deckLabel(inDeck) });
       } else setMoreLike(null);
@@ -1422,6 +1435,21 @@ export default function HomeScreen() {
   const noteBottle = useCallback((b: OceanBottle) => setJourney(b), []);
   const openPortrait = useCallback(() => setPortraitOpen(true), []);
 
+  const revealedNow = !!currentTrack && revealTrack?.id === currentTrack.id;
+  // Follow the Sound: where you can head from the song you just revealed (lib/follow-sound.ts). Only with a measured sound.
+  const followFrom = useMemo<FollowFrom | null>(
+    () => (revealedNow && currentTrack && topSound?.status === 'measured' ? followFromTrack(currentTrack, topSound.features) : null),
+    [revealedNow, currentTrack, topSound]
+  );
+  const followOpen = useMemo<Direction[]>(() => {
+    if (!followFrom) return [];
+    const heard = heardIds(swipeHistory).add(followFrom.trackId);
+    return directionsOpen(deckPool().filter((c) => !heard.has(c.track.id) && !seenArtists.has(c.artist) && !hideFromDiscovery(c.artist) && !alreadyKnown(c.artist)), followFrom);
+    // Once per reveal: what's open doesn't change while you listen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followFrom]);
+  const heading = deck?.kind === 'follow' ? deck.dir : null;
+
   if (!hydrated) {
     return (
       <ThemedView style={styles.centered}>
@@ -1457,6 +1485,7 @@ export default function HomeScreen() {
     editionReady: editionReady ?? null,
     newsCount: news.length,
     mapWords: mapFocus ? mapFocus.words : null,
+    noteText: followFrom ? followEndLine(heading, followOpen) : null,
     deckLabel: deck ? deckLabel(deck) : null,
     moreLabel: !!moreLike && !!currentTrack && moreLike.ids.has(currentTrack.id) ? moreLike.label : null,
     sortedText:
@@ -1492,8 +1521,6 @@ export default function HomeScreen() {
     else if (item.kind === 'map') leaveMap();
     else if (item.kind === 'deck') leaveDeck();
   }
-
-  const revealedNow = !!currentTrack && revealTrack?.id === currentTrack.id;
 
   function isStillBlind(trackId: number) {
     return stillBlind(trackId, currentTrack ? { id: currentTrack.id, revealed: revealedNow } : null);
@@ -1787,6 +1814,17 @@ export default function HomeScreen() {
               />
             ) : (
               <ChromeFade visible={chrome.visible}>
+                {/* In this row, not above the buttons: the card sizes itself to the height left, so a row up there would shrink it on every reveal. */}
+                {followFrom && (
+                  <FollowStrip
+                    open={followOpen}
+                    heading={heading}
+                    onPick={(dir) => {
+                      wake();
+                      void startDeck({ kind: 'follow', dir, from: followFrom });
+                    }}
+                  />
+                )}
                 <CreditLine />
               </ChromeFade>
             )}
@@ -1965,7 +2003,8 @@ const styles = StyleSheet.create({
   cornerPause: { position: 'absolute', top: Spacing.md, left: Spacing.md },
   bottom: { gap: Spacing.lg },
   hint: { ...Typography.caption, position: 'absolute', left: 0, right: 0, bottom: 72, textAlign: 'center' },
-  slot: { height: 52, justifyContent: 'center' },
+  // Reaches 12 up into the gap under the buttons, without taking any height from the card, so Follow the Sound's strip is inside it and tappable on Android.
+  slot: { height: 64, marginTop: -12, paddingTop: 12, justifyContent: 'center' },
   lift: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   statusArea: { flex: 1, marginBottom: Spacing.lg },
   // The loading screen keeps its light look, so at night it sits on its own light panel.

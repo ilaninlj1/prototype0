@@ -56,3 +56,9 @@ test('a sound deck shows after the map, with its name and a way out', () => {
   assert.equal(pickStatus({ ...base, deckLabel: 'Quiet and sparse', mapWords: 'dark' })?.kind, 'map');
   assert.equal(statusText({ kind: 'deck', label: 'Quiet and sparse' }), 'Swiping: Quiet and sparse ✕');
 });
+
+test('a note about the feed wins over a ready edition and the deck it is about, and reads as plain words', () => {
+  const item = pickStatus({ failedOffline: false, editionReady: 2, newsCount: 0, mapWords: null, noteText: 'Nothing harder from here', deckLabel: 'Harder than “Creep”', moreLabel: null, sortedText: null });
+  assert.deepEqual(item, { kind: 'note', text: 'Nothing harder from here' });
+  assert.equal(statusText(item!), 'Nothing harder from here');
+});

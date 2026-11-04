@@ -1,6 +1,6 @@
 // When Home's buttons show (Minimal UI, spec 2026-10-21): while you listen,
 // only the card and its clues stay. Everything else comes back on a touch and
-// fades again after a few quiet seconds, and stays up whenever hiding it would
+// fades again after a few quiet seconds (a reveal brings it back too), and stays up whenever hiding it would
 // strand you: your first songs, a clip that ended, no card, a sheet, a screen reader.
 
 export const HIDE_AFTER_MS = 3000;

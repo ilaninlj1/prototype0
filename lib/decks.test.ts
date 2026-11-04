@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 
 import { allDecks, deckCounts, deckKey, deckLabel, deckMatches, pickDeck, SOUND_DECKS, soundTiles, TEMPO_BANDS, type Deck, type DeckCandidate } from './decks.ts';
-import { nearestInDeck } from './decks.ts';
+import { nearestInDeck, servedByDeck } from './decks.ts';
 import type { DiscoveryTrack } from './discovery.ts';
 import type { Depth, Species } from './ocean-map.ts';
 import { describeSound, type SoundFeatures } from './sound.ts';
@@ -256,4 +256,25 @@ test('nearestInDeck: More like this never leaves the deck, for a sound deck or a
   assert.deepEqual(ids({ kind: 'sound', id: 'quiet' }), [1, 3, 4]);
   assert.deepEqual(ids({ kind: 'ocean', water: 'reef', depth: 'buried' }), [3]);
   assert.deepEqual(nearestInDeck(pool, { kind: 'ocean', water: 'reef', depth: 'buried' }, null, 'x', o).map((t) => t.id), [3]);
+});
+
+test('a follow deck heads its way from its song, unheard and kept artists only, and reads as a sentence', () => {
+  const from = { trackId: 1, label: 'Creep', artist: 'Radiohead', sound: f({ energy: 0.5 }), depth: 'popular' as Depth };
+  const d: Deck = { kind: 'follow', dir: 'harder', from };
+  const pool = [cand(2, 'a', f({ energy: 0.65 })), cand(3, 'b', f({ energy: 0.66 })), cand(4, 'c', f({ energy: 0.67 })), cand(5, 'd', f({ energy: 0.3 }))];
+  const got = pickDeck(pool, d, { heard: new Set([2]), keep: (a) => a !== 'b', n: 5, rand: () => 0 });
+  assert.deepEqual(got.map((t) => t.id), [4]);
+  assert.equal(deckLabel(d), 'Harder than “Creep”');
+  assert.equal(deckKey(d), 'follow:harder:1');
+  assert.deepEqual(nearestInDeck(pool, d, f(), 'x', { heard: new Set(), keep: () => true, n: 1, rand: () => 0 }).map((t) => t.id), [2]);
+});
+
+test('a song says which deck served it, so the logs can compare them', () => {
+  const t = track(9);
+  const from = { trackId: 1, label: 'Creep', artist: 'Radiohead', sound: f(), depth: 'popular' as Depth };
+  assert.equal(servedByDeck({ kind: 'ocean', water: 'reef', depth: 'popular' }, t).via, 'ocean');
+  const followed = servedByDeck({ kind: 'follow', dir: 'darker', from }, t);
+  assert.equal(followed.via, 'follow');
+  assert.deepEqual(followed.followed, { dir: 'darker', fromTrackId: 1 });
+  assert.equal(servedByDeck({ kind: 'sound', id: 'quiet' }, t), t);
 });

@@ -2,6 +2,7 @@
 // songs like one you loved. Details' sound tiles open them (soundTiles reads exactly like describeSound), and
 // the What to swipe page lists them all. Pure; lib/pool.ts deckPool supplies the measured catalog.
 
+import { followLabel, pickFollow, type Direction, type FollowFrom } from './follow-sound.ts';
 import { pickNeighbors } from './sound-neighbors.ts';
 import { keyLabel, type SoundFeatures } from './sound.ts';
 import type { DiscoveryTrack } from './discovery.ts';
@@ -14,7 +15,8 @@ export type Deck =
   | { kind: 'key'; key: number; mode: 0 | 1 }
   | { kind: 'tempo'; lo: number; hi: number }
   | { kind: 'like'; trackId: number; label: string; sound: SoundFeatures }
-  | { kind: 'ocean'; water: Water; depth: Depth; species?: Species };
+  | { kind: 'ocean'; water: Water; depth: Depth; species?: Species }
+  | { kind: 'follow'; dir: Direction; from: FollowFrom };
 
 const isLoud = (s: SoundFeatures) => s.energy >= 0.7 && s.loudness >= -8; // lib/sound.ts describeSound's rule
 
@@ -69,6 +71,8 @@ export function deckKey(d: Deck): string {
       return `like:${d.trackId}`;
     case 'ocean':
       return `ocean:${placeKey(d)}${d.species ? `:${d.species}` : ''}`;
+    case 'follow':
+      return `follow:${d.dir}:${d.from.trackId}`;
   }
 }
 
@@ -84,6 +88,8 @@ export function deckLabel(d: Deck): string {
       return `Like “${d.label}”`;
     case 'ocean':
       return d.species ? `${SPECIES_INFO[d.species].means} songs in ${placeLabel(d)}` : placeLabel(d);
+    case 'follow':
+      return followLabel(d.dir, d.from.label);
   }
 }
 
@@ -96,6 +102,7 @@ export function deckMatches(d: Deck, s: SoundFeatures, depth?: Depth): boolean {
     case 'tempo':
       return s.tempo >= d.lo && s.tempo < d.hi;
     case 'like':
+    case 'follow':
       return true; // ranked by closeness instead (pickDeck)
     case 'ocean':
       return depth === d.depth && waterOf(s) === d.water && (!d.species || speciesOf(s) === d.species);
@@ -133,6 +140,7 @@ export function pickDeck(
 ): DiscoveryTrack[] {
   const open = pool.filter((c) => !o.heard.has(c.track.id) && o.keep(c.artist) && (d.kind !== 'like' || c.track.id !== d.trackId));
   if (d.kind === 'like') return pickNeighbors(d.sound, '', open.map((c) => ({ item: c.track, artist: c.artist, sound: c.sound })), o.n);
+  if (d.kind === 'follow') return pickFollow(open, d.dir, d.from, o.n);
   const matching = open.filter((c) => deckMatches(d, c.sound, c.depth));
   for (let i = matching.length - 1; i > 0; i--) {
     const j = Math.floor(o.rand() * (i + 1));
@@ -160,9 +168,16 @@ export function nearestInDeck(
   artist: string,
   o: { heard: Set<number>; keep: (artist: string) => boolean; n: number; rand: () => number }
 ): DiscoveryTrack[] {
-  if (!sound || d.kind === 'like') return pickDeck(pool, d, o);
+  if (!sound || d.kind === 'like' || d.kind === 'follow') return pickDeck(pool, d, o);
   const open = pool.filter((c) => !o.heard.has(c.track.id) && o.keep(c.artist) && deckMatches(d, c.sound, c.depth));
   return pickNeighbors(sound, artist, open.map((c) => ({ item: c.track, artist: c.artist, sound: c.sound })), o.n);
+}
+
+/** Marks a song with the deck that served it, for the logs. */
+export function servedByDeck(d: Deck, t: DiscoveryTrack): DiscoveryTrack {
+  if (d.kind === 'ocean') return { ...t, via: 'ocean' };
+  if (d.kind === 'follow') return { ...t, via: 'follow', followed: { dir: d.dir, fromTrackId: d.from.trackId } };
+  return t;
 }
 
 /** How many unheard songs each deck has left, by deckKey. */
