@@ -4,7 +4,16 @@
  * already been read, so it can be tested without a phone. Nothing is thrown: every file and
  * every row ends up either as a song or as a plain reason it isn't one.
  */
-import { cleanField, isExportify, parseCsv, readExportify, type RowSkip, type SkipReason } from './spotify-file.ts';
+import {
+  cleanField,
+  hasUnclosedQuote,
+  isExportify,
+  parseCsv,
+  readExportify,
+  unclosedQuoteNote,
+  type RowSkip,
+  type SkipReason,
+} from './spotify-file.ts';
 import { mergeSaves, type SpotifyLike } from './spotify.ts';
 
 export type PickedFile = {
@@ -36,6 +45,8 @@ export type ImportReport = {
   leftOut: { shortPlays: number; notYours: number; repeats: number };
   files: FileResult[];
   saveFailed?: boolean;
+  /** The save failed and your earlier songs couldn't be written back either. */
+  lostPrevious?: boolean;
 };
 
 const SKIP_TEXT: Record<SkipReason, string> = {
@@ -104,7 +115,7 @@ export function parseWhen(value: unknown, now: number): number | null {
   let at: number | null = null;
   if (typeof value === 'number') at = value > 1e11 ? value : value * 1000;
   else if (typeof value === 'string') at = readDateText(value.trim());
-  else if (value && typeof value === 'object' && 'uts' in value) at = readDateText(String(value.uts).trim());
+  else if (value && typeof value === 'object' && 'uts' in value && typeof value.uts === 'string') at = readDateText(value.uts.trim());
   if (at == null || !Number.isFinite(at) || at < EARLIEST || at > now + DAY_MS) return null;
   return at;
 }
@@ -138,8 +149,11 @@ const pick = (entry: Map<string, unknown>, names: string[]) => {
   return undefined;
 };
 
-const idFrom = (uri: unknown, name: string, artist: string) =>
-  (typeof uri === 'string' && /track[:/]([A-Za-z0-9]+)/.exec(uri)?.[1]) || `song:${artist.toLowerCase()}|${name.toLowerCase()}`;
+/** Only a real Spotify track link gives a Spotify id. Other sites' links say nothing about which song it is here. */
+function idFrom(uri: unknown, name: string, artist: string): string {
+  const m = typeof uri === 'string' ? /^spotify:track:([A-Za-z0-9]+)$|open\.spotify\.com\/(?:[a-z-]+\/)?track\/([A-Za-z0-9]+)/.exec(uri.trim()) : null;
+  return m?.[1] ?? m?.[2] ?? `song:${artist.toLowerCase()}|${name.toLowerCase()}`;
+}
 
 type EntryResult = { song: SpotifyLike } | { skip: Omit<RowSkip, 'at'> } | 'short-play';
 
@@ -153,8 +167,10 @@ function readEntry(entry: Map<string, unknown>, now: number): EntryResult {
   if (!name && !artist) return skip('empty');
   if (!name) return skip('no-title');
   if (!artist) return skip('no-artist');
-  const ms = pick(entry, PLAYED_MS);
-  if (typeof ms === 'number' && ms < SHORT_PLAY_MS) return 'short-play';
+  const played = pick(entry, PLAYED_MS);
+  // A number in JSON, text in a CSV.
+  const ms = typeof played === 'number' || typeof played === 'string' ? Number(played) : NaN;
+  if (ms < SHORT_PLAY_MS) return 'short-play';
   const when = pick(entry, WHEN);
   const addedAt = when === undefined ? now : parseWhen(when, now);
   if (addedAt == null) return skip('bad-date');
@@ -174,15 +190,25 @@ function readEntry(entry: Map<string, unknown>, now: number): EntryResult {
 
 // ---------- One file ----------
 
-type FileRead = { result: FileResult; songs: SpotifyLike[]; skips: RowSkip[]; shortPlays: number; notYours: number; unit: 'Row' | 'Item' };
+type FileRead = {
+  result: FileResult;
+  songs: SpotifyLike[];
+  skips: RowSkip[];
+  shortPlays: number;
+  notYours: number;
+  unit: 'Row' | 'Item';
+  /** This file just isn't a song file. Inside a ZIP that's normal, so it isn't worth a line once another file worked. */
+  notSongs?: boolean;
+};
 
-const empty = (name: string, problem: string): FileRead => ({
+const empty = (name: string, problem: string, notSongs = false): FileRead => ({
   result: { name, found: 0, problem },
   songs: [],
   skips: [],
   shortPlays: 0,
   notYours: 0,
   unit: 'Row',
+  notSongs,
 });
 
 const list = (columns: string[]) => columns.map((c) => c.trim().slice(0, 30)).filter(Boolean).slice(0, 6).join(', ');
@@ -220,14 +246,11 @@ function readCsvFile(name: string, text: string, now: number): FileRead {
     const has = `It has: ${list(head ?? [])}.`;
     if (hasTitle) return empty(name, `This has a song column but no artist column, so its songs can’t be matched. ${has}`);
     if (hasArtist) return empty(name, `This has an artist column but no song column. ${has}`);
-    return empty(name, `No song or artist columns here. It has: ${list(head ?? [])}.`);
+    return empty(name, `No song or artist columns here. It has: ${list(head ?? [])}.`, true);
   }
-  // An odd number of quote marks: one never closes, and the parser took the rest of the file as a single field.
-  const unclosed = (text.match(/"/g)?.length ?? 0) % 2 === 1;
+  const unclosed = hasUnclosedQuote(text);
   if (unclosed) body.pop();
-  const note = unclosed
-    ? `A quote mark in this file never closes around row ${body.length + 2}, so that row and everything after it couldn’t be read.`
-    : undefined;
+  const note = unclosed ? unclosedQuoteNote(body.length + 2) : undefined;
   const rows = body
     .map((cells, i) => ({ cells, at: i + 2 }))
     // A truly blank line isn't a row. A row of empty cells is, since someone meant something by it.
@@ -279,9 +302,9 @@ function parseJson(text: string): { json: unknown; cutOff: boolean } | null {
 function readJsonFile(name: string, text: string, now: number): FileRead {
   const parsed = parseJson(text);
   if (!parsed) return empty(name, 'This JSON is broken and can’t be read. Try exporting it again.');
-  if (Array.isArray(parsed.json) && !parsed.json.length) return empty(name, 'This file has no songs in it.');
+  if (Array.isArray(parsed.json) && !parsed.json.length) return empty(name, 'This file has no songs in it.', true);
   const items = songListIn(parsed.json);
-  if (!items) return empty(name, 'This JSON has no list of songs in it.');
+  if (!items) return empty(name, 'This JSON has no list of songs in it.', true);
   const keys = items.slice(0, 20).flatMap((i) => [...(entryMap(i)?.keys() ?? [])]);
   const history = keys.some((k) => PLAYED_MS.includes(k));
   const kind = history ? 'Spotify listening history' : Array.isArray(parsed.json) ? 'A list of songs' : 'A saved library';
@@ -304,7 +327,7 @@ function readOneFile(name: string, raw: string, now: number): FileRead {
 
 const FAILED_TEXT: Record<NonNullable<PickedFile['failed']>, string> = {
   unreadable: 'Couldn’t open this file. Try exporting it again.',
-  'too-big': 'This file is too big to read on a phone (over 100 MB).',
+  'too-big': 'This is too big to read on a phone, over 100 MB in all. Pick fewer files.',
   'empty-zip': 'This ZIP has no .csv or .json files in it.',
 };
 
@@ -327,10 +350,16 @@ export function readImport(files: PickedFile[], now: number): ImportReport {
     const name = baseName(f.name);
     if (f.failed || f.text == null) return empty(name, FAILED_TEXT[f.failed ?? 'unreadable']);
     const e = exportOf.get(f);
-    if (!e) return { ...readOneFile(name, f.text, now), fromZip: f.fromZip };
-    if (!e.rows) return empty(name, 'This file has the right columns but no songs under them.');
+    if (!e) {
+      try {
+        return { ...readOneFile(name, f.text, now), fromZip: f.fromZip };
+      } catch {
+        return empty(name, FAILED_TEXT.unreadable);
+      }
+    }
+    if (!e.rows) return empty(name, e.note ?? 'This file has the right columns but no songs under them.');
     return {
-      result: { name, kind: 'Exportify export', found: e.songs.length },
+      result: { name, kind: 'Exportify export', found: e.songs.length, ...(e.note ? { note: e.note } : {}) },
       songs: e.songs,
       skips: e.skips,
       shortPlays: 0,
@@ -360,7 +389,7 @@ export function readImport(files: PickedFile[], now: number): ImportReport {
       notYours: reads.reduce((sum, r) => sum + r.notYours, 0),
       repeats: all.length - songs.length,
     },
-    files: reads.filter((r) => !(worked && r.fromZip && r.result.problem)).map((r) => r.result),
+    files: reads.filter((r) => !(worked && r.fromZip && r.notSongs)).map((r) => r.result),
   };
 }
 
@@ -376,6 +405,7 @@ const n = (count: number) => count.toLocaleString('en-US');
 const plural = (count: number, one: string, many: string) => `${n(count)} ${count === 1 ? one : many}`;
 
 export function importHeadline(r: ImportReport): string {
+  if (r.lostPrevious) return 'Nothing was saved, and your earlier songs couldn’t be put back. Import them again.';
   if (r.saveFailed) return 'Nothing was saved. What you had before is still here.';
   if (!r.songs.length)
     return r.skippedCount ? `Nothing came in. ${plural(r.skippedCount, 'row', 'rows')} couldn’t be used.` : 'Nothing came in.';

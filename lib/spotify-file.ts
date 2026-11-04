@@ -61,13 +61,21 @@ export function cleanField(value: unknown): string {
 
 const hasExportifyColumns = (head: string[] | undefined) => !!head?.includes('Track URI') && head.includes('Added At');
 
-function table(text: string): Numbered[] | null {
+/** An odd number of quote marks: one never closes, so the parser took the rest of the file as a single field. */
+export const hasUnclosedQuote = (text: string) => (text.match(/"/g)?.length ?? 0) % 2 === 1;
+export const unclosedQuoteNote = (row: number) =>
+  `A quote mark in this file never closes around row ${row}, so that row and everything after it couldn’t be read.`;
+
+function table(text: string): { rows: Numbered[]; note?: string } | null {
   const [head, ...body] = parseCsv(text.replace(/^\uFEFF/, ''));
   if (!hasExportifyColumns(head)) return null;
-  return body
+  const unclosed = hasUnclosedQuote(text);
+  if (unclosed) body.pop();
+  const rows = body
     .map((r, i) => ({ r, at: i + 2 }))
     .filter(({ r }) => r.length > 1)
     .map(({ r, at }) => ({ at, cells: Object.fromEntries(head.map((h, i) => [h, r[i] ?? ''])) }));
+  return { rows, ...(unclosed ? { note: unclosedQuoteNote(body.length + 2) } : {}) };
 }
 
 /** Whether this text is an Exportify export, from its first line. */
@@ -114,7 +122,7 @@ function toSong(r: Row, from: string): SpotifyLike | SkipReason {
   };
 }
 
-export type ExportifyFile = { name: string; rows: number; songs: SpotifyLike[]; skips: RowSkip[]; notYours: number };
+export type ExportifyFile = { name: string; rows: number; songs: SpotifyLike[]; skips: RowSkip[]; notYours: number; note?: string };
 
 /**
  * What each Exportify file holds, row by row. A file whose rows have no "Added By" is Liked
@@ -123,15 +131,15 @@ export type ExportifyFile = { name: string; rows: number; songs: SpotifyLike[]; 
  */
 export function readExportify(files: NamedText[]): ExportifyFile[] {
   const tables = files.flatMap((f) => {
-    const rows = table(f.text);
-    return rows ? [{ name: f.name, rows }] : [];
+    const read = table(f.text);
+    return read ? [{ name: f.name, ...read }] : [];
   });
   const adders = new Map<string, number>();
   for (const t of tables)
     for (const { cells } of t.rows) if (cells['Added By']) adders.set(cells['Added By'], (adders.get(cells['Added By']) ?? 0) + 1);
   const me = [...adders].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   return tables.map((t) => {
-    const out: ExportifyFile = { name: t.name, rows: t.rows.length, songs: [], skips: [], notYours: 0 };
+    const out: ExportifyFile = { name: t.name, rows: t.rows.length, songs: [], skips: [], notYours: 0, ...(t.note ? { note: t.note } : {}) };
     const liked = t.rows.every(({ cells }) => !cells['Added By']);
     for (const { at, cells } of t.rows) {
       if (!liked && cells['Added By'] !== me) {
@@ -152,8 +160,29 @@ export function fileSongs(files: NamedText[]): SpotifyLike[] {
   return mergeSaves(readExportify(files).flatMap((f) => f.songs));
 }
 
-/** The CSV and JSON files inside a ZIP: Exportify's "export everything" or Spotify's account data (skipping macOS's __MACOSX copies). */
-export function filesFromZip(bytes: Uint8Array): NamedText[] {
-  const entries = unzipSync(bytes, { filter: (f) => /\.(csv|json)$/i.test(f.name) && !f.name.startsWith('__MACOSX/') });
-  return Object.entries(entries).map(([name, data]) => ({ name, text: strFromU8(data) }));
+/** More than a phone should hold in memory at once, for one file or for everything in a ZIP. */
+export const MAX_FILE_BYTES = 100 * 1024 * 1024;
+
+/**
+ * The CSV and JSON files inside a ZIP: Exportify's "export everything" or Spotify's account data (skipping
+ * macOS's __MACOSX copies). A small ZIP can unpack huge, so sizes are checked first and what won't fit is named.
+ */
+export function filesFromZip(bytes: Uint8Array, maxBytes = MAX_FILE_BYTES): (NamedText | { name: string; tooBig: true })[] {
+  const tooBig: string[] = [];
+  let total = 0;
+  const entries = unzipSync(bytes, {
+    filter: (f) => {
+      if (!/\.(csv|json)$/i.test(f.name) || f.name.startsWith('__MACOSX/')) return false;
+      if (total + f.originalSize > maxBytes) {
+        tooBig.push(f.name);
+        return false;
+      }
+      total += f.originalSize;
+      return true;
+    },
+  });
+  return [
+    ...Object.entries(entries).map(([name, data]) => ({ name, text: strFromU8(data) })),
+    ...tooBig.map((name) => ({ name, tooBig: true as const })),
+  ];
 }

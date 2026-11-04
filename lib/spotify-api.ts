@@ -18,7 +18,7 @@ import {
   type SpotifyLike,
 } from './spotify';
 import { setKnownArtists } from './known-artists';
-import { filesFromZip } from './spotify-file';
+import { filesFromZip, MAX_FILE_BYTES } from './spotify-file';
 import { mergeIntoLibrary, readImport, type ImportReport, type PickedFile } from './import-file';
 
 // The network and storage half of your Spotify songs, liked and playlist adds (see lib/spotify.ts for the why).
@@ -216,8 +216,6 @@ export async function clearSpotifyLibrary(slot: SpotifySlot = 'login'): Promise<
 
 // ---------- Importing a file ----------
 
-const MAX_FILE_BYTES = 100 * 1024 * 1024;
-
 /**
  * Pick any files: Exportify's CSV or ZIP, Spotify's JSON or ZIP, or a song list. Several can be
  * picked at once, and a file that can't be opened is reported without stopping the others.
@@ -237,8 +235,8 @@ async function pickImportFiles(): Promise<PickedFile[] | 'cancelled'> {
           files.push({ name: asset.name, failed: 'too-big' });
         } else if (/\.zip$/i.test(asset.name) || asset.mimeType?.includes('zip')) {
           const inside = filesFromZip(await new File(asset.uri).bytes());
-          if (inside.length) files.push(...inside.map((f) => ({ ...f, fromZip: true })));
-          else files.push({ name: asset.name, failed: 'empty-zip' });
+          if (!inside.length) files.push({ name: asset.name, failed: 'empty-zip' });
+          for (const f of inside) files.push('tooBig' in f ? { name: f.name, failed: 'too-big' } : { ...f, fromZip: true });
         } else {
           files.push({ name: asset.name, text: await new File(asset.uri).text() });
         }
@@ -273,8 +271,8 @@ export async function importAndKeepFile(): Promise<KeptImport | 'cancelled'> {
   const { likes, newCount } = mergeIntoLibrary(before?.likes ?? [], report.songs);
   const library = { syncedAt: Date.now(), likes };
   if (!(await saveSpotifyLibrary(library, 'file'))) {
-    if (before) await saveSpotifyLibrary(before, 'file');
-    return { report: { ...report, saveFailed: true }, library: null, newCount: 0 };
+    const restored = !before || (await saveSpotifyLibrary(before, 'file'));
+    return { report: { ...report, saveFailed: true, lostPrevious: !restored }, library: null, newCount: 0 };
   }
   setKnownArtists(likes);
   return { report, library, newCount };

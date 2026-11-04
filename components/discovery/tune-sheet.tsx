@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ImportReportBody } from '@/components/import-report';
@@ -11,7 +11,7 @@ import type { Region } from '@/lib/discovery';
 import { chooseCity, loadCityOk, saveBottlesOn, useBottlesOn } from '@/lib/bottles-api';
 import { setAllowAi, useAllowAi } from '@/lib/human-check-api';
 import type { NetworkTest } from '@/lib/feed-load';
-import { readImport } from '@/lib/import-file';
+import { readImport, type ImportReport } from '@/lib/import-file';
 import { IMPORT_SAMPLES } from '@/lib/import-samples';
 import type { PresetId } from '@/lib/pool-types';
 import { DIMENSIONS, describeFilter, isActive, type Level, type SoundFilter } from '@/lib/sound-filter';
@@ -94,7 +94,11 @@ export function TuneSheet({
 
   const [more, setMore] = useState(false);
   const [sample, setSample] = useState<'off' | keyof typeof IMPORT_SAMPLES>('off');
-  const sampleReport = useMemo(() => (sample === 'off' ? null : readImport(IMPORT_SAMPLES[sample].files, Date.now())), [sample]);
+  const [sampleReport, setSampleReport] = useState<ImportReport | null>(null);
+  const chooseSample = (key: typeof sample) => {
+    setSample(key);
+    setSampleReport(key === 'off' ? null : readImport(IMPORT_SAMPLES[key].files, Date.now()));
+  };
   const sorted = isActive(soundFilter);
   const summary = tuneSummary(PRESET_LABELS[preset], sorted ? describeFilter(soundFilter) : null);
 
@@ -263,7 +267,7 @@ export function TuneSheet({
                   { key: 'wrong', label: IMPORT_SAMPLES.wrong.label },
                 ]}
                 value={sample}
-                onChange={setSample}
+                onChange={chooseSample}
                 label="Test import"
                 small
               />

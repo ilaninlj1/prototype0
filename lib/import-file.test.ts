@@ -315,6 +315,70 @@ test('a song really called Unknown stays a song; only Spotify’s stand-ins coun
   assert.equal(read('a.csv', 'Artist,Song\nUnknown Artist,Song\n').songs.length, 0);
 });
 
+test('a strange date object in valid JSON is a named row, and never stops the file beside it', () => {
+  const r = readImport(
+    [
+      { name: 'odd.json', text: '[{"track":"Odd","artist":"A","date":{"uts":{"toString":null}}}]' },
+      { name: 'good.csv', text: 'Artist,Song\nSade,Jezebel\n' },
+    ],
+    NOW
+  );
+  assert.deepEqual(r.songs.map((s) => s.name), ['Jezebel']);
+  assert.deepEqual(group(r, 'bad-date')!.rows, ['Item 1 · “Odd” by A']);
+});
+
+test('a link that is not Spotify’s gives no Spotify id, so two songs on one site stay two songs', () => {
+  const r = read(
+    'a.json',
+    JSON.stringify([
+      { track: 'Song One', artist: 'A', uri: 'https://a.bandcamp.com/track/song-one' },
+      { track: 'Song Two', artist: 'A', uri: 'https://a.bandcamp.com/track/song-two' },
+      { track: 'Three', artist: 'A', uri: 'https://open.spotify.com/track/ID3' },
+      { track: 'Four', artist: 'A', uri: 'spotify:track:ID4' },
+    ])
+  );
+  assert.deepEqual(r.songs.map((s) => s.id).sort(), ['ID3', 'ID4', 'song:a|song one', 'song:a|song two']);
+});
+
+test('a quote mark that never closes in an Exportify file is reported too', () => {
+  const head = 'Track URI,Track Name,Artist Name(s),Added At,Extra';
+  const r = read(
+    'Liked_Songs.csv',
+    [
+      head,
+      'spotify:track:A,First,Artist,2020-01-01T00:00:00Z,x',
+      'spotify:track:B,Second,Artist,2020-01-01T00:00:00Z,"unclosed',
+      'spotify:track:C,Third,Artist,2021-01-01T00:00:00Z,x',
+    ].join('\n')
+  );
+  assert.deepEqual(r.songs.map((s) => s.name), ['First']);
+  assert.match(r.files[0].note!, /never closes around row 3/);
+});
+
+test('a broken song file inside a ZIP is still reported after another file worked', () => {
+  const r = readImport(
+    [
+      { name: 'good.csv', text: 'Song,Artist\nGood,A', fromZip: true },
+      { name: 'history.json', text: '[{"trackName":"Lost","artistName":"A"', fromZip: true },
+    ],
+    NOW
+  );
+  assert.equal(r.songs.length, 1);
+  assert.deepEqual(r.files.map((f) => f.name), ['good.csv', 'history.json']);
+  assert.match(r.files[1].problem!, /broken/);
+});
+
+test('short plays are left out of a CSV too, where every cell is text', () => {
+  const r = read('a.csv', 'track,artist,msPlayed\nQuick,A,1000\nLong,A,90000\n');
+  assert.deepEqual(r.songs.map((s) => s.name), ['Long']);
+  assert.equal(r.leftOut.shortPlays, 1);
+});
+
+test('if your earlier songs could not be put back after a failed save, the headline says so', () => {
+  const base: ImportReport = { songs: [], skipped: [], skippedCount: 0, leftOut: { shortPlays: 0, notYours: 0, repeats: 0 }, files: [] };
+  assert.match(importHeadline({ ...base, saveFailed: true, lostPrevious: true }), /couldn’t be put back/);
+});
+
 test('the messy sample: 4 songs in, 8 named, 1 repeat', () => {
   const r = readImport(IMPORT_SAMPLES.messy.files, NOW);
   assert.deepEqual(r.songs.map((s) => s.name).sort(), ['Blackbird', 'Karma Police', 'Smooth Operator', 'Superstition']);

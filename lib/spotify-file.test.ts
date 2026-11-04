@@ -123,3 +123,15 @@ test('parseCsv can split on another delimiter', () => {
     ['1', '2'],
   ]);
 });
+
+test('a ZIP that would unpack past the limit names the files it left out instead of filling the phone', () => {
+  const zip = zipSync({ 'small.csv': strToU8('a,b'), 'huge.json': strToU8('x'.repeat(5000)) }, { level: 9 });
+  const files = filesFromZip(zip, 1000);
+  assert.deepEqual(
+    files.map((f) => [f.name, 'tooBig' in f]),
+    [
+      ['small.csv', false],
+      ['huge.json', true],
+    ]
+  );
+});
