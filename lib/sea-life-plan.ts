@@ -38,7 +38,10 @@ export function makeSighting(kind: SeaLifeKind, o: { width: number; screenH: num
     const ending: Sighting['ending'] = lucky ? 'breach' : rand() < (kind === 'blue' ? 0.55 : 0.85) ? 'fluke' : 'dive';
     const start = kind === 'sperm' ? 1.4 + (n - 1) * gap + 2.6 : n * gap;
     const leave = ending === 'breach' ? 4 : w.roll * 1.25 + (ending === 'fluke' ? 5.2 + 3 : 1);
-    return { ...base, z: w.z, x: between(0.26, 0.74) * o.width, n, gap, ending, duration: start + leave + 1 };
+    // It swims while it breathes, so it starts off to one side and passes through the middle instead of leaving the screen.
+    const drift = w.v * (300 / w.z) * start;
+    const x = between(0.36, 0.64) * o.width - (dir * drift) / 2;
+    return { ...base, z: w.z, x, n, gap, ending, duration: start + leave + 1 };
   }
   if (kind === 'pod') {
     const leap = o.forceLeap ?? dolphinsAwake(o.hour);

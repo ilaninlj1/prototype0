@@ -55,6 +55,24 @@ test('nothing shows below the water it comes out of', () => {
   }
 });
 
+test('a whale stays on screen for its whole run of breaths and its leaving', () => {
+  for (const kind of ['hump', 'blue', 'sperm'] as const) {
+    for (const dir of [0.2, 0.8]) {
+      for (const lucky of [0.05, 0.3, 0.6, 0.95]) {
+        const values = [dir, lucky];
+        let i = 0;
+        const s = makeSighting(kind, { width: 390, screenH: 844, horizon: 704, hour: 12, wind: 0.8, rand: () => values[i++ % 2] });
+        for (let t = 0; t < s.duration - 1; t += 0.25) {
+          const d = sceneAt(s, t).layers[0].back;
+          if (!d) continue;
+          const xs = [...d.matchAll(/[ML](-?[\d.]+) /g)].map((m) => Number(m[1]));
+          assert.ok((Math.max(...xs) + Math.min(...xs)) / 2 > 0 && (Math.max(...xs) + Math.min(...xs)) / 2 < 390, `${kind} ${s.ending} off screen at ${t}: ${Math.min(...xs)} to ${Math.max(...xs)}`);
+        }
+      }
+    }
+  }
+});
+
 test('a breach really leaves the water', () => {
   const s = { ...make('hump'), ending: 'breach' as const };
   const y0 = s.horizon + (1.5 * 300) / s.z;

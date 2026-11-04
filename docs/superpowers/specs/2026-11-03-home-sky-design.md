@@ -24,6 +24,12 @@ The clouds are the costly part, so the shader's canvas is 2.5x smaller than the 
 
 The colors, the weather formula, where the sun and moon travel, the island's look, and rounding the tab bar's lowest contrast (3.9:1 for under 1% of hour, water and weather combinations) rather than forcing a jump in the water's color.
 
-## Phase 2: sea life (not built)
+## Phase 2: sea life
 
-Seven animals at real distances from a camera 1.5 m above the water, so size and speed come from real meters: flying fish that passes in front of the buttons, small fish from dusk to dawn, an elephant seal, dolphins that roll by day and leap from dusk, a humpback that breaches more in wind, a sperm whale with its angled blow, a blue whale. They stay at the surface, so the user's "no wild creatures under water" still holds. Sightings should stay rare, about one every song or two.
+Seven animals at real distances from a camera 1.5 m above the water, so size and speed come from real meters: flying fish that passes in front of the buttons, small fish from dusk to dawn, an elephant seal, dolphins that roll by day and leap from dusk, a humpback that breaches more in wind, a sperm whale with its angled blow, a blue whale. They stay at the surface, so the user's "no wild creatures under water" still holds.
+
+One sighting every 30 to 75 seconds (Claude's call, for "every song or two"), one at a time, on Home only. Each is a pure function of time since it began (`lib/sea-life.ts`), drawn in small strips that only exist while it's up (`components/sky/sea-life-layer.tsx`). Reduced motion turns them off. Tune → Test sea life brings up any of them, and Tune → Test sky shows the frame rate.
+
+**Not real timing:** runs of breaths are shortened on Home (3 or 4 breaths, 4.5 to 8.5 seconds apart), or you'd swipe past them. The real numbers are on the mock page. Which animals come up and how they move come from the research; how often they appear doesn't.
+
+**Weak facts:** one study links breaching to wind and one survey finds no link. Blow heights come from a tour company. Dolphin timing mixes spinner day and night habits with captive bottlenose breathing. Body lengths are general knowledge.
