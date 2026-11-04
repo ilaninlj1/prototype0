@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { strToU8, zipSync } from 'fflate';
-import { fileSongs, filesFromZip, parseCsv, readExport } from './spotify-file.ts';
+import { fileSongs, filesFromZip, parseCsv } from './spotify-file.ts';
 
 const HEADER =
   'Track URI,Track Name,Artist URI(s),Artist Name(s),Album URI,Album Name,Album Artist URI(s),Album Artist Name(s),Album Release Date,Album Image URL,Disc Number,Track Number,Track Duration (ms),Track Preview URL,Explicit?,Popularity,ISRC,Added By,Added At';
@@ -96,13 +96,6 @@ test('rows without a usable id or date are skipped; local files have no Spotify 
   assert.deepEqual(fileSongs([{ name: 'Liked_Songs.csv', text: csv }]), []);
 });
 
-test('readExport says what it found, or why it found nothing', () => {
-  const liked = [HEADER, row('T1', 'Song', 'A', '2014', 41, '', '2019-04-02T21:15:00Z')].join('\n');
-  assert.equal(readExport([{ name: 'Liked_Songs.csv', text: liked }]).songs.length, 1);
-  assert.equal(readExport([{ name: 'notes.csv', text: 'hello,world\n1,2' }]).problem, 'not-exportify');
-  assert.equal(readExport([]).problem, 'empty');
-});
-
 test('a ZIP of every playlist opens into its CSV files', () => {
   const liked = [HEADER, row('T1', 'Song', 'A', '2014', 41, '', '2019-04-02T21:15:00Z')].join('\n');
   const zip = zipSync({
@@ -114,4 +107,19 @@ test('a ZIP of every playlist opens into its CSV files', () => {
     filesFromZip(zip).map((f) => f.name),
     ['Liked_Songs.csv']
   );
+});
+
+test('a ZIP also opens its JSON files, which is how Spotify sends your account data', () => {
+  const zip = zipSync({ 'Spotify Account Data/StreamingHistory_music_0.json': strToU8('[]'), 'photo.png': strToU8('x') });
+  assert.deepEqual(
+    filesFromZip(zip).map((f) => f.name),
+    ['Spotify Account Data/StreamingHistory_music_0.json']
+  );
+});
+
+test('parseCsv can split on another delimiter', () => {
+  assert.deepEqual(parseCsv('a;"b;c"\n1;2', ';'), [
+    ['a', 'b;c'],
+    ['1', '2'],
+  ]);
 });

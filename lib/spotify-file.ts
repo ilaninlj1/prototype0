@@ -13,7 +13,7 @@ import { mergeSaves, type SpotifyLike } from './spotify.ts';
 export type NamedText = { name: string; text: string };
 
 /** RFC 4180 CSV: quoted fields can hold commas, doubled quotes and line breaks. */
-export function parseCsv(text: string): string[][] {
+export function parseCsv(text: string, delimiter = ','): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
@@ -27,7 +27,7 @@ export function parseCsv(text: string): string[][] {
       } else if (c === '"') quoted = false;
       else field += c;
     } else if (c === '"') quoted = true;
-    else if (c === ',') {
+    else if (c === delimiter) {
       row.push(field);
       field = '';
     } else if (c === '\n' || c === '\r') {
@@ -46,12 +46,31 @@ export function parseCsv(text: string): string[][] {
 }
 
 type Row = Record<string, string>;
+/** A row and where it sits in a spreadsheet: the header is row 1, so the first song is row 2. */
+type Numbered = { at: number; cells: Row };
 
-function table(text: string): Row[] | null {
-  const [head, ...body] = parseCsv(text.replace(/^﻿/, ''));
-  if (!head?.includes('Track URI') || !head.includes('Added At')) return null;
-  return body.filter((r) => r.length > 1).map((r) => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ''])));
+/** Spotify's own stand-ins for a song it no longer knows, plus what spreadsheets leave behind. */
+const PLACEHOLDERS = new Set(['unknown artist', 'unknown track', 'unknown', 'null', 'undefined', 'n/a', 'none']);
+
+/** A field as plain text: spaces tidied, control characters out, and a placeholder counts as blank. */
+export function cleanField(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  // eslint-disable-next-line no-control-regex
+  const text = value.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+  return PLACEHOLDERS.has(text.toLowerCase()) ? '' : text;
 }
+
+function table(text: string): Numbered[] | null {
+  const [head, ...body] = parseCsv(text.replace(/^\uFEFF/, ''));
+  if (!head?.includes('Track URI') || !head.includes('Added At')) return null;
+  return body
+    .map((r, i) => ({ r, at: i + 2 }))
+    .filter(({ r }) => r.length > 1)
+    .map(({ r, at }) => ({ at, cells: Object.fromEntries(head.map((h, i) => [h, r[i] ?? ''])) }));
+}
+
+/** Whether this text is an Exportify export. */
+export const isExportify = (text: string) => table(text) != null;
 
 /** "Road_Trip.csv" -> "Road Trip". */
 const playlistName = (file: string) =>
@@ -61,21 +80,30 @@ const playlistName = (file: string) =>
     .replace(/_/g, ' ')
     .trim();
 
-function toSong(r: Row, from: string): SpotifyLike | null {
+export type SkipReason = 'no-title' | 'no-artist' | 'bad-date' | 'no-link' | 'empty' | 'not-a-song' | 'not-an-entry';
+export type RowSkip = { reason: SkipReason; at: number; name: string; artist: string };
+
+function toSong(r: Row, from: string): SpotifyLike | SkipReason {
+  const name = cleanField(r['Track Name']);
+  const artist = cleanField(r['Artist Name(s)'])
+    // Exportify joins several artists with a bare comma.
+    .split(',')
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .join(', ');
+  if (!name && !artist) return 'empty';
   const id = r['Track URI'].replace(/^spotify:track:/, '');
+  if (!id || !r['Track URI'].startsWith('spotify:track:')) return 'no-link';
+  if (!name) return 'no-title';
+  if (!artist) return 'no-artist';
   const addedAt = Date.parse(r['Added At']);
-  if (!id || !r['Track URI'].startsWith('spotify:track:') || Number.isNaN(addedAt)) return null;
+  if (Number.isNaN(addedAt)) return 'bad-date';
   const year = parseInt(r['Album Release Date'], 10);
   const popularity = parseInt(r['Popularity'], 10);
   return {
     id,
-    name: r['Track Name'],
-    // Exportify joins several artists with a bare comma.
-    artist: r['Artist Name(s)']
-      .split(',')
-      .map((a) => a.trim())
-      .filter(Boolean)
-      .join(', '),
+    name,
+    artist,
     art: r['Album Image URL'] ?? '',
     addedAt,
     from,
@@ -85,43 +113,46 @@ function toSong(r: Row, from: string): SpotifyLike | null {
   };
 }
 
+export type ExportifyFile = { name: string; rows: number; songs: SpotifyLike[]; skips: RowSkip[]; notYours: number };
+
 /**
- * Every song from the files, each once (see mergeSaves). A file whose rows have no "Added By"
- * is Liked Songs. In playlist files only your own adds count, and "you" is whoever added the
- * most songs across all of them: a followed playlist's songs were added by someone else.
+ * What each Exportify file holds, row by row. A file whose rows have no "Added By" is Liked
+ * Songs. In playlist files only your own adds count, and "you" is whoever added the most songs
+ * across all of them: a followed playlist's songs were added by someone else.
  */
-export function fileSongs(files: NamedText[]): SpotifyLike[] {
+export function readExportify(files: NamedText[]): ExportifyFile[] {
   const tables = files.flatMap((f) => {
     const rows = table(f.text);
     return rows ? [{ name: f.name, rows }] : [];
   });
   const adders = new Map<string, number>();
   for (const t of tables)
-    for (const r of t.rows) if (r['Added By']) adders.set(r['Added By'], (adders.get(r['Added By']) ?? 0) + 1);
+    for (const { cells } of t.rows) if (cells['Added By']) adders.set(cells['Added By'], (adders.get(cells['Added By']) ?? 0) + 1);
   const me = [...adders].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-  const songs: SpotifyLike[] = [];
-  for (const t of tables) {
-    const liked = t.rows.every((r) => !r['Added By']);
-    for (const r of t.rows) {
-      if (!liked && r['Added By'] !== me) continue;
-      const song = toSong(r, liked ? '' : playlistName(t.name));
-      if (song) songs.push(song);
+  return tables.map((t) => {
+    const out: ExportifyFile = { name: t.name, rows: t.rows.length, songs: [], skips: [], notYours: 0 };
+    const liked = t.rows.every(({ cells }) => !cells['Added By']);
+    for (const { at, cells } of t.rows) {
+      if (!liked && cells['Added By'] !== me) {
+        out.notYours++;
+        continue;
+      }
+      const song = toSong(cells, liked ? '' : playlistName(t.name));
+      if (typeof song === 'string')
+        out.skips.push({ reason: song, at, name: cleanField(cells['Track Name']), artist: cleanField(cells['Artist Name(s)']) });
+      else out.songs.push(song);
     }
-  }
-  return mergeSaves(songs);
+    return out;
+  });
 }
 
-export type ExportRead = { songs: SpotifyLike[]; problem?: 'empty' | 'not-exportify' };
-
-/** What a picked file (or files) holds, or why it can't be used. */
-export function readExport(files: NamedText[]): ExportRead {
-  if (!files.length) return { songs: [], problem: 'empty' };
-  if (!files.some((f) => table(f.text))) return { songs: [], problem: 'not-exportify' };
-  return { songs: fileSongs(files) };
+/** Every song from the files, each once (see mergeSaves). */
+export function fileSongs(files: NamedText[]): SpotifyLike[] {
+  return mergeSaves(readExportify(files).flatMap((f) => f.songs));
 }
 
-/** The CSV files inside Exportify's "export everything" ZIP (skipping macOS's __MACOSX copies). */
+/** The CSV and JSON files inside a ZIP: Exportify's "export everything" or Spotify's account data (skipping macOS's __MACOSX copies). */
 export function filesFromZip(bytes: Uint8Array): NamedText[] {
-  const entries = unzipSync(bytes, { filter: (f) => /\.csv$/i.test(f.name) && !f.name.startsWith('__MACOSX/') });
+  const entries = unzipSync(bytes, { filter: (f) => /\.(csv|json)$/i.test(f.name) && !f.name.startsWith('__MACOSX/') });
   return Object.entries(entries).map(([name, data]) => ({ name, text: strFromU8(data) }));
 }

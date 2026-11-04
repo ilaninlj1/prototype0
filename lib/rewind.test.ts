@@ -294,3 +294,10 @@ test('equal zones: each step gets the same width of the strip', () => {
   assert.ok(Math.abs(BAND_STARTS.month - BAND_STARTS.day - width) < 1e-9);
   assert.ok(Math.abs(BAND_STARTS.year - BAND_STARTS.month - width) < 1e-9);
 });
+
+test('songs from a file with no dates stay off the timeline', () => {
+  const at = Date.UTC(2026, 10, 3, 12);
+  const song = { id: 'a', name: 'A', artist: 'B', art: '', addedAt: at, from: '', source: 'file' as const };
+  const shown = likesInPeriod([song, { ...song, id: 'b', undated: true }], at, 'day');
+  assert.deepEqual(shown.map((l) => l.id), ['a']);
+});
