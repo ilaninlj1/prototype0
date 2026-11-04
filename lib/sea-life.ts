@@ -42,7 +42,7 @@ export function emptyScene(): Scene {
 
 /** Lengths in meters, from general references. The rest is how each one moves at the surface. */
 export const WHALES = {
-  blue: { L: 27, z: 75, hump: 0.04, w: 0.62, fin: 0.84, finH: 0.012, roll: 7, v: 2.2, flukeW: 6, under: false },
+  blue: { L: 27, z: 75, hump: 0.04, w: 0.62, fin: 0.84, finH: 0.012, roll: 7, v: 1.5, flukeW: 6, under: false },
   hump: { L: 14, z: 55, hump: 0.075, w: 0.5, fin: 0.64, finH: 0.035, roll: 4.2, v: 1.8, flukeW: 4.5, under: true },
   sperm: { L: 15, z: 65, hump: 0.06, w: 0.5, fin: 0.66, finH: 0.014, roll: 4.4, v: 0.6, flukeW: 4.5, under: false },
 };
