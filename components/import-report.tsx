@@ -53,8 +53,8 @@ export function ImportReportBody({ report, newCount }: { report: ImportReport; n
       )}
       {saved && (
         <ThemedText style={styles.line}>
-          {newCount.toLocaleString('en-US')} {newCount === 1 ? 'is' : 'are'} new here. Home now skips the{' '}
-          {knownCount().toLocaleString('en-US')} artists you already have.
+          {newCount === 0 ? 'You already had all of them.' : `${newCount.toLocaleString('en-US')} ${newCount === 1 ? 'is' : 'are'} new here.`}{' '}
+          Home now skips the {knownCount().toLocaleString('en-US')} artists you already have.
         </ThemedText>
       )}
       {leftOut && <ThemedText style={styles.small}>{leftOut}</ThemedText>}
@@ -119,7 +119,7 @@ export function ImportReportSheet({
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl, gap: Spacing.lg },
+  scroll: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, paddingBottom: Spacing.xl, gap: Spacing.lg },
   body: { gap: Spacing.sm },
   headline: { fontFamily: Fonts.sansSemiBold, fontSize: 22, lineHeight: 28, color: Colors.text },
   line: { fontSize: 15, lineHeight: 21, color: Colors.text },

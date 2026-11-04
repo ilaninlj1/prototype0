@@ -46,6 +46,7 @@ const SKIP_TEXT: Record<SkipReason, string> = {
   'not-a-song': 'A podcast or audiobook, not a song',
   empty: 'Blank, or marked Unknown',
   'not-an-entry': 'Not a song entry',
+  'bad-columns': 'Too many columns, maybe a comma with no quotes around it',
 };
 
 /** Enough to check a file by eye, without holding every row of a huge one. */
@@ -119,8 +120,9 @@ const URI = ['spotifytrackuri', 'trackuri', 'spotifyuri', 'uri'];
 const PLAYED_MS = ['msplayed', 'playdurationmilliseconds'];
 const NOT_A_SONG = ['episodename', 'episodeshowname', 'podcastname', 'audiobooktitle', 'audiobookchaptertitle'];
 
-/** A name, even when an export nests it: { name: 'Sade' } or Last.fm's { '#text': 'Sade' }. */
+/** A name, even when an export nests it: { name: 'Sade' }, Last.fm's { '#text': 'Sade' }, or a list of those. */
 function textOf(value: unknown): string {
+  if (Array.isArray(value)) return value.map(textOf).filter(Boolean).join(', ');
   if (value && typeof value === 'object') {
     const v = value as { name?: unknown; '#text'?: unknown };
     return cleanField(v.name ?? v['#text']);
@@ -183,13 +185,19 @@ const empty = (name: string, problem: string): FileRead => ({
   unit: 'Row',
 });
 
-const list = (columns: string[]) => columns.map((c) => c.trim()).filter(Boolean).slice(0, 6).join(', ');
+const list = (columns: string[]) => columns.map((c) => c.trim().slice(0, 30)).filter(Boolean).slice(0, 6).join(', ');
 
-function readRows(name: string, kind: string, unit: FileRead['unit'], entries: { at: number; entry: Map<string, unknown> | null }[], now: number, note?: string): FileRead {
+type RawEntry = { at: number; entry: Map<string, unknown> | null; broken?: SkipReason };
+
+function readRows(name: string, kind: string, unit: FileRead['unit'], entries: RawEntry[], now: number, note?: string): FileRead {
   const out: FileRead = { result: { name, kind, found: 0, ...(note ? { note } : {}) }, songs: [], skips: [], shortPlays: 0, notYours: 0, unit };
-  for (const { at, entry } of entries) {
+  for (const { at, entry, broken } of entries) {
     if (!entry) {
       out.skips.push({ reason: 'not-an-entry', at, name: '', artist: '' });
+      continue;
+    }
+    if (broken) {
+      out.skips.push({ reason: broken, at, name: textOf(pick(entry, TITLE)), artist: textOf(pick(entry, ARTIST)) });
       continue;
     }
     const read = readEntry(entry, now);
@@ -214,13 +222,24 @@ function readCsvFile(name: string, text: string, now: number): FileRead {
     if (hasArtist) return empty(name, `This has an artist column but no song column. ${has}`);
     return empty(name, `No song or artist columns here. It has: ${list(head ?? [])}.`);
   }
+  // An odd number of quote marks: one never closes, and the parser took the rest of the file as a single field.
+  const unclosed = (text.match(/"/g)?.length ?? 0) % 2 === 1;
+  if (unclosed) body.pop();
+  const note = unclosed
+    ? `A quote mark in this file never closes around row ${body.length + 2}, so that row and everything after it couldn’t be read.`
+    : undefined;
   const rows = body
     .map((cells, i) => ({ cells, at: i + 2 }))
     // A truly blank line isn't a row. A row of empty cells is, since someone meant something by it.
     .filter(({ cells }) => cells.length > 1 || cells[0]?.trim())
-    .map(({ cells, at }) => ({ at, entry: new Map<string, unknown>(columns.map((c, i) => [c, cells[i]?.trim() ?? ''])) }));
-  if (!rows.length) return empty(name, 'This file has the right columns but no songs under them.');
-  return readRows(name, 'A list of songs', 'Row', rows, now);
+    .map(({ cells, at }): RawEntry => ({
+      at,
+      entry: new Map<string, unknown>(columns.map((c, i) => [c, cells[i]?.trim() ?? ''])),
+      // Cells past the last column mean a comma split something, so every column after it is wrong.
+      broken: cells.slice(columns.length).some((c) => c.trim()) ? 'bad-columns' : undefined,
+    }));
+  if (!rows.length) return empty(name, note ?? 'This file has the right columns but no songs under them.');
+  return readRows(name, 'A list of songs', 'Row', rows, now, note);
 }
 
 const entryMap = (item: unknown) =>
@@ -300,14 +319,14 @@ function rowLabel(unit: FileRead['unit'], { at, name, artist }: RowSkip): string
 
 /** Read every picked file. One bad file never stops the others. */
 export function readImport(files: PickedFile[], now: number): ImportReport {
-  const usable = files.filter((f) => f.text != null);
-  const exportify = new Map(
-    readExportify(usable.filter((f) => isExportify(f.text!)).map((f) => ({ name: f.name, text: f.text! }))).map((f) => [f.name, f])
-  );
+  const exports = files.filter((f) => f.text != null && isExportify(f.text));
+  // Read together, since "you" in a playlist file is decided across all of them.
+  const exportReads = readExportify(exports.map((f) => ({ name: f.name, text: f.text! })));
+  const exportOf = new Map(exports.map((f, i) => [f, exportReads[i]]));
   const reads = files.map((f): FileRead & { fromZip?: boolean } => {
     const name = baseName(f.name);
     if (f.failed || f.text == null) return empty(name, FAILED_TEXT[f.failed ?? 'unreadable']);
-    const e = exportify.get(f.name);
+    const e = exportOf.get(f);
     if (!e) return { ...readOneFile(name, f.text, now), fromZip: f.fromZip };
     if (!e.rows) return empty(name, 'This file has the right columns but no songs under them.');
     return {

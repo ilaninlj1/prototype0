@@ -49,8 +49,8 @@ type Row = Record<string, string>;
 /** A row and where it sits in a spreadsheet: the header is row 1, so the first song is row 2. */
 type Numbered = { at: number; cells: Row };
 
-/** Spotify's own stand-ins for a song it no longer knows, plus what spreadsheets leave behind. */
-const PLACEHOLDERS = new Set(['unknown artist', 'unknown track', 'unknown', 'null', 'undefined', 'n/a', 'none']);
+/** Spotify's own stand-ins for a song it no longer knows, plus what data tools leave behind. "Unknown" alone can be a real song. */
+const PLACEHOLDERS = new Set(['unknown artist', 'unknown track', 'null', 'undefined', 'n/a']);
 
 /** A field as plain text: spaces tidied, control characters out, and a placeholder counts as blank. */
 export function cleanField(value: unknown): string {
@@ -59,17 +59,19 @@ export function cleanField(value: unknown): string {
   return PLACEHOLDERS.has(text.toLowerCase()) ? '' : text;
 }
 
+const hasExportifyColumns = (head: string[] | undefined) => !!head?.includes('Track URI') && head.includes('Added At');
+
 function table(text: string): Numbered[] | null {
   const [head, ...body] = parseCsv(text.replace(/^\uFEFF/, ''));
-  if (!head?.includes('Track URI') || !head.includes('Added At')) return null;
+  if (!hasExportifyColumns(head)) return null;
   return body
     .map((r, i) => ({ r, at: i + 2 }))
     .filter(({ r }) => r.length > 1)
     .map(({ r, at }) => ({ at, cells: Object.fromEntries(head.map((h, i) => [h, r[i] ?? ''])) }));
 }
 
-/** Whether this text is an Exportify export. */
-export const isExportify = (text: string) => table(text) != null;
+/** Whether this text is an Exportify export, from its first line. */
+export const isExportify = (text: string) => hasExportifyColumns(parseCsv(text.replace(/^\uFEFF/, '').split(/\r|\n/, 1)[0])[0]);
 
 /** "Road_Trip.csv" -> "Road Trip". */
 const playlistName = (file: string) =>
@@ -79,7 +81,7 @@ const playlistName = (file: string) =>
     .replace(/_/g, ' ')
     .trim();
 
-export type SkipReason = 'no-title' | 'no-artist' | 'bad-date' | 'no-link' | 'empty' | 'not-a-song' | 'not-an-entry';
+export type SkipReason = 'no-title' | 'no-artist' | 'bad-date' | 'no-link' | 'empty' | 'not-a-song' | 'not-an-entry' | 'bad-columns';
 export type RowSkip = { reason: SkipReason; at: number; name: string; artist: string };
 
 function toSong(r: Row, from: string): SpotifyLike | SkipReason {

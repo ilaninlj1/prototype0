@@ -24,6 +24,7 @@ Sade,Smooth Operator,05/06/2019
 The Beatles,Blackbird,2018-08-30
 the beatles,BLACKBIRD,2022-01-01
 Stevie Wonder,Superstition,
+Earth, Wind & Fire,September,2020-09-21
 `,
       },
     ],

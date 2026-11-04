@@ -284,10 +284,42 @@ test('a new import joins what you already had and counts only what is new', () =
 
 // ---------- The class demo samples go through the real reader ----------
 
-test('the messy sample: 4 songs in, 7 named, 1 repeat', () => {
+test('a comma nobody quoted shifts the columns, so that row is named instead of coming in wrong', () => {
+  const r = read('a.csv', 'Artist,Song,Date\nEarth, Wind & Fire,September,2020-01-01\nSade,Jezebel,2020-01-01,\n');
+  assert.deepEqual(r.songs.map((s) => s.name), ['Jezebel']);
+  assert.deepEqual(group(r, 'bad-columns')!.rows, ['Row 2 · “Wind & Fire” by Earth']);
+});
+
+test('a quote mark that never closes keeps the rows before it and says what was lost', () => {
+  const r = read('a.csv', 'Artist,Song\nA,One\nB,"Two\nC,Three\nD,Four\n');
+  assert.deepEqual(r.songs.map((s) => s.name), ['One']);
+  assert.match(r.files[0].note!, /quote mark .* never closes around row 3/);
+});
+
+test('two picked files with the same name are both read', () => {
+  const file = (uri: string, name: string) => ({
+    name: 'Liked_Songs.csv',
+    text: [EXPORTIFY, exportify(uri, name, 'A', '', '2019-04-02T21:15:00Z')].join('\n'),
+  });
+  const r = readImport([file('spotify:track:O', 'One'), file('spotify:track:W', 'Two')], NOW);
+  assert.deepEqual(r.songs.map((s) => s.name).sort(), ['One', 'Two']);
+});
+
+test('a list of artist objects is read too, as other apps export it', () => {
+  const r = read('a.json', JSON.stringify([{ name: 'Song', artists: [{ name: 'A' }, { name: 'B' }] }]));
+  assert.equal(r.songs[0].artist, 'A, B');
+});
+
+test('a song really called Unknown stays a song; only Spotify’s stand-ins count as blank', () => {
+  assert.equal(read('a.csv', 'Artist,Song\nSade,Unknown\n').songs.length, 1);
+  assert.equal(read('a.csv', 'Artist,Song\nUnknown Artist,Song\n').songs.length, 0);
+});
+
+test('the messy sample: 4 songs in, 8 named, 1 repeat', () => {
   const r = readImport(IMPORT_SAMPLES.messy.files, NOW);
   assert.deepEqual(r.songs.map((s) => s.name).sort(), ['Blackbird', 'Karma Police', 'Smooth Operator', 'Superstition']);
-  assert.equal(r.skippedCount, 7);
+  assert.equal(r.skippedCount, 8);
+  assert.equal(group(r, 'bad-columns')!.count, 1);
   assert.equal(group(r, 'no-artist')!.count, 2);
   assert.equal(group(r, 'no-title')!.count, 1);
   assert.equal(group(r, 'bad-date')!.count, 3);
