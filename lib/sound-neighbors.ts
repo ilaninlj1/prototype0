@@ -33,6 +33,7 @@ export function pickNeighbors<T>(
   targetArtist: string,
   candidates: Candidate<T>[],
   n = 3,
+  distanceOf: (a: SoundFeatures, b: SoundFeatures) => number = soundDistance,
 ): T[] {
   const artist = normName(targetArtist);
   const ranked: { item: T; artist: string; distance: number; index: number }[] = [];
@@ -43,7 +44,7 @@ export function pickNeighbors<T>(
     ranked.push({
       item: candidate.item,
       artist: name,
-      distance: soundDistance(target, candidate.sound),
+      distance: distanceOf(target, candidate.sound),
       index,
     });
   });

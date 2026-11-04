@@ -6,6 +6,11 @@ staleness.
 
 Add new entries at the top, newest first.
 
+## [2026-11-03] Follow the Sound
+After a reveal you can pick where to go next: Calmer, Harder, Brighter, Darker or Deeper. The feed heads that way from that song, and each song you reveal becomes the next starting point, so you travel instead of filtering. Each word is backed by a number we really have: energy, valence, or popularity. A word dims when there's nothing further that way, and heading somewhere that runs out says so on the status line. Songs served this way are logged as `source: 'follow'` with the step that served them, so saves can be compared with the rest of the feed and a path can be retraced later.
+
+Measured on the 8,294 songs we have sound for: a step moves its number about 0.15, the other number drifts about 0.05, and about 92% of the next songs are in another genre. That last one is the point, but it's also the risk, because these numbers don't know what a song really sounds like; a few picks read wrong, and one known-wrong measurement (Bad Bunny's DtMF as nearly silent) shows the data's limits. It needs judging by ear.
+
 ## [2026-11-03] The Ocean: each biome its own, fish that climb, the whole ocean as a graph
 Nothing lives in the ocean but your songs now, and each song has its own body from its sound. Sand is only at the bottom of Buried. Sunny reef has coral towers and anemones where clownfish nest, the Kelp forest thickens with stems in the colors of songs you heard, Open blue has currents and drifting rafts, and Midnight has glowing tendrils, smoking vents and whale bones. Biomes dissolve into each other in layers moving at their own speeds. A fish climbs a level for every fourfold rise in its artist's listeners, leaving a trail, and pinching in (or See it all) shows the whole ocean as one graph with your own path through it.
 
