@@ -119,13 +119,13 @@ export function sunAt(hour: number, width: number, horizon: number): SkyBody {
   return { x: width / 2 + k * (135 * Math.cos(a) + 105 * Math.sin(a)), y: horizon - (horizon - 36) * Math.sin(a), up: t > -0.06 && t < 1.06, low: 1 - clamp01(Math.sin(a) / 0.4) };
 }
 
-/** The moon spends most of the night high in the top left, clear of the island. */
-export function moonAt(hour: number, width: number, horizon: number): SkyBody {
+/** The moon spends most of the night high in the top left, above the genre button and clear of the island. */
+export function moonAt(hour: number, width: number, horizon: number, highest = 32): SkyBody {
   const h = ((hour % 24) + 24) % 24;
   const t = ((h - 20.4 + 24) % 24) / 9.2;
   const a = Math.PI * t;
   const k = width / 390;
-  return { x: width / 2 - k * (60 * Math.cos(a) + 125 * Math.sin(a)), y: horizon - (horizon - 32) * Math.pow(Math.max(0, Math.sin(a)), 0.15), up: t < 1.04, low: 0 };
+  return { x: width / 2 - k * (60 * Math.cos(a) + 125 * Math.sin(a)), y: horizon - (horizon - highest) * Math.pow(Math.max(0, Math.sin(a)), 0.03), up: t < 1.04, low: 0 };
 }
 
 /** Makes `c` no brighter than `most` of `than`. */

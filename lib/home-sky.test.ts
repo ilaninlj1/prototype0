@@ -47,6 +47,8 @@ test('the sun is on the horizon at 6:30 and 7:00, high at midday, and gone at ni
   assert.equal(sunAt(23, 390, H).up, false);
   assert.equal(moonAt(23, 390, H).up, true);
   assert.equal(moonAt(13, 390, H).up, false);
+  // Most of the night it stays clear of the row of buttons, whose top is here at 87.
+  for (const h of [22, 23, 0, 1, 2, 3, 4]) assert.ok(moonAt(h, 390, H, 69).y + 15 <= 87 + 12, `moon at ${h}: ${moonAt(h, 390, H, 69).y}`);
 });
 
 test('the water never outshines the sky it meets, in any water, depth, hour or weather', () => {

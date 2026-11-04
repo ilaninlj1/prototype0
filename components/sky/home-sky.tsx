@@ -83,7 +83,8 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
   const reduced = useReducedMotion();
   const weather = look.weather;
   const sun = useMemo(() => sunAt(hour, width, horizon), [hour, width, horizon]);
-  const moon = useMemo(() => moonAt(hour, width, horizon), [hour, width, horizon]);
+  // Stops short of the row of buttons: a bright moon behind the genre button washes out its word.
+  const moon = useMemo(() => moonAt(hour, width, horizon, Math.max(18, headerY - 40)), [hour, width, horizon, headerY]);
   const vector = useMemo(() => lookVector(look, sun, moon), [look, sun, moon]);
   const colors = useMemo(() => islandColors(look), [look]);
   const veil = useMemo(() => wordsVeil(look, wordsDark), [look, wordsDark]);
