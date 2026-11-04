@@ -21,7 +21,7 @@ import Animated, {
 import { COVER_BLUR } from '@/components/discovery/swipe-card';
 import { DEFAULT_SWIPE_THRESHOLDS, isSwipeUp, resolveSwipeDirection, rotationForDrag, type CardSize, type SwipeDirection } from '@/components/discovery/swipe-physics';
 import { HeartBurst } from '@/components/heart-burst';
-import { LivePrint } from '@/components/print/live-print';
+import { MarblePrint } from '@/components/print/marble-print';
 import { PrintStill } from '@/components/print/print-still';
 import { DarkColors, Spacing } from '@/constants/theme';
 import { oceanDive } from '@/components/ocean/dive-gesture';
@@ -99,6 +99,7 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   const duration = useSharedValue(0);
   const furthest = useSharedValue(0);
   const isRevealed = useSharedValue(revealed);
+  const pop = useSharedValue(0);
   const badgeRef = useRef<ViewInstance>(null);
 
   // Listening develops the print: the particles gather as the song plays, fully formed at 80% of the preview.
@@ -227,8 +228,13 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   function tick() {
     Haptics.selectionAsync();
   }
+  // A marble hitting the card's edge ticks the phone; a hard hit, a little more.
+  function marbleHit(strength: number) {
+    Haptics.impactAsync(strength > 2 ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+  }
   function saved() {
     setBurst((n) => n + 1);
+    pop.set(pop.get() + 1);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onSave();
   }
@@ -292,6 +298,8 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   // The print is square: the card's shorter side, centered (the card fills whatever room Home has).
   const side = Math.min(size.width, size.height);
   const printBox = { top: (size.height - side) / 2, left: (size.width - side) / 2, width: side, height: side };
+  // The marbles get the whole card, so they can roll to its edges.
+  const cardBox = { top: 0, left: 0, width: size.width, height: size.height };
 
   return (
     <Animated.View style={cardStyle}>
@@ -305,13 +313,30 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
           </Animated.View>
 
           {/* The formation crossfades when sound data lands after the card appeared. */}
-          <Animated.View pointerEvents="none" style={[styles.print, printBox, printStyle]}>
+          <Animated.View pointerEvents="none" style={[styles.print, reduceMotion ? printBox : cardBox, printStyle]}>
             {/* Keyed apart from the opacity above: the entering fade and the reveal fade can't share one view. */}
             <Animated.View key={`${recipe.source}:${recipe.label ?? ''}`} entering={FadeIn.duration(400)}>
               {reduceMotion ? (
                 <PrintStill recipe={aged} size={side} ground={false} />
               ) : (
-                <LivePrint recipe={liveRecipe} size={side} clock={clock} gather={living} scatter={scatter} fall={fall} />
+                <MarblePrint
+                  recipe={liveRecipe}
+                  side={side}
+                  card={size}
+                  left={printBox.left}
+                  top={printBox.top}
+                  clock={clock}
+                  playing={playing}
+                  gather={living}
+                  scatter={scatter}
+                  fall={fall}
+                  tx={tx}
+                  ty={ty}
+                  locked={isRevealed}
+                  quiet={exiting}
+                  pop={pop}
+                  onHit={marbleHit}
+                />
               )}
             </Animated.View>
           </Animated.View>

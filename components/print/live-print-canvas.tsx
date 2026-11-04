@@ -1,7 +1,7 @@
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 
-import { particleAt, particleHash, ringOf, type PrintRecipe } from '@/lib/print-recipe';
+import { placeParticle as place, ringOf, type PrintRecipe } from '@/lib/print-recipe';
 
 const TRAIL = 0.1; // seconds of motion each stroke shows
 
@@ -44,15 +44,6 @@ export default function LiveCanvas({ recipe, size, clock, gather, scatter, fall 
       )}
     </Canvas>
   );
-}
-
-/** One particle where it is now, then pushed outward (scatter) or dropped (fall) by the drag. */
-function place(r: PrintRecipe, i: number, t: number, gather: number, scatter: number, fall: number): [number, number] {
-  'worklet';
-  const [x, y] = particleAt(r, i, t, gather);
-  const h = particleHash(i, r.seed);
-  const k = 1 + scatter * (1.2 + 1.6 * h);
-  return [0.5 + (x - 0.5) * k, 0.5 + (y - 0.5) * k + fall * fall * (0.5 + 0.9 * h)];
 }
 
 /** One ring's particles at time t, as a path in a size × size box (also drawn by the Edition's Flow scene). */

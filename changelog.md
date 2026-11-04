@@ -113,6 +113,16 @@ unheard songs from any genre until you leave, and goes back to the genre by itse
 bloom in each time you open it, and a list of regions reads it out for VoiceOver. The sound index now also measures
 songs that are only in an artist's Mixed list, so 8,296 of 10,889 catalog songs have sound data (was 5,559).
 
+## [2026-10-14] Marbles: the blind card's particles have weight
+Moving the card now swings the particles. A loud song's swing the other way, like marbles; a calm song's lean
+into the motion, like balloons (a helium balloon leans forward in a car that speeds up). They bounce off the
+card's edges, and a marble's hit gives a light tick. A deliberate wiggle shakes them loose: marbles drop to the
+bottom of the card and balloons float to the top, then, once the card is still, they fly back into the print
+one by one. One drag, a fling or letting go never shakes them loose, since only a wiggle keeps turning the card
+around. A save pops them outward. The print's own motion, the flow and the breathing at the song's tempo, is
+untouched, and a paused card stops redrawing. Checked in a web build: a wiggle drops them to the floor and they
+are back within five seconds, and the reveal still works.
+
 ## [2026-10-14] Older songs look older; the reveal says when a song came out
 Every bundled catalog song now carries its iTunes release date (`npm run add-release-dates`), and live iTunes
 results keep theirs. Blind, an older song's card comes in warmer and its colors faded, so you can guess the era

@@ -77,7 +77,8 @@ the card's edges and a light haptic tick when they hit. Calm songs could float u
 sink, from one gravity setting rather than two kinds of objects. Most of the motion already exists (particles
 follow the drag and breathe at the song's tempo), so this is a tuning pass. Keep any beat pulse soft: the index
 has each song's tempo but not where its beats land, so a hard thump would drift off the music.
-**Status (2026-10-14): Waiting** on a phone check of whether today's particles feel floaty.
+**Status (2026-10-14): Built** on branch `marbles` (`lib/marbles.ts`), after the user said "continue". Not yet felt
+on a phone; its edge ticks extend haptics, which is Prototype 7's goal (10/22).
 
 ## [2026-10-08] The Edition: a motion reel of your last 5 finds
 After every 5 reveals, a ~30-second full-screen reel plays those 5 songs as scenes in the style of the user's
