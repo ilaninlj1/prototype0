@@ -40,8 +40,8 @@ export function stillPlan(hour: number, rand: () => number): StillStep[] {
   const whale: SeaLifeKind = r < 0.6 ? 'hump' : r < 0.8 ? 'sperm' : 'blue';
   return [
     { at: 3, kind: first, quick: false },
-    { at: 8, kind: 'pod', quick: false },
-    { at: 13, kind: second, quick: false },
+    { at: 8, kind: 'pod', quick: true },
+    { at: 14, kind: second, quick: false },
     { at: 17, kind: whale, quick: true },
   ];
 }
@@ -75,6 +75,8 @@ export function makeSighting(kind: SeaLifeKind, o: { width: number; screenH: num
     const v = leap ? 5.5 : 1.8;
     const margin = 110;
     const span = o.width + margin * 2;
+    // Slow resting dolphins would take half a minute to cross, and hold up the whale. Quick ones just surface here and go.
+    if (o.quick && !leap) return { ...base, z, leap, x: between(0.3, 0.7) * o.width, members: Math.round(between(3, 5.4)), duration: 8 };
     return { ...base, z, leap, x: dir > 0 ? -margin : o.width + margin, members: Math.round(between(3, 5.4)), duration: Math.min(span / (v * (300 / z)), 26) };
   }
   if (kind === 'seal') return { ...base, z: between(7.6, 8.6), x: between(0.14, 0.86) * o.width, duration: 10.2 };

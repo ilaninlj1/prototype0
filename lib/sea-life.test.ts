@@ -146,6 +146,22 @@ test('leaving a song alone wakes the sea: close things first, then dolphins, a w
   assert.ok(seen.has('bait'));
 });
 
+test('nothing in a still song holds up the next thing, by day or by night, so the whale always gets its turn', () => {
+  let i = 0;
+  const seq = () => (i = (i + 0.137) % 1);
+  for (const hour of [12, 22]) {
+    for (let n = 0; n < 300; n++) {
+      const plan = stillPlan(hour, seq);
+      const ends: Record<string, number> = { far: 0, near: 0 };
+      for (const step of plan) {
+        const slot = isFar(step.kind) ? 'far' : 'near';
+        assert.ok(ends[slot] <= step.at, `${step.kind} at ${step.at} is blocked until ${ends[slot]}`);
+        ends[slot] = step.at + make(step.kind, { hour, quick: step.quick, rand: seq }).duration;
+      }
+    }
+  }
+});
+
 test('a quick whale comes up sooner than a normal one, and breaches more often', () => {
   const at = (quick: boolean) => makeSighting('hump', { width: 390, screenH: 844, horizon: 704, hour: 12, wind: 0.5, quick, rand: () => 0.9 });
   assert.ok(at(true).n < at(false).n);
