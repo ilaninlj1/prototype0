@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MiniPlayer } from '@/components/mini-player';
 import { Cassette } from '@/components/rewind/cassette';
 import { RewindStrip } from '@/components/rewind/rewind-strip';
+import { ImportReportSheet } from '@/components/import-report';
 import { SpotifySheet } from '@/components/rewind/spotify-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { DarkColors, Fonts, Radius, Spacing, DarkUi } from '@/constants/theme';
@@ -38,6 +39,7 @@ import {
   inPeriod,
   jump,
   likesInPeriod,
+  likeTimes,
   offsetLabel,
   periodLabel,
   periodLine,
@@ -50,18 +52,18 @@ import {
   type Unit,
 } from '@/lib/rewind';
 import { knownCount, setKnownArtists } from '@/lib/known-artists';
-import { describeImport, mergeSaves, spotifyTrackUrl, type SpotifyLike } from '@/lib/spotify';
+import { describeImport, mergeSaves, spotifyLink, type SpotifyLike } from '@/lib/spotify';
 import { DarkRoom } from '@/components/dark-room';
 import { useLightStatusBar } from '@/hooks/use-light-status-bar';
 import {
   clearSpotifyLibrary,
   FAIL_TEXT,
-  FILE_FAIL_TEXT,
   importAndKeepFile,
   importSpotifyLikes,
   loadSpotifyLibrary,
   saveSpotifyLibrary,
   spotifyReturnUrl,
+  type KeptImport,
   type SpotifyLibrary,
 } from '@/lib/spotify-api';
 
@@ -150,6 +152,7 @@ function RewindScreenBody() {
   );
   const [spotifyOn, setSpotifyOn] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [importReport, setImportReport] = useState<KeptImport | null>(null);
   const [importing, setImporting] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -166,7 +169,7 @@ function RewindScreenBody() {
       const dated = withLikedAt(liked, h).filter((t) => t.likedAt != null);
       setFinds(dated);
       setHistory(h);
-      const spotifyTimes = [...(login?.likes ?? []), ...(file?.likes ?? [])].map((l) => l.addedAt);
+      const spotifyTimes = likeTimes([...(login?.likes ?? []), ...(file?.likes ?? [])]);
       setLoginLib(login);
       setFileLib(file);
       setSpotifyOn(spotifyTimes.length > 0);
@@ -181,7 +184,7 @@ function RewindScreenBody() {
 
   const findTimes = useMemo(() => finds.map((t) => t.likedAt!), [finds]);
   const likes = useMemo(() => (spotifyOn && spotify ? spotify.likes : []), [spotifyOn, spotify]);
-  const times = useMemo(() => (likes.length ? [...findTimes, ...likes.map((l) => l.addedAt)] : findTimes), [findTimes, likes]);
+  const times = useMemo(() => (likes.length ? [...findTimes, ...likeTimes(likes)] : findTimes), [findTimes, likes]);
   // The day on screen: the one you landed on, or while scrubbing, the stop under your finger.
   const stop = scrubbing ? stopAt(scrubbing, scrubbing.steps) : null;
   const shownAt = stop?.at ?? view?.at;
@@ -234,7 +237,7 @@ function RewindScreenBody() {
     Haptics.selectionAsync();
     const on = !spotifyOn;
     setSpotifyOn(on);
-    settle(on ? [...findTimes, ...spotify.likes.map((l) => l.addedAt)] : findTimes, !on);
+    settle(on ? [...findTimes, ...likeTimes(spotify.likes)] : findTimes, !on);
   }
 
   async function connect() {
@@ -256,22 +259,21 @@ function RewindScreenBody() {
     if (!view) setView(latest(result.map((l) => l.addedAt)));
   }
 
-  /** Anyone, no Spotify test list needed: the CSV or ZIP from exportify.app. Replaces an earlier import. */
+  /** Anyone, no Spotify test list needed: a file from exportify.app, Spotify's own history, or any song list. Joins an earlier import. */
   async function importFile() {
     setSheet(false);
     setNotice(null);
     setImporting(0);
-    const library = await importAndKeepFile();
+    const result = await importAndKeepFile();
     setImporting(null);
-    if (typeof library === 'string') {
-      if (library !== 'cancelled') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return setNotice(FILE_FAIL_TEXT[library]);
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setFileLib(library);
+    if (result === 'cancelled') return setNotice('No file picked. Nothing changed.');
+    Haptics.notificationAsync(result.library ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error);
+    setImportReport(result);
+    if (!result.library) return;
+    setFileLib(result.library);
     setSpotifyOn(true);
-    setNotice(`Imported ${describeImport(library.likes, now)} Home now skips the ${knownCount()} artists already in it.`);
-    if (!view) setView(latest(library.likes.map((l) => l.addedAt)));
+    setNotice(`Imported ${describeImport(result.library.likes, now)} Home now skips the ${knownCount()} artists already in it.`);
+    if (!view) setView(latest(likeTimes(result.library.likes)));
   }
 
   function removeSpotify() {
@@ -633,6 +635,15 @@ function RewindScreenBody() {
           </>
         )}
         <SpotifySheet visible={sheet} onConnect={connect} onImport={importFile} onClose={() => setSheet(false)} />
+        <ImportReportSheet
+          kept={importReport}
+          onClose={() => setImportReport(null)}
+          onPickAnother={() => {
+            setImportReport(null);
+            // The file picker can't open while this sheet is still sliding away.
+            setTimeout(importFile, 400);
+          }}
+        />
       </View>
     </GestureDetector>
   );
@@ -643,7 +654,7 @@ function SpotifyCover({ like, size, delay }: { like: SpotifyLike; size: number; 
   return (
     <Animated.View entering={delay == null ? undefined : FadeIn.delay(delay)} style={{ width: size }}>
       <Pressable
-        onPress={() => Linking.openURL(spotifyTrackUrl(like.id))}
+        onPress={() => Linking.openURL(spotifyLink(like))}
         accessibilityLabel={`${like.name} by ${like.artist}, open in Spotify`}>
         <Image source={like.art ? { uri: like.art } : null} style={[styles.art, { width: size, height: size }]} />
         <View style={styles.spotifyMark}>

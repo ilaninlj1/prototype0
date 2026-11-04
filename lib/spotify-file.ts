@@ -55,7 +55,6 @@ const PLACEHOLDERS = new Set(['unknown artist', 'unknown track', 'unknown', 'nul
 /** A field as plain text: spaces tidied, control characters out, and a placeholder counts as blank. */
 export function cleanField(value: unknown): string {
   if (typeof value !== 'string') return '';
-  // eslint-disable-next-line no-control-regex
   const text = value.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
   return PLACEHOLDERS.has(text.toLowerCase()) ? '' : text;
 }
