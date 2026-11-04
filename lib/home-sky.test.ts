@@ -135,7 +135,7 @@ test('every function a frame calls is marked as a worklet', () => {
 
 test('nothing loaded up front brings Skia with it', () => {
   // On the web Skia binds when its module is first evaluated, so one stray import blanks the screen.
-  for (const file of ['components/sky/home-sky.tsx', 'components/sky/sky-island.tsx', 'components/home/sky-ink.tsx']) {
+  for (const file of ['components/sky/home-sky.tsx', 'components/sky/sky-island.tsx', 'components/sky/sea-life-layer.tsx', 'components/home/sky-ink.tsx', 'hooks/use-sea-life.ts']) {
     const source = readFileSync(file, 'utf8');
     assert.doesNotMatch(source, /@shopify\/react-native-skia/, `${file} imports Skia`);
     for (const line of source.split('\n')) if (/^import (?!type ).*sky-canvas'/.test(line)) assert.fail(`${file}: ${line}`);

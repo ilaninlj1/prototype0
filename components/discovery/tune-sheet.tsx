@@ -1,5 +1,6 @@
 import { useSkyInk } from '@/components/home/sky-ink';
 import type { SkyTest } from '@/lib/home-sky';
+import { SEA_LIFE_TESTS, type SeaLifeTest } from '@/lib/sea-life-tests';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -44,6 +45,8 @@ type TuneSheetProps = {
   /** Look at Home's sky at any time of day. Not saved. */
   skyTest?: SkyTest;
   onChangeSkyTest?: (mode: SkyTest) => void;
+  /** Bring up one animal now. The sheet closes so you can see it. */
+  onShowAnimal?: (animal: SeaLifeTest) => void;
   /** 'icon': a round icon button for Home's top bar instead of the labeled one. */
   trigger?: 'button' | 'icon';
   /** Told every time the sheet opens or closes (Home keeps its buttons up while a sheet is open). */
@@ -65,6 +68,7 @@ export function TuneSheet({
   onChangeNetworkTest,
   skyTest,
   onChangeSkyTest,
+  onShowAnimal,
   trigger = 'button',
   onOpenChange,
 }: TuneSheetProps) {
@@ -271,7 +275,28 @@ export function TuneSheet({
                     onChange={(mode) => onChangeSkyTest(mode as SkyTest)}
                     label="Test sky"
                   />
-                  <ThemedText type="caption">Shows Home&apos;s sky at another time of day. Turns off when you close the app.</ThemedText>
+                  <ThemedText type="caption">Shows Home&apos;s sky at another time of day, with the frame rate at the top of Home. Turns off when you close the app.</ThemedText>
+                </>
+              )}
+              {onShowAnimal && (
+                <>
+                  <ThemedText style={sheetStyles.heading}>Test sea life</ThemedText>
+                  <View style={styles.animals}>
+                    {SEA_LIFE_TESTS.map((a) => (
+                      <TouchableOpacity
+                        key={a.key}
+                        onPress={() => {
+                          close();
+                          onShowAnimal(a.key);
+                        }}
+                        activeOpacity={0.6}
+                        style={Ui.outlineButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Show a ${a.label}`}>
+                        <ThemedText style={Ui.label}>{a.label}</ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </>
               )}
             </>
@@ -324,6 +349,7 @@ function Segment<K extends string>({
 }
 
 const styles = StyleSheet.create({
+  animals: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   iconTrigger: { width: TapTarget, height: TapTarget, borderRadius: TapTarget / 2, alignItems: 'center', justifyContent: 'center' },
   body: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xxl, gap: Spacing.sm },
   summary: { fontFamily: Fonts.sansSemiBold, fontSize: 17, lineHeight: 23, color: Colors.textSecondary },

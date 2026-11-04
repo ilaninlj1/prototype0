@@ -1,7 +1,7 @@
-import { memo, useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedProps, useFrameCallback, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
-import Svg, { Circle, Defs, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, { runOnJS, useAnimatedProps, useAnimatedStyle, useFrameCallback, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { oceanDive } from '@/components/ocean/dive-gesture';
 import { lazySkia } from '@/components/print/lazy-skia';
@@ -14,7 +14,6 @@ import type { SkyCanvasProps } from './sky-canvas';
 const SkyCanvas = lazySkia<SkyCanvasProps>(() => import('./sky-canvas'));
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
-const AnimatedG = Animated.createAnimatedComponent(G);
 
 /** The far water starts this far above the near wave, which stays exactly where it was. */
 export const HORIZON_ABOVE = 44;
@@ -22,6 +21,7 @@ export const HORIZON_ABOVE = 44;
 const CLOUD_MS = 50;
 /** Everything else on the sky: the sock, the sign, the far water, rain. */
 const FRAME_MS = 32;
+const GULL_STRIP = 70;
 const TWINKLE_A = Array.from({ length: 45 }, (_, i) => star(i, 1));
 const TWINKLE_B = Array.from({ length: 45 }, (_, i) => star(i, 7));
 
@@ -32,11 +32,25 @@ function star(i: number, salt: number) {
 
 const StarField = memo(function StarField({ width, height, stars }: { width: number; height: number; stars: { x: number; y: number; r: number }[] }) {
   return (
-    <>
+    <Svg width={width} height={height}>
       {stars.map((s, i) => (
         <Circle key={i} cx={s.x * width} cy={s.y * (height - 30)} r={s.r} fill="#fffaeb" />
       ))}
-    </>
+    </Svg>
+  );
+});
+
+/** Two screens of rain, drawn once, that slide down and wrap around. */
+const RainSheet = memo(function RainSheet({ width, height, d, opacity, flip = false }: { width: number; height: number; d: string; opacity: number; flip?: boolean }) {
+  return (
+    <View style={flip ? { transform: [{ scaleX: -1 }] } : undefined}>
+      <Svg width={width} height={height}>
+        <Path d={d} fill="none" stroke="#ebf2ff" strokeWidth={1.2} strokeLinecap="round" strokeOpacity={opacity} />
+      </Svg>
+      <Svg width={width} height={height}>
+        <Path d={d} fill="none" stroke="#ebf2ff" strokeWidth={1.2} strokeLinecap="round" strokeOpacity={opacity} />
+      </Svg>
+    </View>
   );
 });
 
@@ -59,10 +73,12 @@ export type HomeSkyProps = {
   signBack: string;
   /** Home is on screen. Everything stops when it isn't. */
   active: boolean;
+  /** Show the frame rate, for checking on a phone. */
+  showFps: boolean;
 };
 
 /** Behind Home: the sky, stars and moon, the weather, the island, and the far water that runs back to the horizon. */
-export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look, water, wordsDark, tempo, wave, signFront, signBack, active }: HomeSkyProps) {
+export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look, water, wordsDark, tempo, wave, signFront, signBack, active, showFps }: HomeSkyProps) {
   const horizon = surfaceY - HORIZON_ABOVE;
   const reduced = useReducedMotion();
   const weather = look.weather;
@@ -170,14 +186,16 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
   const swellFill = useAnimatedProps(() => ({ d: swellPath(width, clock.get(), HORIZON_ABOVE * 0.45 + 26, 90) }));
   const swellLine = useAnimatedProps(() => ({ d: swellPath(width, clock.get(), HORIZON_ABOVE * 0.45 + 26, 0) }));
   const ripples = useAnimatedProps(() => ({ d: ripplesPath(width, clock.get(), 26, 20) }));
-  const rainD = useAnimatedProps(() => ({ d: rain.get() < 0.04 ? 'M0 0' : rainPath(width, horizon, clock.get(), rain.get(), wind.get()) }));
-  const gulls = useAnimatedProps(() => ({ d: gullsPath(width, clock.get(), horizon - 22, beat.get()) }));
+  const rainD = useMemo(() => rainPath(width, horizon, 0, 1, weather.wind), [width, horizon, weather.wind]);
+  const rainNear = useAnimatedStyle(() => ({ opacity: Math.min(1, rain.get() * 1.6), transform: [{ translateY: (clock.get() * 430) % horizon }] }));
+  const rainFar = useAnimatedStyle(() => ({ opacity: Math.min(1, rain.get() * 1.1), transform: [{ translateY: ((clock.get() * 290 + horizon * 0.4) % horizon) }] }));
+  const gulls = useAnimatedProps(() => ({ d: gullsPath(width, clock.get(), GULL_STRIP - 22, beat.get()) }));
   const boltD = useAnimatedProps(() => {
     const b = bolt.get();
     return { d: flash.get() < 0.02 ? 'M0 0' : boltPath(b.seed, b.x, Math.min(wordsTop, horizon - 200), horizon - 4), strokeOpacity: Math.min(1, flash.get() * 1.4) };
   });
-  const twinkleA = useAnimatedProps(() => ({ opacity: starAmount * (0.55 + 0.45 * Math.sin(clock.get() * 0.9)) }));
-  const twinkleB = useAnimatedProps(() => ({ opacity: starAmount * (0.55 + 0.45 * Math.sin(clock.get() * 1.3 + 2)) }));
+  const twinkleA = useAnimatedStyle(() => ({ opacity: starAmount * (0.55 + 0.45 * Math.sin(clock.get() * 0.9)) }));
+  const twinkleB = useAnimatedStyle(() => ({ opacity: starAmount * (0.55 + 0.45 * Math.sin(clock.get() * 1.3 + 2)) }));
 
   const zen = toHex(look.zen);
   const mid = toHex(look.mid);
@@ -203,23 +221,28 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
       <SkyCanvas width={width} height={height} horizon={horizon} lookFrom={lookFrom} lookTo={lookTo} lookT={lookT} cloud={cloud} flash={flash} />
 
       {night > 0.3 && (
-        <View style={StyleSheet.absoluteFill}>
-        <Svg width={width} height={horizon}>
-          <Defs>
-            <RadialGradient id="moonShade" cx="42%" cy="40%" r="60%">
-              <Stop offset="0" stopColor="#f6f7fb" />
-              <Stop offset="1" stopColor="#d6dce8" />
-            </RadialGradient>
-          </Defs>
-          <AnimatedG animatedProps={twinkleA}>
+        <>
+          {/* Finished pictures that only fade, so twinkling doesn't redraw the sky. */}
+          <Animated.View style={[StyleSheet.absoluteFill, twinkleA]}>
             <StarField width={width} height={horizon} stars={TWINKLE_A} />
-          </AnimatedG>
-          <AnimatedG animatedProps={twinkleB}>
+          </Animated.View>
+          <Animated.View style={[StyleSheet.absoluteFill, twinkleB]}>
             <StarField width={width} height={horizon} stars={TWINKLE_B} />
-          </AnimatedG>
-          {moonVis > 0.01 && <Circle cx={moon.x} cy={moon.y} r={15} fill="url(#moonShade)" opacity={moonVis} />}
-        </Svg>
-        </View>
+          </Animated.View>
+          {moonVis > 0.01 && (
+            <View style={StyleSheet.absoluteFill}>
+              <Svg width={width} height={horizon}>
+                <Defs>
+                  <RadialGradient id="moonShade" cx="42%" cy="40%" r="60%">
+                    <Stop offset="0" stopColor="#f6f7fb" />
+                    <Stop offset="1" stopColor="#d6dce8" />
+                  </RadialGradient>
+                </Defs>
+                <Circle cx={moon.x} cy={moon.y} r={15} fill="url(#moonShade)" opacity={moonVis} />
+              </Svg>
+            </View>
+          )}
+        </>
       )}
 
       {/* A haze behind the words, only as strong as this sky needs. */}
@@ -239,13 +262,30 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
         </View>
       )}
 
-      <View style={StyleSheet.absoluteFill}>
-      <Svg width={width} height={horizon}>
-        {night < 0.5 && weather.dark < 0.25 && !reduced && <AnimatedPath animatedProps={gulls} fill="none" stroke={toHex(look.shade)} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" strokeOpacity={0.8 * (1 - night)} />}
-        {weather.rain > 0.02 && !reduced && <AnimatedPath animatedProps={rainD} fill="none" stroke="#ebf2ff" strokeWidth={1.2} strokeLinecap="round" strokeOpacity={0.42} />}
-        {weather.storm && !reduced && <AnimatedPath animatedProps={boltD} fill="none" stroke="#ffffff" strokeWidth={1.7} strokeLinejoin="round" />}
-      </Svg>
-      </View>
+      {weather.rain > 0.02 && !reduced && (
+        <View style={[styles.rainClip, { width, height: horizon }]}>
+          <Animated.View style={[styles.rainSheet, { top: -horizon }, rainFar]}>
+            <RainSheet width={width} height={horizon} d={rainD} opacity={0.24} />
+          </Animated.View>
+          <Animated.View style={[styles.rainSheet, { top: -horizon }, rainNear]}>
+            <RainSheet width={width} height={horizon} d={rainD} opacity={0.42} flip />
+          </Animated.View>
+        </View>
+      )}
+      {night < 0.5 && weather.dark < 0.25 && !reduced && (
+        <View style={[styles.far, { top: horizon - GULL_STRIP }]}>
+          <Svg width={width} height={GULL_STRIP}>
+            <AnimatedPath animatedProps={gulls} fill="none" stroke={toHex(look.shade)} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" strokeOpacity={0.8 * (1 - night)} />
+          </Svg>
+        </View>
+      )}
+      {weather.storm && !reduced && (
+        <View style={StyleSheet.absoluteFill}>
+          <Svg width={width} height={horizon}>
+            <AnimatedPath animatedProps={boltD} fill="none" stroke="#ffffff" strokeWidth={1.7} strokeLinejoin="round" />
+          </Svg>
+        </View>
+      )}
 
       <SkyIsland left={islandLeft} top={headerY - ISLAND_GROUND + 4} colors={colors} clock={clock} wind={windForSock} sign={sign} front={signFront} back={signBack} />
 
@@ -269,6 +309,32 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
         <AnimatedPath animatedProps={swellLine} fill="none" stroke={water.line} strokeWidth={1} strokeOpacity={water.lineOpacity * 0.36} />
       </Svg>
       </View>
+      {showFps && <SkyFps top={headerY - 48} />}
+    </View>
+  );
+}
+
+/** Frames per second and the worst frame in the last second, for checking on a phone with Tune → Test sky. */
+function SkyFps({ top }: { top: number }) {
+  const [text, setText] = useState('…');
+  const frames = useSharedValue(0);
+  const worst = useSharedValue(0);
+  const elapsed = useSharedValue(0);
+  useFrameCallback((f) => {
+    const dt = f.timeSincePreviousFrame ?? 16;
+    frames.set(frames.get() + 1);
+    worst.set(Math.max(worst.get(), dt));
+    elapsed.set(elapsed.get() + dt);
+    if (elapsed.get() >= 1000) {
+      runOnJS(setText)(`${Math.round((frames.get() * 1000) / elapsed.get())} fps · worst ${Math.round(worst.get())} ms`);
+      frames.set(0);
+      worst.set(0);
+      elapsed.set(0);
+    }
+  });
+  return (
+    <View style={[styles.fps, { top }]}>
+      <Text style={styles.fpsText}>{text}</Text>
     </View>
   );
 }
@@ -307,4 +373,10 @@ export function SeaGlitter({ width, height, surfaceY, look, hour, active }: { wi
   );
 }
 
-const styles = StyleSheet.create({ far: { position: 'absolute', left: 0 } });
+const styles = StyleSheet.create({
+  far: { position: 'absolute', left: 0 },
+  rainClip: { position: 'absolute', left: 0, top: 0, overflow: 'hidden' },
+  rainSheet: { position: 'absolute', left: 0 },
+  fps: { position: 'absolute', left: 16, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  fpsText: { color: '#ffffff', fontSize: 11, fontVariant: ['tabular-nums'] },
+});

@@ -37,7 +37,9 @@ import { BottleOpening, type OpeningGeometry } from '@/components/bottles/bottle
 import { LaunchLight } from '@/components/bottles/launch-light';
 import { SEA_BASE, SEA_HEIGHT, SeaLine, seaX, type SeaWave } from '@/components/bottles/sea-line';
 import { DARK_WORDS, LIGHT_WORDS, SkyInkProvider } from '@/components/home/sky-ink';
-import { HomeSky, SeaGlitter } from '@/components/sky/home-sky';
+import { HORIZON_ABOVE, HomeSky, SeaGlitter } from '@/components/sky/home-sky';
+import { SeaLifeLayer } from '@/components/sky/sea-life-layer';
+import { useSeaLife } from '@/hooks/use-sea-life';
 import { SKY_TEST_HOURS, matchedWater, skyAt, weatherOf, wordsAreDark, type SkyTest } from '@/lib/home-sky';
 import { settleDiveTo, oceanDive, oceanTravel, oceanReduced, setOceanInk, useOceanTabBarHeight } from '@/components/ocean/dive-gesture';
 import type { OceanBottle } from '@/components/ocean/ocean-canvas';
@@ -465,6 +467,16 @@ export default function HomeScreen() {
   // What a save needs to fly from the card into the You tab, read by the listener below.
   const cardAreaViewRef = useRef<ViewInstance>(null);
   const isFocused = useIsFocused();
+  // Animals at the surface: rare, and only ever on top of the water, so "nothing wild under it" still holds.
+  const seaLife = useSeaLife({
+    active: isFocused,
+    paused: underWater,
+    width: frame.width || win.width,
+    screenH: (frame.height || win.height - 72 - insets.bottom) + tabBarHeight,
+    horizon: (frame.height || win.height - 72 - insets.bottom) + 4 - SEA_HEIGHT + SEA_BASE - HORIZON_ABOVE,
+    hour: hourNow,
+    look: skyLook,
+  });
   const flightRef = useRef({ focused: false, revealId: null as number | null, tracks: [] as DiscoveryTrack[], cardHeight: 0 });
   useEffect(() => {
     flightRef.current = {
@@ -1559,8 +1571,10 @@ export default function HomeScreen() {
         signFront={signFront}
         signBack={signBack}
         active={isFocused}
+        showFps={skyTest !== 'clock'}
       />
     )}
+    {frameW > 0 && <SeaLifeLayer life={seaLife} layer={0} width={frameW} top={seaSurfaceY - HORIZON_ABOVE - 100} height={100 + HORIZON_ABOVE + 40} />}
     <SkyInkProvider value={skyInk}>
     <ThemedView
       backgroundColor="transparent"
@@ -1585,6 +1599,7 @@ export default function HomeScreen() {
         />
       )}
       {frameW > 0 && <SeaGlitter width={frameW} height={frameH + 6} surfaceY={seaSurfaceY} look={skyLook} hour={hourNow} active={isFocused} />}
+      {frameW > 0 && <SeaLifeLayer life={seaLife} layer={1} width={frameW} top={seaSurfaceY - 120} height={120 + 80} />}
 
       <ChromeFade visible={chrome.visible} alwaysShow={statusItem?.kind === 'failed'} style={styles.statusLine}>
         {statusItem && (
@@ -1634,6 +1649,7 @@ export default function HomeScreen() {
             onChangeSoundFilter={handleChangeSoundFilter}
             skyTest={skyTest}
             onChangeSkyTest={setSkyTest}
+            onShowAnimal={(a) => seaLife.show(a === 'leap' ? 'pod' : a === 'breach' ? 'hump' : a, { leap: a === 'leap' ? true : a === 'pod' ? false : undefined, breach: a === 'breach' })}
             networkTest={networkTest}
             onChangeNetworkTest={(mode) => {
               networkTestRef.current = mode;
@@ -1843,6 +1859,7 @@ export default function HomeScreen() {
       />
     </ThemedView>
     </SkyInkProvider>
+    {frameW > 0 && <SeaLifeLayer life={seaLife} layer={2} width={frameW} top={0} height={frameH + tabBarHeight} />}
       </Animated.View>
       <OceanOverlay
         sea={oceanSea}
