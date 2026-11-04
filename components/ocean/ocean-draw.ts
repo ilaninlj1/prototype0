@@ -63,6 +63,8 @@ export type Frame = {
   warm: number;
   stops: StopRow[][];
   rest: StopRow;
+  /** The water Home shows at the surface, which matches the sky. The dive starts from it and eases into the ocean's own. */
+  homeWater: { top: Rgb; mid: Rgb; low: Rgb; midAt: number } | null;
   stages: Stage[];
   floorTop: Rgb[];
   floorBot: Rgb[];
@@ -120,6 +122,16 @@ function drawWater(c: SkCanvas, f: Frame, here: StopRow, surface: number) {
   const y0 = surface - 12;
   p.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: y0 }, { x: 0, y: y0 + f.height }, [colorOf(here.top), colorOf(here.mid), colorOf(here.bot)], [0, 0.45, 1], TileMode.Clamp));
   c.drawRect(Skia.XYWHRect(0, 0, f.width, f.height), p);
+  const home = f.homeWater;
+  if (!home) return;
+  const near = Math.min(1, f.dive / 0.4);
+  const fade = 1 - near * near * (3 - 2 * near);
+  if (fade <= 0.01) return;
+  // Home packs its water into the strip above the phone's bottom edge, so it's drawn the same way here until it fades.
+  const q = Skia.Paint();
+  q.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: y0 }, { x: 0, y: y0 + f.height - f.surfaceY + 12 }, [colorOf(home.top), colorOf(home.mid), colorOf(home.low)], [0, home.midAt, 1], TileMode.Clamp));
+  q.setAlphaf(fade);
+  c.drawRect(Skia.XYWHRect(0, y0, f.width, f.height - y0), q);
 }
 
 function drawLight(c: SkCanvas, f: Frame, here: StopRow, surface: number) {

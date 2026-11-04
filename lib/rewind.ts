@@ -53,10 +53,13 @@ export function inPeriod(tracks: DiscoveryTrack[], at: number, unit: Unit): Disc
   return tracks.filter((t) => t.likedAt != null && periodStart(t.likedAt, unit) === here).sort((a, b) => b.likedAt! - a.likedAt!);
 }
 
+/** The times songs were saved, for the timeline's stops. Songs with no date have none. */
+export const likeTimes = (likes: SpotifyLike[]) => likes.filter((l) => !l.undated).map((l) => l.addedAt);
+
 /** Spotify likes from the same day, month or year as `at`, newest first. */
 export function likesInPeriod(likes: SpotifyLike[], at: number, unit: Unit): SpotifyLike[] {
   const here = periodStart(at, unit);
-  return likes.filter((l) => periodStart(l.addedAt, unit) === here).sort((a, b) => b.addedAt - a.addedAt);
+  return likes.filter((l) => !l.undated && periodStart(l.addedAt, unit) === here).sort((a, b) => b.addedAt - a.addedAt);
 }
 
 /** Songs heard in that period, counted the same way as the Profile tab's total. */

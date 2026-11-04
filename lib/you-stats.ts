@@ -222,6 +222,7 @@ export function biggest(songs: SpotifyLike[]): {
   const years = new Map<number, number>();
   const days = new Map<number, number>();
   for (const s of fromFile(songs)) {
+    if (s.undated) continue;
     const y = new Date(s.addedAt).getFullYear();
     years.set(y, (years.get(y) ?? 0) + 1);
     days.set(dayKey(s.addedAt), (days.get(dayKey(s.addedAt)) ?? 0) + 1);

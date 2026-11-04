@@ -45,6 +45,10 @@ export function SpotifySheet({
             <ThemedText style={styles.step}>2. Tap Export next to Liked Songs, or Export All for every playlist.</ThemedText>
             <ThemedText style={styles.step}>3. Come back, tap Import a file, and pick what it saved.</ThemedText>
             <ThemedText style={styles.small}>
+              Spotify&apos;s own listening history (the .json or .zip from your account&apos;s privacy page) works too, and so does
+              any CSV with song and artist columns. You&apos;ll see what came in and what didn&apos;t.
+            </ThemedText>
+            <ThemedText style={styles.small}>
               Files also unlock your Spotify stats on You, and Home stops showing you artists you already have.
             </ThemedText>
             <TouchableOpacity onPress={onImport} style={[styles.button, styles.primary]} accessibilityRole="button">

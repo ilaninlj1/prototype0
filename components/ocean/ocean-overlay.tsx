@@ -62,6 +62,7 @@ export const OceanOverlay = memo(function OceanOverlay({
   floor,
   focused,
   rest,
+  homeWater,
   hour,
   life,
   bottles,
@@ -83,6 +84,8 @@ export const OceanOverlay = memo(function OceanOverlay({
   focused: boolean;
   /** Where Home's water is from: Sunny reef / Popular, or the active filter's place. */
   rest: Place;
+  /** The sky-matched water on Home, so the dive starts from what you can see. */
+  homeWater?: { top: string; mid: string; low: string; midAt: number } | null;
   hour: number;
   life: OceanLife | null;
   bottles: OceanBottle[];
@@ -481,6 +484,7 @@ export const OceanOverlay = memo(function OceanOverlay({
             splash={splash}
             place={place}
             rest={rest}
+            homeWater={homeWater}
             hour={hour}
             life={life}
             bottles={bottles}

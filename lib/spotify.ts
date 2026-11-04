@@ -39,9 +39,17 @@ export type SpotifyLike = {
   /** File songs only: Spotify's 0-100 popularity when exported, and the album's release year. */
   popularity?: number;
   released?: number;
+  /** The file gave no date, so addedAt is just the day it came in: it counts as known, but stays off timelines. */
+  undated?: true;
 };
 
 export const spotifyTrackUrl = (id: string) => `https://open.spotify.com/track/${id}`;
+
+/** Where a song opens: its own page, or a search when it came from a list with no Spotify id. */
+export const spotifyLink = (like: Pick<SpotifyLike, 'id' | 'name' | 'artist'>) =>
+  like.id.startsWith('song:')
+    ? `https://open.spotify.com/search/${encodeURIComponent(`${like.artist} ${like.name}`)}`
+    : spotifyTrackUrl(like.id);
 
 const UNRESERVED = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
 

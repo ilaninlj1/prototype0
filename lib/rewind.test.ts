@@ -11,6 +11,7 @@ import {
   inPeriod,
   jump,
   likesInPeriod,
+  likeTimes,
   offsetLabel,
   periodLabel,
   periodLine,
@@ -293,4 +294,16 @@ test('equal zones: each step gets the same width of the strip', () => {
   const width = 1 - BAND_STARTS.year;
   assert.ok(Math.abs(BAND_STARTS.month - BAND_STARTS.day - width) < 1e-9);
   assert.ok(Math.abs(BAND_STARTS.year - BAND_STARTS.month - width) < 1e-9);
+});
+
+test('songs from a file with no dates stay off the timeline', () => {
+  const at = Date.UTC(2026, 10, 3, 12);
+  const song = { id: 'a', name: 'A', artist: 'B', art: '', addedAt: at, from: '', source: 'file' as const };
+  const shown = likesInPeriod([song, { ...song, id: 'b', undated: true }], at, 'day');
+  assert.deepEqual(shown.map((l) => l.id), ['a']);
+});
+
+test('likeTimes leaves out songs with no date, so the timeline only stops on real days', () => {
+  const song = { id: 'a', name: 'A', artist: 'B', art: '', addedAt: 5, from: '' };
+  assert.deepEqual(likeTimes([song, { ...song, id: 'b', addedAt: 9, undated: true }]), [5]);
 });

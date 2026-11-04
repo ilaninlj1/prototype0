@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
+import { ImportReportBody } from '@/components/import-report';
 import { ThemedText } from '@/components/themed-text';
 import { BottomSheet, SheetHeader, sheetStyles } from '@/components/ui/sheet';
 import { Colors, Fonts, Spacing, TapTarget, Ui } from '@/constants/theme';
@@ -13,6 +14,8 @@ import type { Region } from '@/lib/discovery';
 import { chooseCity, loadCityOk, saveBottlesOn, useBottlesOn } from '@/lib/bottles-api';
 import { setAllowAi, useAllowAi } from '@/lib/human-check-api';
 import type { NetworkTest } from '@/lib/feed-load';
+import { readImport, type ImportReport } from '@/lib/import-file';
+import { IMPORT_SAMPLES } from '@/lib/import-samples';
 import type { PresetId } from '@/lib/pool-types';
 import { DIMENSIONS, describeFilter, isActive, type Level, type SoundFilter } from '@/lib/sound-filter';
 import { PRESET_LABELS, PresetChips } from './preset-chips';
@@ -102,6 +105,12 @@ export function TuneSheet({
 
 
   const [more, setMore] = useState(false);
+  const [sample, setSample] = useState<'off' | keyof typeof IMPORT_SAMPLES>('off');
+  const [sampleReport, setSampleReport] = useState<ImportReport | null>(null);
+  const chooseSample = (key: typeof sample) => {
+    setSample(key);
+    setSampleReport(key === 'off' ? null : readImport(IMPORT_SAMPLES[key].files, Date.now()));
+  };
   const sorted = isActive(soundFilter);
   const summary = tuneSummary(PRESET_LABELS[preset], sorted ? describeFilter(soundFilter) : null);
 
@@ -180,7 +189,7 @@ export function TuneSheet({
             style={styles.moreRow}
             accessibilityRole="button"
             accessibilityState={{ expanded: more }}
-            accessibilityLabel="More settings: store region, AI-made music, Bottles, test network">
+            accessibilityLabel="More settings: store region, AI-made music, Bottles, test network, test import">
             <ThemedText style={styles.moreText}>More</ThemedText>
             <ThemedText style={styles.moreHint} numberOfLines={1}>
               {region} store · AI {allowAi ? 'shown' : 'hidden'}
@@ -298,6 +307,28 @@ export function TuneSheet({
                     ))}
                   </View>
                 </>
+              )}
+
+              <ThemedText style={sheetStyles.heading}>Test import</ThemedText>
+              <Segment
+                options={[
+                  { key: 'off', label: 'Off' },
+                  { key: 'messy', label: IMPORT_SAMPLES.messy.label },
+                  { key: 'cutOff', label: IMPORT_SAMPLES.cutOff.label },
+                  { key: 'wrong', label: IMPORT_SAMPLES.wrong.label },
+                ]}
+                value={sample}
+                onChange={chooseSample}
+                label="Test import"
+                small
+              />
+              <ThemedText type="caption">
+                Reads a file that’s broken on purpose, the same way a real import does, so you can see what it says. Nothing gets saved.
+              </ThemedText>
+              {sampleReport && (
+                <View style={sheetStyles.card}>
+                  <ImportReportBody key={sample} report={sampleReport} />
+                </View>
               )}
             </>
           )}

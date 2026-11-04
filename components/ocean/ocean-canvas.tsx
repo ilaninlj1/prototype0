@@ -37,6 +37,8 @@ export type OceanCanvasProps = {
   /** Where you are: only this water and the ones either side are kept ready. */
   place: Place;
   rest: Place;
+  /** The sky-matched water on Home (lib/home-sky.ts), as hex, so the dive starts from what you can see. */
+  homeWater?: { top: string; mid: string; low: string; midAt: number } | null;
   hour: number;
   life: OceanLife | null;
   bottles: OceanBottle[];
@@ -51,7 +53,7 @@ const vividBucket = (v: number) => Math.round(v * 4) / 4;
 const FLOOR_DIM = 0.86;
 const ABYSS: Record<Water, string> = { reef: '#04203a', kelp: '#04221f', blue: '#041a40', midnight: '#020818' };
 
-export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea, posX, posY, clock, touch, touchPower, spotlight, song, drawMs, splash, place, rest, hour, life, bottles }: OceanCanvasProps) {
+export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea, posX, posY, clock, touch, touchPower, spotlight, song, drawMs, splash, place, rest, hour, life, bottles, homeWater }: OceanCanvasProps) {
   // Pictures are expensive to record and cheap to draw, so each is kept until its look actually changes.
   const pictures = useRef(new Map<string, { signature: string; picture: SkPicture }>());
   const sprites = useRef(new Map<string, SkPicture[]>());
@@ -189,6 +191,11 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
 
   const stops = useMemo(() => DEPTHS.map((d) => WATERS.map((w) => rows(w, d, hour))), [hourKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const restStops = useMemo(() => rows(rest.water, rest.depth, hour), [rest.water, rest.depth, hourKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const homeTop = homeWater?.top;
+  const homeMid = homeWater?.mid;
+  const homeLow = homeWater?.low;
+  const homeAt = homeWater?.midAt;
+  const homeRow = useMemo(() => (homeTop && homeMid && homeLow && homeAt != null ? { top: hexToRgb(homeTop), mid: hexToRgb(homeMid), low: hexToRgb(homeLow), midAt: homeAt } : null), [homeTop, homeMid, homeLow, homeAt]);
   const day = dayMixAt(hour);
   const floorDetail = useMemo(() => recordFloorDetail(width, height), [width, height]);
   const wobble = useMemo(() => makeWobble(), []);
@@ -239,6 +246,7 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
       warm,
       stops,
       rest: restStops,
+      homeWater: homeRow,
       stages,
       floorTop,
       floorBot,
@@ -258,7 +266,7 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
     );
     drawMs.set((typeof performance !== 'undefined' ? performance.now() : Date.now()) - started);
     return result;
-  }, [width, height, travel, surfaceY, night, warm, stops, restStops, stages, floorTop, floorBot, rises, floorDetail, farArt, wobble]);
+  }, [width, height, travel, surfaceY, night, warm, stops, restStops, homeRow, stages, floorTop, floorBot, rises, floorDetail, farArt, wobble]);
 
   return (
     <Canvas style={{ width, height }} pointerEvents="none">

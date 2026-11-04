@@ -14,6 +14,7 @@ import {
   toPlaylistAdd,
   unpackState,
   verifierFrom,
+  spotifyLink,
 } from './spotify.ts';
 
 const at = (y: number, m: number, d: number) => new Date(y, m - 1, d, 12).getTime();
@@ -176,4 +177,10 @@ test('mergeSaves keeps one of each song, from the first time you saved it', () =
     ],
     'newest first; liked and in a playlist counts once, and so does the same name and artist on another id'
   );
+});
+
+test('a song with a Spotify id links to it; a song from a plain list searches for it instead', () => {
+  const song = { name: 'Jezebel', artist: 'Sade', art: '', addedAt: 1, from: '' };
+  assert.equal(spotifyLink({ ...song, id: 'T1' }), 'https://open.spotify.com/track/T1');
+  assert.equal(spotifyLink({ ...song, id: 'song:sade|jezebel' }), 'https://open.spotify.com/search/Sade%20Jezebel');
 });

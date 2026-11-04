@@ -246,3 +246,10 @@ test('calledStories: finds that grew since you found them, biggest growth first'
   assert.equal(stories[0].now, 68_500);
   assert.deepEqual(calledStories([], {}), []);
 });
+
+test('songs from a file with no dates do not count as the day or year you saved the most', () => {
+  const at = Date.UTC(2026, 10, 3, 12);
+  const song = { id: 'a', name: 'A', artist: 'B', art: '', addedAt: at, from: '', source: 'file' as const, undated: true as const };
+  const many = [song, { ...song, id: 'b' }, { ...song, id: 'c' }];
+  assert.deepEqual(biggest(many), { year: null, day: null });
+});

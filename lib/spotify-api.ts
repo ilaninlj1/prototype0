@@ -18,7 +18,8 @@ import {
   type SpotifyLike,
 } from './spotify';
 import { setKnownArtists } from './known-artists';
-import { filesFromZip, readExport, type NamedText } from './spotify-file';
+import { filesFromZip, MAX_FILE_BYTES } from './spotify-file';
+import { mergeIntoLibrary, readImport, type ImportReport, type PickedFile } from './import-file';
 
 // The network and storage half of your Spotify songs, liked and playlist adds (see lib/spotify.ts for the why).
 // Nothing is kept from the login: one pass reads your liked songs and the token is dropped.
@@ -185,7 +186,8 @@ export async function loadSpotifyLibrary(slot: SpotifySlot = 'login'): Promise<S
   }
 }
 
-export async function saveSpotifyLibrary(library: SpotifyLibrary, slot: SpotifySlot = 'login'): Promise<void> {
+/** Whether it was stored: a phone can run out of room, and then the songs aren't really in. */
+export async function saveSpotifyLibrary(library: SpotifyLibrary, slot: SpotifySlot = 'login'): Promise<boolean> {
   const prefix = prefixOf(slot);
   try {
     await clearSpotifyLibrary(slot);
@@ -195,8 +197,9 @@ export async function saveSpotifyLibrary(library: SpotifyLibrary, slot: SpotifyS
     }
     if (chunks.length) await AsyncStorage.multiSet(chunks);
     await AsyncStorage.setItem(`${prefix}Meta`, JSON.stringify({ syncedAt: library.syncedAt, chunks: chunks.length }));
+    return true;
   } catch {
-    // ignore
+    return false;
   }
 }
 
@@ -213,46 +216,64 @@ export async function clearSpotifyLibrary(slot: SpotifySlot = 'login'): Promise<
 
 // ---------- Importing a file ----------
 
-export type FileFail = 'cancelled' | 'not-exportify' | 'empty' | 'unreadable';
-
-export const FILE_FAIL_TEXT: Record<FileFail, string> = {
-  cancelled: 'No file picked. Nothing changed.',
-  'not-exportify': 'That file isn’t an Exportify export. Export from exportify.app, then pick the .csv or .zip it saves.',
-  empty: 'That file has no songs in it.',
-  unreadable: 'Couldn’t open that file. Try exporting it again.',
-};
-
 /**
- * Pick Exportify's CSV (Liked Songs, a playlist) or its ZIP of everything, and read the songs.
- * Several files can be picked at once. Nothing is uploaded.
+ * Pick any files: Exportify's CSV or ZIP, Spotify's JSON or ZIP, or a song list. Several can be
+ * picked at once, and a file that can't be opened is reported without stopping the others.
+ * Nothing is uploaded.
  */
-export async function importSpotifyFile(): Promise<SpotifyLike[] | FileFail> {
+async function pickImportFiles(): Promise<PickedFile[] | 'cancelled'> {
   try {
     // Loaded here, not at the top: an APK built before these modules were added fails on this tap, not at launch.
     const DocumentPicker = await import('expo-document-picker');
     const { File } = await import('expo-file-system');
     const picked = await DocumentPicker.getDocumentAsync({ type: '*/*', multiple: true, copyToCacheDirectory: true });
     if (picked.canceled || !picked.assets?.length) return 'cancelled';
-    const files: NamedText[] = [];
+    const files: PickedFile[] = [];
     for (const asset of picked.assets) {
-      const file = new File(asset.uri);
-      if (/\.zip$/i.test(asset.name) || asset.mimeType?.includes('zip')) files.push(...filesFromZip(await file.bytes()));
-      else files.push({ name: asset.name, text: await file.text() });
+      try {
+        if ((asset.size ?? 0) > MAX_FILE_BYTES) {
+          files.push({ name: asset.name, failed: 'too-big' });
+        } else if (/\.zip$/i.test(asset.name) || asset.mimeType?.includes('zip')) {
+          const inside = filesFromZip(await new File(asset.uri).bytes());
+          if (!inside.length) files.push({ name: asset.name, failed: 'empty-zip' });
+          for (const f of inside) files.push('tooBig' in f ? { name: f.name, failed: 'too-big' } : { ...f, fromZip: true });
+        } else {
+          files.push({ name: asset.name, text: await new File(asset.uri).text() });
+        }
+      } catch {
+        files.push({ name: asset.name, failed: 'unreadable' });
+      }
     }
-    const read = readExport(files);
-    if (read.problem) return read.problem;
-    return read.songs.length ? read.songs : 'empty';
+    return files;
   } catch {
-    return 'unreadable';
+    return [{ name: 'That file', failed: 'unreadable' }];
   }
 }
 
-/** Import a file and keep it: saved in the file slot, and Home starts skipping its artists right away. */
-export async function importAndKeepFile(): Promise<SpotifyLibrary | FileFail> {
-  const result = await importSpotifyFile();
-  if (typeof result === 'string') return result;
-  const library = { syncedAt: Date.now(), likes: result };
-  await saveSpotifyLibrary(library, 'file');
-  setKnownArtists(result);
-  return library;
+export type KeptImport = {
+  report: ImportReport;
+  /** The whole library after this import, or null if nothing changed. */
+  library: SpotifyLibrary | null;
+  /** Songs you didn't already have. */
+  newCount: number;
+};
+
+/**
+ * Import files and keep what's good: it joins what you already had, and Home starts skipping
+ * those artists right away. If nothing's usable, or the phone can't store it, what you had stays.
+ */
+export async function importAndKeepFile(): Promise<KeptImport | 'cancelled'> {
+  const files = await pickImportFiles();
+  if (files === 'cancelled') return 'cancelled';
+  const report = readImport(files, Date.now());
+  if (!report.songs.length) return { report, library: null, newCount: 0 };
+  const before = await loadSpotifyLibrary('file');
+  const { likes, newCount } = mergeIntoLibrary(before?.likes ?? [], report.songs);
+  const library = { syncedAt: Date.now(), likes };
+  if (!(await saveSpotifyLibrary(library, 'file'))) {
+    const restored = !before || (await saveSpotifyLibrary(before, 'file'));
+    return { report: { ...report, saveFailed: true, lostPrevious: !restored }, library: null, newCount: 0 };
+  }
+  setKnownArtists(likes);
+  return { report, library, newCount };
 }

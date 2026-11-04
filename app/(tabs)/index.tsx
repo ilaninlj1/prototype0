@@ -1910,6 +1910,7 @@ export default function HomeScreen() {
         floor={tabBarHeight}
         focused={isFocused}
         rest={restPlace}
+        homeWater={seaWater}
         hour={oceanHour}
         life={oceanLife}
         bottles={oceanExample ? NO_BOTTLES : oceanBottles}

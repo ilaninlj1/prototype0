@@ -6,6 +6,7 @@ import { StyleSheet, useWindowDimensions, View, type ViewInstance } from 'react-
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ImportReportSheet } from '@/components/import-report';
 import { DecodedLine } from '@/components/decoded/decoded-line';
 import { RewindEmblem } from '@/components/emblems';
 import { ThemedText } from '@/components/themed-text';
@@ -61,7 +62,7 @@ import {
 import { EDITION_SIZE } from '@/lib/edition';
 import { PIECE } from '@/lib/piece';
 import { setNote } from '@/lib/saved-songs';
-import { FILE_FAIL_TEXT, importAndKeepFile, loadSpotifyLibrary, type SpotifyLibrary } from '@/lib/spotify-api';
+import { importAndKeepFile, loadSpotifyLibrary, type KeptImport, type SpotifyLibrary } from '@/lib/spotify-api';
 import {
   biggest,
   calledStories,
@@ -98,6 +99,7 @@ export default function ProfileScreen() {
   const [blindTest, setBlindTest] = useState<BlindTestResult | null>(null);
   // Only a Spotify file the person imported feeds stats (Spotify's Developer Policy rules out the login's songs).
   const [spotifyFile, setSpotifyFile] = useState<SpotifyLibrary | null>(null);
+  const [importReport, setImportReport] = useState<KeptImport | null>(null);
   const [importNote, setImportNote] = useState<string | null>(null);
   // "Today" for streaks and dates, refreshed each time you open the tab.
   const [today, setToday] = useState(() => Date.now());
@@ -214,14 +216,13 @@ export default function ProfileScreen() {
   const lineup = topArtists(songs, 18);
 
   async function importFile() {
+    setImportNote('Reading your file…');
+    const result = await importAndKeepFile();
+    if (result === 'cancelled') return setImportNote('No file picked. Nothing changed.');
     setImportNote(null);
-    const library = await importAndKeepFile();
-    if (typeof library === 'string') {
-      if (library !== 'cancelled') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return setImportNote(FILE_FAIL_TEXT[library]);
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSpotifyFile(library);
+    Haptics.notificationAsync(result.library ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error);
+    setImportReport(result);
+    if (result.library) setSpotifyFile(result.library);
   }
 
   return (
@@ -481,7 +482,7 @@ export default function ProfileScreen() {
                       </>
                     )}
                     <ThemedText style={styles.dim}>
-                      From your Spotify file: {songs.length.toLocaleString('en-US')} songs, imported{' '}
+                      From your files: {songs.length.toLocaleString('en-US')} songs, last imported{' '}
                       {shortDay(spotifyFile!.syncedAt)}.{' '}
                       <ThemedText style={styles.link} onPress={importFile}>
                         Import again
@@ -494,12 +495,13 @@ export default function ProfileScreen() {
                       See the year your library sounds like, how mainstream it is, your decades, and your own festival lineup.
                     </ThemedText>
                     <ThemedText style={styles.dim}>
-                      Export from exportify.app (Liked Songs, or Export All), then import the file here. It stays on your phone,
-                      and Home stops showing you artists you already have.
+                      Export from exportify.app (Liked Songs, or Export All), then import the file here. Spotify’s own listening
+                      history or any CSV with song and artist columns works too. It stays on your phone, and Home stops showing
+                      you artists you already have.
                     </ThemedText>
                     <PressableScale onPress={importFile} style={[Ui.outlineButton, styles.importButton]}>
                       <Ionicons name="document-outline" size={16} color={Colors.text} />
-                      <ThemedText style={Ui.label}>Import a Spotify file</ThemedText>
+                      <ThemedText style={Ui.label}>Import a music file</ThemedText>
                     </PressableScale>
                   </>
                 )}
@@ -523,6 +525,15 @@ export default function ProfileScreen() {
           </ThemedText>
         </ThemedView>
       </Animated.ScrollView>
+      <ImportReportSheet
+        kept={importReport}
+        onClose={() => setImportReport(null)}
+        onPickAnother={() => {
+          setImportReport(null);
+          // The file picker can't open while this sheet is still sliding away.
+          setTimeout(importFile, 400);
+        }}
+      />
       <Animated.View
         style={[styles.bar, { paddingTop: insets.top + Spacing.sm }, chrome.barStyle]}
         onLayout={(e) => {
