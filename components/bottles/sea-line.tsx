@@ -18,6 +18,7 @@ import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-nativ
 
 import { oceanDive, settleDiveTo, useDivePan } from '@/components/ocean/dive-gesture';
 import { Hatchling } from '@/components/ocean/hatchling';
+import { useEasedWater } from '@/hooks/use-eased-water';
 
 import { DarkColors } from '@/constants/theme';
 import { CALM_RHYTHM, SEA_BASE, SEA_TALL, SPLASH_AT, crestOf, seaY, startWave, stepSea, swellFront, type Rhythm, type SeaState } from '@/lib/sea-beat';
@@ -106,7 +107,7 @@ export function SeaLine({
   sea,
   width,
   below,
-  water,
+  water: waterTarget,
   onTapWater,
   hatch,
   incoming,
@@ -134,6 +135,8 @@ export function SeaLine({
   songTime: number;
   playing: boolean;
 }) {
+  // Fades with the sky rather than snapping to the next song's colors.
+  const water = useEasedWater(waterTarget);
   const reduceMotion = useReducedMotion();
   const target = useSharedValue<Rhythm>(CALM_RHYTHM);
   const queued = useSharedValue(0);

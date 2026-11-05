@@ -41,7 +41,8 @@ import { DARK_WORDS, LIGHT_WORDS, SkyInkProvider } from '@/components/home/sky-i
 import { HORIZON_ABOVE, HomeSky, SeaGlitter } from '@/components/sky/home-sky';
 import { SeaLifeLayer } from '@/components/sky/sea-life-layer';
 import { useSeaLife } from '@/hooks/use-sea-life';
-import { SKY_TEST_HOURS, matchedWater, skyAt, weatherOf, wordsAreDark, type SkyTest } from '@/lib/home-sky';
+import { useDelayedValue } from '@/hooks/use-eased-water';
+import { INK_SWITCH_MS, SKY_TEST_HOURS, matchedWater, skyAt, weatherOf, wordsAreDark, type SkyTest } from '@/lib/home-sky';
 import { settleDiveTo, oceanDive, oceanTravel, oceanReduced, setOceanInk, useOceanTabBarHeight } from '@/components/ocean/dive-gesture';
 import type { OceanBottle } from '@/components/ocean/ocean-canvas';
 import { OceanOverlay, type OceanHandlers } from '@/components/ocean/ocean-overlay';
@@ -386,8 +387,10 @@ export default function HomeScreen() {
   const hourNow = skyTest === 'clock' ? skyHour : SKY_TEST_HOURS[skyTest];
   const skyLook = useMemo(() => skyAt(hourNow, weatherOf(skySound)), [hourNow, skySound]);
   const seaWater = useMemo(() => matchedWater(restPlace.water, restPlace.depth, skyLook), [restPlace, skyLook]);
-  useEffect(() => setOceanInk(seaWater.ink), [seaWater.ink]);
-  const wordsDark = wordsAreDark(skyLook, true);
+  // Words and the tab bar change halfway through the sky's fade, when either ink reads about as well.
+  const tabInk = useDelayedValue(seaWater.ink, INK_SWITCH_MS);
+  useEffect(() => setOceanInk(tabInk), [tabInk]);
+  const wordsDark = useDelayedValue(wordsAreDark(skyLook, true), INK_SWITCH_MS);
   const skyInk = wordsDark ? DARK_WORDS : LIGHT_WORDS;
   const signFront = skySound ? `${Math.round(skySound.tempo)} BPM` : '♪';
   const signBack = (skySound && keyLabel(skySound.key, skySound.mode)?.replace(' minor', ' min').replace(' major', ' maj')) || '♪';

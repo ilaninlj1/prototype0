@@ -235,6 +235,25 @@ export function lookVector(look: SkyLook, sun: SkyBody, moon: SkyBody): number[]
   ];
 }
 
+/** How long one sky takes to become the next. */
+export const SKY_FADE_MS = 2200;
+/** Words and the tab bar change here, when the sky is about halfway and either ink reads about as well. */
+export const INK_SWITCH_MS = SKY_FADE_MS / 2;
+export const easeOfSky = (t: number) => t * t * (3 - 2 * t);
+
+/** One set of water colors partway to the next. Hex colors and numbers blend; anything else takes the next value. */
+export function mixWater<T extends Record<string, unknown>>(a: T, b: T, t: number): T {
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(b)) {
+    const x = a[k];
+    const y = b[k];
+    if (typeof x === 'string' && typeof y === 'string' && /^#[0-9a-f]{6}$/i.test(x) && /^#[0-9a-f]{6}$/i.test(y)) out[k] = toHex(mixRgb(hexToRgb(x), hexToRgb(y), t));
+    else if (typeof x === 'number' && typeof y === 'number') out[k] = x + (y - x) * t;
+    else out[k] = y;
+  }
+  return out as T;
+}
+
 export type SkyTest = 'clock' | 'dawn' | 'noon' | 'dusk' | 'night';
 /** Tune's test control: look at any time of day without waiting for it. */
 export const SKY_TEST_HOURS: Record<Exclude<SkyTest, 'clock'>, number> = { dawn: 6.6, noon: 12.5, dusk: 18.7, night: 22.5 };

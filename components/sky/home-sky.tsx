@@ -1,12 +1,13 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { runOnJS, useAnimatedProps, useAnimatedStyle, useFrameCallback, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { oceanDive } from '@/components/ocean/dive-gesture';
 import { lazySkia } from '@/components/print/lazy-skia';
-import { islandColors, lookVector, moonAt, sunAt, toHex, wordsVeil, type MatchedWater, type SkyLook } from '@/lib/home-sky';
-import { boltPath, glitterPath, gullsPath, rainPath, ripplesPath, stepSign, swellPath, type SignState } from '@/lib/home-sky-motion';
+import { useEasedWater } from '@/hooks/use-eased-water';
+import { SKY_FADE_MS, islandColors, lookVector, moonAt, sunAt, toHex, wordsVeil, type MatchedWater, type SkyLook } from '@/lib/home-sky';
+import { boltPath, glitterPath, gullsPath, mixVector, rainPath, ripplesPath, stepSign, swellPath, type SignState } from '@/lib/home-sky-motion';
 
 import { ISLAND_GROUND, ISLAND_WIDTH, SkyIsland } from './sky-island';
 import type { SkyCanvasProps } from './sky-canvas';
@@ -95,13 +96,12 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
   const lookFrom = useSharedValue(vector);
   const lookTo = useSharedValue(vector);
   const lookT = useSharedValue(1);
-  const lastVector = useRef(vector);
   useEffect(() => {
-    lookFrom.set(lastVector.current);
+    // From where the sky is right now, so a new song in the middle of a fade doesn't make it jump.
+    lookFrom.set(mixVector(lookFrom.get(), lookTo.get(), lookT.get()));
     lookTo.set(vector);
-    lastVector.current = vector;
     lookT.set(0);
-    lookT.set(withTiming(1, { duration: reduced ? 0 : 2200 }));
+    lookT.set(withTiming(1, { duration: reduced ? 0 : SKY_FADE_MS }));
   }, [vector, lookFrom, lookTo, lookT, reduced]);
 
   const clock = useSharedValue(0);
@@ -195,14 +195,44 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
     const b = bolt.get();
     return { d: flash.get() < 0.02 ? 'M0 0' : boltPath(b.seed, b.x, Math.min(wordsTop, horizon - 200), horizon - 4), strokeOpacity: Math.min(1, flash.get() * 1.4) };
   });
-  const twinkleA = useAnimatedStyle(() => ({ opacity: starAmount * (0.55 + 0.45 * Math.sin(clock.get() * 0.9)) }));
-  const twinkleB = useAnimatedStyle(() => ({ opacity: starAmount * (0.55 + 0.45 * Math.sin(clock.get() * 1.3 + 2)) }));
+  const starsNow = useSharedValue(starAmount);
+  useEffect(() => {
+    starsNow.set(withTiming(starAmount, { duration: reduced ? 0 : SKY_FADE_MS }));
+  }, [starAmount, starsNow, reduced]);
+  const twinkleA = useAnimatedStyle(() => ({ opacity: starsNow.get() * (0.55 + 0.45 * Math.sin(clock.get() * 0.9)) }));
+  const twinkleB = useAnimatedStyle(() => ({ opacity: starsNow.get() * (0.55 + 0.45 * Math.sin(clock.get() * 1.3 + 2)) }));
 
   const zen = toHex(look.zen);
   const mid = toHex(look.mid);
   const hor = toHex(look.hor);
   const moonVis = moon.up ? Math.max(0, Math.min(1, (night - 0.3) / 0.5)) * (1 - weather.dark * 0.6) * (1 - weather.cover * 0.5) : 0;
   const islandLeft = width * 0.45 - ISLAND_WIDTH / 2;
+  // The far water, the haze and what's in the air all fade with the sky too.
+  const far = useEasedWater({ far: water.far, top: water.top, line: water.line, lineOpacity: water.lineOpacity, hor });
+  const moonNow = useSharedValue(moonVis);
+  const veilNow = useSharedValue(veil.opacity);
+  const gullsOn = night < 0.5 && weather.dark < 0.25 && !reduced;
+  const gullsNow = useSharedValue(gullsOn ? 1 : 0);
+  useEffect(() => {
+    const duration = reduced ? 0 : SKY_FADE_MS;
+    moonNow.set(withTiming(moonVis, { duration }));
+    veilNow.set(withTiming(veil.opacity, { duration }));
+    gullsNow.set(withTiming(gullsOn ? 1 : 0, { duration }));
+  }, [moonVis, veil.opacity, gullsOn, moonNow, veilNow, gullsNow, reduced]);
+  const moonStyle = useAnimatedStyle(() => ({ opacity: moonNow.get() }));
+  const veilStyle = useAnimatedStyle(() => ({ opacity: veilNow.get() }));
+  const gullStyle = useAnimatedStyle(() => ({ opacity: gullsNow.get() }));
+  // Rain stays mounted until it has finished easing away, so it thins out instead of stopping dead.
+  const rainWanted = weather.rain > 0.02 && !reduced;
+  const [rainUp, setRainUp] = useState(rainWanted);
+  useEffect(() => {
+    if (rainWanted) {
+      setRainUp(true);
+      return;
+    }
+    const id = setTimeout(() => setRainUp(false), 4000);
+    return () => clearTimeout(id);
+  }, [rainWanted]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -230,8 +260,8 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
           <Animated.View style={[StyleSheet.absoluteFill, twinkleB]}>
             <StarField width={width} height={horizon} stars={TWINKLE_B} />
           </Animated.View>
-          {moonVis > 0.01 && (
-            <View style={StyleSheet.absoluteFill}>
+          {moon.up && (
+            <Animated.View style={[StyleSheet.absoluteFill, moonStyle]}>
               <Svg width={width} height={horizon}>
                 <Defs>
                   <RadialGradient id="moonShade" cx="42%" cy="40%" r="60%">
@@ -239,31 +269,29 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
                     <Stop offset="1" stopColor="#d6dce8" />
                   </RadialGradient>
                 </Defs>
-                <Circle cx={moon.x} cy={moon.y} r={15} fill="url(#moonShade)" opacity={moonVis} />
+                <Circle cx={moon.x} cy={moon.y} r={15} fill="url(#moonShade)" />
               </Svg>
-            </View>
+            </Animated.View>
           )}
         </>
       )}
 
       {/* A haze behind the words, only as strong as this sky needs. */}
-      {veil.opacity > 0.01 && (
-        <View style={StyleSheet.absoluteFill}>
+      <Animated.View style={[StyleSheet.absoluteFill, veilStyle]}>
         <Svg width={width} height={height}>
           <Defs>
             <LinearGradient id="wordsVeil" x1="0" y1={wordsTop - 10} x2="0" y2={horizon} gradientUnits="userSpaceOnUse">
               <Stop offset="0" stopColor={toHex(veil.color)} stopOpacity="0" />
-              <Stop offset="0.14" stopColor={toHex(veil.color)} stopOpacity={veil.opacity} />
-              <Stop offset="0.86" stopColor={toHex(veil.color)} stopOpacity={veil.opacity} />
+              <Stop offset="0.14" stopColor={toHex(veil.color)} stopOpacity="1" />
+              <Stop offset="0.86" stopColor={toHex(veil.color)} stopOpacity="1" />
               <Stop offset="1" stopColor={toHex(veil.color)} stopOpacity="0" />
             </LinearGradient>
           </Defs>
           <Rect x={0} y={wordsTop - 10} width={width} height={horizon - wordsTop + 10} fill="url(#wordsVeil)" />
         </Svg>
-        </View>
-      )}
+      </Animated.View>
 
-      {weather.rain > 0.02 && !reduced && (
+      {rainUp && (
         <View style={[styles.rainClip, { width, height: horizon }]}>
           <Animated.View style={[styles.rainSheet, { top: -horizon }, rainFar]}>
             <RainSheet width={width} height={horizon} d={rainD} opacity={0.24} />
@@ -273,12 +301,12 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
           </Animated.View>
         </View>
       )}
-      {night < 0.5 && weather.dark < 0.25 && !reduced && (
-        <View style={[styles.far, { top: horizon - GULL_STRIP }]}>
+      {night < 0.5 && !reduced && (
+        <Animated.View style={[styles.far, { top: horizon - GULL_STRIP }, gullStyle]}>
           <Svg width={width} height={GULL_STRIP}>
             <AnimatedPath animatedProps={gulls} fill="none" stroke={toHex(look.shade)} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" strokeOpacity={0.8 * (1 - night)} />
           </Svg>
-        </View>
+        </Animated.View>
       )}
       {weather.storm && !reduced && (
         <View style={StyleSheet.absoluteFill}>
@@ -295,19 +323,19 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
       <Svg width={width} height={HORIZON_ABOVE + 26 + 34}>
         <Defs>
           <LinearGradient id="farHaze" x1="0" y1="0" x2="0" y2="26" gradientUnits="userSpaceOnUse">
-            <Stop offset="0" stopColor={hor} stopOpacity="0" />
-            <Stop offset="1" stopColor={hor} stopOpacity="0.55" />
+            <Stop offset="0" stopColor={far.hor} stopOpacity="0" />
+            <Stop offset="1" stopColor={far.hor} stopOpacity="0.55" />
           </LinearGradient>
           <LinearGradient id="farWater" x1="0" y1="26" x2="0" y2={26 + HORIZON_ABOVE + 16} gradientUnits="userSpaceOnUse">
-            <Stop offset="0" stopColor={water.far} />
-            <Stop offset="1" stopColor={water.top} />
+            <Stop offset="0" stopColor={far.far} />
+            <Stop offset="1" stopColor={far.top} />
           </LinearGradient>
         </Defs>
         <Rect width={width} height={26} fill="url(#farHaze)" />
         <Rect y={26} width={width} height={HORIZON_ABOVE + 34} fill="url(#farWater)" />
         <AnimatedPath animatedProps={ripples} fill="none" stroke="#ffffff" strokeWidth={0.8} strokeLinecap="round" strokeOpacity={0.2 * (1 - night * 0.55)} />
         <AnimatedPath animatedProps={swellFill} fill="url(#farWater)" />
-        <AnimatedPath animatedProps={swellLine} fill="none" stroke={water.line} strokeWidth={1} strokeOpacity={water.lineOpacity * 0.36} />
+        <AnimatedPath animatedProps={swellLine} fill="none" stroke={far.line} strokeWidth={1} strokeOpacity={far.lineOpacity * 0.36} />
       </Svg>
       </View>
       {showFps && <SkyFps top={headerY - 48} />}
@@ -363,14 +391,19 @@ export function SeaGlitter({ width, height, surfaceY, look, hour, active }: { wi
   const x = source?.x ?? 0;
   const span = height - horizon;
   const dashes = useAnimatedProps(() => ({ d: glitterPath(x, 0, span, clock.get()) }));
-  if (!source || strength < 0.03 || source.y > horizon + 6) return null;
+  const lightNow = useSharedValue(strength);
+  useEffect(() => {
+    lightNow.set(withTiming(strength, { duration: SKY_FADE_MS }));
+  }, [strength, lightNow]);
+  const lightStyle = useAnimatedStyle(() => ({ opacity: Math.max(0, Math.min(1, lightNow.get() * 0.75)) }));
+  if (!source || source.y > horizon + 6) return null;
   const color = sun.up ? toHex([255, 244 - 68 * sun.low, 210 - 100 * sun.low]) : '#d6e2ff';
   return (
-    <View style={[styles.far, { top: horizon }]} pointerEvents="none">
+    <Animated.View style={[styles.far, { top: horizon }, lightStyle]} pointerEvents="none">
       <Svg width={width} height={span}>
-        <AnimatedPath animatedProps={dashes} fill="none" stroke={color} strokeWidth={1.1} strokeLinecap="round" strokeOpacity={strength * 0.75} />
+        <AnimatedPath animatedProps={dashes} fill="none" stroke={color} strokeWidth={1.1} strokeLinecap="round" />
       </Svg>
-    </View>
+    </Animated.View>
   );
 }
 

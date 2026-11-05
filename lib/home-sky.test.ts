@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { CALM_WEATHER, contrast, luminance, matchedWater, moonAt, skyAt, sunAt, textBand, weatherOf, wordsAreDark, wordsVeil } from './home-sky.ts';
+import { CALM_WEATHER, contrast, easeOfSky, luminance, matchedWater, mixWater, moonAt, skyAt, sunAt, textBand, weatherOf, wordsAreDark, wordsVeil } from './home-sky.ts';
 import { glitterPath, gullsPath, mixVector, rainPath, signFace, sockPaths, stepSign } from './home-sky-motion.ts';
 import { hexToRgb, mixRgb } from './ocean-scene.ts';
 import { DEPTHS, WATERS } from './ocean-map.ts';
@@ -58,6 +58,25 @@ test('the water never outshines the sky it meets, in any water, depth, hour or w
     assert.ok(luminance(hexToRgb(m.top)) <= luminance(look.hor) * 0.98, `${water} ${depth} ${h}`);
     assert.ok(luminance(hexToRgb(m.low)) <= luminance(hexToRgb(m.top)) * 1.02, `near water brighter than far at ${water} ${depth} ${h}`);
   }
+});
+
+test('water fades from one song\'s sky to the next with nothing jumping', () => {
+  const soft = matchedWater('reef', 'popular', skyAt(15, SOFT));
+  const storm = matchedWater('reef', 'popular', skyAt(15, HEAVY));
+  assert.deepEqual(mixWater(soft, storm, 0).top, soft.top);
+  assert.deepEqual(mixWater(soft, storm, 1), storm);
+  assert.equal(mixWater(soft, storm, 0.5).ink, storm.ink);
+  let last = soft;
+  for (let i = 1; i <= 22; i++) {
+    const now = mixWater(soft, storm, easeOfSky(i / 22));
+    for (const k of ['top', 'mid', 'low', 'far', 'line'] as const) {
+      const [a, b] = [hexToRgb(last[k]), hexToRgb(now[k])];
+      assert.ok(Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2])) < 40, `${k} jumped at step ${i}`);
+    }
+    last = now;
+  }
+  assert.equal(easeOfSky(0), 0);
+  assert.equal(easeOfSky(1), 1);
 });
 
 test('the tab bar stays readable on the water everywhere', () => {
@@ -137,7 +156,7 @@ test('every function a frame calls is marked as a worklet', () => {
 
 test('nothing loaded up front brings Skia with it', () => {
   // On the web Skia binds when its module is first evaluated, so one stray import blanks the screen.
-  for (const file of ['components/sky/home-sky.tsx', 'components/sky/sky-island.tsx', 'components/sky/sea-life-layer.tsx', 'components/home/sky-ink.tsx', 'hooks/use-sea-life.ts']) {
+  for (const file of ['components/sky/home-sky.tsx', 'components/sky/sky-island.tsx', 'components/sky/sea-life-layer.tsx', 'components/home/sky-ink.tsx', 'hooks/use-sea-life.ts', 'hooks/use-eased-water.ts']) {
     const source = readFileSync(file, 'utf8');
     assert.doesNotMatch(source, /@shopify\/react-native-skia/, `${file} imports Skia`);
     for (const line of source.split('\n')) if (/^import (?!type ).*sky-canvas'/.test(line)) assert.fail(`${file}: ${line}`);
