@@ -550,6 +550,8 @@ export function spreadByAlbum(
 export type RefillResult = {
   queue: DiscoveryTrack[];
   fetched: DiscoveryTrack[];
+  // A fetch failed after this refill already had new songs: they're kept, and it stopped asking.
+  interrupted: boolean;
 };
 
 /**
@@ -559,7 +561,8 @@ export type RefillResult = {
  * never make it into the queue — since a genre only needs to have been *returned*
  * by iTunes to count as discovered (see lib/discovery-storage.ts's genre catalog).
  * Gives up after MAX_REFILL_ATTEMPTS fetches that add nothing new, rather than
- * looping forever against an exhausted strategy.
+ * looping forever against an exhausted strategy. A failed fetch throws only if
+ * this refill has no new songs yet; otherwise it keeps what it has and stops.
  *
  * Fresh candidates from every attempt accumulate in a pool and are spread by
  * album (spreadByAlbum) once, after fetching stops — not per batch — so a
@@ -580,10 +583,19 @@ export async function refillQueue(
   const fetched: DiscoveryTrack[] = [];
   const pool: DiscoveryTrack[] = [];
   let attempts = 0;
+  let interrupted = false;
 
   while (result.length + pool.length < QUEUE_TARGET_DEPTH && attempts < MAX_REFILL_ATTEMPTS) {
     attempts += 1;
-    const batch = dedupeDiscoveryTracks(await fetcher(strategy));
+    let response: DiscoveryTrack[];
+    try {
+      response = await fetcher(strategy);
+    } catch (error) {
+      if (pool.length === 0) throw error; // nothing new to keep, so the caller has to hear about it
+      interrupted = true;
+      break;
+    }
+    const batch = dedupeDiscoveryTracks(response);
     fetched.push(...batch);
 
     const queuedIds = new Set([...result, ...pool].map((t) => t.id));
@@ -596,7 +608,7 @@ export async function refillQueue(
     result = [...result, ...spreadByAlbum(pool, windowSoFar)].slice(0, QUEUE_TARGET_DEPTH);
   }
 
-  return { queue: result, fetched };
+  return { queue: result, fetched, interrupted };
 }
 
 export const MAX_GENRE_FALLBACKS = 5;
@@ -631,18 +643,25 @@ export async function refillQueueWithFallback(
   const recentAlbumIds = history.slice(-ALBUM_SPREAD_WINDOW).map((e) => e.collectionId);
 
   let currentStrategy = strategy;
+  let previousStrategy = strategy;
   let currentQueue = [...queue];
   let knownGenres = discoveredGenres;
   const fetched: DiscoveryTrack[] = [];
   let fallbacks = 0;
 
   for (;;) {
-    const result = await refillQueue(currentQueue, currentStrategy, seenTrackIds, fetcher, recentAlbumIds);
+    let result: RefillResult;
+    try {
+      result = await refillQueue(currentQueue, currentStrategy, seenTrackIds, fetcher, recentAlbumIds);
+    } catch (error) {
+      if (currentQueue.length === queue.length) throw error; // this refill has nothing new to show for itself
+      return { queue: currentQueue, fetched, strategy: previousStrategy }; // an earlier genre's songs are still good
+    }
     currentQueue = result.queue;
     fetched.push(...result.fetched);
     knownGenres = mergeDiscoveredGenres(knownGenres, extractGenres(result.fetched));
 
-    if (currentQueue.length >= QUEUE_TARGET_DEPTH || fallbacks >= MAX_GENRE_FALLBACKS) break;
+    if (result.interrupted || currentQueue.length >= QUEUE_TARGET_DEPTH || fallbacks >= MAX_GENRE_FALLBACKS) break;
 
     fallbacks += 1;
     if (currentStrategy.type === 'genre') triedGenres.add(currentStrategy.genre);
@@ -650,6 +669,7 @@ export async function refillQueueWithFallback(
     const untriedAll = allGenres.filter((g) => !triedGenres.has(g));
     if (untriedDiscovered.length === 0 && untriedAll.length === 0) break;
     const fallbackGenre = pickJumpGenre(untriedDiscovered, genresHeard, untriedAll, history);
+    previousStrategy = currentStrategy;
     currentStrategy = { type: 'genre', genre: fallbackGenre };
   }
 

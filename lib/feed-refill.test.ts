@@ -95,3 +95,47 @@ test('Case 4, failure: when the connection dies halfway, the songs it already go
 
   assert.deepEqual(result.queue.map((t) => t.id), [1, 2]);
 });
+
+// ---------- Added with the Case 4 fix ----------
+
+test('a failed fetch stops the refill, so a rate limited app does not keep asking other genres', async () => {
+  let fetches = 0;
+  const fetcher = async () => {
+    fetches += 1;
+    if (fetches === 1) return [1, 2].map((id) => song(id));
+    throw new Error('iTunes rate limited the app');
+  };
+
+  await refillQueueWithFallback([], rock, [], ['Rock'], ['Rock', 'Jazz', 'Pop'], fetcher);
+
+  assert.equal(fetches, 2);
+});
+
+test('when the next genre fails, the song the last genre found stays and that genre stays current', async () => {
+  const fetcher = async (strategy: Strategy) => {
+    if (genreOf(strategy) === 'Rock') return [1, 2].map((id) => song(id));
+    throw new Error('the connection dropped');
+  };
+
+  const result = await refillQueueWithFallback([], rock, heard([1]), ['Rock', 'Jazz'], ['Rock', 'Jazz'], fetcher);
+
+  assert.deepEqual(result.queue.map((t) => t.id), [2]);
+  assert.deepEqual(result.strategy, rock);
+});
+
+test('with no connection from the first fetch the refill still fails, so Home can say it could not load', async () => {
+  const fetcher = async (): Promise<DiscoveryTrack[]> => {
+    throw new Error('offline');
+  };
+
+  await assert.rejects(refillQueueWithFallback([], rock, [], ['Rock'], ['Rock', 'Jazz'], fetcher), /offline/);
+});
+
+test('a background refill that gains nothing still fails, so Home can show its tap to retry note', async () => {
+  const playing = [song(50), song(51)];
+  const fetcher = async (): Promise<DiscoveryTrack[]> => {
+    throw new Error('offline');
+  };
+
+  await assert.rejects(refillQueueWithFallback(playing, rock, [], ['Rock'], ['Rock', 'Jazz'], fetcher), /offline/);
+});
