@@ -139,3 +139,27 @@ test('a background refill that gains nothing still fails, so Home can show its t
 
   await assert.rejects(refillQueueWithFallback(playing, rock, [], ['Rock'], ['Rock', 'Jazz'], fetcher), /offline/);
 });
+
+// ---------- Added with the follow-up change ----------
+
+test('an artist is looked up once per refill, since asking again returns the same list', async () => {
+  const asked: string[] = [];
+  const fetcher = async (strategy: Strategy) => {
+    asked.push(strategy.type === 'artist' ? 'artist' : strategy.genre);
+    if (strategy.type === 'artist') return [song(1)];
+    return [10, 11, 12].map((id) => song(id, 'Jazz'));
+  };
+
+  const result = await refillQueueWithFallback(
+    [],
+    { type: 'artist', artistId: 77, artistName: 'Some Artist' },
+    [],
+    ['Jazz'],
+    ['Jazz'],
+    fetcher
+  );
+
+  assert.deepEqual(asked, ['artist', 'Jazz']);
+  assert.deepEqual(result.queue.map((t) => t.id), [1, 10, 11]);
+  assert.deepEqual(result.strategy, { type: 'genre', genre: 'Jazz' });
+});

@@ -584,8 +584,10 @@ export async function refillQueue(
   const pool: DiscoveryTrack[] = [];
   let attempts = 0;
   let interrupted = false;
+  // An artist's song list is the same on every lookup, so asking again would only use up the iTunes rate limit.
+  const maxAttempts = strategy.type === 'artist' ? 1 : MAX_REFILL_ATTEMPTS;
 
-  while (result.length + pool.length < QUEUE_TARGET_DEPTH && attempts < MAX_REFILL_ATTEMPTS) {
+  while (result.length + pool.length < QUEUE_TARGET_DEPTH && attempts < maxAttempts) {
     attempts += 1;
     let response: DiscoveryTrack[];
     try {
