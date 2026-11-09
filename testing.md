@@ -89,3 +89,38 @@ This is the first time the tests ran. The code wasn't changed first.
 Case 4 didn't finish. It stopped with the error from the fake fetcher, `iTunes rate limited the app`. That's the bug I expected. The first fetch got 2 new songs, they were still in the local list inside `refillQueue`, and the second fetch threw before they reached the queue. On a phone Home would say "Couldn't load songs" even though it had 2 songs it could play.
 
 One limit on Case 3: the test checks that the queue comes back empty and what the "empty" state says. The line in Home that picks the "empty" state isn't tested, because these tests don't touch the screen.
+
+### Why Case 4 failed and what I changed
+
+The results and my prediction agreed, but the app didn't do what it should. When a fetch failed, the whole refill failed, including the songs it already had.
+
+While fixing it I found the same problem one level up, which I hadn't predicted. If Rock found 1 new song and the fetch for the next genre failed, that Rock song got lost too. So I added a test for that, watched it fail, and fixed both spots.
+
+The fix is in commit a9f19dc:
+
+- A failed fetch keeps the new songs this refill already found.
+- It stops asking other genres after a fetch fails, so a rate limit doesn't get hit over and over.
+- If the refill found nothing new, it still fails. Home needs that to say "Couldn't load songs" or show its tap to retry note. I added two tests to make sure the fix didn't break this.
+
+### Run 2, on commit a9f19dc
+
+All four cases passed, plus the four tests added with the fix, so 8 out of 8. The whole test suite passed, 977 out of 977.
+
+### The follow-up change
+
+Commit 05d8d1f looks an artist up once per refill instead of 5 times. iTunes returns the same list every time, so the extra 4 lookups only used up the rate limit. The test for this failed first and showed 5 lookups, then passed with 1. Genres still get 5 tries because their results can change between tries.
+
+### Run 3, on commit 05d8d1f
+
+| Case | Result |
+| --- | --- |
+| 1, a normal refill | Pass |
+| 2, a genre has one song left | Pass |
+| 3, you've heard everything | Pass |
+| 4, the connection dies halfway | Pass |
+
+All 9 tests in this file passed. The whole test suite passed, 978 out of 978. The change didn't break anything in these cases.
+
+### Phone check
+
+Not done yet. The steps are in "What they won't show" above.
