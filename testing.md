@@ -73,4 +73,19 @@ To cover some of that on a phone, I'll repeat this by hand:
 
 ## Results
 
-Not run yet.
+### Run 1, on commit 3d17c4d, Nov 9, 2026
+
+This is the first time the tests ran. The code wasn't changed first.
+
+| Case | I predicted | What happened |
+| --- | --- | --- |
+| 1, a normal refill | Pass | Pass |
+| 2, a genre has one song left | Pass | Pass |
+| 3, you've heard everything | Pass | Pass |
+| 4, the connection dies halfway | Fail | Fail |
+
+3 passed and 1 failed, and all four matched my predictions.
+
+Case 4 didn't finish. It stopped with the error from the fake fetcher, `iTunes rate limited the app`. That's the bug I expected. The first fetch got 2 new songs, they were still in the local list inside `refillQueue`, and the second fetch threw before they reached the queue. On a phone Home would say "Couldn't load songs" even though it had 2 songs it could play.
+
+One limit on Case 3: the test checks that the queue comes back empty and what the "empty" state says. The line in Home that picks the "empty" state isn't tested, because these tests don't touch the screen.
