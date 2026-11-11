@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { log } from './app-log';
 import { ensureSession, hasStoredSession } from './auth';
-import { resolveTrackById } from './bottles-api';
 import type { DiscoveryTrack } from './discovery';
 import { loadLikedTracks, loadRegion } from './discovery-storage';
 import { normalizeArtist } from './human-check';
@@ -11,10 +11,12 @@ import {
   parseDeck,
   parsePeople,
   personPrintSeeds,
+  resolveDeckTracks,
   sortPeople,
   type Intent,
   type Person,
 } from './people';
+import { catalogTrackById } from './pool';
 import { soundFor } from './sound-index';
 import { lookupTracks } from './song-details';
 import type { Platform } from './twins';
@@ -133,13 +135,13 @@ export async function fetchDeck(lim: number, skip: Set<number>): Promise<DeckCar
   if (!r.ok) return null;
   const songs = parseDeck(r.data).filter((s) => !skip.has(s.trackId));
   const region = await loadRegion();
-  const cards = await Promise.all(
-    songs.map(async (s): Promise<DeckCard | null> => {
-      const track = await resolveTrackById(s.trackId, region);
-      return track?.previewUrl && !hideFromDiscovery(track.artistName) ? { track: { ...track, via: undefined }, heartedBy: s.heartedBy } : null;
-    })
-  );
-  return cards.filter((c): c is DeckCard => c !== null);
+  const heartedBy = new Map(songs.map((s) => [s.trackId, s.heartedBy]));
+  const tracks = await resolveDeckTracks(songs.map((s) => s.trackId), catalogTrackById, (ids) => lookupTracks(ids, region));
+  const cards = tracks
+    .filter((t) => t.previewUrl && !hideFromDiscovery(t.artistName))
+    .map((t) => ({ track: { ...t, via: undefined }, heartedBy: heartedBy.get(t.id) ?? 0 }));
+  log('people', `deck: server gave ${songs.length}, ${cards.length} playable`);
+  return cards;
 }
 
 // ---------- the people ----------

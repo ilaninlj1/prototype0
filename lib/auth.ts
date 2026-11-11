@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { describeError, log } from './app-log';
 import { sessionNeedsRefresh } from './twins';
+import { within } from './within';
 
 // An invisible Supabase account per install (anonymous sign-in), used by
 // Taste Twins so no one can act as someone else. Kept on the phone and
@@ -20,12 +22,24 @@ let pending: Promise<Stored | null> | null = null;
 const GONE = new Set(['refresh_token_not_found', 'refresh_token_already_used', 'session_not_found', 'validation_failed']);
 
 async function authCall(path: string, body: object): Promise<{ ok: boolean; status: number; data: any }> {
-  const res = await fetch(`${URL_ROOT}/auth/v1/${path}`, {
-    method: 'POST',
-    headers: { apikey: KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  return { ok: res.ok, status: res.status, data: await res.json().catch(() => null) };
+  const name = `sign-in ${path.split('?')[0]}`;
+  const start = Date.now();
+  try {
+    const r = await within(
+      fetch(`${URL_ROOT}/auth/v1/${path}`, {
+        method: 'POST',
+        headers: { apikey: KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then(async (res) => ({ ok: res.ok, status: res.status, data: await res.json().catch(() => null) })),
+      15_000,
+      name
+    );
+    log('server', `${name} answered ${r.status} in ${Date.now() - start}ms`, r.ok ? 'info' : 'warn');
+    return r;
+  } catch (e) {
+    log('server', `${name} failed after ${Date.now() - start}ms: ${describeError(e)}`, 'error');
+    throw e; // load() below treats this as offline and keeps the stored session
+  }
 }
 
 const toStored = (d: any): Stored => ({

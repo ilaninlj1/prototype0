@@ -6,6 +6,7 @@ import {
   deckProgressLine,
   isAdult,
   matchScore,
+  resolveDeckTracks,
   newlyInTune,
   modeLabel,
   parseDeck,
@@ -153,4 +154,42 @@ test('the empty row says how close you are', () => {
   assert.equal(deckProgressLine({ close: 0, judged: 1 }), '1 song judged so far.');
   assert.equal(deckProgressLine({ close: 1, judged: 12 }), '1 person is getting close.');
   assert.equal(deckProgressLine({ close: 3, judged: 12 }), '3 people are getting close.');
+});
+
+// ---------- Resolving the deck: one iTunes lookup, not one per song ----------
+
+test('catalog songs resolve straight away and the rest come from a single lookup, in deck order', async () => {
+  const catalog = new Map([[1, { id: 1 }], [3, { id: 3 }]]);
+  const lookups: number[][] = [];
+  const tracks = await resolveDeckTracks(
+    [1, 2, 3, 4],
+    (id) => catalog.get(id) ?? null,
+    async (ids) => {
+      lookups.push(ids);
+      return ids.map((id) => ({ id }));
+    }
+  );
+  assert.deepEqual(lookups, [[2, 4]]);
+  assert.deepEqual(tracks.map((t) => t.id), [1, 2, 3, 4]);
+});
+
+test('when every song is in the catalog nothing is looked up', async () => {
+  let looked = 0;
+  const tracks = await resolveDeckTracks([5, 6], (id) => ({ id }), async () => {
+    looked += 1;
+    return [];
+  });
+  assert.equal(looked, 0);
+  assert.deepEqual(tracks.map((t) => t.id), [5, 6]);
+});
+
+test('a failed lookup still leaves the catalog songs, so the deck is never stuck waiting', async () => {
+  const tracks = await resolveDeckTracks(
+    [1, 2],
+    (id) => (id === 1 ? { id } : null),
+    async () => {
+      throw new Error('iTunes said no');
+    }
+  );
+  assert.deepEqual(tracks.map((t) => t.id), [1]);
 });

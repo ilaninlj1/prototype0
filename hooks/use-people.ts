@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { describeError, log, timed } from '@/lib/app-log';
 import type { DiscoveryTrack, SwipeEntry } from '@/lib/discovery';
 import { appendSwipeEntry } from '@/lib/discovery-storage';
 import { newlyInTune, type Person } from '@/lib/people';
@@ -45,11 +46,13 @@ export function usePeople() {
     filling.current = true;
     const skip = new Set([...judged.current, ...deckRef.current.map((c) => c.track.id)]);
     try {
-      const more = await fetchDeck(DECK_SIZE, skip);
+      const more = await timed('people', 'deck', () => fetchDeck(DECK_SIZE, skip), (m) => (m ? `${m.length} songs` : 'none, server said no'));
       if (more) {
         const have = new Set(deckRef.current.map((c) => c.track.id));
         putDeck([...deckRef.current, ...more.filter((c) => !have.has(c.track.id) && !judged.current.has(c.track.id))]);
       }
+    } catch {
+      // Logged by timed; the deck shows what it has.
     } finally {
       filling.current = false;
       setDeckLoading(false);
@@ -72,11 +75,17 @@ export function usePeople() {
   }, []);
 
   const load = useCallback(async () => {
-    const s = await peopleStatus();
+    let s: PeopleStatus;
+    try {
+      s = await timed('people', 'status', peopleStatus, (v) => v);
+    } catch {
+      // Anything unexpected shows the offline note with Try again, never an endless spinner.
+      s = 'offline';
+    }
     setStatus(s);
     if (s !== 'member') return;
-    refreshPrint();
-    await Promise.all([fill(), refreshPeople()]);
+    refreshPrint().catch((e) => log('people', `print not sent: ${describeError(e)}`, 'warn'));
+    await Promise.all([fill(), refreshPeople().catch((e) => log('people', `people list failed: ${describeError(e)}`, 'error'))]);
   }, [fill, refreshPeople]);
 
   useEffect(() => {

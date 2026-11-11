@@ -9,32 +9,47 @@ import { lookupTracks } from './song-details';
 import type { Intent } from './people';
 import type { RingSeed } from './bottle-rows';
 import { rankTwins, type Platform, type Twin, type TwinRow } from './twins';
+import { describeError, log } from './app-log';
+import { within } from './within';
 
 const URL_ROOT = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 const JOINED = 'twins-joined-v1';
+/** Past this a server call counts as failed, so no screen waits on it forever. */
+const SERVER_LIMIT_MS = 15_000;
 
 export async function api(
   path: string,
   init: { method?: string; body?: unknown; prefer?: string; conflictOk?: boolean } = {}
 ): Promise<{ ok: boolean; data: any }> {
+  const name = path.split('?')[0];
   const s = await ensureSession();
-  if (!s || !URL_ROOT) return { ok: false, data: null };
+  if (!s || !URL_ROOT) {
+    log('server', `${name} skipped: ${URL_ROOT ? 'no sign-in' : 'no server address in this build'}`, 'warn');
+    return { ok: false, data: null };
+  }
+  const start = Date.now();
   try {
-    const res = await fetch(`${URL_ROOT}/rest/v1/${path}`, {
-      method: init.method ?? 'GET',
-      headers: {
-        apikey: KEY,
-        Authorization: `Bearer ${s.token}`,
-        'Content-Type': 'application/json',
-        ...(init.prefer ? { Prefer: init.prefer } : {}),
-      },
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    });
-    const text = await res.text();
+    const res = await within(
+      fetch(`${URL_ROOT}/rest/v1/${path}`, {
+        method: init.method ?? 'GET',
+        headers: {
+          apikey: KEY,
+          Authorization: `Bearer ${s.token}`,
+          'Content-Type': 'application/json',
+          ...(init.prefer ? { Prefer: init.prefer } : {}),
+        },
+        body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      }).then(async (r) => ({ ok: r.ok, status: r.status, text: await r.text() })),
+      SERVER_LIMIT_MS,
+      name
+    );
     // 409 = "already there", fine for likes and waves, a real failure for a new profile.
-    return { ok: res.ok || (res.status === 409 && init.conflictOk !== false), data: text ? JSON.parse(text) : null };
-  } catch {
+    const ok = res.ok || (res.status === 409 && init.conflictOk !== false);
+    if (!ok) log('server', `${name} answered ${res.status} after ${Date.now() - start}ms: ${res.text.slice(0, 200)}`, 'warn');
+    return { ok, data: res.text ? JSON.parse(res.text) : null };
+  } catch (e) {
+    log('server', `${name} failed after ${Date.now() - start}ms: ${describeError(e)}`, 'error');
     return { ok: false, data: null };
   }
 }

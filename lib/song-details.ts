@@ -7,14 +7,24 @@
 
 import { parseArtistLookupResponse, type DiscoveryTrack } from './discovery';
 import { parseCredits, replayScore, wikiMatches, type Credits } from './song-facts';
+import { describeError, log } from './app-log';
+import { within } from './within';
 
 const UA = 'Blindspot/0.1 (student project; ilan@homewyrks.com)';
 
 async function json<T>(url: string, headers: Record<string, string> = {}): Promise<T | null> {
+  const host = url.split('/')[2] ?? url;
+  const start = Date.now();
   try {
-    const res = await fetch(url, { headers });
-    return res.ok ? ((await res.json()) as T) : null;
-  } catch {
+    const res = await within(
+      fetch(url, { headers }).then(async (r) => ({ ok: r.ok, status: r.status, body: r.ok ? ((await r.json()) as T) : null })),
+      15_000,
+      host
+    );
+    if (!res.ok) log('network', `${host} answered ${res.status} after ${Date.now() - start}ms`, 'warn');
+    return res.body;
+  } catch (e) {
+    log('network', `${host} failed after ${Date.now() - start}ms: ${describeError(e)}`, 'error');
     return null;
   }
 }

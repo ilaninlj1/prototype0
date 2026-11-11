@@ -131,6 +131,37 @@ export function parsePeople(data: unknown): PersonRow[] {
 
 export type DeckSong = { trackId: number; heartedBy: number };
 
+/**
+ * The deck's songs as tracks, in deck order. Catalog songs resolve straight away and the rest
+ * come from one lookup for all of them, instead of one paced iTunes call each, which could keep
+ * the deck spinning for a minute behind everything else waiting on iTunes. A failed lookup
+ * still leaves the catalog songs.
+ */
+export async function resolveDeckTracks<T extends { id: number }>(
+  ids: number[],
+  fromCatalog: (id: number) => T | null,
+  lookupMany: (ids: number[]) => Promise<T[]>
+): Promise<T[]> {
+  const known = new Map<number, T>();
+  const missing: number[] = [];
+  for (const id of ids) {
+    const t = fromCatalog(id);
+    if (t) known.set(id, t);
+    else missing.push(id);
+  }
+  if (missing.length) {
+    try {
+      for (const t of await lookupMany(missing)) if (!known.has(t.id)) known.set(t.id, t);
+    } catch {
+      // Keep the catalog songs.
+    }
+  }
+  return ids.flatMap((id) => {
+    const t = known.get(id);
+    return t ? [t] : [];
+  });
+}
+
 export function parseDeck(data: unknown): DeckSong[] {
   if (!Array.isArray(data)) return [];
   const seen = new Set<number>();
