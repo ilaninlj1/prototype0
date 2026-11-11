@@ -2,6 +2,7 @@ import { useSkyInk } from '@/components/home/sky-ink';
 import type { SkyTest } from '@/lib/home-sky';
 import { SEA_LIFE_TESTS, type SeaLifeTest } from '@/lib/sea-life-tests';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
@@ -255,6 +256,22 @@ export function TuneSheet({
                 </>
               )}
 
+              <ThemedText style={sheetStyles.heading}>Log</ThemedText>
+              <TouchableOpacity
+                onPress={() => {
+                  close();
+                  router.push('/log');
+                }}
+                activeOpacity={0.6}
+                style={[Ui.outlineButton, styles.logButton]}
+                accessibilityRole="button"
+                accessibilityLabel="Open the log">
+                <ThemedText style={Ui.label}>Open the log</ThemedText>
+              </TouchableOpacity>
+              <ThemedText type="caption">
+                What the app did and when, including errors. If something hangs or breaks, open this and tap Share log.
+              </ThemedText>
+
               <ThemedText style={sheetStyles.heading}>Test network</ThemedText>
               <Segment
                 options={[
@@ -381,6 +398,7 @@ function Segment<K extends string>({
 
 const styles = StyleSheet.create({
   animals: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  logButton: { alignSelf: 'flex-start' },
   iconTrigger: { width: TapTarget, height: TapTarget, borderRadius: TapTarget / 2, alignItems: 'center', justifyContent: 'center' },
   body: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xxl, gap: Spacing.sm },
   summary: { fontFamily: Fonts.sansSemiBold, fontSize: 17, lineHeight: 23, color: Colors.textSecondary },

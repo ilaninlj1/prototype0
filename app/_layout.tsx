@@ -28,6 +28,10 @@ import { Colors, Fonts, Spacing } from '@/constants/theme';
 import { PlaybackProvider } from '@/hooks/use-playback';
 import { refreshDecodedNews } from '@/hooks/use-taste-decoded';
 import { startTwinSync } from '@/lib/twins-api';
+import { installAppLog } from '@/lib/app-log-app';
+
+// First, so a crash while the app is still starting up is in the log too.
+installAppLog();
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -121,6 +125,7 @@ export default function RootLayout() {
             <Stack.Screen name="modal" options={{ headerShown: false, animation: 'none' }} />
             <Stack.Screen name="export-history" options={{ presentation: 'modal', title: 'Export history' }} />
             <Stack.Screen name="recently-deleted" options={{ presentation: 'modal', title: 'Recently deleted' }} />
+            <Stack.Screen name="log" options={{ presentation: 'modal', title: 'Log' }} />
             <Stack.Screen name="drop-play" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="edition" options={{ presentation: 'fullScreenModal', headerShown: false }} />
             <Stack.Screen name="search" options={{ headerShown: false }} />

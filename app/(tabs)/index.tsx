@@ -128,6 +128,7 @@ import {
   type FeedLoad,
   type NetworkTest,
 } from '@/lib/feed-load';
+import { describeError, log } from '@/lib/app-log';
 import { type PieceMark } from '@/lib/piece';
 import { recipeFor, type PrintRecipe } from '@/lib/print-recipe';
 import { keyLabel, moreLikeLabel, type SoundFeatures } from '@/lib/sound';
@@ -642,8 +643,11 @@ export default function HomeScreen() {
   ) {
     const epoch = ++refillEpochRef.current;
     lastRefillRef.current = [baseQueue, activeStrategy, history, knownGenres, activeRegion, activePreset, excludeArtists];
+    const label = activeStrategy.type === 'genre' ? activeStrategy.genre : activeStrategy.artistName;
+    const startedAt = Date.now();
+    log('feed', `finding songs · ${label} · ${baseQueue.length} left${networkTestRef.current === 'off' ? '' : ` · test network ${networkTestRef.current}`}`);
     // Only an empty feed shows the waiting panel; a refill behind a playing card stays quiet unless it fails.
-    if (baseQueue.length === 0) setLoad((prev) => startLoad(prev, activeStrategy.type === 'genre' ? activeStrategy.genre : activeStrategy.artistName, Date.now()));
+    if (baseQueue.length === 0) setLoad((prev) => startLoad(prev, label, Date.now()));
     try {
       const { queue: nextQueue, fetched, strategy: landedStrategy } = await refillQueueWithFallback(
         baseQueue,
@@ -675,6 +679,8 @@ export default function HomeScreen() {
           (ms) => new Promise((r) => setTimeout(r, ms)))
       );
       if (refillEpochRef.current !== epoch) return;
+      const landedLabel = landedStrategy.type === 'genre' ? landedStrategy.genre : landedStrategy.artistName;
+      log('feed', `found ${nextQueue.length - baseQueue.length} in ${Date.now() - startedAt}ms${landedLabel !== label ? ` · moved to ${landedLabel}` : ''}${nextQueue.length === 0 ? ' · no songs left' : ''}`);
 
       setQueue(nextQueue);
       setLoad((prev) => (nextQueue.length === 0 ? failLoad(prev, 'empty') : succeedLoad()));
@@ -688,7 +694,8 @@ export default function HomeScreen() {
         setDiscoveredGenres(merged);
         await saveDiscoveredGenres(merged);
       }
-    } catch {
+    } catch (e) {
+      log('feed', `couldn't load songs after ${Date.now() - startedAt}ms: ${describeError(e)}`, 'error');
       if (refillEpochRef.current !== epoch) return;
       setLoad((prev) => failLoad(prev, 'offline'));
     }
