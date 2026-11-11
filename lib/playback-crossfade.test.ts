@@ -255,3 +255,39 @@ test('late gesture and readiness callbacks after blur cannot restart either song
   assert.equal(peek.playing, false);
   assert.equal(peek.source, 'next');
 });
+
+// ---------- Opening the app paused ----------
+
+function bare() {
+  const main = fakePlayer();
+  const peek = fakePlayer();
+  const fade = createPlaybackCrossfade(main, peek, () => {}, { now: () => 0, requestFrame: () => 0, cancelFrame: () => {} });
+  return { main, peek, fade };
+}
+
+test('after holdNext, the next song loads but waits for a tap', () => {
+  const { main, fade } = bare();
+  fade.holdNext();
+  fade.playPreview('first');
+  assert.equal(main.source, 'first');
+  assert.equal(main.plays, 0);
+  assert.equal(main.playing, false);
+});
+
+test('the hold covers one song only, so the song after it plays as usual', () => {
+  const { main, fade } = bare();
+  fade.holdNext();
+  fade.playPreview('first');
+  fade.playPreview('second');
+  assert.equal(main.source, 'second');
+  assert.equal(main.playing, true);
+});
+
+test('a screen with no song yet does not use up the hold', () => {
+  const { main, fade } = bare();
+  fade.holdNext();
+  fade.playPreview(undefined);
+  fade.playPreview('first');
+  assert.equal(main.source, 'first');
+  assert.equal(main.playing, false);
+});

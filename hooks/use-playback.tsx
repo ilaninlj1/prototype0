@@ -26,11 +26,16 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const firstStatus = useAudioPlayerStatus(first);
   const secondStatus = useAudioPlayerStatus(second);
   const status = player === first ? firstStatus : secondStatus;
-  const crossfade = useMemo(() => createPlaybackCrossfade(first, second, setPlayer, {
-    now: Date.now,
-    requestFrame: requestAnimationFrame,
-    cancelFrame: cancelAnimationFrame,
-  }), [first, second]);
+  const crossfade = useMemo(() => {
+    const fade = createPlaybackCrossfade(first, second, setPlayer, {
+      now: Date.now,
+      requestFrame: requestAnimationFrame,
+      cancelFrame: cancelAnimationFrame,
+    });
+    // Opening the app never starts music on its own: the first song waits for a tap.
+    fade.holdNext();
+    return fade;
+  }, [first, second]);
 
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});

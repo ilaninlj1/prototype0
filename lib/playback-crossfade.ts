@@ -27,6 +27,7 @@ export function createPlaybackCrossfade<Player extends CrossfadePlayer>(
   let peekUrl: string | undefined;
   let promotedUrl: string | undefined;
   let active = false;
+  let held = false;
   let mix = 0;
   let started = false;
   let frame: number | undefined;
@@ -138,6 +139,11 @@ export function createPlaybackCrossfade<Player extends CrossfadePlayer>(
     return true;
   }
 
+  /** The next song loads but waits for a tap. One song only, so everything after it plays as usual. */
+  function holdNext() {
+    held = true;
+  }
+
   function playPreview(url: string | undefined) {
     active = true;
     if (url && url === promotedUrl) {
@@ -151,7 +157,8 @@ export function createPlaybackCrossfade<Player extends CrossfadePlayer>(
     if (url) {
       current.replace(url);
       current.volume = 1;
-      current.play();
+      if (held) held = false;
+      else current.play();
     }
   }
 
@@ -165,5 +172,5 @@ export function createPlaybackCrossfade<Player extends CrossfadePlayer>(
     current.pause();
   }
 
-  return { peekLoad, setMix, cancelPeek, promotePeek, playPreview, stopPreview, refresh };
+  return { peekLoad, setMix, cancelPeek, promotePeek, playPreview, stopPreview, refresh, holdNext };
 }
