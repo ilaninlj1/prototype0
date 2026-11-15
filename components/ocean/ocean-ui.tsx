@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
@@ -91,6 +92,7 @@ export function OceanUi({
   onToggleMeter: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={[styles.top, { paddingTop: insets.top + Spacing.sm }]} pointerEvents="box-none">
@@ -148,6 +150,9 @@ export function OceanUi({
           </Pressable>
           <Pressable onPress={onChart} style={styles.plain} accessibilityRole="button">
             <ThemedText style={styles.plainText}>See it all</ThemedText>
+          </Pressable>
+          <Pressable onPress={() => router.push('/coral')} style={styles.plain} accessibilityRole="button" accessibilityLabel="Coral: join two songs">
+            <ThemedText style={styles.plainText}>Coral</ThemedText>
           </Pressable>
           {allCount > 0 && (
             <Pressable onPress={onOpenList} style={styles.plain} accessibilityRole="button">

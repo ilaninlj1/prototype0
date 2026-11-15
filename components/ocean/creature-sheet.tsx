@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -29,6 +30,7 @@ export function CreatureSheet({
   onSwipeLike: () => void;
   onClose: () => void;
 }) {
+  const router = useRouter();
   return (
     <BottomSheet visible={!!creature} onClose={onClose} maxHeight="80%">
       {creature && (
@@ -62,6 +64,17 @@ export function CreatureSheet({
                 <Pressable style={styles.outline} onPress={onSwipeLike} accessibilityRole="button">
                   <ThemedText style={styles.outlineText}>Swipe songs like this</ThemedText>
                 </Pressable>
+                {!!track?.previewUrl && (
+                  <Pressable
+                    style={styles.outline}
+                    onPress={() => {
+                      onClose();
+                      router.push({ pathname: '/coral', params: { from: String(creature.trackId) } });
+                    }}
+                    accessibilityRole="button">
+                    <ThemedText style={styles.outlineText}>Grow a branch from this song</ThemedText>
+                  </Pressable>
+                )}
               </View>
             )}
             {/* Even the reasons can hint at it (a school means you already saved this artist), so they wait too. */}
