@@ -42,9 +42,9 @@ const StarField = memo(function StarField({ width, height, stars }: { width: num
 });
 
 /** Two screens of rain, drawn once, that slide down and wrap around. */
-const RainSheet = memo(function RainSheet({ width, height, d, opacity, flip = false }: { width: number; height: number; d: string; opacity: number; flip?: boolean }) {
+const RainSheet = memo(function RainSheet({ width, height, d, opacity }: { width: number; height: number; d: string; opacity: number }) {
   return (
-    <View style={flip ? { transform: [{ scaleX: -1 }] } : undefined}>
+    <View>
       <Svg width={width} height={height}>
         <Path d={d} fill="none" stroke="#ebf2ff" strokeWidth={1.2} strokeLinecap="round" strokeOpacity={opacity} />
       </Svg>
@@ -188,6 +188,8 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
   const swellLine = useAnimatedProps(() => ({ d: swellPath(width, clock.get(), HORIZON_ABOVE * 0.45 + 26, 0) }));
   const ripples = useAnimatedProps(() => ({ d: ripplesPath(width, clock.get(), 26, 20) }));
   const rainD = useMemo(() => rainPath(width, horizon, 0, 1, weather.wind), [width, horizon, weather.wind]);
+  // The near sheet is the same rain a moment later, not a mirror: mirrored, it leaned against the wind and the sock.
+  const rainNearD = useMemo(() => rainPath(width, horizon, 0.37, 1, weather.wind), [width, horizon, weather.wind]);
   const rainNear = useAnimatedStyle(() => ({ opacity: Math.min(1, rain.get() * 1.6), transform: [{ translateY: (clock.get() * 430) % horizon }] }));
   const rainFar = useAnimatedStyle(() => ({ opacity: Math.min(1, rain.get() * 1.1), transform: [{ translateY: ((clock.get() * 290 + horizon * 0.4) % horizon) }] }));
   const gulls = useAnimatedProps(() => ({ d: gullsPath(width, clock.get(), GULL_STRIP - 22, beat.get()) }));
@@ -297,7 +299,7 @@ export function HomeSky({ width, height, surfaceY, headerY, wordsTop, hour, look
             <RainSheet width={width} height={horizon} d={rainD} opacity={0.24} />
           </Animated.View>
           <Animated.View style={[styles.rainSheet, { top: -horizon }, rainNear]}>
-            <RainSheet width={width} height={horizon} d={rainD} opacity={0.42} flip />
+            <RainSheet width={width} height={horizon} d={rainNearD} opacity={0.42} />
           </Animated.View>
         </View>
       )}
