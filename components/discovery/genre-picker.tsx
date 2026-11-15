@@ -291,6 +291,7 @@ const styles = StyleSheet.create({
   // A light pill: the genre you're in, at the top left of Home.
   trigger: {
     maxWidth: 220,
+    flexShrink: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
