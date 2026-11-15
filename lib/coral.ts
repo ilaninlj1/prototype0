@@ -565,3 +565,47 @@ export function touchPoint(layout: GardenLayout, touch: CoralTouch): Point {
   const f = at - i;
   return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * f, y: pts[i].y + (pts[i + 1].y - pts[i].y) * f };
 }
+
+/** A pull shorter than this is a wobble, not a stretch. */
+export const PULL_SLACK = 12;
+/** A pull this long reaches the latest start point. */
+export const PULL_FULL = 170;
+
+/** Which end of which branch a pulled song stretches, and the start point that pull means. */
+export type CoralPull = { linkId: string; end: 'a' | 'b'; seconds: number; stretch: number };
+
+/**
+ * Pulling a song away from the coral stretches the branch it is pulled against, like a rubber band, and the length of
+ * the stretch is where that song comes in on that branch. A song on several branches stretches the one most opposite
+ * the pull, so each branch can bring the same song in at a different part.
+ */
+export function pullStart(layout: GardenLayout, trackId: number, x: number, y: number): CoralPull | null {
+  const node = layout.nodes.find((n) => n.trackId === trackId);
+  if (!node) return null;
+  const dx = x - node.x;
+  const dy = y - node.y;
+  const length = Math.hypot(dx, dy);
+  let best: { linkId: string; end: 'a' | 'b'; against: number } | null = null;
+  for (const b of layout.branches) {
+    const end = b.a === trackId ? 'a' : b.b === trackId ? 'b' : null;
+    if (!end || b.points.length < 2) continue;
+    const last = b.points.length - 1;
+    const step = Math.min(4, last);
+    const near = end === 'a' ? b.points[step] : b.points[last - step];
+    const bx = near.x - node.x;
+    const by = near.y - node.y;
+    const along = Math.hypot(bx, by) || 1;
+    // 1 when the finger pulls straight away from the branch, -1 when it pushes along it.
+    const against = length > 0 ? -(dx * bx + dy * by) / (length * along) : 0;
+    if (!best || against > best.against) best = { linkId: b.linkId, end, against };
+  }
+  if (!best) return null;
+  const stretch = Math.max(0, Math.min(1, (length - PULL_SLACK) / (PULL_FULL - PULL_SLACK)));
+  return { linkId: best.linkId, end: best.end, seconds: Math.round(stretch * MAX_START * 2) / 2, stretch };
+}
+
+/** Where on its branch a start point's bud sits: just in from that song's end, further in the later it starts. */
+export function budPoint(layout: GardenLayout, linkId: string, end: 'a' | 'b', seconds: number): Point {
+  const along = 0.08 + 0.3 * Math.max(0, Math.min(1, seconds / MAX_START));
+  return touchPoint(layout, { linkId, t: end === 'a' ? along : 1 - along });
+}

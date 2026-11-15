@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import {
   addLink, BRANCH_POINTS, canLink, emptyCoral, gardenFloor, GARDEN_MARGIN,
   hitBranch, hitNode, layoutGarden, mixFor, parseCoral, removeLink,
-  setLinkStart, setLinkType, touchPoint, traceStep,
+  budPoint, pullStart, PULL_FULL, setLinkStart, setLinkType, touchPoint, traceStep,
 } from './coral.ts';
 import { MAX_LINKS, MAX_START, type CoralLink, type CoralSong, type GardenLayout } from './coral-types.ts';
 
@@ -212,4 +212,34 @@ test('touchPoint interpolates samples, clamps to endpoints and handles missing b
     const hit = hitBranch(layout, point.x, point.y, 1e-8)!;
     assert.ok(Math.abs(hit.t - t) < 1e-10);
   }
+});
+
+test('pulling a song stretches the branch it is pulled against, and the stretch is its start point', () => {
+  const layout = layoutGarden([link(1, 2), link(2, 3)], 390, 600);
+  const node = layout.nodes.find((n) => n.trackId === 2)!;
+  assert.equal(pullStart(layout, 99, 0, 0), null);
+  assert.equal(pullStart(layout, 2, node.x + 3, node.y)!.seconds, 0, 'a wobble sets nothing');
+  for (const b of layout.branches) {
+    const end = b.a === 2 ? 'a' : 'b';
+    const near = end === 'a' ? b.points[4] : b.points[b.points.length - 5];
+    const ux = (node.x - near.x) / Math.hypot(node.x - near.x, node.y - near.y);
+    const uy = (node.y - near.y) / Math.hypot(node.x - near.x, node.y - near.y);
+    // Straight away from this branch stretches this branch, at this song's end.
+    const half = pullStart(layout, 2, node.x + ux * 90, node.y + uy * 90)!;
+    assert.equal(half.linkId, b.linkId);
+    assert.equal(half.end, end);
+    assert.ok(half.seconds > 0 && half.seconds < MAX_START);
+    const full = pullStart(layout, 2, node.x + ux * PULL_FULL * 2, node.y + uy * PULL_FULL * 2)!;
+    assert.equal(full.seconds, MAX_START);
+    assert.equal(full.stretch, 1);
+  }
+});
+
+test('a start point bud sits on its branch, further in the later the song starts', () => {
+  const layout = layoutGarden([link(1, 2)], 390, 600);
+  const [a, b] = [layout.nodes.find((n) => n.trackId === 1)!, layout.nodes.find((n) => n.trackId === 2)!];
+  const away = (p: { x: number; y: number }, n: { x: number; y: number }) => Math.hypot(p.x - n.x, p.y - n.y);
+  assert.ok(away(budPoint(layout, '1-2', 'a', MAX_START), a) > away(budPoint(layout, '1-2', 'a', 0), a));
+  assert.ok(away(budPoint(layout, '1-2', 'b', MAX_START), b) > away(budPoint(layout, '1-2', 'b', 0), b));
+  assert.ok(away(budPoint(layout, '1-2', 'a', 0), a) < away(budPoint(layout, '1-2', 'a', 0), b));
 });
