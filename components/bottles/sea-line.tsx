@@ -18,6 +18,7 @@ import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-nativ
 
 import { oceanDive, settleDiveTo, useDivePan } from '@/components/ocean/dive-gesture';
 import { Hatchling } from '@/components/ocean/hatchling';
+import { useSkyInk } from '@/components/home/sky-ink';
 import { useEasedWater } from '@/hooks/use-eased-water';
 
 import { DarkColors } from '@/constants/theme';
@@ -137,6 +138,7 @@ export function SeaLine({
 }) {
   // Fades with the sky rather than snapping to the next song's colors.
   const water = useEasedWater(waterTarget);
+  const ink = useSkyInk();
   const reduceMotion = useReducedMotion();
   const target = useSharedValue<Rhythm>(CALM_RHYTHM);
   const queued = useSharedValue(0);
@@ -337,7 +339,7 @@ export function SeaLine({
         <View style={[styles.strip, { top: SEA_BASE - STRIP_ABOVE, bottom: below }]} />
       </GestureDetector>
       <Animated.View
-        style={[styles.grabber, grabberStyle]}
+        style={[styles.grabber, { backgroundColor: ink.paper }, grabberStyle]}
         accessible
         accessibilityRole="button"
         accessibilityLabel="Go under the water"
@@ -361,6 +363,6 @@ export function SeaLine({
 const styles = StyleSheet.create({
   sea: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   strip: { position: 'absolute', left: 0, right: 0 },
-  grabber: { position: 'absolute', left: 0, top: 0, width: GRABBER, height: 4, borderRadius: 2, backgroundColor: '#ffffff', shadowColor: '#06222b', shadowOpacity: 0.25, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
+  grabber: { position: 'absolute', left: 0, top: 0, width: GRABBER, height: 4, borderRadius: 2, shadowColor: '#06222b', shadowOpacity: 0.25, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
   bottle: { position: 'absolute', left: 0, top: 0, width: BOTTLE, height: BOTTLE },
 });

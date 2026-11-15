@@ -26,7 +26,8 @@ export const INDEX_FIELDS = [
   'instrumentalness', 'speechiness', 'liveness', 'valence', 'loudness',
 ] as const;
 
-export const KEY_NAMES: readonly string[] = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+// Plain # and b: none of the app's fonts has the ♯ and ♭ signs, so they were drawn in a system font at another weight.
+export const KEY_NAMES: readonly string[] = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 function finiteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);

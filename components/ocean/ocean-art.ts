@@ -1068,10 +1068,14 @@ export function makeWobble() {
 }
 
 /** A bottle with a rolled note inside, tied with a thread in its song's color: open it and it tells you where it's been. */
-export function recordBottle(color: string): SkPicture {
+export function recordBottle(color: string, seed: number): SkPicture {
+  const random = rng(seed);
+  const angle = -28 + random() * 24;
+  const size = 0.9 + random() * 0.2;
   return createPicture(
     (c) => {
-      c.rotate(-16, 0, 0);
+      c.rotate(angle, 0, 0);
+      c.scale(size, size);
       // The glass behind the note.
       const glass = Skia.PathBuilder.Make();
       glass.moveTo(-14, -6);
@@ -1095,7 +1099,7 @@ export function recordBottle(color: string): SkPicture {
       c.drawLine(-11, -4.3, 2, -4.6, line('#ffffff', 1.1, 0.55));
       c.drawRRect(Skia.RRectXY(Skia.XYWHRect(14.4, -2.6, 3.6, 5.2), 1.1, 1.1), fill('#b07a4a'));
     },
-    Skia.XYWHRect(-22, -14, 44, 28)
+    Skia.XYWHRect(-26, -22, 52, 44)
   );
 }
 

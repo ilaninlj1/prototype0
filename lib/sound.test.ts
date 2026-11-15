@@ -50,16 +50,16 @@ test('maps onto SongFeel for the Tasteform and Taste Decoded', () => {
 });
 
 test('key labels', () => {
-  assert.equal(keyLabel(1, 1), 'C♯ major');
+  assert.equal(keyLabel(1, 1), 'C# major');
   assert.equal(keyLabel(9, 0), 'A minor');
-  assert.equal(keyLabel(3, null), 'E♭');
+  assert.equal(keyLabel(3, null), 'Eb');
   assert.equal(keyLabel(null, 1), null);
 });
 
 test('plain words for Details', () => {
   const lines = describeSound(f);
   assert.equal(lines[0], 'Fast · 148 BPM');
-  assert.ok(lines.includes('C♯ major'));
+  assert.ok(lines.includes('C# major'));
   assert.ok(lines.includes('Loud and dense'));
   const calm = describeSound({ ...f, tempo: 72, energy: 0.2, loudness: -20, instrumentalness: 0.9, key: null });
   assert.equal(calm[0], 'Slow · 72 BPM');
@@ -69,6 +69,6 @@ test('plain words for Details', () => {
 });
 
 test('the more-like-this note', () => {
-  assert.equal(moreLikeLabel(f), 'fast, loud, C♯ major');
+  assert.equal(moreLikeLabel(f), 'fast, loud, C# major');
   assert.equal(moreLikeLabel({ ...f, tempo: 100, energy: 0.5, loudness: -9, key: null }), 'mid-tempo');
 });

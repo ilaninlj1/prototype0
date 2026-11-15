@@ -12,12 +12,12 @@ import { Colors, Spacing, TapTarget, Ui } from '@/constants/theme';
 export function MapButton({ share, onPress, variant }: { share: number | null; onPress: () => void; variant?: 'icon' }) {
   const ink = useSkyInk();
   const pct = share == null ? null : Math.round(share * 100);
-  const a11y = pct == null ? 'Dark map' : `Dark map, ${pct} percent lit`;
+  const a11y = pct == null ? 'Dark map' : `Dark map, ${pct} percent of the sound map lit by your listening`;
   if (variant === 'icon') {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.6} style={styles.icon} accessibilityRole="button" accessibilityLabel={a11y}>
         <Ionicons name="map-outline" size={22} color={ink.text} />
-        {pct != null && <ThemedText style={[styles.pct, { color: ink.secondary }]}>{pct}%</ThemedText>}
+        {pct != null && <ThemedText style={[styles.pct, { color: ink.secondary }]}>{pct}% lit</ThemedText>}
       </TouchableOpacity>
     );
   }

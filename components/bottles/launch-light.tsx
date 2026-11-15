@@ -20,7 +20,9 @@ export function LaunchLight({ trigger, height, fall, color }: { trigger: number;
   }, [trigger, reduceMotion, t]);
   const style = useAnimatedStyle(() => {
     const p = t.get();
-    return { opacity: p >= 1 ? 0 : p > 0.85 ? (1 - p) / 0.15 : 1, transform: [{ translateY: p * fall }, { scale: 1 - 0.5 * p }] };
+    // The light becomes visible below the heart, so it never dots the heart's center.
+    const clearHeart = Math.max(0, Math.min(1, (p * fall - 80) / 24));
+    return { opacity: clearHeart * (p >= 1 ? 0 : p > 0.85 ? (1 - p) / 0.15 : 1), transform: [{ translateY: p * fall }, { scale: 1 - 0.5 * p }] };
   });
   return <Animated.View pointerEvents="none" style={[styles.light, { top: height / 2 - 7, backgroundColor: color, shadowColor: color }, style]} />;
 }

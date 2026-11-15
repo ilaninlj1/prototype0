@@ -79,7 +79,9 @@ export function beatPulse(clock: number, tempo: number): number {
 
 function water(x: number, phase: number, r: Rhythm, pulse: number): number {
   'worklet';
-  return r.amp * (1 + 0.45 * pulse) * Math.sin(K * x + phase);
+  // A slower swell breaks up the repeated crests without raising the water's bounds.
+  const waves = 0.82 * Math.sin(K * x + phase) + 0.18 * Math.sin(K * 0.45 * x + phase * 0.28 + 0.8);
+  return r.amp * (1 + 0.45 * pulse) * waves;
 }
 
 function chopAt(x: number, s: SeaState): number {
