@@ -6,6 +6,7 @@ import Animated, {
   Easing,
   runOnJS,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withSequence,
@@ -80,14 +81,19 @@ const END_SCALE = 18 / SIZE;
 
 function SaveFlight({ flight, onLanded }: { flight: Flight; onLanded: (id: number) => void }) {
   const { id, artwork, blind, from, to } = flight;
+  const reduced = useReducedMotion();
   const x = useSharedValue(from.x);
   const y = useSharedValue(from.y);
   const scale = useSharedValue(0.4);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    // Wait for the heart to pop, lift off the card a little, then fall in an arc.
-    const wait = 300;
+    if (reduced) {
+      onLanded(id);
+      return;
+    }
+    // HeartBurst finishes its 450 ms hold and 300 ms fade before the cover appears.
+    const wait = 750;
     const lift = { duration: 200, easing: Easing.out(Easing.quad) };
     const fall = 560;
     opacity.value = withDelay(wait, withTiming(1, { duration: 120 }));
