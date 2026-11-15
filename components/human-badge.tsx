@@ -38,19 +38,17 @@ export function HumanBadge({ artist }: { artist: string }) {
   }
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, !ai && !proof && styles.reportOnly]}>
       {ai ? (
         <ThemedText style={[styles.text, styles.ai]}>AI-tagged by listeners</ThemedText>
       ) : proof ? (
         <ThemedText style={styles.text}>{proof}</ThemedText>
-      ) : (
-        <View />
-      )}
+      ) : null}
       {ai === false &&
         (reported ? (
           <ThemedText style={styles.text}>Thanks, noted</ThemedText>
         ) : (
-          <Pressable onPress={report} hitSlop={8}>
+          <Pressable onPress={report} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Report ${artist} as possibly AI-made`}>
             <ThemedText style={[styles.text, styles.link]}>Sounds like AI?</ThemedText>
           </Pressable>
         ))}
@@ -60,6 +58,7 @@ export function HumanBadge({ artist }: { artist: string }) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginTop: Spacing.xs, minHeight: 18 },
+  reportOnly: { justifyContent: 'flex-start' },
   text: { fontFamily: Fonts.sans, fontSize: 13, lineHeight: 17, color: Colors.textSecondary, flexShrink: 1 },
   ai: { fontFamily: Fonts.sansSemiBold, color: Colors.text },
   link: { textDecorationLine: 'underline', color: Colors.textSecondary },
