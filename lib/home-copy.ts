@@ -1,7 +1,8 @@
 // The sound clues and taste tier share one sentence-case line under the card.
 
 export function cluesLine(label: string | null, tier: string | null): string | null {
-  const sound = label?.replace(/\b(MAJOR|MINOR)\b/g, (word) => word.toLowerCase());
+  // Prints saved before 2026-11-15 carry ♯ and ♭, which no font here can draw.
+  const sound = label?.replace(/\b(MAJOR|MINOR)\b/g, (word) => word.toLowerCase()).replace(/♯/g, '#').replace(/♭/g, 'b');
   return [sound, tier].filter(Boolean).join(' · ') || null;
 }
 

@@ -16,7 +16,7 @@ const loud: SoundFeatures = {
   speechiness: 0.07, liveness: 0.1, valence: 0.2, loudness: -4,
 };
 const SAMPLES: { name: string; recipe: PrintRecipe }[] = [
-  { name: '148 BPM · C♯ major, loud', recipe: recipeFor(1, loud, null) },
+  { name: '148 BPM · C# major, loud', recipe: recipeFor(1, loud, null) },
   { name: 'Same song in minor', recipe: recipeFor(1, { ...loud, mode: 0 }, null) },
   { name: 'Calm acoustic, 72 BPM', recipe: recipeFor(3, { ...loud, tempo: 72, energy: 0.2, acousticness: 0.8, loudness: -16, key: 9, mode: 0 }, null) },
   { name: 'Dyad (mode unknown)', recipe: recipeFor(4, { ...loud, mode: null }, null) },

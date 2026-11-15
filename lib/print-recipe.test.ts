@@ -50,8 +50,8 @@ test('dyad, neutral and cover fallback formations', () => {
 });
 
 test('labels only say what was measured', () => {
-  assert.equal(recipeFor(7, s, null).label, '148 BPM · C♯ MAJOR');
-  assert.equal(recipeFor(7, { ...s, mode: null }, null).label, '148 BPM · C♯');
+  assert.equal(recipeFor(7, s, null).label, '148 BPM · C# MAJOR');
+  assert.equal(recipeFor(7, { ...s, mode: null }, null).label, '148 BPM · C#');
   assert.equal(recipeFor(7, { ...s, key: null, mode: null }, null).label, '148 BPM');
 });
 

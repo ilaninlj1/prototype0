@@ -149,7 +149,7 @@ export function recipeFor(
     stroke: sound !== null && sound.speechiness > 0.33 ? 'dash' : 'trail',
     regularity: sound?.danceability ?? 0.5,
     brightness,
-    label: sound === null ? null : `${Math.round(sound.tempo)} BPM${key === null ? '' : ` · ${key.toUpperCase()}`}`,
+    label: sound === null ? null : `${Math.round(sound.tempo)} BPM${key === null ? '' : ` · ${key.replace(/ (major|minor)$/, (mode) => mode.toUpperCase())}`}`,
   };
 }
 

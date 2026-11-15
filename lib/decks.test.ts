@@ -49,7 +49,7 @@ test('the BPM tile opens the tempo band around it', () => {
 test('the key tile opens that key', () => {
   const key = soundTiles(f({ key: 6, mode: 1 })).find((t) => t.deck.kind === 'key')!;
   assert.deepEqual(key.deck, { kind: 'key', key: 6, mode: 1 });
-  assert.equal(deckLabel(key.deck), 'F♯ major');
+  assert.equal(deckLabel(key.deck), 'F# major');
 });
 
 test('quiet and sparse is the same rule as its tile', () => {
