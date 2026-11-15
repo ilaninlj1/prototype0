@@ -12,7 +12,7 @@ export type CoralPlayback = Pick<
   Crossfade,
   'playPreview' | 'peekLoad' | 'setMix' | 'promotePeek' | 'cancelPeek' | 'stopPreview'
 > &
-  Partial<Pick<Crossfade, 'currentDone' | 'peekLouder'>>;
+  Partial<Pick<Crossfade, 'currentDone' | 'peekLouder' | 'seekCurrent'>>;
 
 /** Timers for the short ease on release. Tests pass a fake one. */
 export type CoralClock = {
@@ -150,6 +150,18 @@ export function createCoralMix(playback: CoralPlayback, clock: CoralClock = real
     else play(url, 0);
   }
 
+  /** A pulled song is heard alone from where the pull puts it. Called on every move, so it only seeks once it is up. */
+  function scrub(song: CoralSong, seconds: number) {
+    const url = song.previewUrl;
+    stopEase();
+    forgetIfDone();
+    if (soloUrl === url && currentUrl === url && !peekUrl) playback.seekCurrent?.(seconds);
+    else {
+      soloUrl = url;
+      play(url, seconds);
+    }
+  }
+
   function release() {
     stopEase();
     if (!currentUrl) return;
@@ -169,5 +181,5 @@ export function createCoralMix(playback: CoralPlayback, clock: CoralClock = real
     soloUrl = '';
   }
 
-  return { touch, solo, release, stop };
+  return { touch, solo, scrub, release, stop };
 }

@@ -461,3 +461,17 @@ test('currentDone distinguishes stopped and ended clips from loading, cueing and
   fade.stopPreview();
   assert.equal(fade.currentDone(), true);
 });
+
+test('scrubbing a pulled song loads it once, then only moves it', async () => {
+  const { coral, forSong, main, peek } = setup();
+  coral.scrub(ab.a, 6);
+  await Promise.resolve();
+  const player = forSong(ab.a);
+  const loads = main.replaces + peek.replaces;
+  coral.scrub(ab.a, 9);
+  coral.scrub(ab.a, 12.5);
+  await Promise.resolve();
+  assert.equal(main.replaces + peek.replaces, loads, 'no reload while scrubbing');
+  assert.equal(player.playing, true);
+  assert.equal(player.currentTime, 12.5);
+});

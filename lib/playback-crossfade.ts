@@ -248,6 +248,12 @@ export function createPlaybackCrossfade<Player extends CrossfadePlayer>(
       peek.volume > (current.playing ? current.volume : 0);
   }
 
+  /** Moves the song that is playing, for scrubbing to a start point. Nothing happens while it is still loading. */
+  function seekCurrent(seconds: number) {
+    if (!active || !current.isLoaded || currentCue !== undefined || cueing) return;
+    void current.seekTo(Math.max(0, seconds)).catch(() => {});
+  }
+
   function stopPreview() {
     if (!active) return;
     active = false;
@@ -259,5 +265,5 @@ export function createPlaybackCrossfade<Player extends CrossfadePlayer>(
     current.pause();
   }
 
-  return { peekLoad, setMix, cancelPeek, promotePeek, playPreview, stopPreview, refresh, holdNext, currentDone, peekLouder };
+  return { peekLoad, setMix, cancelPeek, promotePeek, playPreview, stopPreview, refresh, holdNext, currentDone, peekLouder, seekCurrent };
 }

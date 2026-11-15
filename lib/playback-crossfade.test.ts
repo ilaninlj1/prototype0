@@ -291,3 +291,12 @@ test('a screen with no song yet does not use up the hold', () => {
   assert.equal(main.source, 'first');
   assert.equal(main.playing, false);
 });
+
+test('seekCurrent moves the playing song and leaves the next one alone', async () => {
+  const { main, peek, fade } = setup();
+  fade.seekCurrent(11);
+  await Promise.resolve();
+  assert.equal(main.currentTime, 11);
+  assert.deepEqual(peek.seeks, []);
+  assert.equal(main.playing, true);
+});
