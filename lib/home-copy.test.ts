@@ -18,13 +18,17 @@ test('only the words MAJOR and MINOR in the sound label change case', () => {
     'BPM · major · minor · MAJORITY · MINORITY · New ground');
 });
 
-test('the listener meter runs from 1K (a hidden gem) to 10M (everyone), on a log scale', () => {
+test('the listener meter runs from 1K (a hidden gem) to 10M (everyone), a quarter for each verdict', () => {
   assert.equal(listenerMeter(1_000), 0);
   assert.equal(listenerMeter(10_000_000), 1);
   assert.equal(listenerMeter(100_000), 0.5);
   assert.equal(listenerMeter(200), 0);
   assert.equal(listenerMeter(50_000_000), 1);
   assert.equal(listenerMeter(0), 0);
+  assert.equal(listenerMeter(25_000), 0.25);
+  assert.equal(listenerMeter(1_000_000), 0.75);
+  // 87.8K is 'Under the radar': inside the second quarter, left of the middle mark.
+  assert.ok(listenerMeter(87_800) > 0.25 && listenerMeter(87_800) < 0.5);
 });
 
 test('the Tune summary names the preset, then the sound when it is sorted', () => {

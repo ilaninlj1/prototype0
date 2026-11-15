@@ -79,6 +79,9 @@ export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, kn
               accessibilityLabel="How well-known, from hidden gem to popular"
               accessibilityValue={{ min: 0, max: 100, now: Math.round((meter ?? 0) * 100) }}>
               <View style={styles.meterTrack} />
+              {[25, 50, 75].map((at) => (
+                <View key={at} style={[styles.meterMark, { left: `${at}%` }]} />
+              ))}
               <View style={[styles.meterDot, { left: `${Math.round((meter ?? 0) * 100)}%` }]} />
             </View>
             <View style={styles.meterLabels}>
@@ -175,6 +178,7 @@ const styles = StyleSheet.create({
   verdict: { fontFamily: Fonts.sans, fontSize: 15, color: Colors.textSecondary },
   meter: { height: 14, justifyContent: 'center', marginTop: Spacing.xs },
   meterTrack: { height: 4, borderRadius: 2, backgroundColor: Colors.surface },
+  meterMark: { position: 'absolute', width: 2, height: 10, marginLeft: -1, borderRadius: 1, backgroundColor: Colors.background },
   meterDot: { position: 'absolute', width: 14, height: 14, borderRadius: 7, marginLeft: -7, backgroundColor: Colors.text },
   meterLabels: { flexDirection: 'row', justifyContent: 'space-between' },
   small: { fontSize: 13, lineHeight: 17, color: Colors.textSecondary },

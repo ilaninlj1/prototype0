@@ -6,13 +6,21 @@ export function cluesLine(label: string | null, tier: string | null): string | n
   return [sound, tier].filter(Boolean).join(' · ') || null;
 }
 
+/** Where the words about an artist's listeners change (describeListeners in lib/discovery.ts uses the same three). */
+export const LISTENER_CUTS = [25_000, 100_000, 1_000_000] as const;
+
 /**
- * Where an artist sits between a hidden gem and a household name, 0 to 1, on
- * a log scale from 1K listeners to 10M (Details' meter).
+ * Where an artist sits between a hidden gem and a household name, 0 to 1, from 1K listeners to 10M (Details' meter).
+ * Each quarter of the meter is one of the four verdicts, so the dot and the words can't disagree.
  */
 export function listenerMeter(listeners: number): number {
   if (!(listeners > 0)) return 0;
-  return Math.min(1, Math.max(0, (Math.log10(listeners) - 3) / 4));
+  const stops = [1_000, ...LISTENER_CUTS, 10_000_000];
+  if (listeners <= stops[0]) return 0;
+  for (let i = 1; i < stops.length; i++) {
+    if (listeners < stops[i]) return (i - 1 + Math.log(listeners / stops[i - 1]) / Math.log(stops[i] / stops[i - 1])) / 4;
+  }
+  return 1;
 }
 
 /** Tune's one-line summary of where the feed is set: "Hidden gems · slow, calm". */
