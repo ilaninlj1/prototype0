@@ -1507,6 +1507,12 @@ export default function HomeScreen() {
   const side = cardSize.width;
   const cardLeft = cardArea ? cardArea.x + (cardArea.width - side) / 2 : 0;
   const cardTop = cardArea ? cardArea.y + (cardArea.height - (side + Spacing.xl + LISTEN_INFO_HEIGHT)) / 2 : 0;
+  const cardTopGap = Math.max(1, cardTop - insets.top);
+  const cardDiveFade = useAnimatedStyle(() => {
+    // Clear the status bar before the cover slides beneath the clock.
+    const travel = oceanReduced.get() ? 0 : oceanDive.get() * oceanTravel.get();
+    return { opacity: Math.max(0, Math.min(1, (cardTopGap - travel) / Math.min(48, cardTopGap))) };
+  });
   const frameW = frame.width || win.width;
   const frameH = frame.height || win.height - 72 - insets.bottom;
   const seaSurfaceY = frameH + 4 - SEA_HEIGHT + SEA_BASE;
@@ -1706,7 +1712,7 @@ export default function HomeScreen() {
       {currentTrack && topRecipe ? (
         <>
           <View ref={cardAreaViewRef} style={styles.cardArea} onLayout={handleCardAreaLayout} pointerEvents="box-none">
-            <View style={cardSize}>
+            <Animated.View style={[cardSize, cardDiveFade]}>
               {queue
                 .slice(1, 3)
                 .map((t, i) => ({ t, i: i + 1, recipe: underRecipes[i] }))
@@ -1754,7 +1760,7 @@ export default function HomeScreen() {
                     handleTogglePlay();
                   }} />
               </ChromeFade>
-            </View>
+            </Animated.View>
             <ListenInfo
               track={currentTrack}
               revealed={revealedNow}
