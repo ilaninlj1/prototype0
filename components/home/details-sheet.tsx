@@ -59,14 +59,14 @@ export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, kn
         <ThemedText style={styles.secondary}>{release ? `${track.artistName} · ${release}` : track.artistName}</ThemedText>
         <HumanBadge artist={track.artistName} />
 
-        <ThemedText style={sheetStyles.heading}>Listen on</ThemedText>
+        <ThemedText style={[sheetStyles.heading, styles.sectionHeading]}>Listen on</ThemedText>
         <View style={styles.links}>
           <AppleMusicLink trackId={track.id} url={track.trackViewUrl} />
           <SpotifyLink artist={track.artistName} title={track.trackName} />
           {described && <LastfmLink artist={track.artistName} />}
         </View>
 
-        <ThemedText style={sheetStyles.heading}>Listeners</ThemedText>
+        <ThemedText style={[sheetStyles.heading, styles.sectionHeading]}>Listeners</ThemedText>
         {described ? (
           <>
             <ThemedText style={styles.count}>
@@ -102,12 +102,15 @@ export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, kn
         </View>
 
         {livesIn && onDive && (
-          <Pressable onPress={onDive} accessibilityRole="button" style={styles.livesIn}>
-            <ThemedText style={styles.livesInText}>Lives in {livesIn}</ThemedText>
+          <Pressable onPress={onDive} accessibilityRole="button" accessibilityLabel={`Find this song in your ocean: ${livesIn}. Dive in.`} style={styles.livesIn}>
+            <View style={styles.livesInCopy}>
+              <ThemedText style={styles.small}>Find this song in your ocean</ThemedText>
+              <ThemedText style={styles.livesInText}>{livesIn}</ThemedText>
+            </View>
             <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />
           </Pressable>
         )}
-        <ThemedText style={sheetStyles.heading}>The sound</ThemedText>
+        <ThemedText style={[sheetStyles.heading, styles.sectionHeading]}>The sound</ThemedText>
         {sound ? (
           <>
             <View style={styles.tiles}>
@@ -169,8 +172,10 @@ export function DetailsSheet({ visible, track, listeners, onSave, onPlayDeck, kn
 
 const styles = StyleSheet.create({
   livesIn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36 },
+  livesInCopy: { flex: 1 },
   livesInText: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: Colors.text },
-  body: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, paddingBottom: Spacing.xl, gap: Spacing.xs },
+  body: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, paddingBottom: Spacing.sm, gap: Spacing.xs },
+  sectionHeading: { fontSize: 18, lineHeight: 24 },
   cover: { borderRadius: 20, marginBottom: Spacing.md, alignSelf: 'center' },
   secondary: { fontSize: 15, lineHeight: 21, color: Colors.textSecondary },
   links: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
