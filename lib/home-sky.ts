@@ -170,7 +170,7 @@ export function matchedWater(water: Water, depth: Depth, look: SkyLook): Matched
     mid: toHex(m),
     midAt: MID_AT,
     low: toHex(low),
-    far: toHex(below(okMix(top, hor, 0.4), hor, 0.92)),
+    far: toHex(below(okMix(top, hor, 0.4 + 0.35 * day.warm), hor, 0.92)),
     foam: toHex(mixRgb(m, [2, 30, 45], 0.25)),
     line: toHex(mixRgb([255, 255, 255], hor, 0.22 + 0.3 * day.night)),
     lineOpacity: lerp(0.92, 0.62, Math.max(day.night, dk)),
