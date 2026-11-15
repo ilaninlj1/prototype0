@@ -73,7 +73,7 @@ export function Button({
         accessibilityLabel={a11y}
         style={({ pressed }) => [
           styles.circle,
-          { width: size, height: size, borderRadius: size / 2, marginTop: (BIG - size) / 2 },
+          { width: size, height: size, borderRadius: size / 2, marginVertical: (BIG - size) / 2 },
           { backgroundColor: primary ? ink.main : ink.frost },
           (pressed || disabled) && { opacity: disabled ? 0.4 : 0.7 },
         ]}>
