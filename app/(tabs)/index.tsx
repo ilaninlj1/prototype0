@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, StyleSheet, useWindowDimensions, View, type ViewInstance } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, type StyleProp, StyleSheet, useWindowDimensions, View, type ViewInstance, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FindsNewsSheet } from '@/components/finds-news-sheet';
@@ -167,6 +167,18 @@ type Flight = { mark: Omit<PieceMark, 'branch'>; from: { x: number; y: number };
 
 function followFromTrack(track: DiscoveryTrack, sound: SoundFeatures): FollowFrom {
   return { trackId: track.id, label: track.trackName, artist: track.artistName, sound, depth: depthOfTrack(track) };
+}
+
+/**
+ * Fades the card out before it slides under the clock on a dive. Its own component, because Home returns early
+ * while it loads and a hook after that return crashes with "Rendered more hooks".
+ */
+function DiveFade({ style, gap, children }: { style: StyleProp<ViewStyle>; gap: number; children: ReactNode }) {
+  const fade = useAnimatedStyle(() => {
+    const travel = oceanReduced.get() ? 0 : oceanDive.get() * oceanTravel.get();
+    return { opacity: Math.max(0, Math.min(1, (gap - travel) / Math.min(48, gap))) };
+  });
+  return <Animated.View style={[style, fade]}>{children}</Animated.View>;
 }
 
 export default function HomeScreen() {
@@ -1508,11 +1520,6 @@ export default function HomeScreen() {
   const cardLeft = cardArea ? cardArea.x + (cardArea.width - side) / 2 : 0;
   const cardTop = cardArea ? cardArea.y + (cardArea.height - (side + Spacing.xl + LISTEN_INFO_HEIGHT)) / 2 : 0;
   const cardTopGap = Math.max(1, cardTop - insets.top);
-  const cardDiveFade = useAnimatedStyle(() => {
-    // Clear the status bar before the cover slides beneath the clock.
-    const travel = oceanReduced.get() ? 0 : oceanDive.get() * oceanTravel.get();
-    return { opacity: Math.max(0, Math.min(1, (cardTopGap - travel) / Math.min(48, cardTopGap))) };
-  });
   const frameW = frame.width || win.width;
   const frameH = frame.height || win.height - 72 - insets.bottom;
   const seaSurfaceY = frameH + 4 - SEA_HEIGHT + SEA_BASE;
@@ -1712,7 +1719,7 @@ export default function HomeScreen() {
       {currentTrack && topRecipe ? (
         <>
           <View ref={cardAreaViewRef} style={styles.cardArea} onLayout={handleCardAreaLayout} pointerEvents="box-none">
-            <Animated.View style={[cardSize, cardDiveFade]}>
+            <DiveFade style={cardSize} gap={cardTopGap}>
               {queue
                 .slice(1, 3)
                 .map((t, i) => ({ t, i: i + 1, recipe: underRecipes[i] }))
@@ -1760,7 +1767,7 @@ export default function HomeScreen() {
                     handleTogglePlay();
                   }} />
               </ChromeFade>
-            </Animated.View>
+            </DiveFade>
             <ListenInfo
               track={currentTrack}
               revealed={revealedNow}
