@@ -173,10 +173,11 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
           members,
           order: members.map((_, i) => i).sort((a, b) => members[a].z - members[b].z || a - b),
           bottles: hereBottles.map((b, i) => {
-            let art = bottleArt.current.get(b.color);
+            const key = `${b.color}:${b.seed}`;
+            let art = bottleArt.current.get(key);
             if (!art) {
-              art = recordBottle(b.color);
-              bottleArt.current.set(b.color, art);
+              art = recordBottle(b.color, b.seed);
+              bottleArt.current.set(key, art);
             }
             const spot = bottleSpot(i, hereBottles.length, width, height);
             return { sprite: art, x: spot.x, y: spot.y };
