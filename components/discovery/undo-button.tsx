@@ -18,7 +18,7 @@ export function UndoButton({ disabled, onPress, variant }: UndoButtonProps) {
   if (variant === 'icon') {
     return (
       <TouchableOpacity onPress={onPress} disabled={disabled} activeOpacity={0.6} style={[styles.icon, disabled && styles.disabled]} accessibilityLabel="Undo the last swipe">
-        <Ionicons name="arrow-undo" size={22} color={ink.text} />
+        <Ionicons name="arrow-undo-outline" size={22} color={ink.text} />
       </TouchableOpacity>
     );
   }
