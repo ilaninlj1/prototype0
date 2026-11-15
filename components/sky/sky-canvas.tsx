@@ -63,7 +63,8 @@ half4 main(float2 xy) {
   float glow = uSunVis * (0.72 * exp(-ds / 34.0) + 0.24 * exp(-ds / 105.0));
   c = 1.0 - (1.0 - c) * (1.0 - warm * glow);
   float r = mix(19.0, 27.0, uSunLow);
-  c = mix(c, float3(1.0, 0.99, 0.93), uSunVis * smoothstep(r, r * 0.45, ds));
+  float3 disc = mix(float3(1.0, 0.99, 0.93), warm, uSunLow);
+  c = mix(c, disc, uSunVis * smoothstep(r, r * 0.45, ds));
 
   // The moon's glow. Its disc is drawn sharp in home-sky.tsx.
   float dm = length(p - uMoon);
