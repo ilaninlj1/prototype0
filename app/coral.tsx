@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type LayoutChangeEvent, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { cancelAnimation, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { cancelAnimation, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CoralBranchSheet } from '@/components/coral/coral-branch-sheet';
@@ -23,7 +23,7 @@ import { useLightStatusBar } from '@/hooks/use-light-status-bar';
 import { usePlayback } from '@/hooks/use-playback';
 import { useScreenReader } from '@/hooks/use-screen-reader';
 import { useSound } from '@/hooks/use-sound';
-import { addLink, canLink, emptyCoral, hitBranch, hitNode, layoutGarden, mixFor, removeLink, setLinkStart, setLinkType, touchPoint, traceStep } from '@/lib/coral';
+import { addLink, budPoint, canLink, emptyCoral, hitBranch, hitNode, layoutGarden, mixFor, pullStart, removeLink, setLinkStart, setLinkType, touchPoint, traceStep, type CoralPull } from '@/lib/coral';
 import { createCoralMix } from '@/lib/coral-mix';
 import type { CoralSong, CoralTouch, LinkType } from '@/lib/coral-types';
 import type { DiscoveryTrack } from '@/lib/discovery';
@@ -75,10 +75,10 @@ function CoralScreenBody() {
   const showList = listOpen || screenReader || fontScale > 1.6;
   const fromOpened = useRef<string | null>(null);
 
-  const { playPreview, peekLoad, setMix, promotePeek, cancelPeek, stopPreview, currentDone } = usePlayback();
+  const { playPreview, peekLoad, setMix, promotePeek, cancelPeek, stopPreview, currentDone, peekLouder, seekCurrent } = usePlayback();
   // Playback's context changes with its clock; these controller methods stay stable.
-  const coralMix = useMemo(() => createCoralMix({ playPreview, peekLoad, setMix, promotePeek, cancelPeek, stopPreview, currentDone }),
-    [playPreview, peekLoad, setMix, promotePeek, cancelPeek, stopPreview, currentDone]);
+  const coralMix = useMemo(() => createCoralMix({ playPreview, peekLoad, setMix, promotePeek, cancelPeek, stopPreview, currentDone, peekLouder, seekCurrent }),
+    [playPreview, peekLoad, setMix, promotePeek, cancelPeek, stopPreview, currentDone, peekLouder, seekCurrent]);
   const focused = useRef(false);
   const touch = useRef<CoralTouch | null>(null);
   const began = useRef<CoralTouch | null>(null);
@@ -91,6 +91,15 @@ function CoralScreenBody() {
   const blend = useSharedValue(0);
   const sway = useSharedValue(0);
   const growth = useSharedValue(1);
+  // Pulling a song: which one, what the pull means so far, and when the sound last moved.
+  const pulling = useRef<number | null>(null);
+  const pulled = useRef<CoralPull | null>(null);
+  const lastScrub = useRef({ at: 0, seconds: -1 });
+  const [pullFrom, setPullFrom] = useState<{ x: number; y: number; color: string } | null>(null);
+  const [pullSeconds, setPullSeconds] = useState<number | null>(null);
+  const pullX = useSharedValue(0);
+  const pullY = useSharedValue(0);
+  const pullOn = useSharedValue(0);
 
   useFocusEffect(useCallback(() => {
     focused.current = true;
@@ -223,13 +232,70 @@ function CoralScreenBody() {
     }
   }
 
+  // A drag that starts on a song pulls it like a rubber band; the stretch is where it comes in on that branch.
+  function movePull(x: number, y: number) {
+    const id = pulling.current;
+    const song = id === null ? undefined : songsById.get(id);
+    if (id === null || !song || !focused.current) return;
+    const point = inGarden(x, y);
+    const pull = pullStart(layout, id, point.x, point.y);
+    if (!pull) return;
+    pulled.current = pull;
+    pullX.set(x);
+    pullY.set(y);
+    setPullSeconds(pull.seconds);
+    const now = Date.now();
+    // Seeking on every frame stutters; a few times a second follows the finger well enough to find a part.
+    if (pull.seconds !== lastScrub.current.seconds && now - lastScrub.current.at >= 140) {
+      if (Math.floor(pull.seconds / 4) !== Math.floor(lastScrub.current.seconds / 4)) void Haptics.selectionAsync().catch(() => {});
+      lastScrub.current = { at: now, seconds: pull.seconds };
+      coralMix.scrub(song, pull.seconds);
+    }
+  }
+  function finishPull() {
+    const id = pulling.current;
+    const pull = pulled.current;
+    const song = id === null ? undefined : songsById.get(id);
+    pulling.current = null;
+    pulled.current = null;
+    setPullSeconds(null);
+    if (pullFrom) {
+      // It snaps back to the coral; the bud left on the branch shows where it now comes in.
+      const spring = reduceMotion ? { duration: 0 } : undefined;
+      pullX.set(spring ? pullFrom.x : withSpring(pullFrom.x, { damping: 9, stiffness: 180 }));
+      pullY.set(spring ? pullFrom.y : withSpring(pullFrom.y, { damping: 9, stiffness: 180 }));
+      pullOn.set(withTiming(0, { duration: reduceMotion ? 0 : 320 }));
+    }
+    if (!pull || !song) return;
+    coralMix.scrub(song, pull.seconds);
+    if (isExample) setExample((old) => setLinkStart(old, pull.linkId, pull.end, pull.seconds));
+    else void changeLinkStart(pull.linkId, pull.end, pull.seconds);
+  }
+
   function beginTrace(x: number, y: number) {
       const point = inGarden(x, y);
-      began.current = traceStep(layout, null, point.x, point.y, 26);
+      pulling.current = hitNode(layout, point.x, point.y, 22);
+      began.current = pulling.current === null ? traceStep(layout, null, point.x, point.y, 26) : null;
       leftBranch.current = false;
       dragging.current = false;
   }
   function startTrace(x: number, y: number) {
+      if (pulling.current !== null && focused.current) {
+        const node = layout.nodes.find((n) => n.trackId === pulling.current);
+        if (!node) return;
+        touch.current = null;
+        glowOn.set(0);
+        lastScrub.current = { at: 0, seconds: -1 };
+        setPullFrom({ x: node.x, y: node.y, color: node.color });
+        pullX.set(x);
+        pullY.set(y);
+        pullOn.set(1);
+        setActiveNode(node.trackId);
+        setPlaying(true);
+        setMixing(false);
+        movePull(x, y);
+        return;
+      }
       if (!began.current || !focused.current) return;
       dragging.current = true;
       touch.current = null;
@@ -241,6 +307,7 @@ function CoralScreenBody() {
       hear(began.current, x, y);
   }
   function moveTrace(x: number, y: number) {
+      if (pulling.current !== null) return movePull(x, y);
       if (!dragging.current || leftBranch.current || !focused.current) return;
       const point = inGarden(x, y);
       const next = traceStep(layout, touch.current, point.x, point.y, 34);
@@ -252,6 +319,7 @@ function CoralScreenBody() {
       }
   }
   function finishTrace() {
+    if (pulling.current !== null) finishPull();
     if (dragging.current) release();
     began.current = null;
   }
@@ -278,6 +346,11 @@ function CoralScreenBody() {
     setArea((old) => old.width === width && old.height === height ? old : { width, height });
   }
 
+  const buds = useMemo(() => state.links.flatMap((link) => [
+    ...(link.startA > 0 ? [{ ...budPoint(layout, link.id, 'a', link.startA), color: link.a.color }] : []),
+    ...(link.startB > 0 ? [{ ...budPoint(layout, link.id, 'b', link.startB), color: link.b.color }] : []),
+  ]), [state.links, layout]);
+
   const chosen = selected ? linksById.get(selected) : undefined;
   const active = activeNode === null ? undefined : songsById.get(activeNode);
   const empty = state.links.length === 0;
@@ -297,7 +370,8 @@ function CoralScreenBody() {
         {!showList && area.width > 0 && area.height > 0 && <CoralGesture onBegin={beginTrace} onStart={startTrace} onMove={moveTrace} onFinish={finishTrace} onTap={tapAt}>
           <View style={StyleSheet.absoluteFill} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <CoralCanvas width={area.width} height={area.height} layout={layout} glowX={glowX} glowY={glowY} glowOn={glowOn}
-              blend={blend} sway={sway} growth={growth} blooms={blooms} activeNode={activeNode} reduceMotion={reduceMotion} />
+              blend={blend} sway={sway} growth={growth} blooms={blooms} activeNode={activeNode} reduceMotion={reduceMotion}
+              pullFrom={pullFrom} pullX={pullX} pullY={pullY} pullOn={pullOn} buds={buds} />
           </View>
         </CoralGesture>}
         {ready && !empty && showList && <CoralList links={state.links} blindIds={blindIds} positions={positions} onAdjust={adjust} onOpen={openBranch} onPlay={solo} />}
@@ -307,7 +381,8 @@ function CoralScreenBody() {
         </View>}
       </View>
       {ready && <View style={styles.footer}>
-        {active && playing && <ThemedText style={styles.now} accessibilityLiveRegion="polite">{songLabel(active, blindIds.has(active.trackId))}</ThemedText>}
+        {pullSeconds !== null && <ThemedText style={styles.now}>{pullSeconds === 0 ? 'Pull further to start later in the song' : `Comes in at 0:${String(Math.floor(pullSeconds)).padStart(2, '0')}`}</ThemedText>}
+        {pullSeconds === null && active && playing && <ThemedText style={styles.now} accessibilityLiveRegion="polite">{songLabel(active, blindIds.has(active.trackId))}</ThemedText>}
         <View style={styles.actions}>
           {!empty && <CoralButton dark primary onPress={() => { release(); setPicker({}); }}>Grow a branch</CoralButton>}
           {mixing && <CoralButton dark onPress={release}>Keep louder song</CoralButton>}

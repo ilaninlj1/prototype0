@@ -1,7 +1,7 @@
 // The coral garden, drawn with Skia. Everything still is recorded once as a picture (the water, the floor, the coral
 // itself); a frame only moves those pictures and the finger's glow, so it stays cheap on a slow phone.
 
-import { BlendMode, Canvas, Circle, Group, PaintStyle, Picture, Skia, StrokeCap, TileMode, createPicture, type SkCanvas, type SkPaint } from '@shopify/react-native-skia';
+import { BlendMode, Canvas, Circle, Group, Line, PaintStyle, Picture, Skia, StrokeCap, TileMode, createPicture, type SkCanvas, type SkPaint } from '@shopify/react-native-skia';
 import { useEffect, useMemo, useRef } from 'react';
 import { Easing, cancelAnimation, useDerivedValue, useSharedValue, withRepeat, withTiming, type SharedValue } from 'react-native-reanimated';
 
@@ -25,6 +25,13 @@ export type CoralCanvasProps = {
   /** The song playing alone, ringed. */
   activeNode: number | null;
   reduceMotion: boolean;
+  /** A song being pulled like a rubber band: where it is anchored, and where the finger has it (0 to 1 lit). */
+  pullFrom: { x: number; y: number; color: string } | null;
+  pullX: SharedValue<number>;
+  pullY: SharedValue<number>;
+  pullOn: SharedValue<number>;
+  /** Small buds on the branches, marking where each song comes in. */
+  buds: { x: number; y: number; color: string }[];
 };
 
 const TAU = Math.PI * 2;
@@ -324,7 +331,7 @@ function recordGlow() {
 }
 
 /** Water, floor, the coral grown from your links, and a light where the finger is. */
-export default function CoralCanvas({ width, height, layout, glowX, glowY, glowOn, blend, sway, growth, blooms, activeNode, reduceMotion }: CoralCanvasProps) {
+export default function CoralCanvas({ width, height, layout, glowX, glowY, glowOn, blend, sway, growth, blooms, activeNode, reduceMotion, pullFrom, pullX, pullY, pullOn, buds }: CoralCanvasProps) {
   const still = useMemo(() => recordWater(width, height), [width, height]);
   const far = useMemo(() => recordFar(width, height), [width, height]);
   const bubbles = useMemo(() => recordBubbles(width, height), [width, height]);
@@ -380,6 +387,11 @@ export default function CoralCanvas({ width, height, layout, glowX, glowY, glowO
     return 12 + 28 * 4 * blend.get() * (1 - blend.get());
   });
 
+  const pullEnd = useDerivedValue(() => {
+    'worklet';
+    return { x: pullX.get(), y: pullY.get() };
+  });
+
   const active = activeNode === null ? undefined : layout.nodes.find((n) => n.trackId === activeNode);
 
   return (
@@ -396,8 +408,22 @@ export default function CoralCanvas({ width, height, layout, glowX, glowY, glowO
       </Group>
       <Group transform={lean}>
         <Picture picture={coral} />
+        {buds.map((bud, i) => (
+          <Group key={i}>
+            <Circle cx={bud.x} cy={bud.y} r={6} color={safeHex(bud.color)} />
+            <Circle cx={bud.x} cy={bud.y} r={3} color="#ffffff" opacity={0.95} />
+          </Group>
+        ))}
         {active && <Circle cx={active.x} cy={active.y} r={Math.max(6, active.r) * 1.75} style="stroke" strokeWidth={2} color="#ffffff" opacity={0.9} />}
       </Group>
+      {pullFrom && (
+        <Group opacity={pullOn}>
+          <Line p1={{ x: pullFrom.x, y: pullFrom.y }} p2={pullEnd} color={safeHex(pullFrom.color)} strokeWidth={7} strokeCap="round" />
+          <Line p1={{ x: pullFrom.x, y: pullFrom.y }} p2={pullEnd} color="#ffffff" strokeWidth={2} strokeCap="round" opacity={0.7} />
+          <Circle cx={pullX} cy={pullY} r={15} color={safeHex(pullFrom.color)} />
+          <Circle cx={pullX} cy={pullY} r={15} style="stroke" strokeWidth={2} color="#ffffff" opacity={0.9} />
+        </Group>
+      )}
       <Group transform={glowAt} opacity={glowOn}>
         <Picture picture={glow} opacity={0.45} />
         <Circle cx={0} cy={0} r={ripple} style="stroke" strokeWidth={9} color="#e5ffff" opacity={0.08} />
