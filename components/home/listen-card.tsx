@@ -359,7 +359,9 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
             </Animated.View>
           )}
 
-          <View style={[styles.progress, { width: size.width * progress }]} pointerEvents="none" />
+          <View style={styles.progressTrack} pointerEvents="none">
+            <View style={[styles.progress, { width: `${progress * 100}%` }]} />
+          </View>
           <DragLabels tx={tx} ty={ty} revealed={revealed} words={dragWords} />
           {burst > 0 && <HeartBurst key={burst} size={120} />}
         </View>
@@ -418,5 +420,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DarkColors.hairline,
   },
-  progress: { position: 'absolute', left: 0, bottom: 0, height: 2, backgroundColor: DarkColors.text, opacity: 0.5 },
+  progressTrack: { position: 'absolute', left: Spacing.lg, right: Spacing.lg, bottom: Spacing.md, height: 3, borderRadius: 2, overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.65)' },
+  progress: { height: 3, borderRadius: 2, backgroundColor: DarkColors.text },
 });
