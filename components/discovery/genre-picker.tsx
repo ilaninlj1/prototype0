@@ -226,7 +226,7 @@ export function GenrePicker({
   return (
     <>
       <TouchableOpacity onPress={() => setVisible(true)} activeOpacity={0.6} style={[Ui.textButton, styles.trigger, { backgroundColor: ink.frost }]} accessibilityLabel={`Genre: ${currentLabel}. Change genre`}>
-        <ThemedText numberOfLines={1} style={[styles.triggerText, { color: ink.text }]}>
+        <ThemedText grows="chrome" numberOfLines={1} style={[styles.triggerText, { color: ink.text }]}>
           {currentLabel}
         </ThemedText>
         <Ionicons name="chevron-down" size={16} color={ink.text} />

@@ -28,7 +28,8 @@ import { FlyingPrint } from '@/components/home/flying-print';
 import { FollowStrip } from '@/components/home/follow-strip';
 import { GenreStamp } from '@/components/home/genre-stamp';
 import { ListenCard, StackFace, type ListenCardHandle } from '@/components/home/listen-card';
-import { LISTEN_INFO_HEIGHT, ListenInfo } from '@/components/home/listen-info';
+import { ListenInfo, listenInfoHeight } from '@/components/home/listen-info';
+import { useTextScale } from '@/hooks/use-text-scale';
 import { MapButton } from '@/components/home/map-button';
 import { slotCenter, type StripRect } from '@/components/home/piece-strip';
 import { SavedToast } from '@/components/home/saved-toast';
@@ -184,6 +185,8 @@ function DiveFade({ style, gap, children }: { style: StyleProp<ViewStyle>; gap: 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  // Bigger phone text makes the words under the card taller, and the card gives up that room.
+  const infoHeight = listenInfoHeight(useTextScale());
   const [hydrated, setHydrated] = useState(false);
   // The feed's loading, as explicit states (lib/feed-load.ts): waiting, failed, stopped. Retry re-runs the last load.
   const [load, setLoad] = useState<FeedLoad>(IDLE);
@@ -211,7 +214,7 @@ export default function HomeScreen() {
     setCardArea(e.nativeEvent.layout);
     const { width, height } = e.nativeEvent.layout;
     // A square, as big as fits above its words, never wider than the mockup's 340.
-    const side = Math.max(160, Math.min(width, height - LISTEN_INFO_HEIGHT - Spacing.xl, CARD_MAX));
+    const side = Math.max(160, Math.min(width, height - infoHeight - Spacing.xl, CARD_MAX));
     setCardSize({ width: side, height: side });
   }
 
@@ -1518,7 +1521,7 @@ export default function HomeScreen() {
   // The sea and the opening, in Home's own coordinates.
   const side = cardSize.width;
   const cardLeft = cardArea ? cardArea.x + (cardArea.width - side) / 2 : 0;
-  const cardTop = cardArea ? cardArea.y + (cardArea.height - (side + Spacing.xl + LISTEN_INFO_HEIGHT)) / 2 : 0;
+  const cardTop = cardArea ? cardArea.y + (cardArea.height - (side + Spacing.xl + infoHeight)) / 2 : 0;
   const cardTopGap = Math.max(1, cardTop - insets.top);
   const frameW = frame.width || win.width;
   const frameH = frame.height || win.height - 72 - insets.bottom;
@@ -1527,7 +1530,7 @@ export default function HomeScreen() {
     cardArea && frameW > 0
       ? {
           from: { x: seaX(0, frameW), y: seaSurfaceY },
-          stage: { x: cardLeft + side / 2, y: cardTop + side + Spacing.xl + LISTEN_INFO_HEIGHT / 2 },
+          stage: { x: cardLeft + side / 2, y: cardTop + side + Spacing.xl + infoHeight / 2 },
           card: { x: cardLeft, y: cardTop, size: side },
         }
       : null;
@@ -1663,7 +1666,7 @@ export default function HomeScreen() {
             accessibilityRole={statusTappable ? 'button' : 'text'}
             style={styles.statusRow}>
             {(statusItem.kind === 'failed' || statusItem.kind === 'edition' || statusItem.kind === 'news') && <View style={styles.dot} />}
-            <ThemedText style={[styles.statusText, { color: skyInk.secondary }]} numberOfLines={1}>
+            <ThemedText grows="chrome" style={[styles.statusText, { color: skyInk.secondary }]} numberOfLines={1}>
               {statusText(statusItem)}
             </ThemedText>
             {statusTappable && statusItem.kind !== 'map' && <Ionicons name="chevron-forward" size={14} color={skyInk.secondary} />}
@@ -2007,7 +2010,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   // Reserved height, so the card never jumps when the line comes and goes.
-  statusLine: { height: 20, justifyContent: 'center' },
+  statusLine: { minHeight: 20, justifyContent: 'center' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.signal },
   statusText: { ...Typography.caption, fontSize: 14, lineHeight: 18, flexShrink: 1 },

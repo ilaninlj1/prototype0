@@ -79,7 +79,7 @@ export function Button({
         ]}>
         <Ionicons name={icon} size={primary ? 28 : 22} color={iconColor ?? (primary ? ink.mainText : ink.text)} />
       </Pressable>
-      <ThemedText style={[styles.label, { color: ink.secondary }, primary && styles.primaryLabel, primary && { color: ink.text }]} numberOfLines={1}>
+      <ThemedText grows="label" style={[styles.label, { color: ink.secondary }, primary && styles.primaryLabel, primary && { color: ink.text }]} numberOfLines={2}>
         {label}
       </ThemedText>
     </View>
@@ -87,9 +87,10 @@ export function Button({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: Spacing.xxl },
-  slot: { alignItems: 'center', gap: Spacing.sm, minWidth: BIG },
+  // Three equal slots across the width, so a label made bigger by the phone's text size wraps under its own button.
+  row: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', alignSelf: 'stretch', paddingHorizontal: Spacing.sm },
+  slot: { alignItems: 'center', gap: Spacing.sm, flex: 1, maxWidth: BIG + Spacing.xxl },
   circle: { alignItems: 'center', justifyContent: 'center' },
-  label: { fontSize: 13, lineHeight: 16, color: Colors.textSecondary },
+  label: { fontSize: 13, lineHeight: 16, color: Colors.textSecondary, textAlign: 'center' },
   primaryLabel: { color: Colors.text, fontWeight: '600' },
 });

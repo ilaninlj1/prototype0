@@ -156,7 +156,7 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
           const badge =
             route.name === 'library' && newSaves > 0 && !focused ? (
               <View style={styles.count}>
-                <ThemedText style={styles.countText}>+{newSaves}</ThemedText>
+                <ThemedText grows="chrome" style={styles.countText}>+{newSaves}</ThemedText>
               </View>
             ) : (route.name === 'explore' && decodedNews) || (route.name === 'play' && dropWaiting) ||
                 (route.name === 'people' && peopleNews) ? (
@@ -167,6 +167,8 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
               key={route.key}
               style={styles.tab}
               accessibilityRole="tab"
+              accessibilityShowsLargeContentViewer
+              accessibilityLargeContentTitle={icon.label}
               accessibilityState={{ selected: focused }}
               accessibilityLabel={route.name === 'library' && newSaves > 0 ? `${icon.label}, ${newSaves} new` : icon.label}
               onPress={() => {
@@ -185,7 +187,7 @@ export function BlindspotTabBar({ state, emitter, navigateToTab }: TabBarProps) 
                   {badge}
                 </View>
               )}
-              <ThemedText style={[styles.label, { color }]}>{icon.label}</ThemedText>
+              <ThemedText grows="chrome" numberOfLines={1} style={[styles.label, { color }]}>{icon.label}</ThemedText>
             </Pressable>
           );
         })}

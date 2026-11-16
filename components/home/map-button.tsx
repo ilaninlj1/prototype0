@@ -17,7 +17,7 @@ export function MapButton({ share, onPress, variant }: { share: number | null; o
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.6} style={styles.icon} accessibilityRole="button" accessibilityLabel={a11y}>
         <Ionicons name="map-outline" size={22} color={ink.text} />
-        {pct != null && <ThemedText style={[styles.pct, { color: ink.secondary }]}>{pct}% lit</ThemedText>}
+        {pct != null && <ThemedText grows="chrome" style={[styles.pct, { color: ink.secondary }]}>{pct}% lit</ThemedText>}
       </TouchableOpacity>
     );
   }

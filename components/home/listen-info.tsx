@@ -5,8 +5,10 @@ import { CallButton } from '@/components/discovery/call-button';
 import { useSkyInk } from '@/components/home/sky-ink';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Fonts, Spacing, Typography } from '@/constants/theme';
+import { useTextScale } from '@/hooks/use-text-scale';
 import { describeListeners, type DiscoveryTrack } from '@/lib/discovery';
 import { releaseLine } from '@/lib/song-age';
+import { scaled, TEXT_CAP } from '@/lib/text-scale';
 
 type Props = {
   track: DiscoveryTrack;
@@ -23,6 +25,11 @@ type Props = {
 // Fixed, so the buttons under it never move between blind and revealed.
 export const LISTEN_INFO_HEIGHT = 92;
 
+/** The box is taller when the phone's text is bigger, so its three lines still fit; the card above gives up the room. */
+export function listenInfoHeight(fontScale: number): number {
+  return scaled(LISTEN_INFO_HEIGHT, fontScale, TEXT_CAP.label);
+}
+
 /**
  * The words under the card. Blind: "Just listen." and the only clues, tempo,
  * key and how far it is from your taste. Revealed: who it is, when it came
@@ -31,28 +38,29 @@ export const LISTEN_INFO_HEIGHT = 92;
 export function ListenInfo({ track, revealed, clues, listeners, onCallSave, origin }: Props) {
   const reduceMotion = useReducedMotion();
   const ink = useSkyInk();
+  const box = [styles.box, { height: listenInfoHeight(useTextScale()) }];
   if (!revealed) {
     return (
-      <View style={styles.box}>
-        <ThemedText type="subtitle" style={[styles.center, { color: ink.text }]}>
+      <View style={box}>
+        <ThemedText type="subtitle" grows="label" style={[styles.center, { color: ink.text }]}>
           Just listen.
         </ThemedText>
-        {!!clues && <ThemedText style={[styles.caption, styles.center, { color: ink.secondary }]}>{clues}</ThemedText>}
+        {!!clues && <ThemedText grows="label" style={[styles.caption, styles.center, { color: ink.secondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{clues}</ThemedText>}
       </View>
     );
   }
   const described = listeners != null ? describeListeners(listeners) : null;
   const release = origin ?? releaseLine(track.releaseDate, track.collectionName);
   return (
-    <Animated.View key={track.id} entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={styles.box}>
-      <ThemedText style={[styles.title, styles.center, { color: ink.text }]} numberOfLines={1}>
+    <Animated.View key={track.id} entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={box}>
+      <ThemedText grows="label" style={[styles.title, styles.center, { color: ink.text }]} numberOfLines={1}>
         {track.trackName}
       </ThemedText>
-      <ThemedText style={[styles.caption, styles.center, { color: ink.secondary }]} numberOfLines={1}>
+      <ThemedText grows="label" style={[styles.caption, styles.center, { color: ink.secondary }]} numberOfLines={1}>
         {release ? `${track.artistName} · ${release}` : track.artistName}
       </ThemedText>
       <View style={styles.callRow}>
-        <ThemedText style={[styles.caption, { color: ink.secondary }]} numberOfLines={1}>
+        <ThemedText grows="label" style={[styles.caption, styles.listeners, { color: ink.secondary }]} numberOfLines={1}>
           {described ? `${described.count} listeners` : listeners === undefined ? 'Counting listeners…' : 'No listener count yet'}
         </ThemedText>
         <View style={styles.call}>
@@ -70,4 +78,5 @@ const styles = StyleSheet.create({
   title: { fontFamily: Fonts.display, fontSize: 22, lineHeight: 26 },
   callRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
   call: { width: 116, flexDirection: 'row' },
+  listeners: { flexShrink: 1 },
 });
