@@ -1,11 +1,11 @@
-// Your coral, seen from Home: it grows out of the sand at the left edge of the water, where the shore is, in the colors
+// Your coral, seen from Home: it grows up from the bottom left of the water, the side the shore is on, in the colors
 // of the songs you joined. It sways, pulses with the playing song, and a tap takes you to the shore. Drawn with
 // react-native-svg like the rest of Home's sea, so Home never loads Skia for it.
 
 import { useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useCoral } from '@/hooks/use-coral';
 
@@ -24,14 +24,14 @@ const pale = (hex: string, t: number) => {
 
 type Sprig = { d: string; tips: { x: number; y: number }[]; color: string };
 
-/** One forked sprig per color, standing on the mound. The same colors always draw the same coral. */
+/** One forked sprig per color, rising from the bottom edge. The same colors always draw the same coral. */
 export function homeSprigs(colors: string[]): Sprig[] {
   const list = colors.slice(0, MAX_SPRIGS);
   return list.map((color, i) => {
-    const x = 14 + i * (list.length > 3 ? 15 : 20);
-    // The mound's top under x.
-    const y = HOME_CORAL_H - 40 * Math.sqrt(Math.max(0, 1 - (x / 96) ** 2)) + 3;
-    const tall = 30 - (i % 3) * 6;
+    const x = 16 + i * (list.length > 3 ? 16 : 22);
+    // Rooted below the bottom edge of the screen, so it rises out of the water with nothing under it.
+    const y = HOME_CORAL_H + 4;
+    const tall = 52 - (i % 3) * 11;
     const lean = (i % 2 ? 1 : -1) * 3;
     const fork = { x: x + lean, y: y - tall * 0.55 };
     const tips = [
@@ -82,10 +82,6 @@ export function HomeCoral({ tempo, playing, onPress }: { tempo: number; playing:
       hitSlop={{ top: 8, right: 8 }}
       accessibilityRole="button"
       accessibilityLabel={links.length ? 'Your coral. Go to the shore to play it.' : 'The shore. Join two saved songs and coral grows here.'}>
-      <Svg width={HOME_CORAL_W} height={HOME_CORAL_H} style={StyleSheet.absoluteFill}>
-        <Ellipse cx={0} cy={HOME_CORAL_H} rx={96} ry={40} fill="#f8e7bb" fillOpacity={0.9} />
-        <Ellipse cx={0} cy={HOME_CORAL_H} rx={70} ry={24} fill="#dcc08a" fillOpacity={0.55} />
-      </Svg>
       <Animated.View style={[StyleSheet.absoluteFill, styles.grown, move]}>
         <Svg width={HOME_CORAL_W} height={HOME_CORAL_H}>
           {sprigs.map((s, i) => (
