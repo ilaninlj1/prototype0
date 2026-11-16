@@ -7,11 +7,14 @@ import { drawnScale, TEXT_CAP, type TextRole } from '@/lib/text-scale';
 
 export type ThemedTextProps = TextProps & {
   type?: keyof typeof Typography;
-  /** How far the phone's text size setting may grow this text (lib/text-scale.ts). Reading text by default. */
+  /** How far the phone's text size setting may grow this text (lib/text-scale.ts). Reading text by default, and headlines grow like labels. */
   grows?: TextRole;
 };
 
-export function ThemedText({ style, type = 'default', grows = 'reading', maxFontSizeMultiplier, ...rest }: ThemedTextProps) {
+// Headlines are already big, so they stop growing sooner than the reading text under them.
+const HEADLINES: ReadonlySet<string> = new Set(['hero', 'title', 'number']);
+
+export function ThemedText({ style, type = 'default', grows, maxFontSizeMultiplier, ...rest }: ThemedTextProps) {
   const dark = useDarkRoom();
   // A dark room keeps its mono eyebrows, and light tokens (from Typography or a shared style) become their navy-set twins.
   const flat: TextStyle = { ...StyleSheet.flatten([{ color: Colors.text }, (dark ? DarkTypography : Typography)[type], style]) };
@@ -21,7 +24,9 @@ export function ThemedText({ style, type = 'default', grows = 'reading', maxFont
   const own = StyleSheet.flatten(style) ?? {};
   const weight = own.fontWeight ?? (own.fontFamily ? undefined : flat.fontWeight);
   const fontFamily = fontFor(flat.fontFamily, weight);
-  const cap = maxFontSizeMultiplier ?? TEXT_CAP[grows];
+  // Text held to one line has nowhere to wrap to, so it grows like a label too.
+  const role = grows ?? (HEADLINES.has(type) || rest.numberOfLines === 1 ? 'label' : 'reading');
+  const cap = maxFontSizeMultiplier ?? TEXT_CAP[role];
   // The phone grows text by itself. The web has no such setting, so ?textScale= does the same sum by hand.
   const web = Platform.OS === 'web' && WEB_TEXT_SCALE !== 1 && rest.allowFontScaling !== false ? drawnScale(WEB_TEXT_SCALE, cap) : 1;
   const size = web === 1 ? null : { fontSize: (flat.fontSize ?? 14) * web, lineHeight: flat.lineHeight ? flat.lineHeight * web : undefined };

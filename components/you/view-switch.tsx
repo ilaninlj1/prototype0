@@ -25,7 +25,7 @@ export function ViewSwitch({ view, onChange }: { view: YouView; onChange: (view:
             activeOpacity={0.7}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}>
-            <ThemedText style={[styles.label, { color: active ? Colors.accentText : Colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+            <ThemedText grows="chrome" style={[styles.label, { color: active ? Colors.accentText : Colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {v.label}
             </ThemedText>
           </TouchableOpacity>
