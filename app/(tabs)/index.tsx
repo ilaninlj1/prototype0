@@ -1357,7 +1357,6 @@ export default function HomeScreen() {
   const [toast, setToast] = useState(false);
   const [toastFloating, setToastFloating] = useState(false);
   const chrome = useHomeChrome({
-    songsDecided: new Set(swipeHistory.map((e) => e.trackId)).size,
     clipEnded: hasEnded,
     feedStatusUp: !currentTrack,
     sheetOpen: detailsOpen || newsSheetVisible || tuneOpen || genreOpen,

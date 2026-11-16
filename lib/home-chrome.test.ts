@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { chromeVisible, HIDE_AFTER_MS, LEARNING_SONGS, msUntilHide, pinnedOpen, tabBarVisible, type ChromeState } from './home-chrome.ts';
+import { chromeVisible, HIDE_AFTER_MS, msUntilHide, pinnedOpen, tabBarVisible, wakesOnRelease, type ChromeState } from './home-chrome.ts';
 
 const base: ChromeState = {
   now: 10000,
   lastWakeAt: 10000,
   hiddenByTap: false,
-  songsDecided: 50,
   clipEnded: false,
   feedStatusUp: false,
   sheetOpen: false,
@@ -22,10 +21,15 @@ test('a wake keeps the buttons up for 3 seconds, then they hide', () => {
   assert.equal(chromeVisible(at(3000)), false);
 });
 
-test('a new user keeps them for the first 5 songs', () => {
-  assert.equal(LEARNING_SONGS, 5);
-  assert.equal(chromeVisible(at(0, { lastWakeAt: -Infinity, songsDecided: 4 })), true);
-  assert.equal(chromeVisible(at(0, { lastWakeAt: -Infinity, songsDecided: 5 })), false);
+test('Home opens bare: with no touch yet the buttons are hidden, even on a first song', () => {
+  assert.equal(chromeVisible(at(0, { lastWakeAt: -Infinity })), false);
+  assert.equal(pinnedOpen(at(0, { lastWakeAt: -Infinity })), false);
+});
+
+test('only a sheet closing leaves the buttons up for a moment', () => {
+  assert.equal(wakesOnRelease(at(0, { sheetOpen: true })), true);
+  assert.equal(wakesOnRelease(at(0, { feedStatusUp: true })), false);
+  assert.equal(wakesOnRelease(at(0, { clipEnded: true })), false);
 });
 
 test('a clip ending, the feed status, a sheet or a screen reader pin them up', () => {

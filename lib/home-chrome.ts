@@ -1,11 +1,10 @@
-// When Home's buttons show (Minimal UI, spec 2026-10-21): while you listen,
-// only the card and its clues stay. Everything else comes back on a touch and
-// fades again after a few quiet seconds (a reveal brings it back too), and stays up whenever hiding it would
-// strand you: your first songs, a clip that ended, no card, a sheet, a screen reader.
+// When Home's buttons show (Minimal UI, spec 2026-10-21): Home opens bare, only the sky, the card and its clues.
+// Everything else comes on a touch and fades again after a few quiet seconds (a reveal brings it back too), and
+// stays up whenever hiding it would strand you: a clip that ended, no card, a sheet, a screen reader. A line under
+// the card says how to get the buttons, so a first song needs no pin.
 
 export const HIDE_AFTER_MS = 3000;
 export const FADE_MS = 250;
-export const LEARNING_SONGS = 5;
 export const TOAST_MS = 4000;
 
 export type ChromeState = {
@@ -14,8 +13,6 @@ export type ChromeState = {
   lastWakeAt: number;
   /** The card was tapped to put them away. */
   hiddenByTap: boolean;
-  /** Songs swiped so far, ever (the swipe history's length). */
-  songsDecided: number;
   clipEnded: boolean;
   /** No card: the loading or failed panel is up. */
   feedStatusUp: boolean;
@@ -25,11 +22,16 @@ export type ChromeState = {
 
 /** Up no matter how long it's been. */
 export function pinnedOpen(s: ChromeState): boolean {
-  return s.songsDecided < LEARNING_SONGS || s.clipEnded || s.feedStatusUp || s.sheetOpen || s.screenReader;
+  return s.clipEnded || s.feedStatusUp || s.sheetOpen || s.screenReader;
 }
 
 export function chromeVisible(s: ChromeState): boolean {
   return pinnedOpen(s) || (!s.hiddenByTap && s.now - s.lastWakeAt < HIDE_AFTER_MS);
+}
+
+/** A sheet closing leaves the buttons up for a moment, since you were just using them. Any other pin ending goes straight back to bare. */
+export function wakesOnRelease(before: ChromeState): boolean {
+  return before.sheetOpen;
 }
 
 /** How long until they fade on their own, or null when nothing is counting down. */
