@@ -112,6 +112,14 @@ export function OceanUi({
         )}
       </View>
 
+      {/* The shore lies past the Sunny reef: the sand shows at the edge of the water, and it's a button as well as a swipe. */}
+      {place.water === 'reef' && (
+        <Pressable onPress={() => router.push('/coral')} style={styles.shore} hitSlop={{ top: 8, bottom: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Go to the shore, where your coral grows">
+          <Ionicons name="chevron-back" size={15} color="#5b4520" />
+          <ThemedText style={styles.shoreText}>Shore</ThemedText>
+        </Pressable>
+      )}
+
       <View style={styles.depths}>
         {DEPTHS.map((d) => {
           const here = d === place.depth;
@@ -150,9 +158,6 @@ export function OceanUi({
           </Pressable>
           <Pressable onPress={onChart} style={styles.plain} accessibilityRole="button">
             <ThemedText style={styles.plainText}>See it all</ThemedText>
-          </Pressable>
-          <Pressable onPress={() => router.push('/coral')} style={styles.plain} accessibilityRole="button" accessibilityLabel="Coral: join two songs">
-            <ThemedText style={styles.plainText}>Coral</ThemedText>
           </Pressable>
           {allCount > 0 && (
             <Pressable onPress={onOpenList} style={styles.plain} accessibilityRole="button">
@@ -195,6 +200,9 @@ const styles = StyleSheet.create({
   depthHere: { backgroundColor: Colors.text },
   depthText: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: Colors.text },
   depthTextHere: { fontWeight: '700', color: Colors.accentText },
+  // Sand colored, and flush with the left edge, so it reads as the beach showing past the reef.
+  shore: { position: 'absolute', left: 0, top: '52%', flexDirection: 'row', alignItems: 'center', gap: 2, height: 44, paddingLeft: 6, paddingRight: 14, borderTopRightRadius: 22, borderBottomRightRadius: 22, backgroundColor: '#f8e7bb', shadowColor: '#04222d', shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  shoreText: { fontSize: 13, lineHeight: 17, fontWeight: '700', color: '#5b4520' },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg },
   swipe: { alignSelf: 'stretch', maxWidth: 340, width: '100%', backgroundColor: Colors.text, borderRadius: 26, height: 48, alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.45 },
