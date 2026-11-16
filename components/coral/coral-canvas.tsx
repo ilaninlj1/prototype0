@@ -94,110 +94,225 @@ function water() {
   return { top: mixHex(high.mid, high.top, 0.35), mid: mixHex(waterStops('reef', 'deepcuts', day).mid, low.mid, 0.5), bot: low.bot };
 }
 
-/** The shore, still: sky, the water under it, light falling in, and the sand climbing out of the sea into a beach. */
+/** The stream's course down the beach, t from 0 at the bluff to 1 at the sea. Shared by the drawing and the moving glints. */
+export function streamPoint(t: number, width: number, height: number): Point {
+  'worklet';
+  const line0 = SHORE_WATERLINE * height;
+  const x = width * (0.385 + 0.05 * t + 0.022 * Math.sin(t * 6.2831853 * 1.25));
+  return { x, y: line0 - height * 0.098 * (1 - t) };
+}
+
+function shape(points: [number, number][]) {
+  const b = Skia.PathBuilder.Make();
+  points.forEach(([x, y], i) => (i ? b.lineTo(x, y) : b.moveTo(x, y)));
+  b.close();
+  return b.build();
+}
+function smoothLine(points: [number, number][]) {
+  const b = Skia.PathBuilder.Make();
+  b.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length - 1; i++) {
+    const mx = (points[i][0] + points[i + 1][0]) / 2;
+    const my = (points[i][1] + points[i + 1][1]) / 2;
+    b.quadTo(points[i][0], points[i][1], mx, my);
+  }
+  const last = points[points.length - 1];
+  b.lineTo(last[0], last[1]);
+  return b;
+}
+function vertical(y0: number, y1: number, colors: string[], stops?: number[]): SkPaint {
+  const p = Skia.Paint();
+  p.setAntiAlias(true);
+  p.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: y0 }, { x: 0, y: y1 }, colors.map((c) => Skia.Color(c)), stops ?? null, TileMode.Clamp));
+  return p;
+}
+
+/** The cove above the water: a sandstone bluff with palms, a small beach with a stream crossing it, and tide-pool rocks. */
+function drawCove(c: SkCanvas, width: number, height: number, r: () => number) {
+  const W = width;
+  const H = height;
+  const y0 = SHORE_WATERLINE * H;
+  const up = (f: number) => y0 - f * H;
+  c.drawRect(Skia.XYWHRect(0, 0, W, y0), vertical(0, y0, ['#4a9be8', '#9fd0f5', '#e4f3fc'], [0, 0.6, 1]));
+  // A far headland, pale with distance.
+  c.drawPath(smoothLine([[W * 0.46, y0], [W * 0.56, up(0.022)], [W * 0.7, up(0.04)], [W * 0.84, up(0.034)], [W, up(0.055)], [W, y0]]).close().build(), fill('#b4cfe2'));
+  c.drawPath(smoothLine([[W * 0.7, up(0.04)], [W * 0.84, up(0.034)], [W, up(0.055)], [W, up(0.045)], [W * 0.84, up(0.026)], [W * 0.7, up(0.03)]]).close().build(), fill('#9dbf9a', 0.7));
+
+  // The bluff: layered sandstone, lighter on top, with the cove's notch where the stream comes down.
+  const top: [number, number][] = [[-4, up(0.158)], [W * 0.1, up(0.166)], [W * 0.22, up(0.156)], [W * 0.31, up(0.132)], [W * 0.37, up(0.1)], [W * 0.41, up(0.094)], [W * 0.46, up(0.11)], [W * 0.53, up(0.098)], [W * 0.59, up(0.06)], [W * 0.64, up(0.02)], [W * 0.67, y0]];
+  const bluff = smoothLine(top).lineTo(-4, y0).close().build();
+  c.drawPath(bluff, vertical(up(0.17), y0, ['#ecd3a4', '#d9b682', '#bd9462'], [0, 0.55, 1]));
+  c.save();
+  c.clipPath(bluff, ClipOp.Intersect, true);
+  for (let k = 1; k <= 5; k++) {
+    const drop = H * 0.024 * k + r() * 3;
+    const band = smoothLine(top.map(([x, y], i) => [x, y + drop + 2.5 * Math.sin(i * 1.7 + k)] as [number, number])).build();
+    c.drawPath(band, line(k % 2 ? '#b98d5b' : '#f3deb4', k % 2 ? 2.2 : 1.4, k % 2 ? 0.55 : 0.6));
+  }
+  // Shade under the overhangs and a few weathered cracks.
+  c.drawRect(Skia.XYWHRect(0, y0 - H * 0.02, W * 0.7, H * 0.02), vertical(y0 - H * 0.02, y0, ['#9a744800', '#8a643c88']));
+  for (let i = 0; i < 9; i++) {
+    const x = W * (0.02 + r() * 0.6);
+    const y = up(0.03 + r() * 0.09);
+    c.drawLine(x, y, x + (r() - 0.5) * 5, y + 8 + r() * 12, line('#a67c4e', 1.2, 0.5));
+  }
+  c.restore();
+  // Green along the top: ice plant spilling over, and palms.
+  c.drawPath(smoothLine(top.slice(0, 9)).build(), line('#7fb069', 7));
+  c.drawPath(smoothLine(top.slice(0, 9).map(([x, y]) => [x, y - 3] as [number, number])).build(), line('#a5cf86', 2.4, 0.9));
+  for (let i = 0; i < 16; i++) {
+    const f = r() * 0.5;
+    const at = Math.min(7, Math.floor(f / 0.07));
+    const x = W * f;
+    const y = top[at][1] + (top[at + 1][1] - top[at][1]) * 0.5 + 3 + r() * 5;
+    c.drawCircle(x, y, 2 + r() * 2.5, fill(i % 3 ? '#6f9f5b' : '#d98fb0', i % 3 ? 0.9 : 0.85));
+  }
+  for (const [fx, tall, lean] of [[0.07, 0.07, 5], [0.16, 0.056, -4], [0.27, 0.064, 6]] as const) {
+    const bx = W * fx;
+    const by = up(0.16) + 2;
+    const tx = bx + lean;
+    const ty = by - H * tall;
+    const trunk = Skia.PathBuilder.Make();
+    trunk.moveTo(bx, by);
+    trunk.quadTo(bx + lean * 0.2, by - H * tall * 0.6, tx, ty);
+    c.drawPath(trunk.build(), line('#8b6c4c', 3));
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * TAU + 0.2;
+      const len = 11 + (i % 2) * 4;
+      const frond = Skia.PathBuilder.Make();
+      frond.moveTo(tx, ty);
+      frond.quadTo(tx + Math.cos(ang) * len * 0.7, ty + Math.sin(ang) * len * 0.5 - 4, tx + Math.cos(ang) * len, ty + Math.sin(ang) * len * 0.7 + 3);
+      c.drawPath(frond.build(), line(i % 2 ? '#4f9a5c' : '#3c8551', 2.4));
+    }
+  }
+
+  // The beach in the cove, and the stream that crosses it.
+  const beach = Skia.PathBuilder.Make();
+  beach.moveTo(W * 0.15, y0 + 2);
+  beach.quadTo(W * 0.27, up(0.03), W * 0.4, up(0.05));
+  beach.quadTo(W * 0.55, up(0.04), W * 0.66, y0 + 2);
+  beach.close();
+  c.drawPath(beach.build(), vertical(up(0.05), y0, ['#fbefd0', '#f1dcae']));
+  const stream = Skia.PathBuilder.Make();
+  for (let i = 0; i <= 16; i++) {
+    const p = streamPoint(i / 16, W, H);
+    if (i === 0) stream.moveTo(p.x, p.y);
+    else stream.lineTo(p.x, p.y);
+  }
+  const course = stream.build();
+  c.drawPath(course, line('#e3cc9c', 9, 0.9));
+  c.drawPath(course, line('#7fcfe6', 5.5));
+  c.drawPath(course, line('#c9f1fa', 1.6, 0.9));
+  for (let i = 0; i < 9; i++) c.drawCircle(W * (0.2 + r() * 0.42), up(0.006 + r() * 0.03), 1 + r() * 1.2, fill(i % 2 ? '#d9c08e' : '#ffffff', 0.8));
+
+  // Tide-pool rocks running out from the beach, pools holding the sky, and a sea lion asleep on one.
+  const rocks: [number, number, number][] = [[0.63, 30, 0.004], [0.73, 44, 0.012], [0.86, 38, 0.006], [0.965, 30, 0.014]];
+  for (const [fx, rw, lift] of rocks) {
+    const x = W * fx;
+    const y = up(lift);
+    c.drawOval(Skia.XYWHRect(x - rw, y - rw * 0.36, rw * 2, rw * 0.9), fill('#5f5045'));
+    c.drawOval(Skia.XYWHRect(x - rw * 0.94, y - rw * 0.4, rw * 1.88, rw * 0.62), fill('#84705e'));
+    c.drawOval(Skia.XYWHRect(x - rw * 0.8, y - rw * 0.4, rw * 1.3, rw * 0.3), fill('#a08b76', 0.7));
+    const pw = rw * 0.42;
+    c.drawOval(Skia.XYWHRect(x - pw + rw * 0.18, y - rw * 0.27, pw * 2, pw * 0.62), fill('#3f6f7c'));
+    c.drawOval(Skia.XYWHRect(x - pw + rw * 0.18, y - rw * 0.29, pw * 2, pw * 0.56), fill('#7fd6e4'));
+    c.drawOval(Skia.XYWHRect(x - pw * 0.5 + rw * 0.18, y - rw * 0.26, pw * 0.7, pw * 0.16), fill('#ffffff', 0.7));
+  }
+  const sx = W * 0.71;
+  const sy = up(0.012) - 44 * 0.36;
+  c.drawOval(Skia.XYWHRect(sx - 15, sy - 6, 30, 10), fill('#4b3a2e'));
+  c.drawCircle(sx + 14, sy - 6, 4.6, fill('#4b3a2e'));
+  c.drawLine(sx + 8, sy - 2, sx + 14, sy - 6, line('#4b3a2e', 6));
+  c.drawLine(sx - 14, sy - 1, sx - 20, sy - 4, line('#4b3a2e', 3));
+  c.drawCircle(sx + 15.5, sy - 7, 0.8, fill('#ffffff', 0.9));
+  // Gulls.
+  for (const [gx, gy, gs] of [[0.52, 0.2, 5], [0.6, 0.235, 4], [0.84, 0.16, 5]] as const) {
+    const x = W * gx;
+    const y = up(gy);
+    const wing = Skia.PathBuilder.Make();
+    wing.moveTo(x - gs, y);
+    wing.quadTo(x - gs * 0.5, y - gs * 0.7, x, y);
+    wing.quadTo(x + gs * 0.5, y - gs * 0.7, x + gs, y);
+    c.drawPath(wing.build(), line('#ffffff', 1.4, 0.95));
+  }
+}
+
+/** The shore, still: the cove above, the water under it, light falling in, and the sea floor rising toward the land. */
 function recordWater(width: number, height: number) {
   return createPicture(
     (c) => {
       const w = water();
       const line0 = SHORE_WATERLINE * height;
-      const sky = Skia.Paint();
-      sky.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: 0 }, { x: 0, y: line0 }, [Skia.Color('#3f8fe6'), Skia.Color('#cfeafc')], [0, 1], TileMode.Clamp));
-      c.drawRect(Skia.XYWHRect(0, 0, width, line0), sky);
-      const bg = Skia.Paint();
-      bg.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: line0 }, { x: 0, y: height }, [Skia.Color(w.top), Skia.Color(w.mid), Skia.Color(w.bot)], [0, 0.5, 1], TileMode.Clamp));
-      c.drawRect(Skia.XYWHRect(0, line0, width, height - line0), bg);
       const r = rng(41);
+      c.drawRect(Skia.XYWHRect(0, line0, width, height - line0), vertical(line0, height, [w.top, w.mid, w.bot], [0, 0.5, 1]));
       // Light falling in from the surface.
-      c.save();
-      c.clipRect(Skia.XYWHRect(0, line0, width, height - line0), ClipOp.Intersect, true);
       const ray = Skia.Paint();
       ray.setAntiAlias(true);
       const lit = Skia.Color('#ffffff');
-      lit[3] = 0.12;
+      lit[3] = 0.1;
       const dark = Skia.Color('#ffffff');
       dark[3] = 0;
       ray.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: line0 }, { x: 0, y: height * 0.85 }, [lit, dark], [0, 1], TileMode.Clamp));
       for (let i = 0; i < 5; i++) {
-        const x = width * (0.3 + i * 0.16 + r() * 0.08);
+        const x = width * (0.16 + i * 0.2 + r() * 0.08);
         const half = width * (0.03 + r() * 0.04);
-        const lean = width * 0.22;
-        const b = Skia.PathBuilder.Make();
-        b.moveTo(x - half, line0);
-        b.lineTo(x + half, line0);
-        b.lineTo(x + half * 2.4 - lean, height * 0.85);
-        b.lineTo(x - half * 2.4 - lean, height * 0.85);
-        b.close();
-        c.drawPath(b.build(), ray);
+        const lean = width * 0.2;
+        c.drawPath(shape([[x - half, line0], [x + half, line0], [x + half * 2.4 - lean, height * 0.85], [x - half * 2.4 - lean, height * 0.85]]), ray);
+      }
+      // The rock the bluff stands on, going down into the water at the left edge.
+      const foot = Skia.PathBuilder.Make();
+      foot.moveTo(-4, line0);
+      foot.lineTo(width * 0.2, line0);
+      foot.quadTo(width * 0.13, line0 + height * 0.1, width * 0.1, line0 + height * 0.26);
+      foot.quadTo(width * 0.12, line0 + height * 0.45, width * 0.04, height);
+      foot.lineTo(-4, height);
+      foot.close();
+      const rock = foot.build();
+      c.drawPath(rock, vertical(line0, height, [mixHex('#b08a60', w.top, 0.35), mixHex('#6d5a48', w.mid, 0.45), mixHex('#4a4038', w.bot, 0.6)], [0, 0.4, 1]));
+      c.save();
+      c.clipPath(rock, ClipOp.Intersect, true);
+      for (let i = 0; i < 7; i++) {
+        const y = line0 + height * (0.04 + i * 0.09);
+        c.drawLine(0, y + r() * 6, width * 0.2, y + 8 + r() * 10, line('#ffffff', 1.2, 0.1));
       }
       c.restore();
-      // The surface, seen from the side.
-      const surf = Skia.PathBuilder.Make();
-      for (let x = 0; x <= width + 8; x += 8) {
-        const y = line0 + 1.6 * Math.sin((x / width) * TAU * 3);
-        if (x === 0) surf.moveTo(x, y);
-        else surf.lineTo(x, y);
-      }
-      c.drawPath(surf.build(), line('#ffffff', 2.2, 0.75));
 
-      // The sand: dry and pale on the beach, sinking into the water's color as it goes down.
-      const sand = Skia.Paint();
-      sand.setAntiAlias(true);
+      // The sand.
       const crest = floorY(0, width, height) - 10;
-      const at = (y: number) => Math.max(0, Math.min(1, (y - crest) / Math.max(1, height - crest)));
-      sand.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: crest }, { x: 0, y: height },
-        [Skia.Color('#fbeecb'), Skia.Color(SAND.reef[0]), Skia.Color(mixHex(SAND.reef[0], ABYSS, 0.38)), Skia.Color(mixHex(SAND.reef[1], ABYSS, 0.68))],
-        [0, at(line0), at(line0 + height * 0.16), 1], TileMode.Clamp));
       const b = Skia.PathBuilder.Make();
       b.moveTo(0, height);
       for (let x = 0; x <= width; x += 6) b.lineTo(x, floorY(x, width, height));
       b.lineTo(width, floorY(width, width, height));
       b.lineTo(width, height);
       b.close();
-      c.drawPath(b.build(), sand);
-      // Where the water laps the sand.
-      let shoreX = 0;
-      while (shoreX < width && floorY(shoreX, width, height) < line0) shoreX += 2;
-      c.drawLine(shoreX - 2, line0, shoreX + 26, line0 + 1, line('#ffffff', 5, 0.55));
-      const grain = fill(mixHex(SAND.reef[1], ABYSS, 0.25), 0.3);
-      for (let i = 0; i < 70; i++) {
-        const x = r() * width;
-        const top = floorY(x, width, height);
-        c.drawCircle(x, top + 4 + r() * Math.max(4, height - top - 6), 0.6 + r() * 1.1, grain);
+      c.drawPath(b.build(), vertical(crest, height, [mixHex(SAND.reef[0], w.mid, 0.3), mixHex(SAND.reef[0], ABYSS, 0.42), mixHex(SAND.reef[1], ABYSS, 0.66)], [0, 0.4, 1]));
+      for (let k = 0; k < 4; k++) {
+        const ripple = Skia.PathBuilder.Make();
+        for (let x = 0; x <= width; x += 10) {
+          const y = floorY(x, width, height) + 10 + k * 13 + 2 * Math.sin(x * 0.06 + k);
+          if (x === 0) ripple.moveTo(x, y);
+          else ripple.lineTo(x, y);
+        }
+        c.drawPath(ripple.build(), line('#ffffff', 1, 0.07));
       }
-      // Rocks sunk in the slope.
-      for (let i = 0; i < 6; i++) {
-        const x = width * (0.24 + i * 0.13 + r() * 0.06);
+      for (let i = 0; i < 5; i++) {
+        const x = width * (0.2 + i * 0.17 + r() * 0.06);
         const y = floorY(x, width, height);
-        const rw = 12 + r() * 16;
-        const tone = mixHex('#6d7c88', ABYSS, 0.25 + 0.4 * at(y));
-        c.drawOval(Skia.XYWHRect(x - rw, y - rw * 0.42, rw * 2, rw * 0.95), fill(tone));
+        const rw = 10 + r() * 13;
+        c.drawOval(Skia.XYWHRect(x - rw, y - rw * 0.42, rw * 2, rw * 0.95), fill(mixHex('#6d7c88', ABYSS, 0.45)));
         c.drawOval(Skia.XYWHRect(x - rw * 0.7, y - rw * 0.4, rw * 0.9, rw * 0.3), fill('#ffffff', 0.1));
       }
-      // On the beach: a leaning palm, dune grass, a shell or two.
-      const px = width * 0.09;
-      const py = floorY(px, width, height) + 2;
-      const trunk = Skia.PathBuilder.Make();
-      trunk.moveTo(px, py);
-      trunk.quadTo(px + 4, py - 30, px + 20, py - 56);
-      c.drawPath(trunk.build(), line('#8a6a48', 6));
-      c.drawPath(trunk.build(), line('#b08a60', 2, 0.6));
-      for (let i = 0; i < 7; i++) {
-        const ang = -Math.PI * (0.02 + i * 0.16);
-        const len = 30 + r() * 10;
-        const frond = Skia.PathBuilder.Make();
-        frond.moveTo(px + 20, py - 56);
-        frond.quadTo(px + 20 + Math.cos(ang) * len * 0.6, py - 56 + Math.sin(ang) * len * 0.6 - 10, px + 20 + Math.cos(ang) * len, py - 56 + Math.sin(ang) * len + 8);
-        c.drawPath(frond.build(), line(i % 2 ? '#3f9d5c' : '#2f8650', 4.2));
+
+      drawCove(c, width, height, r);
+      // The surface, and foam where it meets the beach and the rocks.
+      const surf = Skia.PathBuilder.Make();
+      for (let x = 0; x <= width + 8; x += 8) {
+        const y = line0 + 1.6 * Math.sin((x / width) * TAU * 3);
+        if (x === 0) surf.moveTo(x, y);
+        else surf.lineTo(x, y);
       }
-      for (let i = 0; i < 7; i++) {
-        const x = width * (0.015 + r() * 0.15);
-        const y = floorY(x, width, height) + 1;
-        for (let k = -1; k <= 1; k++) c.drawLine(x, y, x + k * (3 + r() * 3), y - 9 - r() * 8, line('#6fae5e', 1.6, 0.9));
-      }
-      for (let i = 0; i < 3; i++) {
-        const x = width * (0.03 + r() * 0.13);
-        c.drawCircle(x, floorY(x, width, height) + 5, 2.4, fill('#ffffff', 0.85));
-      }
+      c.drawPath(surf.build(), line('#ffffff', 2.4, 0.8));
+      c.drawLine(width * 0.17, line0 + 1, width * 0.66, line0 + 1, line('#ffffff', 4.5, 0.7));
     },
     { width, height }
   );
@@ -224,7 +339,7 @@ function recordFar(width: number, height: number) {
       const tone = mixHex(water().mid, '#dbe7e8', 0.2);
       const r = rng(73);
       for (let i = 0; i < 6; i++) {
-        const x = width * (0.3 + i * 0.125 + r() * 0.05);
+        const x = width * (0.16 + i * 0.15 + r() * 0.05);
         const size = 0.7 + r() * 0.9;
         const alpha = 0.3 + r() * 0.25;
         twig(c, x, floorY(x, width, height) + 4, 26 * size, -Math.PI / 2 + (r() - 0.5) * 0.4, 4.5 * size, () => line(tone, 1, alpha), r, 4);
@@ -232,7 +347,7 @@ function recordFar(width: number, height: number) {
       // Sea grass, thickest where the water is shallow.
       const line0 = SHORE_WATERLINE * height;
       for (let i = 0; i < 26; i++) {
-        const x = width * (0.21 + r() * 0.78);
+        const x = width * (0.1 + r() * 0.88);
         const y = floorY(x, width, height) + 3;
         if (y < line0 + 14) continue;
         const tall = Math.min(y - line0 - 8, 12 + r() * 26);
@@ -345,20 +460,18 @@ function drawPolyp(c: SkCanvas, node: GardenNode) {
   const r = Math.max(6, node.r);
   c.save();
   c.translate(node.x, node.y);
-  c.drawCircle(0, 0, r * 2.6, glowPaint(color, r * 2.6, 0.38));
-  const pale = mixHex(color, '#ffffff', 0.45);
+  c.drawCircle(0, 0, r * 1.9, glowPaint(color, r * 1.9, 0.16));
+  const pale = mixHex(color, '#ffffff', 0.5);
   const arms = 11;
   for (let i = 0; i < arms; i++) {
     const a = (i / arms) * TAU + node.trackId * 0.37;
-    c.drawLine(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7, Math.cos(a) * r * 1.22, Math.sin(a) * r * 1.22, line(color, r * 0.3));
-    c.drawCircle(Math.cos(a) * r * 1.26, Math.sin(a) * r * 1.26, r * 0.2, fill(pale));
+    c.drawLine(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7, Math.cos(a) * r * 1.2, Math.sin(a) * r * 1.2, line(color, r * 0.3));
+    c.drawCircle(Math.cos(a) * r * 1.24, Math.sin(a) * r * 1.24, r * 0.19, fill(pale));
   }
-  const body = Skia.Paint();
-  body.setAntiAlias(true);
-  body.setShader(Skia.Shader.MakeRadialGradient({ x: -r * 0.25, y: -r * 0.3 }, r * 1.15, [Skia.Color(pale), Skia.Color(color), Skia.Color(mixHex(color, ABYSS, 0.35))], [0, 0.6, 1], TileMode.Clamp));
-  c.drawCircle(0, 0, r, body);
-  c.drawCircle(0, 0, r, line(mixHex(color, ABYSS, 0.5), 1.2, 0.7));
-  c.drawCircle(0, 0, r * 0.24, fill(mixHex(color, ABYSS, 0.6), 0.75));
+  // Flat, like the Ocean's own creatures: one color, a paler ring, a pale heart.
+  c.drawCircle(0, 0, r, fill(color));
+  c.drawCircle(0, 0, r * 0.72, line(pale, 1.6, 0.55));
+  c.drawCircle(0, 0, r * 0.26, fill(pale, 0.95));
   c.restore();
 }
 
@@ -405,6 +518,21 @@ function recordGlow() {
   );
 }
 
+/** One glint riding the stream down the beach. */
+function Glint({ flow, offset, width, height }: { flow: SharedValue<number>; offset: number; width: number; height: number }) {
+  const at = useDerivedValue(() => {
+    'worklet';
+    const t = (flow.get() + offset) % 1;
+    const p = streamPoint(t, width, height);
+    return [{ translateX: p.x }, { translateY: p.y }];
+  });
+  return (
+    <Group transform={at}>
+      <Circle cx={0} cy={0} r={1.5} color="#ffffff" opacity={0.95} />
+    </Group>
+  );
+}
+
 /** The shore, the coral grown on it from your links, and a light where the finger is. */
 export default function CoralCanvas({ width, height, layout, glowX, glowY, glowOn, blend, sway, growth, blooms, activeNode, reduceMotion, pullFrom, pullX, pullY, pullOn, buds }: CoralCanvasProps) {
   const still = useMemo(() => recordWater(width, height), [width, height]);
@@ -415,6 +543,7 @@ export default function CoralCanvas({ width, height, layout, glowX, glowY, glowO
 
   // The sway leans back and forth; the bubbles climb and come round again.
   const rise = useSharedValue(0);
+  const flow = useSharedValue(0);
   const previousCount = useRef(0);
   const count = layout.branches.length;
   useEffect(() => {
@@ -435,11 +564,14 @@ export default function CoralCanvas({ width, height, layout, glowX, glowY, glowO
     sway.set(withRepeat(withTiming(1, { duration: 5200, easing: Easing.inOut(Easing.sin) }), -1, true));
     rise.set(0);
     rise.set(withRepeat(withTiming(1, { duration: 38000, easing: Easing.linear }), -1, false));
+    flow.set(0);
+    flow.set(withRepeat(withTiming(1, { duration: 2600, easing: Easing.linear }), -1, false));
     return () => {
       cancelAnimation(sway);
       cancelAnimation(rise);
+      cancelAnimation(flow);
     };
-  }, [reduceMotion, sway, rise]);
+  }, [reduceMotion, sway, rise, flow]);
 
   // The coral leans around the floor, so its roots stay put and its tips move most.
   const floor = height - Math.max(26, height * 0.06);
@@ -473,6 +605,7 @@ export default function CoralCanvas({ width, height, layout, glowX, glowY, glowO
   return (
     <Canvas style={{ width, height }} pointerEvents="none">
       <Picture picture={still} />
+      {!reduceMotion && [0, 0.2, 0.4, 0.6, 0.8].map((offset) => <Glint key={offset} flow={flow} offset={offset} width={width} height={height} />)}
       <Group transform={farLean}>
         <Picture picture={far} />
       </Group>

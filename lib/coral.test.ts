@@ -5,7 +5,7 @@ import {
   addLink, BRANCH_POINTS, canLink, emptyCoral, gardenFloor, GARDEN_MARGIN,
   hitBranch, hitNode, layoutGarden, mixFor, parseCoral, removeLink,
   budPoint, pullStart, PULL_FULL, setLinkStart, setLinkType, touchPoint, traceStep,
-  SHORE_START, SHORE_WATERLINE, shoreGarden, shoreSand, shoreTop,
+  SHORE_START, shoreGarden, shoreSand, shoreTop,
 } from './coral.ts';
 import { MAX_LINKS, MAX_START, type CoralLink, type CoralSong, type GardenLayout } from './coral-types.ts';
 
@@ -245,9 +245,10 @@ test('a start point bud sits on its branch, further in the later the song starts
   assert.ok(away(budPoint(layout, '1-2', 'a', 0), a) < away(budPoint(layout, '1-2', 'a', 0), b));
 });
 
-test('the shore: sand is a beach above the water on the left and sea floor on the right', () => {
+test('the shore: the sea floor rises toward the land on the left and stays under the water', () => {
   const [w, h] = [390, 844];
-  assert.ok(shoreSand(0, w, h) < SHORE_WATERLINE * h, 'the beach stands out of the water');
+  assert.ok(shoreSand(0, w, h) < shoreSand(w, w, h) - h * 0.1, 'higher by the land');
+  assert.ok(shoreSand(0, w, h) > h * 0.7, 'most of the height is open water, so coral has room');
   assert.ok(shoreSand(w, w, h) > h * 0.9, 'the right edge is deep');
   for (let x = 10; x <= w; x += 10) assert.ok(shoreSand(x, w, h) >= shoreSand(x - 10, w, h), `never climbs going out at ${x}`);
 });

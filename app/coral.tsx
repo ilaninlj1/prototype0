@@ -89,8 +89,8 @@ function CoralScreenBody() {
   const dragging = useRef(false);
   const leftBranch = useRef(false);
   const lastTick = useRef(0);
-  const glowX = useSharedValue(0);
-  const glowY = useSharedValue(0);
+  const glowX = useSharedValue(-400);
+  const glowY = useSharedValue(-400);
   const glowOn = useSharedValue(0);
   const blend = useSharedValue(0);
   const sway = useSharedValue(0);

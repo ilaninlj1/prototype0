@@ -611,18 +611,19 @@ export function budPoint(layout: GardenLayout, linkId: string, end: 'a' | 'b', s
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The shore: past the Sunny reef the sand climbs out of the water, and your coral grows on that slope.
+// The shore: past the Sunny reef is a cove. Above the water are its bluff, beach and tide pools; under it the sea
+// floor rises gently toward the land, and your coral grows across the whole of it.
 
-/** Where the water's surface is on the shore, as a share of the screen's height. */
-export const SHORE_WATERLINE = 0.22;
-/** The coral's left edge on the shore, as a share of the width: left of it the sand is too close to the surface. */
-export const SHORE_START = 0.36;
-const SHORE_RISE = 0.74;
+/** Where the water's surface is on the shore, as a share of the screen's height. Above it is the cove. */
+export const SHORE_WATERLINE = 0.27;
+/** The coral's left edge on the shore, as a share of the width: left of it is the rock the bluff stands on. */
+export const SHORE_START = 0.06;
+const SHORE_RISE = 0.14;
 
-/** The y of the top of the sand at x: a low beach on the left, a slope down through the middle, sea floor on the right. */
+/** The y of the top of the sand at x: highest by the land on the left, level sea floor from three quarters across. */
 export function shoreSand(x: number, width: number, height: number): number {
   const s = width > 0 ? x / width : 1;
-  const t = Math.max(0, Math.min(1, (s - 0.05) / 0.7));
+  const t = Math.max(0, Math.min(1, s / 0.75));
   const fallen = t * t * (3 - 2 * t);
   return height - Math.max(26, height * 0.06) - SHORE_RISE * height * (1 - fallen);
 }
@@ -634,7 +635,7 @@ export function shoreTop(height: number): number {
 
 /**
  * The coral for these links, grown on the shore. It is laid out as a garden on a flat floor, then pressed onto the
- * slope: roots stand on the sand wherever they are, and coral nearer the beach is shorter, because the water is.
+ * rise: roots stand on the sand wherever they are, and coral nearer the land is a little shorter, because the water is.
  */
 export function shoreGarden(links: CoralLink[], width: number, height: number): GardenLayout {
   const empty: GardenLayout = { width, height, nodes: [], branches: [] };
