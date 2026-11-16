@@ -609,3 +609,48 @@ export function budPoint(layout: GardenLayout, linkId: string, end: 'a' | 'b', s
   const along = 0.08 + 0.3 * Math.max(0, Math.min(1, seconds / MAX_START));
   return touchPoint(layout, { linkId, t: end === 'a' ? along : 1 - along });
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// The shore: past the Sunny reef the sand climbs out of the water, and your coral grows on that slope.
+
+/** Where the water's surface is on the shore, as a share of the screen's height. */
+export const SHORE_WATERLINE = 0.22;
+/** The coral's left edge on the shore, as a share of the width: left of it the sand is too close to the surface. */
+export const SHORE_START = 0.36;
+const SHORE_RISE = 0.74;
+
+/** The y of the top of the sand at x: a low beach on the left, a slope down through the middle, sea floor on the right. */
+export function shoreSand(x: number, width: number, height: number): number {
+  const s = width > 0 ? x / width : 1;
+  const t = Math.max(0, Math.min(1, (s - 0.05) / 0.7));
+  const fallen = t * t * (3 - 2 * t);
+  return height - Math.max(26, height * 0.06) - SHORE_RISE * height * (1 - fallen);
+}
+
+/** The highest coral may reach: a little under the surface. */
+export function shoreTop(height: number): number {
+  return (SHORE_WATERLINE + 0.04) * height;
+}
+
+/**
+ * The coral for these links, grown on the shore. It is laid out as a garden on a flat floor, then pressed onto the
+ * slope: roots stand on the sand wherever they are, and coral nearer the beach is shorter, because the water is.
+ */
+export function shoreGarden(links: CoralLink[], width: number, height: number): GardenLayout {
+  const empty: GardenLayout = { width, height, nodes: [], branches: [] };
+  if (!(width > 0) || !(height > 0)) return empty;
+  const left = SHORE_START * width;
+  const top = shoreTop(height);
+  const boxHeight = height - top;
+  const flat = layoutGarden(links, width - left, boxHeight);
+  const floorIn = gardenFloor(boxHeight);
+  // Roots sit just above the drawn sand, as they do on a flat floor.
+  const share = (x: number) => Math.max(0.05, (shoreSand(x, width, height) - 0.03 * height - top) / floorIn);
+  const place = (p: Point): Point => ({ x: p.x + left, y: top + p.y * share(p.x + left) });
+  return {
+    width,
+    height,
+    nodes: flat.nodes.map((n) => ({ ...n, ...place(n), r: n.r * (0.6 + 0.4 * Math.min(1, share(n.x + left))) })),
+    branches: flat.branches.map((b) => ({ ...b, points: b.points.map(place) })),
+  };
+}

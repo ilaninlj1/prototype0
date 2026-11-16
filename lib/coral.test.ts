@@ -5,6 +5,7 @@ import {
   addLink, BRANCH_POINTS, canLink, emptyCoral, gardenFloor, GARDEN_MARGIN,
   hitBranch, hitNode, layoutGarden, mixFor, parseCoral, removeLink,
   budPoint, pullStart, PULL_FULL, setLinkStart, setLinkType, touchPoint, traceStep,
+  SHORE_START, SHORE_WATERLINE, shoreGarden, shoreSand, shoreTop,
 } from './coral.ts';
 import { MAX_LINKS, MAX_START, type CoralLink, type CoralSong, type GardenLayout } from './coral-types.ts';
 
@@ -242,4 +243,34 @@ test('a start point bud sits on its branch, further in the later the song starts
   assert.ok(away(budPoint(layout, '1-2', 'a', MAX_START), a) > away(budPoint(layout, '1-2', 'a', 0), a));
   assert.ok(away(budPoint(layout, '1-2', 'b', MAX_START), b) > away(budPoint(layout, '1-2', 'b', 0), b));
   assert.ok(away(budPoint(layout, '1-2', 'a', 0), a) < away(budPoint(layout, '1-2', 'a', 0), b));
+});
+
+test('the shore: sand is a beach above the water on the left and sea floor on the right', () => {
+  const [w, h] = [390, 844];
+  assert.ok(shoreSand(0, w, h) < SHORE_WATERLINE * h, 'the beach stands out of the water');
+  assert.ok(shoreSand(w, w, h) > h * 0.9, 'the right edge is deep');
+  for (let x = 10; x <= w; x += 10) assert.ok(shoreSand(x, w, h) >= shoreSand(x - 10, w, h), `never climbs going out at ${x}`);
+});
+
+test('the shore: coral stands on the slope, under the surface, right of the beach', () => {
+  const [w, h] = [390, 844];
+  const links = [link(1, 2), link(2, 3), link(3, 4), link(1, 5), link(6, 7), link(8, 9), link(9, 10)];
+  const shore = shoreGarden(links, w, h);
+  assert.equal(shore.nodes.length, 10);
+  assert.equal(shore.branches.length, links.length);
+  for (const n of shore.nodes) {
+    assert.ok(n.x >= SHORE_START * w && n.x <= w, `node ${n.trackId} across`);
+    assert.ok(n.y >= shoreTop(h) && n.y <= shoreSand(n.x, w, h), `node ${n.trackId} between surface and sand`);
+  }
+  for (const b of shore.branches) {
+    assert.equal(b.points.length, BRANCH_POINTS);
+    for (const p of b.points) assert.ok(p.y >= shoreTop(h) - 1 && p.y <= shoreSand(p.x, w, h) + 1);
+  }
+  // Coral by the beach is shorter than coral in deep water.
+  const flat = layoutGarden(links, w - SHORE_START * w, h - shoreTop(h));
+  const leftmost = flat.nodes.reduce((a, b) => (a.x < b.x ? a : b));
+  const lifted = shore.nodes.find((n) => n.trackId === leftmost.trackId)!;
+  assert.ok(lifted.y < leftmost.y + shoreTop(h));
+  assert.deepEqual(shoreGarden(links, w, h), shoreGarden([...links].reverse(), w, h));
+  assert.deepEqual(shoreGarden([], w, h).nodes, []);
 });

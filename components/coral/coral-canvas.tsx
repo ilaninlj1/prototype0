@@ -1,11 +1,12 @@
-// The coral garden, drawn with Skia. Everything still is recorded once as a picture (the water, the floor, the coral
+// The shore where your coral grows, drawn with Skia. Everything still is recorded once as a picture (the water, the floor, the coral
 // itself); a frame only moves those pictures and the finger's glow, so it stays cheap on a slow phone.
 
-import { BlendMode, Canvas, Circle, Group, Line, PaintStyle, Picture, Skia, StrokeCap, TileMode, createPicture, type SkCanvas, type SkPaint } from '@shopify/react-native-skia';
+import { BlendMode, Canvas, Circle, ClipOp, Group, Line, PaintStyle, Picture, Skia, StrokeCap, TileMode, createPicture, type SkCanvas, type SkPaint } from '@shopify/react-native-skia';
 import { useEffect, useMemo, useRef } from 'react';
 import { Easing, cancelAnimation, useDerivedValue, useSharedValue, withRepeat, withTiming, type SharedValue } from 'react-native-reanimated';
 
 import { mixHex } from '@/components/ocean/ocean-art';
+import { SHORE_WATERLINE, shoreSand } from '@/lib/coral';
 import type { GardenBranch, GardenLayout, GardenNode, Point } from '@/lib/coral-types';
 import { SAND, waterStops } from '@/lib/ocean-scene';
 import type { Bloom } from './coral-rules';
@@ -79,65 +80,123 @@ function stroke(c: SkCanvas, pts: Point[], from: number, to: number, paint: SkPa
   c.drawPath(b.build(), paint);
 }
 
-/** The top of the sand under x. One gentle shape, so stems always have something to stand on. */
+/** The top of the sand under x: the shore's slope, with a little ripple so it isn't a ruled line. */
 function floorY(x: number, width: number, height: number): number {
   const f = x / Math.max(1, width);
-  return height - (Math.max(26, height * 0.06) + 6 * Math.sin(f * TAU * 1.5) + 3 * Math.sin(f * TAU * 4 + 1));
+  return shoreSand(x, width, height) - 6 * Math.sin(f * TAU * 1.5) - 3 * Math.sin(f * TAU * 4 + 1);
 }
 
-/** The Ocean's reef water, a few levels down so pale coral and white words both read on it. */
+/** The Ocean's reef water: bright under the surface, a few levels down by the floor so pale coral and white words both read. */
 function water() {
   const day = { night: 0, warm: 0 };
-  const high = waterStops('reef', 'deepcuts', day);
+  const high = waterStops('reef', 'popular', day);
   const low = waterStops('reef', 'gems', day);
-  return { top: mixHex(high.top, low.top, 0.5), mid: low.mid, bot: low.bot };
+  return { top: mixHex(high.mid, high.top, 0.35), mid: mixHex(waterStops('reef', 'deepcuts', day).mid, low.mid, 0.5), bot: low.bot };
 }
 
+/** The shore, still: sky, the water under it, light falling in, and the sand climbing out of the sea into a beach. */
 function recordWater(width: number, height: number) {
   return createPicture(
     (c) => {
       const w = water();
+      const line0 = SHORE_WATERLINE * height;
+      const sky = Skia.Paint();
+      sky.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: 0 }, { x: 0, y: line0 }, [Skia.Color('#3f8fe6'), Skia.Color('#cfeafc')], [0, 1], TileMode.Clamp));
+      c.drawRect(Skia.XYWHRect(0, 0, width, line0), sky);
       const bg = Skia.Paint();
-      bg.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: 0 }, { x: 0, y: height }, [Skia.Color(w.top), Skia.Color(w.mid), Skia.Color(w.bot)], [0, 0.5, 1], TileMode.Clamp));
-      c.drawRect(Skia.XYWHRect(0, 0, width, height), bg);
-      // Light falling in from above.
+      bg.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: line0 }, { x: 0, y: height }, [Skia.Color(w.top), Skia.Color(w.mid), Skia.Color(w.bot)], [0, 0.5, 1], TileMode.Clamp));
+      c.drawRect(Skia.XYWHRect(0, line0, width, height - line0), bg);
+      const r = rng(41);
+      // Light falling in from the surface.
+      c.save();
+      c.clipRect(Skia.XYWHRect(0, line0, width, height - line0), ClipOp.Intersect, true);
       const ray = Skia.Paint();
       ray.setAntiAlias(true);
       const lit = Skia.Color('#ffffff');
-      lit[3] = 0.1;
+      lit[3] = 0.12;
       const dark = Skia.Color('#ffffff');
       dark[3] = 0;
-      ray.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: 0 }, { x: 0, y: height * 0.75 }, [lit, dark], [0, 1], TileMode.Clamp));
-      const r = rng(41);
+      ray.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: line0 }, { x: 0, y: height * 0.85 }, [lit, dark], [0, 1], TileMode.Clamp));
       for (let i = 0; i < 5; i++) {
-        const x = width * (0.08 + i * 0.2 + r() * 0.08);
+        const x = width * (0.3 + i * 0.16 + r() * 0.08);
         const half = width * (0.03 + r() * 0.04);
         const lean = width * 0.22;
         const b = Skia.PathBuilder.Make();
-        b.moveTo(x - half, 0);
-        b.lineTo(x + half, 0);
-        b.lineTo(x + half * 2.4 - lean, height * 0.75);
-        b.lineTo(x - half * 2.4 - lean, height * 0.75);
+        b.moveTo(x - half, line0);
+        b.lineTo(x + half, line0);
+        b.lineTo(x + half * 2.4 - lean, height * 0.85);
+        b.lineTo(x - half * 2.4 - lean, height * 0.85);
         b.close();
         c.drawPath(b.build(), ray);
       }
-      // The sand.
+      c.restore();
+      // The surface, seen from the side.
+      const surf = Skia.PathBuilder.Make();
+      for (let x = 0; x <= width + 8; x += 8) {
+        const y = line0 + 1.6 * Math.sin((x / width) * TAU * 3);
+        if (x === 0) surf.moveTo(x, y);
+        else surf.lineTo(x, y);
+      }
+      c.drawPath(surf.build(), line('#ffffff', 2.2, 0.75));
+
+      // The sand: dry and pale on the beach, sinking into the water's color as it goes down.
       const sand = Skia.Paint();
       sand.setAntiAlias(true);
-      const top = floorY(0, width, height) - 12;
-      sand.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: top }, { x: 0, y: height }, [Skia.Color(mixHex(SAND.reef[0], ABYSS, 0.5)), Skia.Color(mixHex(SAND.reef[1], ABYSS, 0.68))], [0, 1], TileMode.Clamp));
+      const crest = floorY(0, width, height) - 10;
+      const at = (y: number) => Math.max(0, Math.min(1, (y - crest) / Math.max(1, height - crest)));
+      sand.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: crest }, { x: 0, y: height },
+        [Skia.Color('#fbeecb'), Skia.Color(SAND.reef[0]), Skia.Color(mixHex(SAND.reef[0], ABYSS, 0.38)), Skia.Color(mixHex(SAND.reef[1], ABYSS, 0.68))],
+        [0, at(line0), at(line0 + height * 0.16), 1], TileMode.Clamp));
       const b = Skia.PathBuilder.Make();
       b.moveTo(0, height);
-      for (let x = 0; x <= width; x += 8) b.lineTo(x, floorY(x, width, height));
+      for (let x = 0; x <= width; x += 6) b.lineTo(x, floorY(x, width, height));
       b.lineTo(width, floorY(width, width, height));
       b.lineTo(width, height);
       b.close();
       c.drawPath(b.build(), sand);
-      const grain = fill(mixHex(SAND.reef[0], ABYSS, 0.3), 0.35);
-      for (let i = 0; i < 46; i++) {
+      // Where the water laps the sand.
+      let shoreX = 0;
+      while (shoreX < width && floorY(shoreX, width, height) < line0) shoreX += 2;
+      c.drawLine(shoreX - 2, line0, shoreX + 26, line0 + 1, line('#ffffff', 5, 0.55));
+      const grain = fill(mixHex(SAND.reef[1], ABYSS, 0.25), 0.3);
+      for (let i = 0; i < 70; i++) {
         const x = r() * width;
-        const y = floorY(x, width, height) + 4 + r() * (height - floorY(x, width, height) - 6);
-        c.drawCircle(x, y, 0.6 + r() * 1.1, grain);
+        const top = floorY(x, width, height);
+        c.drawCircle(x, top + 4 + r() * Math.max(4, height - top - 6), 0.6 + r() * 1.1, grain);
+      }
+      // Rocks sunk in the slope.
+      for (let i = 0; i < 6; i++) {
+        const x = width * (0.24 + i * 0.13 + r() * 0.06);
+        const y = floorY(x, width, height);
+        const rw = 12 + r() * 16;
+        const tone = mixHex('#6d7c88', ABYSS, 0.25 + 0.4 * at(y));
+        c.drawOval(Skia.XYWHRect(x - rw, y - rw * 0.42, rw * 2, rw * 0.95), fill(tone));
+        c.drawOval(Skia.XYWHRect(x - rw * 0.7, y - rw * 0.4, rw * 0.9, rw * 0.3), fill('#ffffff', 0.1));
+      }
+      // On the beach: a leaning palm, dune grass, a shell or two.
+      const px = width * 0.09;
+      const py = floorY(px, width, height) + 2;
+      const trunk = Skia.PathBuilder.Make();
+      trunk.moveTo(px, py);
+      trunk.quadTo(px + 4, py - 30, px + 20, py - 56);
+      c.drawPath(trunk.build(), line('#8a6a48', 6));
+      c.drawPath(trunk.build(), line('#b08a60', 2, 0.6));
+      for (let i = 0; i < 7; i++) {
+        const ang = -Math.PI * (0.02 + i * 0.16);
+        const len = 30 + r() * 10;
+        const frond = Skia.PathBuilder.Make();
+        frond.moveTo(px + 20, py - 56);
+        frond.quadTo(px + 20 + Math.cos(ang) * len * 0.6, py - 56 + Math.sin(ang) * len * 0.6 - 10, px + 20 + Math.cos(ang) * len, py - 56 + Math.sin(ang) * len + 8);
+        c.drawPath(frond.build(), line(i % 2 ? '#3f9d5c' : '#2f8650', 4.2));
+      }
+      for (let i = 0; i < 7; i++) {
+        const x = width * (0.015 + r() * 0.15);
+        const y = floorY(x, width, height) + 1;
+        for (let k = -1; k <= 1; k++) c.drawLine(x, y, x + k * (3 + r() * 3), y - 9 - r() * 8, line('#6fae5e', 1.6, 0.9));
+      }
+      for (let i = 0; i < 3; i++) {
+        const x = width * (0.03 + r() * 0.13);
+        c.drawCircle(x, floorY(x, width, height) + 5, 2.4, fill('#ffffff', 0.85));
       }
     },
     { width, height }
@@ -158,17 +217,33 @@ function twig(c: SkCanvas, x: number, y: number, len: number, ang: number, w: nu
   for (let i = 0; i < n; i++) twig(c, x2, y2, len * (0.62 + r() * 0.14), ang + (i - (n - 1) / 2) * (0.55 + r() * 0.25), w * 0.72, paint, r, depth - 1);
 }
 
-/** Pale coral far behind yours, sunk into the water's color, so the garden never stands in empty water. */
+/** Pale coral and sea grass on the slope behind yours, so the shore never stands in empty water. */
 function recordFar(width: number, height: number) {
   return createPicture(
     (c) => {
       const tone = mixHex(water().mid, '#dbe7e8', 0.2);
       const r = rng(73);
       for (let i = 0; i < 6; i++) {
-        const x = width * (0.06 + i * 0.18 + r() * 0.06);
+        const x = width * (0.3 + i * 0.125 + r() * 0.05);
         const size = 0.7 + r() * 0.9;
         const alpha = 0.3 + r() * 0.25;
         twig(c, x, floorY(x, width, height) + 4, 26 * size, -Math.PI / 2 + (r() - 0.5) * 0.4, 4.5 * size, () => line(tone, 1, alpha), r, 4);
+      }
+      // Sea grass, thickest where the water is shallow.
+      const line0 = SHORE_WATERLINE * height;
+      for (let i = 0; i < 26; i++) {
+        const x = width * (0.21 + r() * 0.78);
+        const y = floorY(x, width, height) + 3;
+        if (y < line0 + 14) continue;
+        const tall = Math.min(y - line0 - 8, 12 + r() * 26);
+        const green = mixHex(r() < 0.5 ? '#3fae7c' : '#2f9a6a', water().bot, Math.min(0.6, (y - line0) / height));
+        for (let k = 0; k < 3; k++) {
+          const lean = (k - 1) * 5 + (r() - 0.5) * 6;
+          const blade = Skia.PathBuilder.Make();
+          blade.moveTo(x + (k - 1) * 2.5, y);
+          blade.quadTo(x + lean * 0.3, y - tall * 0.6, x + lean, y - tall * (0.75 + r() * 0.25));
+          c.drawPath(blade.build(), line(green, 2.4, 0.9));
+        }
       }
     },
     { width, height }
@@ -330,7 +405,7 @@ function recordGlow() {
   );
 }
 
-/** Water, floor, the coral grown from your links, and a light where the finger is. */
+/** The shore, the coral grown on it from your links, and a light where the finger is. */
 export default function CoralCanvas({ width, height, layout, glowX, glowY, glowOn, blend, sway, growth, blooms, activeNode, reduceMotion, pullFrom, pullX, pullY, pullOn, buds }: CoralCanvasProps) {
   const still = useMemo(() => recordWater(width, height), [width, height]);
   const far = useMemo(() => recordFar(width, height), [width, height]);
@@ -392,6 +467,7 @@ export default function CoralCanvas({ width, height, layout, glowX, glowY, glowO
     return { x: pullX.get(), y: pullY.get() };
   });
 
+  const underwater = useMemo(() => Skia.XYWHRect(0, SHORE_WATERLINE * height + 4, width, height), [width, height]);
   const active = activeNode === null ? undefined : layout.nodes.find((n) => n.trackId === activeNode);
 
   return (
@@ -400,11 +476,13 @@ export default function CoralCanvas({ width, height, layout, glowX, glowY, glowO
       <Group transform={farLean}>
         <Picture picture={far} />
       </Group>
-      <Group transform={up}>
-        <Picture picture={bubbles} />
-      </Group>
-      <Group transform={upNext}>
-        <Picture picture={bubbles} />
+      <Group clip={underwater}>
+        <Group transform={up}>
+          <Picture picture={bubbles} />
+        </Group>
+        <Group transform={upNext}>
+          <Picture picture={bubbles} />
+        </Group>
       </Group>
       <Group transform={lean}>
         <Picture picture={coral} />
