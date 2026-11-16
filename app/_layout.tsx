@@ -14,7 +14,7 @@ import { Archivo_700Bold, Archivo_800ExtraBold } from '@expo-google-fonts/archiv
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { router, Stack, usePathname } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
@@ -78,6 +78,12 @@ export default function RootLayout() {
   // returns to). Every other screen uses Last.fm, whose terms need written approval
   // for public web pages.
   const pathname = usePathname();
+  // A development server on this computer is not the public website, so its browser can show every screen
+  // (used to check big text with ?textScale=3.1). Only after mounting: the server's first draw has no audio.
+  const [devBrowser, setDevBrowser] = useState(false);
+  useEffect(() => {
+    if (__DEV__ && Platform.OS === 'web') setDevBrowser(true);
+  }, []);
   const [fontsLoaded] = useFonts({
     Archivo_700Bold,
     Archivo_800ExtraBold,
@@ -96,7 +102,7 @@ export default function RootLayout() {
     Parisienne_400Regular,
   });
   if (!fontsLoaded) return <View style={styles.boot} />;
-  if (Platform.OS === 'web' && pathname !== '/pack' && pathname !== '/spotify-callback') {
+  if (Platform.OS === 'web' && !devBrowser && pathname !== '/pack' && pathname !== '/spotify-callback') {
     return (
       <View style={styles.webLanding}>
         <ThemedText type="title">Blindspot</ThemedText>
