@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
+import { useReducedMotion } from 'react-native-reanimated';
+
 import { useScreenReader } from '@/hooks/use-screen-reader';
+import { useTextScale } from '@/hooks/use-text-scale';
+import { isBigText } from '@/lib/text-scale';
 import { chromeVisible, msUntilHide, pinnedOpen, type ChromeState } from '@/lib/home-chrome';
 
 // Home writes, the tab bar reads: the bar lives outside Home but fades with its buttons.
@@ -42,7 +46,10 @@ export function useHomeChrome(inputs: Inputs) {
   // Off on the web, which can't tell and always answers yes (that would pin the buttons for good).
   const screenReader = useScreenReader();
 
-  const state: ChromeState = { ...inputs, ...clock, screenReader };
+  // Big text or Reduce Motion: the buttons stay, and a tap on the card no longer puts them away.
+  const steadyControls = isBigText(useTextScale()) || !!useReducedMotion();
+
+  const state: ChromeState = { ...inputs, ...clock, screenReader, steadyControls };
   const visible = chromeVisible(state);
   const pinned = pinnedOpen(state);
 

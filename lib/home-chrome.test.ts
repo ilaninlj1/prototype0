@@ -53,3 +53,11 @@ test('the tab bar only hides on Home', () => {
   assert.equal(tabBarVisible('index', false), false);
   assert.equal(tabBarVisible('index', true), true);
 });
+
+test('with big text or Reduce Motion on the phone, the buttons never go away', () => {
+  assert.equal(chromeVisible(at(HIDE_AFTER_MS + 60_000, { steadyControls: true })), true);
+  assert.equal(chromeVisible(at(0, { hiddenByTap: true, steadyControls: true })), true);
+  assert.equal(msUntilHide(at(0, { steadyControls: true })), null);
+  // Without it they still fade as before.
+  assert.equal(chromeVisible(at(HIDE_AFTER_MS + 1)), false);
+});

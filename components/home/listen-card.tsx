@@ -3,6 +3,8 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, type ViewInstance } from 'react-native';
+
+import { cardActions, cardLabel, type CardAction } from '@/lib/spoken';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
@@ -72,6 +74,10 @@ type Props = {
   onCancelPeek?: () => void;
   /** What the drag says, where this card's swipes mean something else (People). */
   dragWords?: { left: string; right: string; down: string };
+  /** Saved already, so the screen reader's Save action says the right thing. */
+  saved?: boolean;
+  /** A screen reader can't swipe the card, so it gets the swipes as named actions (lib/spoken.ts). */
+  onAction?: (action: CardAction) => void;
 };
 
 /**
@@ -82,7 +88,7 @@ type Props = {
  * the same frame.
  */
 export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCard(props, ref) {
-  const { track, size, recipe, revealed, restless, heard, takeLock, onSwipe, onFling, onSwipeUp, onSave, onTap, onRevealSettled, onMix, onCancelPeek, dragWords } = props;
+  const { track, size, recipe, revealed, restless, heard, takeLock, onSwipe, onFling, onSwipeUp, onSave, onTap, onRevealSettled, onMix, onCancelPeek, dragWords, saved: alreadySaved = false, onAction } = props;
   const { status } = usePlayback();
   const reduceMotion = useReducedMotion();
 
@@ -304,7 +310,13 @@ export const ListenCard = forwardRef<ListenCardHandle, Props>(function ListenCar
   return (
     <Animated.View style={cardStyle}>
       <GestureDetector gesture={gesture}>
-        <View style={[styles.card, size, { backgroundColor: aged.ground }]} accessibilityLabel={revealed ? `${track.trackName} by ${track.artistName}` : 'A song, playing blind'}>
+        <View
+          style={[styles.card, size, { backgroundColor: aged.ground }]}
+          accessible
+          accessibilityLabel={cardLabel(revealed, track.trackName, track.artistName)}
+          accessibilityHint={onAction ? 'Swipe up or down with one finger to choose an action, then double tap' : undefined}
+          accessibilityActions={onAction ? cardActions(revealed, alreadySaved) : undefined}
+          onAccessibilityAction={onAction ? (e) => onAction(e.nativeEvent.actionName as CardAction) : undefined}>
           <Animated.View style={[StyleSheet.absoluteFill, blurStyle]} pointerEvents="none">
             <Image source={{ uri: artworkUrl(track.artworkUrl100, 300) }} style={StyleSheet.absoluteFill} blurRadius={COVER_BLUR} />
           </Animated.View>

@@ -77,6 +77,9 @@ export function BottomSheet({
             </Animated.View>
             <Animated.View
               onLayout={(e) => height.set(e.nativeEvent.layout.height)}
+              // For a screen reader the sheet is the whole screen while it is up, and VoiceOver's two-finger scrub closes it.
+              accessibilityViewIsModal
+              onAccessibilityEscape={onClose}
               style={[styles.sheet, { maxHeight, paddingBottom: insets.bottom }, sheetStyle]}>
               {/* The grabber and the title bar pull the sheet down; the content under them keeps its own scrolling. */}
               <GestureDetector gesture={dragToClose(drag)}>

@@ -1,7 +1,8 @@
 // When Home's buttons show (Minimal UI, spec 2026-10-21): while you listen,
 // only the card and its clues stay. Everything else comes back on a touch and
 // fades again after a few quiet seconds (a reveal brings it back too), and stays up whenever hiding it would
-// strand you: your first songs, a clip that ended, no card, a sheet, a screen reader.
+// strand you: your first songs, a clip that ended, no card, a sheet, a screen reader, or a phone set to
+// big text or Reduce Motion (someone who needs the buttons should not have to find them again every 3 seconds).
 
 export const HIDE_AFTER_MS = 3000;
 export const FADE_MS = 250;
@@ -21,11 +22,13 @@ export type ChromeState = {
   feedStatusUp: boolean;
   sheetOpen: boolean;
   screenReader: boolean;
+  /** The phone is set to big text or Reduce Motion: the buttons stay put. */
+  steadyControls?: boolean;
 };
 
 /** Up no matter how long it's been. */
 export function pinnedOpen(s: ChromeState): boolean {
-  return s.songsDecided < LEARNING_SONGS || s.clipEnded || s.feedStatusUp || s.sheetOpen || s.screenReader;
+  return s.songsDecided < LEARNING_SONGS || s.clipEnded || s.feedStatusUp || s.sheetOpen || s.screenReader || !!s.steadyControls;
 }
 
 export function chromeVisible(s: ChromeState): boolean {
