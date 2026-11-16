@@ -6,6 +6,7 @@ import { anemonesFor, kelpFor, makeWobble, mixHex, raftsFor, recordBottle, recor
 import { drawGlass, drawOcean, type Stage, type StageMember, type StopRow } from '@/components/ocean/ocean-draw';
 import type { Splash } from '@/lib/ocean-splash';
 import { anatomyKey } from '@/lib/ocean-anatomy';
+import { log } from '@/lib/app-log';
 import { castFor } from '@/lib/ocean-cast';
 import { landmarksAt } from '@/lib/ocean-landmarks';
 import { DEPTHS, WATERS, placeKey, type Depth, type Place, type Water } from '@/lib/ocean-map';
@@ -73,10 +74,15 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
     return () => clearTimeout(t);
   }, [col]);
 
+  useEffect(() => {
+    log('ocean', `canvas mounted ${width}x${height}`);
+  }, [width, height]);
   const hourKey = Math.floor(hour);
   const nearArt = useMemo(() => WATERS.map((w) => recordNear(w, width, height)), [width, height]);
   const farArt = useMemo(() => WATERS.map((w) => recordFar(w, width, height)), [width, height]);
   const stages = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity -- timing only, never part of what is drawn
+    const began = Date.now();
     const out: Stage[] = [];
     for (let c = range[0]; c <= range[1]; c++) {
       const water = WATERS[c];
@@ -185,6 +191,10 @@ export default function OceanCanvas({ width, height, dive, travel, surfaceY, sea
         });
       });
     }
+    // Timed in the app log (Tune → log): a slow build here is a blank scene after a dive.
+    // eslint-disable-next-line react-hooks/purity
+    const took = Date.now() - began;
+    if (took > 40) log('ocean', `scene built in ${took} ms: waters ${range[0]}-${range[1]}, ${out.reduce((n, st) => n + st.members.length, 0)} creatures`, took > 1500 ? 'warn' : 'info');
     return out;
     // hour moves only the cast; recorded art is cached above.
     // eslint-disable-next-line react-hooks/exhaustive-deps

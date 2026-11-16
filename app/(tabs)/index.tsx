@@ -1601,7 +1601,8 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.oceanRoot}>
+    // Water colored, not white: if the scene under the surface is still loading when you dive, you see water.
+    <View style={[styles.oceanRoot, { backgroundColor: seaWater.low }]}>
       <Animated.View
         style={[StyleSheet.absoluteFill, slide]}
         pointerEvents={underWater ? 'none' : 'box-none'}

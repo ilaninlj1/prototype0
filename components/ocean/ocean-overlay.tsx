@@ -21,6 +21,7 @@ import { OceanChart } from '@/components/ocean/ocean-chart';
 import { OceanUi } from '@/components/ocean/ocean-ui';
 import { lazySkia } from '@/components/print/lazy-skia';
 import { useScreenReader } from '@/hooks/use-screen-reader';
+import { log } from '@/lib/app-log';
 import { castFor } from '@/lib/ocean-cast';
 import type { PathPoint } from '@/lib/ocean-chart';
 import { depthDragResult, nearestPlaceIndex, settleDive, showsAt, waterDragResult } from '@/lib/ocean-dive';
@@ -117,6 +118,8 @@ export const OceanOverlay = memo(function OceanOverlay({
   }, [surfaceY]);
 
   const [ready, setReady] = useState(false);
+  const readyRef = useRef(false);
+  readyRef.current = ready;
   const [under, setUnder] = useState(false);
   const [place, setPlace] = useState<Place>({ water: 'reef', depth: 'popular' });
   const [hintSeen, setHintSeen] = useState(true);
@@ -209,6 +212,7 @@ export const OceanOverlay = memo(function OceanOverlay({
   useEffect(
     () =>
       onDiveSettled((nowUnder) => {
+        log('ocean', nowUnder ? `dived, scene ${readyRef.current ? 'ready' : 'NOT ready yet'}` : 'surfaced');
         setUnder(nowUnder);
         handlers.current?.onUnderChange(nowUnder);
       }),
