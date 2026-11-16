@@ -54,6 +54,8 @@ export type BuildFindsNewsParams = {
   calls?: CalledShot[];
   /** Bottle news, already worded; it sits after milestones and before releases. */
   bottleItems?: FindsNewsItem[];
+  /** The time now. A release dated after it is not out yet, so it is not news. */
+  now?: number;
 };
 
 /**
@@ -67,6 +69,7 @@ export function buildFindsNews({
   listenersNow = {},
   calls = [],
   bottleItems = [],
+  now: today = Date.now(),
 }: BuildFindsNewsParams): FindsNewsItem[] {
   const calledArtists = new Set(calls.map((c) => c.artistName));
   const calledTrackByArtist = new Map(calls.map((c) => [c.artistName, c.trackId]));
@@ -118,7 +121,9 @@ export function buildFindsNews({
       const seenAt = seen?.seenAt ?? 0;
       for (const rel of check.releases) {
         const relTime = new Date(rel.releaseDate).getTime();
-        if (Number.isFinite(relTime) && relTime > savedAt && relTime > seenAt) {
+        // iTunes lists albums weeks before they come out. One dated after today could never be marked read
+        // (reading sets seenAt to today, which is still before it), so the line on Home stayed for good.
+        if (Number.isFinite(relTime) && relTime <= today && relTime > savedAt && relTime > seenAt) {
           releaseItems.push({
             id: `release:${track.artistId}:${rel.collectionId}`,
             type: 'release',

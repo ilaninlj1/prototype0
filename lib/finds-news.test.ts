@@ -210,3 +210,18 @@ test('bottle items come after milestones and before releases, and markNewsSeen s
   const seen = markNewsSeen({}, [bottle], {}, 5);
   assert.deepEqual(seen, {});
 });
+
+test('a release dated in the future is not news yet, so closing the sheet can clear the line', () => {
+  const now = Date.parse('2026-11-16T12:00:00Z');
+  const liked = [track(1, 'Mabe Fratti', 100, 4_800, 10_000)];
+  const releaseChecks: ReleaseChecks = {
+    100: { checkedAt: now, releases: [{ collectionId: 7, collectionName: 'Next Album', releaseDate: '2026-12-05T08:00:00Z' }] },
+  };
+  assert.deepEqual(buildFindsNews({ likedTracks: liked, newsSeen: {}, releaseChecks, now }), []);
+  // The day it is out it shows once, and reading it clears it.
+  const later = Date.parse('2026-12-06T12:00:00Z');
+  const out = buildFindsNews({ likedTracks: liked, newsSeen: {}, releaseChecks, now: later });
+  assert.equal(out.length, 1);
+  const seen = markNewsSeen({}, out, {}, later);
+  assert.deepEqual(buildFindsNews({ likedTracks: liked, newsSeen: seen, releaseChecks, now: later }), []);
+});

@@ -61,6 +61,8 @@ export function useFindsNews() {
     }, [reload])
   );
 
+  // What was on the sheet when you closed it: read is read, whatever the stored state says afterwards.
+  const [readIds, setReadIds] = useState<ReadonlySet<string>>(new Set());
   const news = useMemo(() => {
     return buildFindsNews({
       likedTracks: liked,
@@ -69,12 +71,13 @@ export function useFindsNews() {
       listenersNow,
       calls,
       bottleItems,
-    });
-  }, [liked, newsSeen, releaseChecks, listenersNow, calls, bottleItems]);
+    }).filter((item) => !readIds.has(item.id));
+  }, [liked, newsSeen, releaseChecks, listenersNow, calls, bottleItems, readIds]);
 
 
   const dismissNews = useCallback(async () => {
     if (news.length === 0) return;
+    setReadIds((old) => new Set([...old, ...news.map((item) => item.id)]));
     const nextSeen = markNewsSeen(newsSeen, news, listenersNow);
     setNewsSeen(nextSeen);
     await saveNewsSeen(nextSeen);
