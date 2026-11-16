@@ -127,6 +127,17 @@ export function floorAt(col: number, x: number): number {
   return y < 0.03 ? 0.03 : y;
 }
 
+/**
+ * The first stretch under the surface, in the top level of every water, holds nothing that grows or hangs.
+ * You sink into it straight from Home, where the water is empty, so a strand or a tuft starting there looked cut off.
+ */
+export const CLEAR_BAND = 0.34;
+
+/** A height in a level (0 its top, 1 its bottom), moved under the clear band in the top level and left alone below it. */
+export function underClearBand(row: number, share: number): number {
+  return row === 0 ? CLEAR_BAND + Math.min(1, Math.max(0, share)) * (1 - CLEAR_BAND) : share;
+}
+
 /** The reef's coral towers: center across, and how far down from the surface each tip starts, in screen heights. */
 export const TOWERS = [
   { cx: 0.14, tip: 0.42 },

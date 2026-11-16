@@ -19,6 +19,12 @@ Description of the feature, motivation, and any relevant context.
 
 <!-- Add entries below this line -->
 
+## [2026-11-16] The Ocean: a beach past the Reef, with a sand temple
+The user's idea: from the leftmost water (Reef), swipe left once more to reach sand, or see a sand temple
+behind the reef. A new place in the ocean with its own art. Came up while fixing strands that looked cut off
+under the surface (the clear band, `CLEAR_BAND` in `lib/ocean-scene.ts`).
+**Status (2026-11-16): Parked** until Prototype 10 is handed in. The user chose to park it.
+
 ## [2026-11-02] People (phase 1 built)
 A fifth tab, Home · Play · People · Library · You, replaces Taste Twins: swipe songs other members hearted,
 meet through shared hearts, then wave to swap one handle. Includes neutral age gating, consent before upload,

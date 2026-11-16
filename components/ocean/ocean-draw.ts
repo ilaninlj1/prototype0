@@ -21,7 +21,7 @@ export type StopRow = { top: Rgb; mid: Rgb; bot: Rgb; ray: number };
 export type WeedData = { x: number; top: number; base: number; width: number; phase: number; tall: boolean; amp: number; shader: SkShader; front: boolean };
 export type AnemoneData = { x: number; y: number; size: number; color: Float32Array };
 export type RaftData = { sprite: SkPicture; x: number; y: number; speed: number; phase: number };
-export type TendrilData = { x: number; length: number; phase: number; bead: Float32Array; lantern: Float32Array | null };
+export type TendrilData = { x: number; top: number; length: number; phase: number; bead: Float32Array; lantern: Float32Array | null };
 export type VentData = { x: number; y: number };
 export type StageMember = StagedMover & { frames: SkPicture[]; faint: SkPicture; bright: SkPicture; scale: number; rare: boolean; trackId: number; tempo: number; songKey: number; big: boolean; z: number };
 export type Stage = {
@@ -450,11 +450,11 @@ function drawTendril(c: SkCanvas, d: TendrilData, f: Frame) {
   const line = Skia.PathBuilder.Make();
   const beads = Skia.PathBuilder.Make();
   let endX = d.x;
-  let endY = 0;
+  let endY = d.top;
   const steps = 14;
   for (let i = 0; i <= steps; i++) {
     const g = i / steps;
-    const y = g * d.length;
+    const y = d.top + g * d.length;
     const x = d.x + Math.sin(t * 0.5 + d.phase + g * 2.6) * 11 * k * g;
     if (i === 0) line.moveTo(x, y);
     else line.lineTo(x, y);

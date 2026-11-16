@@ -156,7 +156,8 @@ export function squidPose(t: number, w: number, h: number, fx: number, fy: numbe
   return { x: fx * w + Math.sin(t * 0.07) * w * 0.14, y: fy * h - lift * 46, face: 1, tail: squeeze * 2 - 1, tilt: Math.sin(t * 0.07) * 0.14, spin: 0, puff: 1, flash: 0 };
 }
 
-export const MAX_BOTTLES = 10;
+// Three at most: ten in a row crowded the top of the water.
+export const MAX_BOTTLES = 3;
 
 /** Bottles float, so they all bob along near the top of Popular, spread in a loose line. */
 export function bottleSpot(i: number, n: number, w: number, h: number): { x: number; y: number } {

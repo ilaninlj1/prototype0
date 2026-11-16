@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { allPlaces, DEPTHS, WATERS } from './ocean-map.ts';
-import { TOWERS, anemoneSpots, dayMixAt, floorAt, floorLift, gradientAt, hexToRgb, seabedAt, surfaceWater, towerRadius, waterStops } from './ocean-scene.ts';
+import { CLEAR_BAND, TOWERS, underClearBand, anemoneSpots, dayMixAt, floorAt, floorLift, gradientAt, hexToRgb, seabedAt, surfaceWater, towerRadius, waterStops } from './ocean-scene.ts';
 
 const hue = (hex: string) => {
   const [r, g, b] = hexToRgb(hex).map((v) => v / 255);
@@ -98,4 +98,12 @@ test('anemones sit on the towers, inside the screen, and shallow levels have the
     assert.ok(spots.length >= 1, `row ${row}`);
     for (const s of spots) assert.ok(s.x > 0 && s.x < 1 && s.y > 0 && s.y < 1);
   }
+});
+
+test('nothing is placed in the first stretch under the surface, and lower levels are left alone', () => {
+  for (const share of [0, 0.1, 0.5, 1]) assert.ok(underClearBand(0, share) >= CLEAR_BAND, `top level at ${share}`);
+  assert.equal(underClearBand(0, 1), 1);
+  // Spread is kept: what was higher is still higher.
+  assert.ok(underClearBand(0, 0.2) < underClearBand(0, 0.6));
+  for (const row of [1, 2, 3]) assert.equal(underClearBand(row, 0.1), 0.1);
 });

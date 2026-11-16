@@ -8,7 +8,7 @@ import type { Anatomy } from '@/lib/ocean-anatomy';
 import { landmarkSpot, landmarksAt } from '@/lib/ocean-landmarks';
 import { DEPTHS, WATERS, type Depth, type Kind, type Place, type Water } from '@/lib/ocean-map';
 import type { CoralPiece, SandLife } from '@/lib/ocean-person';
-import { TOWERS, anemoneSpots, floorAt, hexToRgb, mixRgb, seabedAt, towerRadius, waterStops, type Rgb } from '@/lib/ocean-scene';
+import { TOWERS, anemoneSpots, floorAt, hexToRgb, mixRgb, seabedAt, towerRadius, underClearBand, waterStops, type Rgb } from '@/lib/ocean-scene';
 
 const TAU = Math.PI * 2;
 const CLIP_IN = 1;
@@ -128,7 +128,7 @@ function fadingDown(hexColor: string, water: Water, row: number, height: number)
 export type Weed = { x: number; top: number; base: number; width: number; phase: number; tall: boolean; amp: number; shader: SkShader; front: boolean };
 export type Anemone = { x: number; y: number; size: number; color: Float32Array };
 export type Raft = { sprite: SkPicture; x: number; y: number; speed: number; phase: number };
-export type Tendril = { x: number; length: number; phase: number; bead: Float32Array; lantern: Float32Array | null };
+export type Tendril = { x: number; top: number; length: number; phase: number; bead: Float32Array; lantern: Float32Array | null };
 export type Vent = { x: number; y: number };
 export type Trail = { x: number; y0: number; y1: number; color: string; seed: number };
 
@@ -143,7 +143,7 @@ export function kelpFor(place: Place, width: number, height: number, songColors:
   const out: Weed[] = [];
   const stem = (x: number, phase: number, tip: number, wide: number, color: string, front: boolean) => {
     const floor = height - floorAt(1, x / width) * height + 8;
-    out.push({ x, top: row === 0 ? height * tip : 0, base: row === 3 ? floor : height, width: wide * k, phase, tall: true, amp: 15 * k, shader: fadingDown(color, 'kelp', row, height), front });
+    out.push({ x, top: row === 0 ? height * underClearBand(0, tip) : 0, base: row === 3 ? floor : height, width: wide * k, phase, tall: true, amp: 15 * k, shader: fadingDown(color, 'kelp', row, height), front });
   };
   const r = rng(137);
   for (let i = 0; i < 5; i++) stem((0.1 + r() * 0.8) * width, r() * 9, 0.14 + r() * 0.2, 3.4, KELP_COLOR, i % 2 === 0);
@@ -192,12 +192,12 @@ export function raftsFor(place: Place, width: number, height: number, coral: Cor
   const out: Raft[] = [];
   if (row === 0) {
     const pale = toneAt('#d6e2d8', 'blue', 0);
-    out.push({ sprite: art(pale), x: 0.25, y: height * 0.17, speed: 4, phase: 1 });
-    out.push({ sprite: art(pale), x: 0.8, y: height * 0.28, speed: 3, phase: 4 });
+    out.push({ sprite: art(pale), x: 0.25, y: height * underClearBand(0, 0.17), speed: 4, phase: 1 });
+    out.push({ sprite: art(pale), x: 0.8, y: height * underClearBand(0, 0.28), speed: 3, phase: 4 });
   }
   coral.slice(0, LIVE_GROWTH).forEach((p) => {
     const f = rng(p.seed + 9);
-    out.push({ sprite: art(p.color), x: f(), y: height * (0.15 + f() * 0.62), speed: 2.5 + f() * 3, phase: f() * 6 });
+    out.push({ sprite: art(p.color), x: f(), y: height * underClearBand(row, 0.15 + f() * 0.62), speed: 2.5 + f() * 3, phase: f() * 6 });
   });
   return out;
 }
@@ -209,10 +209,15 @@ export function tendrilsFor(place: Place, width: number, height: number, coral: 
   const bead = Skia.Color('#8fe3ea');
   const r = rng(61 + row * 17);
   const out: Tendril[] = [];
-  for (let i = 0; i < 5; i++) out.push({ x: (0.06 + r() * 0.88) * width, length: height * (0.35 + r() * 0.5), phase: r() * 9, bead, lantern: null });
+  // In the top level there is no dark above to hang from, only the surface, so nothing hangs there:
+  // your songs are loose lanterns under the clear band instead.
+  if (row > 0) for (let i = 0; i < 5; i++) out.push({ x: (0.06 + r() * 0.88) * width, top: 0, length: height * (0.35 + r() * 0.5), phase: r() * 9, bead, lantern: null });
   coral.slice(0, LIVE_GROWTH).forEach((p) => {
     const f = rng(p.seed + 13);
-    out.push({ x: (0.05 + f() * 0.9) * width, length: height * (0.3 + f() * 0.5), phase: f() * 9, bead, lantern: Skia.Color(p.color) });
+    const x = (0.05 + f() * 0.9) * width;
+    const reach = 0.3 + f() * 0.5;
+    if (row > 0) out.push({ x, top: 0, length: height * reach, phase: f() * 9, bead, lantern: Skia.Color(p.color) });
+    else out.push({ x, top: height * underClearBand(0, reach), length: height * 0.04, phase: f() * 9, bead, lantern: Skia.Color(p.color) });
   });
   return out;
 }
@@ -595,7 +600,7 @@ export function recordPlace(place: Place, width: number, height: number, coral: 
         // Your songs past what can drift live: small still tufts.
         coral.slice(LIVE_GROWTH).forEach((p) => {
           const f = rng(p.seed + 9);
-          oval(c, f() * width, height * (0.1 + f() * 0.75), 5 * k, 1.8 * k, fill(p.color, 0.7));
+          oval(c, f() * width, height * underClearBand(row, 0.1 + f() * 0.75), 5 * k, 1.8 * k, fill(p.color, 0.7));
         });
       }
       if (place.water === 'midnight' && row === 3) {
