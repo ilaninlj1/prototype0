@@ -20,6 +20,7 @@ import { TuneSheet, type NextMode } from '@/components/discovery/tune-sheet';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { CreditLine } from '@/components/credits';
 import { ActionRow } from '@/components/home/action-row';
+import { HomeCoral } from '@/components/coral/home-coral';
 import { ChromeFade } from '@/components/home/chrome-fade';
 import { CornerPause } from '@/components/home/corner-pause';
 import { DetailsSheet } from '@/components/home/details-sheet';
@@ -1945,6 +1946,12 @@ export default function HomeScreen() {
         heardCount={swipeHistory.length}
         handlers={oceanHandlers}
       />
+      {/* Your coral at the edge of Home's water, where the shore is. It rides the dive with the rest of Home. */}
+      {!underWater && frameW > 0 && (
+        <Animated.View style={[StyleSheet.absoluteFill, slide]} pointerEvents="box-none">
+          <HomeCoral tempo={seaRhythmNow?.tempo ?? CALM_RHYTHM.tempo} playing={status.playing} onPress={() => router.push('/coral')} />
+        </Animated.View>
+      )}
       <CreatureSheet
         creature={openCreature}
         track={openCreature ? (oceanTracks.get(openCreature.trackId) ?? null) : null}
