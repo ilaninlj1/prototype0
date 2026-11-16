@@ -3,7 +3,7 @@ import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import { ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, type StyleProp, StyleSheet, useWindowDimensions, View, type ViewInstance, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, type LayoutChangeEvent, type LayoutRectangle, Pressable, type StyleProp, StyleSheet, useWindowDimensions, View, type ViewInstance, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FindsNewsSheet } from '@/components/finds-news-sheet';
@@ -69,6 +69,7 @@ import { useHomeChrome } from '@/hooks/use-home-chrome';
 import { useMyBottles } from '@/hooks/use-my-bottles';
 import { oceanPlaceOf, oceanPlaceOfEntry, useOceanData } from '@/hooks/use-ocean';
 import { cluesLine } from '@/lib/home-copy';
+import { spokenNewSong, spokenReveal } from '@/lib/spoken';
 import { pickStatus, statusText, type StatusItem } from '@/lib/status-line';
 import { addToPiece, forkPiece, saveOnPiece, undoOnPiece, useArt } from '@/hooks/use-art';
 import { useCoverColors } from '@/hooks/use-cover-colors';
@@ -92,6 +93,7 @@ import {
   type Strategy,
   type SwipeEntry,
   withListen,
+  describeListeners,
 } from '@/lib/discovery';
 import {
   appendPresetChangeEntry,
@@ -1462,6 +1464,25 @@ export default function HomeScreen() {
 
   const revealedNow = !!currentTrack && revealTrack?.id === currentTrack.id;
   // Follow the Sound: where you can head from the song you just revealed (lib/follow-sound.ts). Only with a measured sound.
+  // Said out loud for VoiceOver and TalkBack (lib/spoken.ts): the song changes and is revealed without anything
+  // under the finger changing, so a screen reader would say nothing. Silent when no screen reader is on.
+  const spokenForRef = useRef<string | null>(null);
+  const topId = currentTrack?.id;
+  const spokenClue = cluesLine(topRecipe?.label ?? null, depth == null ? null : TIER_LABEL[tierFor(depth)]);
+  useEffect(() => {
+    if (!isFocused || !currentTrack || topId == null) return;
+    // The reveal waits for the listener count, so it is said once and whole.
+    if (revealedNow && revealListeners === undefined) return;
+    const key = `${topId}:${revealedNow ? 'revealed' : 'blind'}`;
+    if (spokenForRef.current === key) return;
+    spokenForRef.current = key;
+    const count = revealListeners != null ? describeListeners(revealListeners).count : null;
+    AccessibilityInfo.announceForAccessibility(
+      revealedNow ? spokenReveal(currentTrack.trackName, currentTrack.artistName, count) : spokenNewSong(currentLabel, spokenClue)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topId, revealedNow, revealListeners, isFocused]);
+
   const followFrom = useMemo<FollowFrom | null>(
     () => (revealedNow && currentTrack && topSound?.status === 'measured' ? followFromTrack(currentTrack, topSound.features) : null),
     [revealedNow, currentTrack, topSound]
@@ -1609,7 +1630,9 @@ export default function HomeScreen() {
         style={[StyleSheet.absoluteFill, slide]}
         pointerEvents={underWater ? 'none' : 'box-none'}
         accessibilityElementsHidden={underWater}
-        importantForAccessibility={underWater ? 'no-hide-descendants' : 'auto'}>
+        importantForAccessibility={underWater ? 'no-hide-descendants' : 'auto'}
+        // VoiceOver's two-finger double tap, from anywhere on Home: play or pause.
+        onMagicTap={() => void handleTogglePlay()}>
     {frameW > 0 && (
       <HomeSky
         width={frameW}
@@ -1687,6 +1710,18 @@ export default function HomeScreen() {
           onOpenChange={setGenreOpen}
         />
         <View style={styles.headerRight}>
+          {/* Diving is a drag up from the water. A drag is hard with a tremor and impossible with a screen reader, so it is a button too. */}
+          <Pressable
+            onPress={() => {
+              wake();
+              settleDiveTo(1);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Dive into your ocean"
+            accessibilityHint="The same as dragging up from the water"
+            style={({ pressed }) => [styles.diveButton, pressed && { opacity: 0.6 }]}>
+            <Ionicons name="water-outline" size={22} color={skyInk.text} />
+          </Pressable>
           <MapButton variant="icon" share={litShare} onPress={() => {
               wake();
               router.push('/map');
@@ -1753,6 +1788,15 @@ export default function HomeScreen() {
                   setDetailsOpen(true);
                 }}
                 onSave={() => saveFromHome(currentTrack)}
+                saved={savedIds.has(currentTrack.id)}
+                onAction={(action) => {
+                  wake();
+                  if (action === 'skip') press('left');
+                  else if (action === 'jump') press('down');
+                  else if (action === 'more' || action === 'next') press('right');
+                  else if (action === 'save') void saveFromHome(currentTrack);
+                  else setDetailsOpen(true);
+                }}
                 onTap={chrome.toggleFromCard}
                 onRevealSettled={lock.release}
                 onMix={setMix}
@@ -2020,6 +2064,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  diveButton: { width: TapTarget, height: TapTarget, alignItems: 'center', justifyContent: 'center' },
   // The card and its words, together in the middle of the white.
   cardArea: {
     flex: 1,
