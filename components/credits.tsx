@@ -21,7 +21,7 @@ function useBrandInk() {
 export function CreditLine({ lastfm = true }: { lastfm?: boolean }) {
   const ink = useSkyInk();
   return (
-    <ThemedText type="caption" style={[styles.credit, ink.onSky && { color: ink.secondary }]} grows="label" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
+    <ThemedText type="caption" style={[styles.credit, ink.onSky && { color: ink.secondary }]} grows="chrome" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
       {lastfm ? CREDIT_LINE : 'Previews provided courtesy of iTunes'}
     </ThemedText>
   );

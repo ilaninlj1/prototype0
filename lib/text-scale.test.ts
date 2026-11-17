@@ -7,7 +7,7 @@ test('text follows the phone setting until its cap', () => {
   assert.equal(drawnScale(1), 1);
   assert.equal(drawnScale(1.35), 1.35);
   assert.equal(drawnScale(3.1), TEXT_CAP.reading);
-  assert.equal(drawnScale(3.1, TEXT_CAP.chrome), 1.35);
+  assert.equal(drawnScale(3.1, TEXT_CAP.chrome), 1.25);
 });
 
 test('smaller than normal text is left alone, and a bad value means normal', () => {
@@ -18,8 +18,8 @@ test('smaller than normal text is left alone, and a bad value means normal', () 
 
 test('a size beside text grows with it', () => {
   assert.equal(scaled(24, 1), 24);
-  assert.equal(scaled(24, 3.1), 48);
-  assert.equal(scaled(24, 3.1, TEXT_CAP.label), 36);
+  assert.equal(scaled(24, 3.1), 42);
+  assert.equal(scaled(24, 3.1, TEXT_CAP.label), 31);
 });
 
 test('big text starts at one and a half times', () => {

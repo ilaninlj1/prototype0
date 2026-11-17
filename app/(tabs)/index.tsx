@@ -31,6 +31,7 @@ import { GenreStamp } from '@/components/home/genre-stamp';
 import { ListenCard, StackFace, type ListenCardHandle } from '@/components/home/listen-card';
 import { ListenInfo, listenInfoHeight } from '@/components/home/listen-info';
 import { useHighContrast } from '@/hooks/use-high-contrast';
+import { useScreenReader } from '@/hooks/use-screen-reader';
 import { useTextScale } from '@/hooks/use-text-scale';
 import { strongInk } from '@/lib/strong-ink';
 import { MapButton } from '@/components/home/map-button';
@@ -414,6 +415,7 @@ export default function HomeScreen() {
   const wordsDark = useDelayedValue(wordsAreDark(skyLook, true), INK_SWITCH_MS);
   // The phone's Increase Contrast setting: solid words, solid buttons and a panel behind the words (lib/strong-ink.ts).
   const highContrast = useHighContrast();
+  const screenReader = useScreenReader();
   const skyInk = useMemo(() => {
     const ink = wordsDark ? DARK_WORDS : LIGHT_WORDS;
     return highContrast ? { ...ink, ...strongInk(ink, wordsDark) } : ink;
@@ -1718,8 +1720,9 @@ export default function HomeScreen() {
           onOpenChange={setGenreOpen}
         />
         <View style={styles.headerRight}>
-          {/* Diving is a drag up from the water. A drag is hard with a tremor and impossible with a screen reader, so it is a button too. */}
-          <Pressable
+          {/* Diving is a drag up from the water, which a screen reader can't do, so with VoiceOver or TalkBack on it is a button too.
+              Not for everyone: a fourth icon pushed the row into the sky's island. */}
+          {screenReader && <Pressable
             onPress={() => {
               wake();
               settleDiveTo(1);
@@ -1729,7 +1732,7 @@ export default function HomeScreen() {
             accessibilityHint="The same as dragging up from the water"
             style={({ pressed }) => [styles.diveButton, pressed && { opacity: 0.6 }]}>
             <Ionicons name="water-outline" size={22} color={skyInk.text} />
-          </Pressable>
+          </Pressable>}
           <MapButton variant="icon" share={litShare} onPress={() => {
               wake();
               router.push('/map');

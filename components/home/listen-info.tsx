@@ -38,14 +38,28 @@ export function listenInfoHeight(fontScale: number): number {
 export function ListenInfo({ track, revealed, clues, listeners, onCallSave, origin }: Props) {
   const reduceMotion = useReducedMotion();
   const ink = useSkyInk();
-  const box = [styles.box, { height: listenInfoHeight(useTextScale()) }, !!ink.backing && { backgroundColor: ink.backing, borderRadius: 18, paddingHorizontal: Spacing.md }];
+  const box = [styles.box, { height: listenInfoHeight(useTextScale()) }];
+  // Increase Contrast: a panel hugs the words only, not the whole box they sit in.
+  const panel = ink.backing ? [styles.panel, { backgroundColor: ink.backing }] : styles.plain;
   if (!revealed) {
     return (
       <View style={box}>
-        <ThemedText type="subtitle" grows="label" style={[styles.center, { color: ink.text }]}>
-          Just listen.
-        </ThemedText>
-        {!!clues && <ThemedText grows="label" style={[styles.caption, styles.center, { color: ink.secondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{clues}</ThemedText>}
+        <View style={panel}>
+          <ThemedText type="subtitle" grows="label" style={[styles.center, { color: ink.text }]}>
+            Just listen.
+          </ThemedText>
+          {!!clues && (
+            <ThemedText
+              grows="label"
+              style={[styles.caption, styles.center, { color: ink.secondary }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {clues}
+            </ThemedText>
+          )}
+        </View>
       </View>
     );
   }
@@ -53,18 +67,20 @@ export function ListenInfo({ track, revealed, clues, listeners, onCallSave, orig
   const release = origin ?? releaseLine(track.releaseDate, track.collectionName);
   return (
     <Animated.View key={track.id} entering={FadeIn.delay(reduceMotion ? 0 : 700)} style={box}>
-      <ThemedText grows="label" style={[styles.title, styles.center, { color: ink.text }]} numberOfLines={1}>
-        {track.trackName}
-      </ThemedText>
-      <ThemedText grows="label" style={[styles.caption, styles.center, { color: ink.secondary }]} numberOfLines={1}>
-        {release ? `${track.artistName} · ${release}` : track.artistName}
-      </ThemedText>
-      <View style={styles.callRow}>
-        <ThemedText grows="label" style={[styles.caption, styles.listeners, { color: ink.secondary }]} numberOfLines={1}>
-          {described ? `${described.count} listeners` : listeners === undefined ? 'Counting listeners…' : 'No listener count yet'}
+      <View style={panel}>
+        <ThemedText grows="label" style={[styles.title, styles.center, { color: ink.text }]} numberOfLines={1}>
+          {track.trackName}
         </ThemedText>
-        <View style={styles.call}>
-          <CallButton track={track} listeners={listeners} onSave={onCallSave} />
+        <ThemedText grows="label" style={[styles.caption, styles.center, { color: ink.secondary }]} numberOfLines={1}>
+          {release ? `${track.artistName} · ${release}` : track.artistName}
+        </ThemedText>
+        <View style={styles.callRow}>
+          <ThemedText grows="label" style={[styles.caption, styles.listeners, { color: ink.secondary }]} numberOfLines={1}>
+            {described ? `${described.count} listeners` : listeners === undefined ? 'Counting listeners…' : 'No listener count yet'}
+          </ThemedText>
+          <View style={styles.call}>
+            <CallButton track={track} listeners={listeners} onSave={onCallSave} />
+          </View>
         </View>
       </View>
     </Animated.View>
@@ -72,11 +88,35 @@ export function ListenInfo({ track, revealed, clues, listeners, onCallSave, orig
 }
 
 const styles = StyleSheet.create({
-  box: { height: LISTEN_INFO_HEIGHT, alignSelf: 'stretch', justifyContent: 'center', gap: 4 },
+  box: {
+    height: LISTEN_INFO_HEIGHT,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    gap: 4,
+  },
   center: { textAlign: 'center' },
-  caption: { ...Typography.caption, fontSize: 15, lineHeight: 20, color: Colors.textSecondary },
+  plain: { alignSelf: 'stretch', gap: 4 },
+  panel: {
+    alignSelf: 'center',
+    maxWidth: '100%',
+    gap: 2,
+    borderRadius: 14,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+  },
+  caption: {
+    ...Typography.caption,
+    fontSize: 15,
+    lineHeight: 20,
+    color: Colors.textSecondary,
+  },
   title: { fontFamily: Fonts.display, fontSize: 22, lineHeight: 26 },
-  callRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
+  callRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.md,
+  },
   call: { width: 116, flexDirection: 'row' },
   listeners: { flexShrink: 1 },
 });

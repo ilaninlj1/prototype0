@@ -1,11 +1,11 @@
 /**
  * How far the phone's text size setting may grow each kind of text.
  * iPhone's biggest setting (Accessibility > Larger Text, all the way up) asks for about 3.1x.
- * Reading text follows it up to 2x and wraps onto more lines. Small labels on fixed controls
+ * Reading text follows it up to 1.75x and wraps onto more lines. Small labels on fixed controls
  * (the tab bar, the round buttons) stop sooner, because they have nowhere to wrap to;
  * those controls say their name through the screen reader and the large content viewer instead.
  */
-export const TEXT_CAP = { reading: 2, label: 1.5, chrome: 1.35 } as const;
+export const TEXT_CAP = { reading: 1.75, label: 1.3, chrome: 1.25 } as const;
 
 export type TextRole = keyof typeof TEXT_CAP;
 
