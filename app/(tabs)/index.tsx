@@ -20,6 +20,7 @@ import { TuneSheet, type NextMode } from '@/components/discovery/tune-sheet';
 import { UndoButton } from '@/components/discovery/undo-button';
 import { CreditLine } from '@/components/credits';
 import { ActionRow } from '@/components/home/action-row';
+import { HomeCoral } from '@/components/coral/home-coral';
 import { ChromeFade } from '@/components/home/chrome-fade';
 import { CornerPause } from '@/components/home/corner-pause';
 import { DetailsSheet } from '@/components/home/details-sheet';
@@ -1362,7 +1363,6 @@ export default function HomeScreen() {
   const [toast, setToast] = useState(false);
   const [toastFloating, setToastFloating] = useState(false);
   const chrome = useHomeChrome({
-    songsDecided: new Set(swipeHistory.map((e) => e.trackId)).size,
     clipEnded: hasEnded,
     feedStatusUp: !currentTrack,
     sheetOpen: detailsOpen || newsSheetVisible || tuneOpen || genreOpen,
@@ -1625,7 +1625,8 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.oceanRoot}>
+    // Water colored, not white: if the scene under the surface is still loading when you dive, you see water.
+    <View style={[styles.oceanRoot, { backgroundColor: seaWater.low }]}>
       <Animated.View
         style={[StyleSheet.absoluteFill, slide]}
         pointerEvents={underWater ? 'none' : 'box-none'}
@@ -1993,6 +1994,12 @@ export default function HomeScreen() {
         heardCount={swipeHistory.length}
         handlers={oceanHandlers}
       />
+      {/* Your coral at the edge of Home's water, where the shore is. It rides the dive with the rest of Home. */}
+      {!underWater && frameW > 0 && (
+        <Animated.View style={[StyleSheet.absoluteFill, slide]} pointerEvents="box-none">
+          <HomeCoral tempo={seaRhythmNow?.tempo ?? CALM_RHYTHM.tempo} playing={status.playing} onPress={() => router.push('/coral')} />
+        </Animated.View>
+      )}
       <CreatureSheet
         creature={openCreature}
         track={openCreature ? (oceanTracks.get(openCreature.trackId) ?? null) : null}

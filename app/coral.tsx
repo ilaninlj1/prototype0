@@ -5,6 +5,7 @@ import { type LayoutChangeEvent, StyleSheet, View, useWindowDimensions } from 'r
 import { cancelAnimation, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ChromeFade } from '@/components/home/chrome-fade';
 import { CoralBranchSheet } from '@/components/coral/coral-branch-sheet';
 import { CoralButton } from '@/components/coral/coral-controls';
 import { exampleCoral } from '@/components/coral/coral-example';
@@ -23,7 +24,7 @@ import { useLightStatusBar } from '@/hooks/use-light-status-bar';
 import { usePlayback } from '@/hooks/use-playback';
 import { useScreenReader } from '@/hooks/use-screen-reader';
 import { useSound } from '@/hooks/use-sound';
-import { addLink, budPoint, canLink, emptyCoral, hitBranch, hitNode, layoutGarden, mixFor, pullStart, removeLink, setLinkStart, setLinkType, touchPoint, traceStep, type CoralPull } from '@/lib/coral';
+import { addLink, budPoint, canLink, emptyCoral, hitBranch, hitNode, mixFor, pullStart, removeLink, setLinkStart, setLinkType, shoreGarden, touchPoint, traceStep, type CoralPull } from '@/lib/coral';
 import { createCoralMix } from '@/lib/coral-mix';
 import type { CoralSong, CoralTouch, LinkType } from '@/lib/coral-types';
 import type { DiscoveryTrack } from '@/lib/discovery';
@@ -74,6 +75,9 @@ function CoralScreenBody() {
   const blindIds = isExample ? NO_BLIND : hidden;
   const showList = listOpen || screenReader || fontScale > 1.6;
   const fromOpened = useRef<string | null>(null);
+  // The shore is bare, like Home: its buttons show when you arrive, fade after a few quiet seconds, and a tap on
+  // open water brings them back. They stay up whenever hiding them would strand you.
+  const [buttons, setButtons] = useState(true);
 
   const { playPreview, peekLoad, setMix, promotePeek, cancelPeek, stopPreview, currentDone, peekLouder, seekCurrent } = usePlayback();
   // Playback's context changes with its clock; these controller methods stay stable.
@@ -85,8 +89,8 @@ function CoralScreenBody() {
   const dragging = useRef(false);
   const leftBranch = useRef(false);
   const lastTick = useRef(0);
-  const glowX = useSharedValue(0);
-  const glowY = useSharedValue(0);
+  const glowX = useSharedValue(-400);
+  const glowY = useSharedValue(-400);
   const glowOn = useSharedValue(0);
   const blend = useSharedValue(0);
   const sway = useSharedValue(0);
@@ -146,7 +150,7 @@ function CoralScreenBody() {
   const linkedSongs = useMemo(() => [...new Map(state.links.flatMap((link) => [link.a, link.b]).map((song) => [song.trackId, song])).values()], [state.links]);
   const linksById = useMemo(() => new Map(state.links.map((link) => [link.id, link])), [state.links]);
   const songsById = useMemo(() => new Map(linkedSongs.map((song) => [song.trackId, song])), [linkedSongs]);
-  const layout = useMemo(() => layoutGarden(state.links, area.width, area.height), [state.links, area]);
+  const layout = useMemo(() => shoreGarden(state.links, area.width, area.height), [state.links, area]);
   const onTempo = useCallback((id: number, tempo: number | null) => {
     setTempos((old) => old[id] === tempo ? old : { ...old, [id]: tempo });
   }, []);
@@ -229,6 +233,7 @@ function CoralScreenBody() {
     else {
       const branch = hitBranch(layout, point.x, point.y, 24);
       if (branch) openBranch(branch.linkId);
+      else setButtons((old) => !old);
     }
   }
 
@@ -356,17 +361,27 @@ function CoralScreenBody() {
   const empty = state.links.length === 0;
   // Until privacy data has loaded, no saved name is put on screen or in its accessibility tree.
   const ready = loaded || isExample;
+  const pinned = !ready || empty || showList || !!picker || !!chosen || screenReader || mixing;
+  const shown = buttons || pinned;
+  // A pin letting go leaves them up for a moment, since you were just using them.
+  const [wasPinned, setWasPinned] = useState(pinned);
+  if (wasPinned !== pinned) {
+    setWasPinned(pinned);
+    if (!pinned) setButtons(true);
+  }
+  useEffect(() => {
+    if (pinned || !buttons) return;
+    const t = setTimeout(() => setButtons(false), 3500);
+    return () => clearTimeout(t);
+  }, [buttons, pinned]);
+  const words = pullSeconds !== null
+    ? (pullSeconds === 0 ? 'Pull further to start later in the song' : `Comes in at 0:${String(Math.floor(pullSeconds)).padStart(2, '0')}`)
+    : active && playing ? songLabel(active, blindIds.has(active.trackId)) : null;
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, Spacing.sm) }]}>
+    <View style={styles.screen}>
       {linkedSongs.map((song) => <SongTempo key={song.trackId} song={song} onTempo={onTempo} />)}
-      <View style={styles.header}>
-        <CoralButton dark onPress={() => { stop(); if (router.canGoBack()) router.back(); else router.replace('/'); }}>Close</CoralButton>
-        <ThemedText style={styles.title} accessibilityRole="header">Coral</ThemedText>
-        {!screenReader && fontScale <= 1.6 && <CoralButton dark onPress={() => { release(); setListOpen((old) => !old); }} label={showList ? 'Show coral' : 'Show branches as a list'}>{showList ? 'Coral' : 'List'}</CoralButton>}
-      </View>
-      {isExample && <ThemedText style={styles.notice}>Example coral. Changes here are not saved.</ThemedText>}
-      <View style={styles.area} onLayout={measure}>
+      <View style={StyleSheet.absoluteFill} onLayout={measure}>
         {!showList && area.width > 0 && area.height > 0 && <CoralGesture onBegin={beginTrace} onStart={startTrace} onMove={moveTrace} onFinish={finishTrace} onTap={tapAt}>
           <View style={StyleSheet.absoluteFill} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <CoralCanvas width={area.width} height={area.height} layout={layout} glowX={glowX} glowY={glowY} glowOn={glowOn}
@@ -374,20 +389,27 @@ function CoralScreenBody() {
               pullFrom={pullFrom} pullX={pullX} pullY={pullY} pullOn={pullOn} buds={buds} />
           </View>
         </CoralGesture>}
-        {ready && !empty && showList && <CoralList links={state.links} blindIds={blindIds} positions={positions} onAdjust={adjust} onOpen={openBranch} onPlay={solo} />}
+        {ready && !empty && showList && <View style={[styles.list, { paddingTop: insets.top + 60, paddingBottom: Math.max(insets.bottom, Spacing.sm) + 110 }]}>
+          <CoralList links={state.links} blindIds={blindIds} positions={positions} onAdjust={adjust} onOpen={openBranch} onPlay={solo} />
+        </View>}
         {(!ready || empty) && <View style={styles.empty} pointerEvents="box-none">
-          <ThemedText style={styles.emptyText}>{loadError ? 'Could not load your Library.' : !ready ? 'Loading your songs…' : 'Join two saved songs and hear what grows.'}</ThemedText>
+          <ThemedText style={styles.emptyText}>{loadError ? 'Could not load your Library.' : !ready ? 'Loading your songs…' : 'Nothing grows here yet. Join two saved songs and coral grows between them.'}</ThemedText>
           {loadError ? <CoralButton dark onPress={() => reloadLibrary.current()}>Try again</CoralButton> : ready && <CoralButton dark primary onPress={() => setPicker({})}>Grow a branch</CoralButton>}
         </View>}
       </View>
-      {ready && <View style={styles.footer}>
-        {pullSeconds !== null && <ThemedText style={styles.now}>{pullSeconds === 0 ? 'Pull further to start later in the song' : `Comes in at 0:${String(Math.floor(pullSeconds)).padStart(2, '0')}`}</ThemedText>}
-        {pullSeconds === null && active && playing && <ThemedText style={styles.now} accessibilityLiveRegion="polite">{songLabel(active, blindIds.has(active.trackId))}</ThemedText>}
-        <View style={styles.actions}>
+      <ChromeFade visible={shown} style={[styles.header, { top: insets.top }]}>
+        <CoralButton dark onPress={() => { stop(); if (router.canGoBack()) router.back(); else router.replace('/'); }} label="Back to the reef">Back to the reef</CoralButton>
+        {!screenReader && fontScale <= 1.6 && <CoralButton dark onPress={() => { release(); setListOpen((old) => !old); }} label={showList ? 'Show the shore' : 'Show branches as a list'}>{showList ? 'Shore' : 'List'}</CoralButton>}
+      </ChromeFade>
+      {ready && <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.sm) + Spacing.sm }]} pointerEvents="box-none">
+        {isExample && <ThemedText style={styles.notice}>Example coral. Changes here are not saved.</ThemedText>}
+        {words && <ThemedText style={styles.now} accessibilityLiveRegion="polite">{words}</ThemedText>}
+        {!words && !shown && <ThemedText style={styles.hint} pointerEvents="none">Drag along the coral to mix · tap the water for buttons</ThemedText>}
+        <ChromeFade visible={shown} style={styles.actions}>
           {!empty && <CoralButton dark primary onPress={() => { release(); setPicker({}); }}>Grow a branch</CoralButton>}
           {mixing && <CoralButton dark onPress={release}>Keep louder song</CoralButton>}
           {playing && <CoralButton dark onPress={stop}>Stop</CoralButton>}
-        </View>
+        </ChromeFade>
       </View>}
       {picker && ready && <CoralPicker songs={songs} state={state} blindIds={blindIds} initialId={picker.first} notice={picker.notice}
         onGrow={grow} onClose={() => setPicker(null)} />}
@@ -400,17 +422,19 @@ function CoralScreenBody() {
   );
 }
 
+const shade = { textShadowColor: 'rgba(0,30,45,0.6)', textShadowRadius: 6 } as const;
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#062436' },
-  header: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
-  title: { fontFamily: Fonts.display, fontSize: 28, lineHeight: 36, color: DarkColors.text, flexShrink: 1 },
-  notice: { color: '#c1d2d5', fontSize: 14, textAlign: 'center', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
-  area: { flex: 1, overflow: 'hidden' },
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, gap: Spacing.lg },
-  emptyText: { color: DarkColors.text, fontSize: 21, lineHeight: 28, textAlign: 'center' },
-  footer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.sm },
+  header: { position: 'absolute', left: 0, right: 0, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
+  list: { flex: 1, backgroundColor: '#062436' },
+  notice: { color: '#e3eef0', fontSize: 14, textAlign: 'center', ...shade },
+  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, paddingTop: '45%', gap: Spacing.lg },
+  emptyText: { color: DarkColors.text, fontSize: 21, lineHeight: 28, textAlign: 'center', ...shade },
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: Spacing.lg, gap: Spacing.sm },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, justifyContent: 'center' },
-  now: { fontSize: 15, color: DarkColors.text, textAlign: 'center' },
+  // The one line of words, the way Home says "Just listen."
+  now: { fontFamily: Fonts.display, fontSize: 22, lineHeight: 28, color: DarkColors.text, textAlign: 'center', ...shade },
+  hint: { fontSize: 13, lineHeight: 18, color: '#e3eef0', textAlign: 'center', ...shade },
 });
 
 export default function CoralScreen() {

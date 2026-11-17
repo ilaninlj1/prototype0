@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useRouter } from 'expo-router';
 import { BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -20,6 +21,7 @@ import { OceanChart } from '@/components/ocean/ocean-chart';
 import { OceanUi } from '@/components/ocean/ocean-ui';
 import { lazySkia } from '@/components/print/lazy-skia';
 import { useScreenReader } from '@/hooks/use-screen-reader';
+import { log } from '@/lib/app-log';
 import { castFor } from '@/lib/ocean-cast';
 import type { PathPoint } from '@/lib/ocean-chart';
 import { depthDragResult, nearestPlaceIndex, settleDive, showsAt, waterDragResult } from '@/lib/ocean-dive';
@@ -107,12 +109,17 @@ export const OceanOverlay = memo(function OceanOverlay({
 }) {
   const reduced = useReducedMotion();
   const screenReader = useScreenReader();
+  const router = useRouter();
+  const goShore = useRef(() => {});
+  goShore.current = () => router.push('/coral');
   useEffect(() => oceanReduced.set(!!reduced || screenReader), [reduced, screenReader]);
   useEffect(() => {
     oceanTravel.set(surfaceY + CLEARANCE);
   }, [surfaceY]);
 
   const [ready, setReady] = useState(false);
+  const readyRef = useRef(false);
+  readyRef.current = ready;
   const [under, setUnder] = useState(false);
   const [place, setPlace] = useState<Place>({ water: 'reef', depth: 'popular' });
   const [hintSeen, setHintSeen] = useState(true);
@@ -205,6 +212,7 @@ export const OceanOverlay = memo(function OceanOverlay({
   useEffect(
     () =>
       onDiveSettled((nowUnder) => {
+        log('ocean', nowUnder ? `dived, scene ${readyRef.current ? 'ready' : 'NOT ready yet'}` : 'surfaced');
         setUnder(nowUnder);
         handlers.current?.onUnderChange(nowUnder);
       }),
@@ -328,6 +336,9 @@ export const OceanOverlay = memo(function OceanOverlay({
     wake() {
       handlers.current?.onWake();
     },
+    shore() {
+      goShore.current();
+    },
     openChart() {
       setChart(handlers.current?.listeningPath() ?? []);
     },
@@ -382,6 +393,8 @@ export const OceanOverlay = memo(function OceanOverlay({
         if (axis.get() === 0) return;
         if (axis.get() === 1) {
           const moved = Math.abs(e.translationX) > width * 0.18 || Math.abs(e.velocityX) > 500;
+          // Swimming on past the Sunny reef brings you to the shore, where the sand climbs out of the water.
+          if (moved && startX.get() === 0 && e.translationX > 0) runOnJS(js.shore)();
           const target = moved ? waterDragResult(startX.get(), Math.sign(e.translationX)) : startX.get();
           // The glide carries on at the speed your finger left at, so letting go is seamless.
           posX.set(withSpring(target, { ...SPRING, velocity: -e.velocityX / Math.max(1, width) }));
