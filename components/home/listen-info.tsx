@@ -38,7 +38,7 @@ export function listenInfoHeight(fontScale: number): number {
 export function ListenInfo({ track, revealed, clues, listeners, onCallSave, origin }: Props) {
   const reduceMotion = useReducedMotion();
   const ink = useSkyInk();
-  const box = [styles.box, { height: listenInfoHeight(useTextScale()) }];
+  const box = [styles.box, { height: listenInfoHeight(useTextScale()) }, !!ink.backing && { backgroundColor: ink.backing, borderRadius: 18, paddingHorizontal: Spacing.md }];
   if (!revealed) {
     return (
       <View style={box}>

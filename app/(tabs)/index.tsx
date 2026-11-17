@@ -30,7 +30,9 @@ import { FollowStrip } from '@/components/home/follow-strip';
 import { GenreStamp } from '@/components/home/genre-stamp';
 import { ListenCard, StackFace, type ListenCardHandle } from '@/components/home/listen-card';
 import { ListenInfo, listenInfoHeight } from '@/components/home/listen-info';
+import { useHighContrast } from '@/hooks/use-high-contrast';
 import { useTextScale } from '@/hooks/use-text-scale';
+import { strongInk } from '@/lib/strong-ink';
 import { MapButton } from '@/components/home/map-button';
 import { slotCenter, type StripRect } from '@/components/home/piece-strip';
 import { SavedToast } from '@/components/home/saved-toast';
@@ -410,7 +412,12 @@ export default function HomeScreen() {
   const tabInk = useDelayedValue(seaWater.ink, INK_SWITCH_MS);
   useEffect(() => setOceanInk(tabInk), [tabInk]);
   const wordsDark = useDelayedValue(wordsAreDark(skyLook, true), INK_SWITCH_MS);
-  const skyInk = wordsDark ? DARK_WORDS : LIGHT_WORDS;
+  // The phone's Increase Contrast setting: solid words, solid buttons and a panel behind the words (lib/strong-ink.ts).
+  const highContrast = useHighContrast();
+  const skyInk = useMemo(() => {
+    const ink = wordsDark ? DARK_WORDS : LIGHT_WORDS;
+    return highContrast ? { ...ink, ...strongInk(ink, wordsDark) } : ink;
+  }, [wordsDark, highContrast]);
   const signFront = skySound ? `${Math.round(skySound.tempo)} BPM` : '♪';
   const signBack = (skySound && keyLabel(skySound.key, skySound.mode)?.replace(' minor', ' min').replace(' major', ' maj')) || '♪';
   const seaSongRef = useRef<number | null>(null);

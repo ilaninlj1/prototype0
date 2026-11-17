@@ -14,6 +14,8 @@ export type SkyInk = {
   paper: string;
   /** On Home's sky, rather than the plain light look. */
   onSky: boolean;
+  /** Increase Contrast is on: a panel of this color goes behind words that sit on the sky (lib/strong-ink.ts). */
+  backing?: string;
 };
 
 /** Everywhere outside Home: the plain light look. Components that read this look the same as ever there. */
