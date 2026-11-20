@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ImportReportBody } from '@/components/import-report';
+import { rearmSwipeHint, useSwipeHintStored } from '@/hooks/use-swipe-hint';
 import { ThemedText } from '@/components/themed-text';
 import { BottomSheet, SheetHeader, sheetStyles } from '@/components/ui/sheet';
 import { Colors, Fonts, Spacing, TapTarget, Ui } from '@/constants/theme';
@@ -83,6 +84,8 @@ export function TuneSheet({
     onOpenChange?.(open);
   };
   const allowAi = useAllowAi();
+  // Armed until the next first swipe, so the button says so while it waits.
+  const hintArmed = useSwipeHintStored() === 'armed';
   // undefined while storage loads: the switch shows neither side rather than a wrong Off.
   const bottlesSetting = useBottlesOn();
   const bottlesOn = bottlesSetting === true;
@@ -255,6 +258,19 @@ export function TuneSheet({
                   {cityNote && <ThemedText type="caption">{cityNote}</ThemedText>}
                 </>
               )}
+
+              <ThemedText style={sheetStyles.heading}>Next person</ThemedText>
+              <TouchableOpacity
+                onPress={rearmSwipeHint}
+                activeOpacity={0.6}
+                style={[Ui.outlineButton, styles.logButton]}
+                accessibilityRole="button"
+                accessibilityLabel="Show the swipe hint again">
+                <ThemedText style={Ui.label}>{hintArmed ? 'Hint is back' : 'Show the swipe hint again'}</ThemedText>
+              </TouchableOpacity>
+              <ThemedText type="caption">
+                Handing the phone to someone new? A few seconds into the next song, a finger shows them to swipe right.
+              </ThemedText>
 
               <ThemedText style={sheetStyles.heading}>Log</ThemedText>
               <TouchableOpacity

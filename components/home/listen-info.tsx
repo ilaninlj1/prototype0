@@ -20,6 +20,8 @@ type Props = {
   onCallSave?: (track: DiscoveryTrack) => Promise<void>;
   /** A bottle's "Washed up from Lisbon": takes the release line's place, which stays in Details. */
   origin?: string | null;
+  /** A first-time visitor's hint, said in place of "Just listen." while the finger shows on the card. */
+  hint?: string | null;
 };
 
 // Fixed, so the buttons under it never move between blind and revealed.
@@ -35,7 +37,7 @@ export function listenInfoHeight(fontScale: number): number {
  * key and how far it is from your taste. Revealed: who it is, when it came
  * out, how many people listen, and Call it.
  */
-export function ListenInfo({ track, revealed, clues, listeners, onCallSave, origin }: Props) {
+export function ListenInfo({ track, revealed, clues, listeners, onCallSave, origin, hint }: Props) {
   const reduceMotion = useReducedMotion();
   const ink = useSkyInk();
   const box = [styles.box, { height: listenInfoHeight(useTextScale()) }];
@@ -45,8 +47,8 @@ export function ListenInfo({ track, revealed, clues, listeners, onCallSave, orig
     return (
       <View style={box}>
         <View style={panel}>
-          <ThemedText type="subtitle" grows="label" style={[styles.center, { color: ink.text }]}>
-            Just listen.
+          <ThemedText type="subtitle" grows="label" style={[styles.center, { color: ink.text }]} accessibilityLiveRegion="polite">
+            {hint ?? 'Just listen.'}
           </ThemedText>
           {!!clues && (
             <ThemedText

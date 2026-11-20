@@ -30,6 +30,9 @@ import { FollowStrip } from '@/components/home/follow-strip';
 import { GenreStamp } from '@/components/home/genre-stamp';
 import { ListenCard, StackFace, type ListenCardHandle } from '@/components/home/listen-card';
 import { ListenInfo, listenInfoHeight } from '@/components/home/listen-info';
+import { SwipeHint } from '@/components/home/swipe-hint';
+import { finishSwipeHint, useSwipeHintStored } from '@/hooks/use-swipe-hint';
+import { HINT_WORDS, hintShowing, hintWanted } from '@/lib/swipe-hint';
 import { useHighContrast } from '@/hooks/use-high-contrast';
 import { useScreenReader } from '@/hooks/use-screen-reader';
 import { useTextScale } from '@/hooks/use-text-scale';
@@ -1245,6 +1248,7 @@ export default function HomeScreen() {
 
   // Every committed swipe lands here holding the action lock (ListenCard asks for it, or press() took it).
   function handleCardSwipe(direction: SwipeDirection, track: DiscoveryTrack) {
+    finishSwipeHint();
     captureUndoSnapshot();
     if (revealTrack) {
       if (direction === 'down') void handleJumpFromReveal();
@@ -1472,6 +1476,14 @@ export default function HomeScreen() {
   const openPortrait = useCallback(() => setPortraitOpen(true), []);
 
   const revealedNow = !!currentTrack && revealTrack?.id === currentTrack.id;
+  // A first-time visitor's hint (lib/swipe-hint.ts): a finger slides right across the blind card a few seconds in.
+  const hintStored = useSwipeHintStored();
+  const hintOn = hintShowing({
+    wanted: hydrated && hintStored !== undefined && hintWanted(hintStored, swipeHistory.length),
+    hasCard: !!currentTrack && !underWater,
+    revealed: revealedNow,
+    position: status.currentTime,
+  });
   // Follow the Sound: where you can head from the song you just revealed (lib/follow-sound.ts). Only with a measured sound.
   // Said out loud for VoiceOver and TalkBack (lib/spoken.ts): the song changes and is revealed without anything
   // under the finger changing, so a screen reader would say nothing. Silent when no screen reader is on.
@@ -1527,6 +1539,8 @@ export default function HomeScreen() {
     if (first) {
       setHatch({ key: Date.now(), color: songLight(track.id) });
       if (!firstHatchSeenRef.current) setFirstHatchPending(true);
+      // The sea answers, by how the song feels (only the top card's sound is on hand).
+      seaLife.answerSave(track.id === currentTrack?.id && topSound?.status === 'measured' ? topSound.features.energy : null);
     }
     await handleSave(track);
     if (first && (await bottles.saved(track, swipeHistory, listenMs))) setToastFloating(true);
@@ -1808,11 +1822,19 @@ export default function HomeScreen() {
                   else if (action === 'save') void saveFromHome(currentTrack);
                   else setDetailsOpen(true);
                 }}
-                onTap={chrome.toggleFromCard}
+                onTap={() => {
+                  // A paused blind card shows a big ▶, so a tap there plays (the app opens paused, and a first-timer
+                  // taps the ▶). Any other tap shows or hides the buttons.
+                  if (!revealedNow && status.isLoaded && !status.playing) {
+                    wake();
+                    void handleTogglePlay();
+                  } else chrome.toggleFromCard();
+                }}
                 onRevealSettled={lock.release}
                 onMix={setMix}
                 onCancelPeek={cancelPeek}
               />
+              {hintOn && <SwipeHint width={cardSize.width} />}
               <LaunchLight
                 trigger={hatch?.key ?? 0}
                 height={cardSize.height}
@@ -1833,6 +1855,7 @@ export default function HomeScreen() {
               listeners={revealedNow ? revealListeners : undefined}
               onCallSave={handleSave}
               origin={currentTrack.bottle ? revealLine(currentTrack.bottle) : null}
+              hint={hintOn ? HINT_WORDS : null}
             />
           </View>
 
