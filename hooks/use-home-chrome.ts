@@ -49,7 +49,11 @@ export function useHomeChrome(inputs: Inputs) {
   const screenReader = useScreenReader();
 
   // Big text or Reduce Motion: the buttons stay, and a tap on the card no longer puts them away.
-  const steadyControls = isBigText(useTextScale()) || !!useReducedMotion();
+  // Both hooks run every render: inside `||` the second was skipped at big text, so changing the
+  // phone's text size with the app open changed Home's hook count and crashed it.
+  const textScale = useTextScale();
+  const reducedMotion = useReducedMotion();
+  const steadyControls = isBigText(textScale) || !!reducedMotion;
 
   const state: ChromeState = { ...inputs, ...clock, screenReader, steadyControls };
   const visible = chromeVisible(state);
