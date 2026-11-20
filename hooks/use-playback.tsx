@@ -7,8 +7,14 @@ import {
 } from 'expo-audio';
 import { useFocusEffect } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { Platform } from 'react-native';
 
 import { createPlaybackCrossfade } from '@/lib/playback-crossfade';
+
+// Left alone, the iPhone fills Now Playing (Dynamic Island, Control Center, lock screen) from the
+// preview file's own tags, cover and title included, which gives a blind card away. Naming the
+// player ourselves replaces that, for every song, since the player can't tell blind from revealed.
+const BLIND_NOW_PLAYING = { title: 'Listening blind', artist: 'Blindspot' };
 
 type PlaybackContextValue = ReturnType<typeof createPlaybackCrossfade<AudioPlayer>> & {
   player: AudioPlayer;
@@ -29,8 +35,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const crossfade = useMemo(() => {
     const fade = createPlaybackCrossfade(first, second, setPlayer, {
       now: Date.now,
-      requestFrame: requestAnimationFrame,
-      cancelFrame: cancelAnimationFrame,
+      // Wrapped: browsers throw "Illegal invocation" when these are called as methods of another object.
+      requestFrame: (cb) => requestAnimationFrame(cb),
+      cancelFrame: (id) => cancelAnimationFrame(id),
     });
     // Opening the app never starts music on its own: the first song waits for a tap.
     fade.holdNext();
@@ -38,8 +45,21 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   }, [first, second]);
 
   useEffect(() => {
-    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+    // iOS only takes our Now Playing words from a player that doesn't mix with other apps' audio.
+    setAudioModeAsync({ playsInSilentMode: true, ...(Platform.OS === 'ios' ? { interruptionMode: 'doNotMix' as const } : null) }).catch(
+      () => {}
+    );
   }, []);
+
+  // Whichever player is current owns Now Playing; the crossfade swaps players, so this follows it.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    try {
+      player.setActiveForLockScreen(true, BLIND_NOW_PLAYING);
+    } catch {
+      // A missing native method must never stop the music.
+    }
+  }, [player]);
 
   useEffect(() => {
     crossfade.refresh();
