@@ -31,6 +31,9 @@ import { soundLookup } from '@/lib/sound-lookup-app';
 // may wash up as one card in five, a card leaving the top stages its bottle news (Undo takes it
 // back), a save floats, and keeping a bottle shows who kept it before you.
 
+/** The first-save question waits until the save's light, hatchling and sea animal have had their moment. */
+const CONSENT_AFTER_MS = 5000;
+
 export type KeepMoment = { key: number; trackId: number; hops: Hop[]; line: string; stops: RouteStop[] };
 export type BottleAsk = { kind: 'consent' } | { kind: 'old'; finds: DiscoveryTrack[] };
 
@@ -89,6 +92,13 @@ export function useBottles(region: Region) {
   const tiersRef = useRef(new Map<number, Tier | null>());
   const [keep, setKeep] = useState<KeepMoment | null>(null);
   const [ask, setAsk] = useState<BottleAsk | null>(null);
+  const askTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (askTimer.current) clearTimeout(askTimer.current);
+    },
+    []
+  );
   const [launchFx, setLaunchFx] = useState<{ key: number; color: string } | null>(null);
 
   // Anything left from last time goes out now; leaving the app sends what's waiting.
@@ -200,7 +210,9 @@ export function useBottles(region: Region) {
       return false;
     }
     if (on === null) {
-      setAsk({ kind: 'consent' });
+      // After the save's own moment (its light, the hatchling, the sea's answer), which this card would cover.
+      if (askTimer.current) clearTimeout(askTimer.current);
+      askTimer.current = setTimeout(() => setAsk((a) => a ?? { kind: 'consent' }), CONSENT_AFTER_MS);
       return false;
     }
     const floats = on === true && canLaunch(track, listenMs, await launchesToday());

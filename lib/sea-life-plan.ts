@@ -46,6 +46,23 @@ export function stillPlan(hour: number, rand: () => number): StillStep[] {
   ];
 }
 
+export type SaveAnswer = { kind: SeaLifeKind; breach?: boolean; leap?: boolean; quick: true };
+
+/** Seconds after a save: its light has dropped into the water and the hatchling is out, then the sea answers. */
+export const SAVE_ANSWER_S = 1.2;
+
+/**
+ * The sea answers a save with an animal that fits the song: something loud brings a humpback up to breach, the middle
+ * sends dolphins leaping, and something calm gets one slow breath from a blue whale. With no measurement, dolphins.
+ * All far away, so the save's own hatchling keeps the water close to you.
+ */
+export function saveAnswer(energy: number | null): SaveAnswer {
+  if (energy == null) return { kind: 'pod', leap: true, quick: true };
+  if (energy >= 0.65) return { kind: 'hump', breach: true, quick: true };
+  if (energy >= 0.35) return { kind: 'pod', leap: true, quick: true };
+  return { kind: 'blue', quick: true };
+}
+
 /** The animals in the distance share one slot and the ones close up share another, so both can be up at once. */
 export const isFar = (kind: SeaLifeKind) => kind === 'hump' || kind === 'blue' || kind === 'sperm' || kind === 'pod';
 

@@ -4,7 +4,7 @@ import { runOnJS, useDerivedValue, useFrameCallback, useReducedMotion, useShared
 import { oceanDive } from '@/components/ocean/dive-gesture';
 import type { SkyLook } from '@/lib/home-sky';
 import { emptyScene, sceneAt, type SeaLifeKind, type Sighting } from '@/lib/sea-life';
-import { colorsFor, isFar, makeSighting, nextGap, pickKind, stillPlan, type SeaLifeColors } from '@/lib/sea-life-plan';
+import { colorsFor, isFar, makeSighting, nextGap, pickKind, SAVE_ANSWER_S, saveAnswer, stillPlan, type SeaLifeColors } from '@/lib/sea-life-plan';
 
 type Where = { width: number; screenH: number; horizon: number; hour: number; look: SkyLook };
 type Options = Where & {
@@ -123,5 +123,27 @@ export function useSeaLife({ active, paused, still, width, screenH, horizon, hou
     return () => ids.forEach(clearTimeout);
   }, [can, still, bringUp]);
 
-  return { far, near, show };
+  // A save: the sea answers once the save's light is in the water. If something far is already up, a flying fish
+  // passes close instead; if both are taken, the save goes unanswered rather than cutting an animal off.
+  const canRef = useRef(can);
+  useEffect(() => {
+    canRef.current = can;
+  }, [can]);
+  const answers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => answers.current.forEach(clearTimeout), []);
+  const answerSave = useCallback(
+    (energy: number | null) => {
+      const id = setTimeout(() => {
+        answers.current = answers.current.filter((x) => x !== id);
+        if (!canRef.current) return;
+        const a = saveAnswer(energy);
+        if (busy.current.far) bringUp('fly');
+        else bringUp(a.kind, a);
+      }, SAVE_ANSWER_S * 1000);
+      answers.current.push(id);
+    },
+    [bringUp]
+  );
+
+  return { far, near, show, answerSave };
 }

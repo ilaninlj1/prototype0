@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 import { CALM_WEATHER, skyAt } from './home-sky.ts';
 import { FLY_PASS_S, sceneAt, type Scene, type SeaLifeKind, type Sighting } from './sea-life.ts';
-import { colorsFor, dolphinsAwake, fishAreUp, isFar, makeSighting, nextGap, pickKind, stillPlan } from './sea-life-plan.ts';
+import { colorsFor, dolphinsAwake, fishAreUp, isFar, makeSighting, nextGap, pickKind, SAVE_ANSWER_S, saveAnswer, stillPlan } from './sea-life-plan.ts';
 
 const KINDS: SeaLifeKind[] = ['fly', 'bait', 'seal', 'pod', 'hump', 'sperm', 'blue'];
 const make = (kind: SeaLifeKind, o: Partial<Parameters<typeof makeSighting>[1]> = {}) => makeSighting(kind, { width: 390, screenH: 844, horizon: 704, hour: 12, wind: 0.5, ...o });
@@ -191,4 +191,28 @@ test('every function a frame calls is marked as a worklet', () => {
   // Inner helpers too: an arrow function inside a worklet that isn't one crashes the same way.
   for (const m of source.matchAll(/const \w+ = \([^)]*\) => \{\n(.*)$/gm)) assert.match(m[1], /^\s*'worklet';/, m[0]);
   assert.doesNotMatch(source, /from '@\/|sea-life-plan/);
+});
+
+test('a save is answered by an animal that fits the song: loud breaches, the middle leaps, calm blows slowly', () => {
+  assert.deepEqual(saveAnswer(0.9), { kind: 'hump', breach: true, quick: true });
+  assert.deepEqual(saveAnswer(0.5), { kind: 'pod', leap: true, quick: true });
+  assert.deepEqual(saveAnswer(0.1), { kind: 'blue', quick: true });
+  // No measurement: dolphins, the one that reads as happy whatever the song.
+  assert.deepEqual(saveAnswer(null), { kind: 'pod', leap: true, quick: true });
+  // The edges belong to the louder side.
+  assert.equal(saveAnswer(0.65).kind, 'hump');
+  assert.equal(saveAnswer(0.35).kind, 'pod');
+});
+
+test('every save answer comes up in the distance and is over within a 30 s preview', () => {
+  for (const energy of [null, 0.1, 0.5, 0.9]) {
+    const a = saveAnswer(energy);
+    assert.ok(isFar(a.kind), `${a.kind} should be far, so the save's hatchling keeps the near water`);
+    const s = make(a.kind, { forceBreach: a.breach, forceLeap: a.leap, quick: a.quick });
+    assert.ok(s.duration <= 30, `${a.kind} lasts ${s.duration}s, longer than a preview`);
+    if (a.breach) assert.equal(s.ending, 'breach');
+    if (a.leap) assert.equal(s.leap, true);
+  }
+  // After the save's light has landed in the water, not on top of it.
+  assert.ok(SAVE_ANSWER_S >= 0.7 && SAVE_ANSWER_S <= 2);
 });
