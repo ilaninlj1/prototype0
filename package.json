@@ -17,6 +17,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "showcase-web": "EXPO_PUBLIC_SHOWCASE_WEB=1 expo export -p web --output-dir dist-showcase && cp node_modules/canvaskit-wasm/bin/full/canvaskit.wasm dist-showcase/",
     "lint": "expo lint",
     "scan-ai-artists": "node --experimental-strip-types --env-file=.env.local scripts/scan-ai-artists.ts",
     "build-sound-index": "node --experimental-strip-types scripts/build-sound-index.ts",

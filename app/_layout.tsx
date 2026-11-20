@@ -14,7 +14,7 @@ import { Archivo_700Bold, Archivo_800ExtraBold } from '@expo-google-fonts/archiv
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { router, Stack, usePathname } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
@@ -60,6 +60,15 @@ if (Platform.OS !== 'web') {
   });
 }
 
+// A development server on this computer is not the public website, so its browser shows every screen (used to check big
+// text with ?textScale=3.1). Neither is a showcase build, made with EXPO_PUBLIC_SHOWCASE_WEB=1 so visitors can try the
+// whole app in a browser.
+const FULL_WEB = __DEV__ || process.env.EXPO_PUBLIC_SHOWCASE_WEB === '1';
+
+const noSubscription = () => () => {};
+/** False on the server and while the page hydrates, then true. Always true on a phone. */
+const useInBrowser = () => useSyncExternalStore(noSubscription, () => true, () => false);
+
 export default function RootLayout() {
   // Tapping the weekly reminder opens the Library (its old /modal link still lands there), or the Decoded page when it announced a finding.
   useEffect(() => {
@@ -78,12 +87,7 @@ export default function RootLayout() {
   // returns to). Every other screen uses Last.fm, whose terms need written approval
   // for public web pages.
   const pathname = usePathname();
-  // A development server on this computer is not the public website, so its browser can show every screen
-  // (used to check big text with ?textScale=3.1). Only after mounting: the server's first draw has no audio.
-  const [devBrowser, setDevBrowser] = useState(false);
-  useEffect(() => {
-    if (__DEV__ && Platform.OS === 'web') setDevBrowser(true);
-  }, []);
+  const inBrowser = useInBrowser();
   const [fontsLoaded] = useFonts({
     Archivo_700Bold,
     Archivo_800ExtraBold,
@@ -101,8 +105,9 @@ export default function RootLayout() {
     InterTight_900Black,
     Parisienne_400Regular,
   });
-  if (!fontsLoaded) return <View style={styles.boot} />;
-  if (Platform.OS === 'web' && !devBrowser && pathname !== '/pack' && pathname !== '/spotify-callback') {
+  // The web build's pages are drawn on a server first, which has no audio: the player would crash it, so pages wait for the browser.
+  if (!fontsLoaded || (Platform.OS === 'web' && !inBrowser)) return <View style={styles.boot} />;
+  if (Platform.OS === 'web' && !FULL_WEB && pathname !== '/pack' && pathname !== '/spotify-callback') {
     return (
       <View style={styles.webLanding}>
         <ThemedText type="title">Blindspot</ThemedText>
