@@ -39,7 +39,6 @@ import { useTextScale } from '@/hooks/use-text-scale';
 import { strongInk } from '@/lib/strong-ink';
 import { MapButton } from '@/components/home/map-button';
 import { slotCenter, type StripRect } from '@/components/home/piece-strip';
-import { SavedToast } from '@/components/home/saved-toast';
 import { BottleAskCard } from '@/components/bottles/bottle-ask';
 import { KeepMoment } from '@/components/bottles/keep-moment';
 import { BottleOpening, type OpeningGeometry } from '@/components/bottles/bottle-opening';
@@ -1373,8 +1372,6 @@ export default function HomeScreen() {
   // Home's buttons come and go (lib/home-chrome.ts): only the card and its clues stay while you listen.
   const [tuneOpen, setTuneOpen] = useState(false);
   const [genreOpen, setGenreOpen] = useState(false);
-  const [toast, setToast] = useState(false);
-  const [toastFloating, setToastFloating] = useState(false);
   const chrome = useHomeChrome({
     clipEnded: hasEnded,
     feedStatusUp: !currentTrack,
@@ -1527,14 +1524,12 @@ export default function HomeScreen() {
 
   // Every button also keeps the buttons up (wake), so a tap never makes them vanish mid-use.
 
-  // A save shows the toast once, the first time a song is kept.
+  // A save shows itself in the world, not in a bar: its light drops into the water, a creature hatches, the sea answers
+  // with an animal, and Library's tab gets a +N. A "Saved to Liked Songs" bar used to sit on the horizon and hide the animal.
   async function saveFromHome(track: DiscoveryTrack) {
-    // Shown at the tap, not after storage answers: the save itself can take a moment.
     const first = !savedIds.has(track.id);
-    if (first) {
-      setToastFloating(false);
-      setToast(true);
-    }
+    // Screen readers still hear it at the tap, not after storage answers: the save itself can take a moment.
+    if (first) AccessibilityInfo.announceForAccessibility('Saved to Liked Songs');
     const listenMs = Math.round(status.currentTime * 1000);
     if (first) {
       setHatch({ key: Date.now(), color: songLight(track.id) });
@@ -1543,9 +1538,8 @@ export default function HomeScreen() {
       seaLife.answerSave(track.id === currentTrack?.id && topSound?.status === 'measured' ? topSound.features.energy : null);
     }
     await handleSave(track);
-    if (first && (await bottles.saved(track, swipeHistory, listenMs))) setToastFloating(true);
-    // Keeping a bottle shows the keep moment in the toast's place; the toast mustn't come back after it.
-    if (first && track.via === 'bottle') setToast(false);
+    // A save that floats sets sail on its own (the launch light), so there's nothing more to say here.
+    if (first) await bottles.saved(track, swipeHistory, listenMs);
   }
 
   // One line at the top, the most important thing first (lib/status-line.ts).
@@ -1889,7 +1883,7 @@ export default function HomeScreen() {
               }}
             />
           </ChromeFade>
-          {/* One row under the buttons: the credits, or for a few seconds after a save, the toast in their place. */}
+          {/* One row under the buttons: the credits, or a Bottles card or line in their place. */}
           <View style={styles.slot} pointerEvents="box-none">
             {/* Bottles' cards are taller than the row, so they rise from its bottom over the buttons. */}
             {bottles.ask ? (
@@ -1906,16 +1900,6 @@ export default function HomeScreen() {
               </View>
             ) : firstHatchLine ? (
               <ThemedText style={[styles.firstHatch, { color: skyInk.text }]}>Your song went under. Swipe up to see it.</ThemedText>
-            ) : toast ? (
-              <SavedToast
-                visible
-                floating={toastFloating}
-                onHide={() => setToast(false)}
-                onViewLibrary={() => {
-                  setToast(false);
-                  router.navigate('/library');
-                }}
-              />
             ) : (
               <ChromeFade visible={chrome.visible}>
                 {/* In this row, not above the buttons: the card sizes itself to the height left, so a row up there would shrink it on every reveal. */}

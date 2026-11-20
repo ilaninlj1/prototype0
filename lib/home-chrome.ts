@@ -7,7 +7,6 @@
 
 export const HIDE_AFTER_MS = 3000;
 export const FADE_MS = 250;
-export const TOAST_MS = 4000;
 
 export type ChromeState = {
   now: number;
