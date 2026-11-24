@@ -9,6 +9,7 @@ import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import { cleanComment, cleanVibe, mergeVibes, timeAgo, type Comment, type Vibe } from '@/lib/comments';
 import { loadDeviceId, loadSenderName } from '@/lib/discovery-storage';
 import { fetchArtistTags } from '@/lib/pool';
+import { PUBLIC_WEB } from '@/lib/public-web';
 import { addVibe, fetchComments, fetchVibes, postComment, reportComment } from '@/lib/supabase';
 
 /** A song's comments, opened only after its reveal. Tags up top so it's never empty. */
@@ -57,6 +58,7 @@ export default function CommentsScreen() {
   }
 
   async function send() {
+    if (PUBLIC_WEB) return; // the public website is read-only
     const body = cleanComment(draft);
     if (!body || !deviceId) return;
     setDraft('');
@@ -108,21 +110,23 @@ export default function CommentsScreen() {
               </TouchableOpacity>
             );
           })}
-          <View style={[styles.chip, styles.chipInput]}>
-            <TextInput
-              value={newVibe}
-              onChangeText={setNewVibe}
-              onSubmitEditing={() => {
-                vote(newVibe);
-                setNewVibe('');
-              }}
-              placeholder="+ your word"
-              placeholderTextColor={Colors.textSecondary}
-              maxLength={24}
-              style={styles.chipText}
-              returnKeyType="done"
-            />
-          </View>
+          {!PUBLIC_WEB && (
+            <View style={[styles.chip, styles.chipInput]}>
+              <TextInput
+                value={newVibe}
+                onChangeText={setNewVibe}
+                onSubmitEditing={() => {
+                  vote(newVibe);
+                  setNewVibe('');
+                }}
+                placeholder="+ your word"
+                placeholderTextColor={Colors.textSecondary}
+                maxLength={24}
+                style={styles.chipText}
+                returnKeyType="done"
+              />
+            </View>
+          )}
         </View>
         {tags.length > 0 && <ThemedText style={styles.credit}>Tags from Last.fm listeners</ThemedText>}
 
@@ -132,7 +136,9 @@ export default function CommentsScreen() {
         {comments === null ? (
           <ThemedText style={styles.dim}>Loading…</ThemedText>
         ) : visible.length === 0 ? (
-          <ThemedText style={styles.empty}>Nobody&apos;s said anything yet. You found it, so you get the first word.</ThemedText>
+          <ThemedText style={styles.empty}>
+            {PUBLIC_WEB ? 'Nobody’s said anything yet.' : 'Nobody’s said anything yet. You found it, so you get the first word.'}
+          </ThemedText>
         ) : (
           visible.map((c) => (
             <View key={c.id} style={styles.comment}>
@@ -150,20 +156,26 @@ export default function CommentsScreen() {
       </ScrollView>
 
       {failed && <ThemedText style={styles.failed}>That didn&apos;t send. Check your connection and try again.</ThemedText>}
-      <View style={[styles.composer, { paddingBottom: insets.bottom + Spacing.sm }]}>
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          placeholder="Say something about it…"
-          placeholderTextColor={Colors.textSecondary}
-          maxLength={280}
-          multiline
-          style={styles.input}
-        />
-        <TouchableOpacity onPress={send} disabled={!canSend} hitSlop={8}>
-          <Ionicons name="arrow-up-circle" size={36} color={canSend ? Colors.signal : Colors.textTertiary} />
-        </TouchableOpacity>
-      </View>
+      {PUBLIC_WEB ? (
+        <View style={[styles.composer, { paddingBottom: insets.bottom + Spacing.sm }]}>
+          <ThemedText style={styles.dim}>Comments are read-only on the website. You can write one in the app.</ThemedText>
+        </View>
+      ) : (
+        <View style={[styles.composer, { paddingBottom: insets.bottom + Spacing.sm }]}>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="Say something about it…"
+            placeholderTextColor={Colors.textSecondary}
+            maxLength={280}
+            multiline
+            style={styles.input}
+          />
+          <TouchableOpacity onPress={send} disabled={!canSend} hitSlop={8}>
+            <Ionicons name="arrow-up-circle" size={36} color={canSend ? Colors.signal : Colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }

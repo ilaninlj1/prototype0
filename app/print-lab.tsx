@@ -1,3 +1,4 @@
+import { Redirect } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFrameCallback, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -24,7 +25,13 @@ const SAMPLES: { name: string; recipe: PrintRecipe }[] = [
   { name: 'Cover fallback', recipe: recipeFor(6, null, { hue: 200, neutral: false }) },
 ];
 
+/** Dev only: release builds, the public website included, send this page home. */
 export default function PrintLab() {
+  if (!__DEV__) return <Redirect href="/" />;
+  return <PrintLabPage />;
+}
+
+function PrintLabPage() {
   const insets = useSafeAreaInsets();
   const clock = useSharedValue(0);
   const gather = useSharedValue(0);

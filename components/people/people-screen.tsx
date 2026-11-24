@@ -11,6 +11,7 @@ import { usePeople } from '@/hooks/use-people';
 import type { Person } from '@/lib/people';
 import { leavePeople, loadDetails, type JoinDetails } from '@/lib/people-api';
 import { EXAMPLE_ID, examplePerson } from '@/lib/people-example';
+import { PUBLIC_WEB } from '@/lib/public-web';
 import { InTuneMoment } from './in-tune-moment';
 import { InTuneRow } from './in-tune-row';
 import { JoinFlow, YouForm } from './join-flow';
@@ -89,7 +90,44 @@ function EditPeople({ onClose, onChanged }: { onClose: () => void; onChanged: ()
   );
 }
 
+/** On the public website People only shows its made-up example: strangers with the link can't join, wave or swap handles. */
+function PeopleShowcase() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [example, setExample] = useState<Person | null>(null);
+
+  return (
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={styles.center}>
+        <ThemedText type="title" style={styles.centerText}>People</ThemedText>
+        <ThemedText style={styles.dim}>
+          Swipe blind songs other people loved. When enough of your hearts line up with someone&apos;s, you&apos;re in tune, and if you both wave, you swap one handle.
+        </ThemedText>
+        <ThemedText style={styles.dim}>Joining is in the phone app. Here you can see how a match looks.</ThemedText>
+        <PressableScale onPress={() => setExample(examplePerson())} style={styles.primary}>
+          <ThemedText style={styles.primaryText}>See an example</ThemedText>
+        </PressableScale>
+      </View>
+      {example && (
+        <InTuneMoment
+          person={example}
+          example
+          onClose={() => setExample(null)}
+          onWaved={() => {
+            setExample(null);
+            router.push({ pathname: '/person', params: { id: EXAMPLE_ID } });
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
 export function PeopleScreen() {
+  return PUBLIC_WEB ? <PeopleShowcase /> : <PeopleLive />;
+}
+
+function PeopleLive() {
   const router = useRouter();
   const p = usePeople();
   const load = p.load;

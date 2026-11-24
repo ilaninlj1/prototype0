@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
@@ -32,7 +32,13 @@ const LAB_BOTTLES = ['#e99854', '#4fa8d8', '#d86f6f', '#7fc98f', '#e8c95a'].flat
 const OceanCanvas = lazySkia(() => import('@/components/ocean/ocean-canvas'));
 
 // A place frozen in time, to judge the art: /ocean-lab?water=midnight&depth=gems&hour=2&person=example&t=30
+/** Dev only: release builds, the public website included, send this page home. */
 export default function OceanLab() {
+  if (!__DEV__) return <Redirect href="/" />;
+  return <OceanLabPage />;
+}
+
+function OceanLabPage() {
   const q = useLocalSearchParams<{ water?: string; depth?: string; hour?: string; person?: string; t?: string; dive?: string; surface?: string; note?: string }>();
   const { width, height } = useWindowDimensions();
   const water = (WATERS.includes(q.water as Water) ? q.water : 'reef') as Water;
