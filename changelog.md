@@ -6,6 +6,9 @@ staleness.
 
 Add new entries at the top, newest first.
 
+## [2026-11-20] Security pass: reports need a real account, and phone ids can't be guessed
+After a class talk on threat mapping, the whole app was mapped for where someone could attack it (`docs/threat-map.md`, on top of `threat-model.md`). Two holes were fixed. Anyone who pulled the public key out of the app could send "Sounds like AI?" or comment reports as three made-up phones and hide a real artist or comment for everyone; now a report is sent signed in, and the server only takes it when its id is the sender's own account (`supabase/crowd-reports.sql`, live since 2026-11-20, proven by `supabase/crowd-sim.mjs`). And each phone's id, which can bring back a People profile, now comes from a secure random generator instead of `Math.random`. Still open, and listed in the threat map: comments have no rate limit, and updates go out through a shared class account.
+
 ## [2026-11-03] A sky over Home, and animals on the water
 Home's white is gone. The clock sets the sky, from sunrise to stars, and the song sets the weather: energy brings wind, and low mood brings cloud, rain or a storm. The water mirrors the sky at the horizon and goes to its own color close to you. A little island floats at the top with a windsock that fills with the song's energy and a sign that flips between its tempo and key. Words and buttons turn light at night.
 

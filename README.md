@@ -27,6 +27,17 @@ I built Blindspot with AI tools: Claude Code, Codex, and Gemini. I decide what t
 
 You can follow the whole process in the [changelog](changelog.md), the [feature log](features.md), the [bug log](bugs.md), and the [design specs](docs/superpowers/specs).
 
+## Security
+
+I mapped where someone could attack Blindspot, using the [threat-mapping method](https://gist.github.com/zenbrent/9d167e49631688d1e03c97cf9069d8ff) Brent Brimhall shared in a class talk, on top of an earlier threat model. Both are in the repo: the [threat map](docs/threat-map.md) and the [threat model](threat-model.md).
+
+What I fixed from it:
+
+- **Fake reports.** Anyone could pull the public key out of the app and pretend to be three different phones, which hid a real artist or a comment for everyone. Now each report has to come from its own account, and a database test shows the old trick is refused.
+- **Guessable phone ids.** Each phone's id is now made by a secure random generator, because that id can bring back a People profile.
+
+What's still open is listed in the threat map, like comments with no rate limit and updates published through a shared class account.
+
 ## Built with
 
 - React Native, Expo, and TypeScript
