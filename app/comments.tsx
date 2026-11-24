@@ -74,7 +74,7 @@ export default function CommentsScreen() {
 
   async function report(c: Comment) {
     setReported(new Set(reported).add(c.id));
-    if (c.id > 0) await reportComment(c.id, deviceId);
+    if (c.id > 0) await reportComment(c.id);
   }
 
   const visible = (comments ?? []).filter((c) => !reported.has(c.id));

@@ -349,12 +349,25 @@ async function writeJson(key: string, value: unknown): Promise<void> {
 export async function loadDeviceId(): Promise<string> {
   const existing = await readJson<string | null>(DEVICE_ID_KEY, null);
   if (existing) return existing;
-  const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-  });
+  const id = await newDeviceId();
   await writeJson(DEVICE_ID_KEY, id);
   return id;
+}
+
+/** The device id can reclaim a People profile (`claim_twin_profile`), so it has to come
+ *  from a secure random source, not Math.random (threat-model.md TM-005). */
+async function newDeviceId(): Promise<string> {
+  try {
+    // Loaded here, like spotify-api.ts does: a build without the native module still starts.
+    const Crypto = await import('expo-crypto');
+    return Crypto.randomUUID();
+  } catch {
+    // Votes and comments need some id to work at all, so an old build keeps the weak one.
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    });
+  }
 }
 
 export const loadCachedDrop = () => readJson<Drop | null>(CACHED_DROP_KEY, null);

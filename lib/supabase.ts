@@ -1,6 +1,7 @@
 // Supabase over plain REST (PostgREST) — no client library. The anon key is
 // safe to ship: row-level security (supabase/setup.sql) only allows reading
 // current drops and the vote counts view, and inserting votes.
+import { ensureSession } from './auth';
 import type { Comment, Vibe } from './comments';
 import type { Drop, DropVote, GuessResult, SongResult } from './daily-drop';
 
@@ -106,8 +107,27 @@ export const fetchComments = (trackId: number) =>
 export const postComment = (trackId: number, deviceId: string, name: string, body: string) =>
   post('comments', { track_id: trackId, device_id: deviceId, name, body });
 
-export const reportComment = (commentId: number, deviceId: string) =>
-  post('comment_reports', { comment_id: commentId, device_id: deviceId });
+/** A crowd report, sent as this phone's own account. The server only takes a report
+ *  whose device_id is the caller's account id (supabase/crowd-reports.sql), so one
+ *  person can't pose as three phones. Reporting is a deliberate tap, so a phone that
+ *  never joined People gets its invisible account here. */
+async function reportAsAccount(table: string, body: object): Promise<boolean> {
+  if (!URL_ROOT || !KEY) return false;
+  const session = await ensureSession();
+  if (!session) return false;
+  try {
+    const res = await fetch(`${URL_ROOT}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { apikey: KEY, Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ ...body, device_id: session.userId }),
+    });
+    return res.ok || res.status === 409; // 409: this account already reported it
+  } catch {
+    return false;
+  }
+}
+
+export const reportComment = (commentId: number) => reportAsAccount('comment_reports', { comment_id: commentId });
 
 export const fetchVibes = (trackId: number) => get<Vibe[]>(`vibe_counts?track_id=eq.${trackId}&select=word,count`);
 
@@ -118,8 +138,8 @@ export const addVibe = (trackId: number, deviceId: string, word: string) =>
 export const fetchRecentCommentRows = () =>
   get<{ track_id: number; created_at: string }[]>(`comments?select=track_id,created_at&order=created_at.desc&limit=200`);
 
-/** "Sounds like AI?" — one report per phone per artist. */
-export const reportAiArtist = (artistKey: string, deviceId: string) => post('ai_reports', { artist_key: artistKey, device_id: deviceId });
+/** "Sounds like AI?" — one report per account per artist. */
+export const reportAiArtist = (artistKey: string) => reportAsAccount('ai_reports', { artist_key: artistKey });
 
 /** Artists reported as AI by 3+ different phones. */
 export const fetchReportedAiArtists = () => get<{ artist_key: string }[]>('ai_reported?select=artist_key');

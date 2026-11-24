@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 
 import scanned from '@/assets/ai-artists.json';
-import { loadDeviceId } from './discovery-storage';
 import { isAiWeighted, isBlocked, normalizeArtist, type Proof } from './human-check';
 import { fetchReportedAiArtists, reportAiArtist } from './supabase';
 
@@ -89,7 +88,7 @@ export async function shouldSkip(name: string): Promise<boolean> {
 }
 
 export async function reportAi(name: string): Promise<boolean> {
-  return reportAiArtist(normalizeArtist(name), await loadDeviceId());
+  return reportAiArtist(normalizeArtist(name));
 }
 
 // ---------- proof of a real person ----------
