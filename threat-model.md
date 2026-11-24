@@ -2,6 +2,8 @@
 
 Made with the `security-threat-model` skill (openai/skills, installed in `.claude/skills/security-threat-model`) on 2026-11-18, against `main` at db788e2. Assessment only: no app code was changed. It identifies risks to look into; it does not certify that the app is secure.
 
+**Update 2026-11-20:** [`docs/threat-map.md`](docs/threat-map.md) maps the same app with Brent Brimhall's method and adds the path to production. TM-002 (crowd reports) and TM-005 (device ids) are fixed; `supabase/crowd-reports.sql` has been live since 2026-11-20 (a report sent with only the public key now gets 42501). TM-008 looks already handled: `app.json` has blocked `RECORD_AUDIO` since 2026-09-01.
+
 ## Executive summary
 
 Blindspot is an Expo app with a small Supabase backend. Its accounts are anonymous: there are no emails, passwords or real names beyond a first name someone types into People. **No urgent issue was found that puts classmates', the professor's or showcase visitors' information at risk.** The app never asks for an email (no `email` field exists anywhere in `app/`, `components/`, `hooks/` or `lib/`). Every table that holds personal data refuses the app's public key: profiles, handles, hearts, waves, bottles and People swipes all returned `401 / 42501` in a live check on 2026-11-18. No secret keys are in the repo or its git history. The top risk themes are about safety and trust, not data leaks:
